@@ -33,7 +33,7 @@ export default function TeamModal({ open, onClose }: TeamModalProps) {
         style={{
           width: 640,
           maxWidth: '92vw',
-          background: '#252530',
+          background: '#252526',
           border: '1px solid #2a2a35',
           boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
         }}
@@ -42,7 +42,7 @@ export default function TeamModal({ open, onClose }: TeamModalProps) {
           <h2 className="text-xl font-bold text-white">团队版</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[#6a6a7a] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-[#e0e0e0] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
           >
             <X className="w-4 h-4" />
           </button>
@@ -74,7 +74,7 @@ export default function TeamModal({ open, onClose }: TeamModalProps) {
               onClick={handlePurchase}
               disabled={purchasing}
               className="w-full py-2 rounded-lg text-[13px] font-semibold mb-4 transition-all hover:-translate-y-px"
-              style={{ background: '#fff', color: '#0a0a0f' }}
+              style={{ background: '#f0f0f0', color: '#0a0a0f' }}
             >
               {purchasing ? '处理中...' : '开通团队版'}
             </button>
@@ -126,7 +126,7 @@ export default function TeamModal({ open, onClose }: TeamModalProps) {
             <div className="text-[11px] text-[#6a6a7a] mb-5">联系销售获取报价</div>
             <button
               className="w-full py-2 rounded-lg text-[13px] font-semibold transition-all hover:-translate-y-px"
-              style={{ background: '#fff', color: '#0a0a0f' }}
+              style={{ background: '#f0f0f0', color: '#0a0a0f' }}
             >
               联系销售
             </button>

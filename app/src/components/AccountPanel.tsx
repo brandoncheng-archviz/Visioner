@@ -92,7 +92,7 @@ export default function AccountPanel({ open, onClose, onUpgrade, onRecharge }: A
           maxWidth: '92vw',
           height: 640,
           maxHeight: '90vh',
-          background: '#252530',
+          background: '#252526',
           border: '1px solid #2a2a35',
           boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
         }}
@@ -100,7 +100,7 @@ export default function AccountPanel({ open, onClose, onUpgrade, onRecharge }: A
         {/* Left Sidebar */}
         <div
           className="w-[200px] flex-shrink-0 flex flex-col gap-1 p-3"
-          style={{ background: 'rgba(255,255,255,0.02)', borderRight: '1px solid #2a2a35' }}
+          style={{ background: '#1e1e1e', borderRight: '1px solid #2a2a35' }}
         >
           <div className="text-[11px] font-semibold text-[#6a6a7a] uppercase tracking-wider px-2 pb-3">
             账户管理
@@ -132,7 +132,7 @@ export default function AccountPanel({ open, onClose, onUpgrade, onRecharge }: A
             {/* Close */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 w-7 h-7 rounded-md flex items-center justify-center text-[#6a6a7a] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
+              className="absolute top-4 right-4 w-7 h-7 rounded-md flex items-center justify-center text-[#e0e0e0] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
             >
               <X className="w-4 h-4" />
             </button>
@@ -191,7 +191,7 @@ function SubscriptionTab({
           <button
             onClick={onUpgrade}
             className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all hover:-translate-y-px"
-            style={{ background: '#fff', color: '#0a0a0f' }}
+            style={{ background: '#f0f0f0', color: '#0a0a0f' }}
           >
             升级
           </button>
@@ -324,7 +324,7 @@ function ProfileTab({
         <span className="text-[#a0a0b0]">用户名</span>
         <span className="text-white font-medium flex items-center gap-2">
           {profile?.username || 'User'}
-          <Pencil className="w-3.5 h-3.5 text-[#6a6a7a] cursor-pointer hover:text-white transition-colors" />
+          <Pencil className="w-3.5 h-3.5 text-[#e0e0e0] cursor-pointer hover:text-white transition-colors" />
         </span>
       </div>
       <div className="flex items-center justify-between py-3.5 border-b border-[#2a2a35] text-[13px]">

@@ -39,7 +39,7 @@ export default function RechargeModal({ open, onClose, balance = 3974 }: Recharg
         style={{
           width: 420,
           maxWidth: '90vw',
-          background: '#252530',
+          background: '#252526',
           border: '1px solid #2a2a35',
           boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
         }}
@@ -49,7 +49,7 @@ export default function RechargeModal({ open, onClose, balance = 3974 }: Recharg
           <h3 className="text-base font-bold text-white">购买一次性积分以继续</h3>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[#6a6a7a] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-[#e0e0e0] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
           >
             <X className="w-4 h-4" />
           </button>
@@ -135,7 +135,7 @@ export default function RechargeModal({ open, onClose, balance = 3974 }: Recharg
             onClick={handlePurchase}
             disabled={purchasing || (isCustom && (!customPoints || parseInt(customPoints) <= 0))}
             className="px-5 py-2 rounded-lg text-[13px] font-semibold transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: '#fff', color: '#0a0a0f' }}
+            style={{ background: '#f0f0f0', color: '#0a0a0f' }}
           >
             {purchasing ? '处理中...' : '购买'}
           </button>

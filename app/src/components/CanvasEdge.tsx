@@ -25,7 +25,7 @@ export default function CanvasEdge({
     setContextMenu(null);
   }, [id, setEdges]);
 
-  const strokeWidth = selected ? 2.5 : 2;
+  const strokeWidth = selected ? 2 : 1.5;
   const opacity = selected ? 1 : hovered ? 0.7 : 0.5;
 
   return (

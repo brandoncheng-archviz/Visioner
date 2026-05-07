@@ -79,7 +79,7 @@ function NodeShell({ label, selected, children }: { label: string; selected: boo
         className="rounded-xl overflow-hidden min-w-[200px] max-w-[260px] transition-all"
         style={{
           background: '#1a1a24',
-          border: `2px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
+          border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
           boxShadow: selected ? '0 0 12px rgba(0,212,255,0.3)' : 'none',
         }}
       >
@@ -198,7 +198,7 @@ function PromptPanel() {
               {model}
             </button>
             {showModelMenu && (
-              <div className="absolute bottom-full left-0 mb-1 py-1 rounded-xl z-30 overflow-hidden" style={{ background: '#252530', border: '1px solid rgba(255,255,255,0.08)', width: 280, maxHeight: 320, overflowY: 'auto' }}>
+              <div className="absolute bottom-full left-0 mb-1 py-1 rounded-xl z-30 overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 280, maxHeight: 320, overflowY: 'auto' }}>
                 {modelOptions.map((m) => (
                   <button
                     key={m.name}
@@ -245,7 +245,7 @@ function PromptPanel() {
               <Maximize className="w-3 h-3" /> {aspectRatio} · {resolution}
             </button>
             {showRatioMenu && (
-              <div className="absolute bottom-full left-0 mb-1 py-3 rounded-xl z-30" style={{ background: '#252530', border: '1px solid rgba(255,255,255,0.08)', width: 240 }}>
+              <div className="absolute bottom-full left-0 mb-1 py-3 rounded-xl z-30" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 240 }}>
                 {/* Resolution */}
                 <div className="px-3 pb-2">
                   <div className="text-[10px] text-[#6a6a7a] mb-2">分辨率</div>
@@ -303,7 +303,7 @@ function PromptPanel() {
               {count}
             </button>
             {showCountMenu && (
-              <div className="absolute bottom-full right-0 mb-1 py-1 rounded-lg z-30" style={{ background: '#252530', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="absolute bottom-full right-0 mb-1 py-1 rounded-lg z-30" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
                 {counts.map((c) => (
                   <button key={c} onClick={() => { setCount(c); setShowCountMenu(false); }} className="w-full px-3 py-2 text-left text-[12px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors">
                     {c}
@@ -433,7 +433,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
             width: cardWidth,
             height: cardHeight,
             background: '#1a1a1a',
-            border: `2px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
+            border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
             boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
           }}
         >
@@ -614,7 +614,7 @@ function TempConnectionLine({ tempLine }: { tempLine: { sourceNodeId: string; cu
       <path
         d={`M ${sx} ${sy} C ${sx + offset} ${sy}, ${tempLine.currentX - offset} ${tempLine.currentY}, ${tempLine.currentX} ${tempLine.currentY}`}
         stroke="rgba(255,255,255,0.6)"
-        strokeWidth="2"
+        strokeWidth="1.5"
         fill="none"
       />
     </svg>
@@ -751,7 +751,7 @@ function FlowCanvas() {
       }
 
       // All checks passed — create edge
-      setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: nodeId, target: targetId, sourceHandle: 'right-source', targetHandle: 'left-target', style: { stroke: '#555', strokeWidth: 1.5 } }]);
+      setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: nodeId, target: targetId, sourceHandle: 'right-source', targetHandle: 'left-target', style: { stroke: '#555', strokeWidth: 1 } }]);
       setTempLine(null);
     };
 
@@ -772,7 +772,7 @@ function FlowCanvas() {
       return {
         ...edge,
         selected: isConnected,
-        style: isConnected ? { stroke: '#00d4ff', strokeWidth: 1.5 } : { stroke: '#555', strokeWidth: 1.5 },
+        style: isConnected ? { stroke: '#00d4ff', strokeWidth: 1 } : { stroke: '#555', strokeWidth: 1 },
       };
     }));
   }, [nodes]);
@@ -838,6 +838,7 @@ function FlowCanvas() {
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
+    setContextMenu(null);
     setNodeContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
   }, []);
 
@@ -964,11 +965,11 @@ function FlowCanvas() {
         /* Edge colors — gray by default, cyan when selected */
         .react-flow__edge-path {
           stroke: #555;
-          stroke-width: 1.5;
+          stroke-width: 1;
         }
         .react-flow__edge.selected .react-flow__edge-path {
           stroke: #00d4ff !important;
-          stroke-width: 2.5px !important;
+          stroke-width: 2px !important;
           filter: drop-shadow(0 0 6px rgba(0,212,255,0.6));
         }
         /* Hide default edge markers if any */
@@ -985,11 +986,10 @@ function FlowCanvas() {
           if (isDrawingRef.current) { e.preventDefault(); return; }
           const target = e.target as HTMLElement;
           if (target.closest('.react-flow__node')) return;
-          if (target.closest('.react-flow__pane') || target.closest('.react-flow__renderer')) {
-            e.preventDefault();
-            const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-            setContextMenu({ x: e.clientX, y: e.clientY, flowPos: pos });
-          }
+          e.preventDefault();
+          setNodeContextMenu(null);
+          const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+          setContextMenu({ x: e.clientX, y: e.clientY, flowPos: pos });
         }}
       >
         {/* Temporary connection line (drawn while dragging from output port) */}
@@ -1003,7 +1003,7 @@ function FlowCanvas() {
               left: rejectTooltip.x,
               top: rejectTooltip.y,
               transform: 'translate(-50%, -140%)',
-              background: '#252530',
+              background: '#252526',
               color: '#fff',
               border: '1px solid rgba(255,255,255,0.1)',
             }}
@@ -1059,7 +1059,7 @@ function FlowCanvas() {
                   top: 'auto',
                   width: 180,
                   height: 120,
-                  background: '#252530',
+                  background: '#252526',
                   border: '1px solid #2a2a35',
                   borderRadius: 12,
                   margin: 0,
@@ -1080,7 +1080,7 @@ function FlowCanvas() {
           className="flex flex-col items-center py-3 gap-2 rounded-2xl"
           style={{
             width: 52,
-            background: '#252530',
+            background: '#252526',
             border: '1px solid rgba(255, 255, 255, 0.06)',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
           }}
@@ -1088,7 +1088,7 @@ function FlowCanvas() {
           <button
             onClick={() => setActivePanel(activePanel === 'add' ? null : 'add')}
             className="w-9 h-9 rounded-full flex items-center justify-center mb-1 transition-all relative"
-            style={{ background: '#ffffff' }}
+            style={{ background: '#f0f0f0' }}
           >
             <Plus className="w-4 h-4 text-[#0a0a0f]" strokeWidth={2.5} />
             <span
@@ -1134,7 +1134,7 @@ function FlowCanvas() {
             top: 56,
             bottom: 0,
             width: 280,
-            background: '#252530',
+            background: '#252526',
             borderRight: '1px solid #2a2a35',
           }}
         >
@@ -1144,7 +1144,7 @@ function FlowCanvas() {
             </span>
             <button
               onClick={() => setActivePanel(null)}
-              className="w-6 h-6 rounded flex items-center justify-center text-[#6a6a7a] hover:text-white hover:bg-[#1e1e28] transition-colors"
+              className="w-6 h-6 rounded flex items-center justify-center text-[#e0e0e0] hover:text-white hover:bg-[#1e1e28] transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1227,10 +1227,15 @@ function FlowCanvas() {
             style={{
               left: contextMenu.x,
               top: contextMenu.y,
-              background: '#252530',
+              background: '#252526',
               border: '1px solid #2a2a35',
               boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
               minWidth: 280,
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+              setContextMenu({ x: e.clientX, y: e.clientY, flowPos: pos });
             }}
           >
             <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">添加节点</div>
@@ -1247,7 +1252,7 @@ function FlowCanvas() {
               </button>
             ))}
           </div>
-          <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} />
+          <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
         </>
       )}
 
@@ -1259,7 +1264,7 @@ function FlowCanvas() {
             style={{
               left: createMenu.x,
               top: createMenu.y,
-              background: '#252530',
+              background: '#252526',
               border: '1px solid #2a2a35',
               boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
               minWidth: 200,
@@ -1284,7 +1289,7 @@ function FlowCanvas() {
               <Image className="w-4 h-4" style={{ color: '#22d3ee' }} /> 图片节点
             </button>
           </div>
-          <div className="fixed inset-0 z-40" onClick={() => { setContextMenu(null); setNodeContextMenu(null); setCreateMenu(null); }} />
+          <div className="fixed inset-0 z-40" onClick={() => { setContextMenu(null); setNodeContextMenu(null); setCreateMenu(null); }} onContextMenu={(e) => { e.preventDefault(); setCreateMenu(null); }} />
         </>
       )}
 
@@ -1293,10 +1298,14 @@ function FlowCanvas() {
         <>
           <div
             className="fixed z-50 py-1.5 rounded-xl"
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setNodeContextMenu({ x: e.clientX, y: e.clientY, nodeId: nodeContextMenu.nodeId });
+            }}
             style={{
               left: nodeContextMenu.x,
               top: nodeContextMenu.y,
-              background: '#252530',
+              background: '#252526',
               border: '1px solid #2a2a35',
               boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
               minWidth: 200,
@@ -1354,7 +1363,7 @@ function FlowCanvas() {
               <Bug className="w-3.5 h-3.5" /> 问题反馈
             </button>
           </div>
-          <div className="fixed inset-0 z-40" onClick={() => { setContextMenu(null); setNodeContextMenu(null); }} />
+          <div className="fixed inset-0 z-40" onClick={() => { setContextMenu(null); setNodeContextMenu(null); }} onContextMenu={(e) => { e.preventDefault(); setNodeContextMenu(null); }} />
         </>
       )}
 
@@ -1372,14 +1381,14 @@ function FlowCanvas() {
         style={{
           left: 16,
           bottom: 16,
-          background: '#252530',
+          background: '#252526',
           border: '1px solid rgba(255,255,255,0.08)',
         }}
       >
         {/* 小地图开关 */}
         <button
           onClick={() => setShowMinimap((v) => !v)}
-          className={`p-1.5 rounded-lg transition-colors ${showMinimap ? 'text-white bg-white/10' : 'text-[#6a6a7a] hover:bg-white/5 hover:text-white'}`}
+          className={`p-1.5 rounded-lg transition-colors ${showMinimap ? 'text-white bg-white/10' : 'text-[#e0e0e0] hover:bg-white/5 hover:text-white'}`}
           title="小地图"
         >
           <MapIcon className="w-4 h-4" />
@@ -1388,7 +1397,7 @@ function FlowCanvas() {
         {/* 网格吸附 */}
         <button
           onClick={() => setSnapGrid((v) => !v)}
-          className={`p-1.5 rounded-lg transition-colors ${snapGrid ? 'text-white bg-white/10' : 'text-[#6a6a7a] hover:bg-white/5 hover:text-white'}`}
+          className={`p-1.5 rounded-lg transition-colors ${snapGrid ? 'text-white bg-white/10' : 'text-[#e0e0e0] hover:bg-white/5 hover:text-white'}`}
           title="网格吸附"
         >
           <Grid3x3 className="w-4 h-4" />
@@ -1397,7 +1406,7 @@ function FlowCanvas() {
         {/* 重置视图 */}
         <button
           onClick={handleReset}
-          className="p-1.5 rounded-lg text-[#6a6a7a] hover:bg-white/5 hover:text-white transition-colors"
+          className="p-1.5 rounded-lg text-[#e0e0e0] hover:bg-white/5 hover:text-white transition-colors"
           title="重置视图"
         >
           <RotateCcw className="w-4 h-4" />
@@ -1407,7 +1416,7 @@ function FlowCanvas() {
 
         {/* 缩放滑块 */}
         <div className="flex items-center gap-1.5 px-1" title="放大/缩小画布（Ctrl+滚轮）">
-          <Minus className="w-3 h-3 text-[#6a6a7a]" />
+          <Minus className="w-3 h-3 text-[#e0e0e0]" />
           <input
             type="range"
             min={0.4}
@@ -1418,7 +1427,7 @@ function FlowCanvas() {
             className="w-20 h-1 cursor-pointer"
             style={{ accentColor: '#22d3ee' }}
           />
-          <Plus className="w-3 h-3 text-[#6a6a7a]" />
+          <Plus className="w-3 h-3 text-[#e0e0e0]" />
         </div>
 
         <div className="w-px h-4 bg-white/10 mx-1" />
@@ -1426,7 +1435,7 @@ function FlowCanvas() {
         {/* 帮助按钮 */}
         <button
           onClick={() => setShowHelp(true)}
-          className="p-1.5 rounded-lg text-[#6a6a7a] hover:bg-white/5 hover:text-white transition-colors"
+          className="p-1.5 rounded-lg text-[#e0e0e0] hover:bg-white/5 hover:text-white transition-colors"
           title="快捷键帮助"
         >
           <HelpCircle className="w-4 h-4" />
@@ -1438,12 +1447,12 @@ function FlowCanvas() {
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowHelp(false)}>
           <div
             className="w-72 rounded-xl p-5"
-            style={{ background: '#252530', border: '1px solid #2a2a35', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }}
+            style={{ background: '#252526', border: '1px solid #2a2a35', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-white">快捷键</h3>
-              <button onClick={() => setShowHelp(false)} className="text-[#6a6a7a] hover:text-white transition-colors">
+              <button onClick={() => setShowHelp(false)} className="text-[#e0e0e0] hover:text-white transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>

@@ -85,7 +85,7 @@ export default function UpgradePanel({ open, onClose, onRecharge, onTeam }: Upgr
           maxWidth: '94vw',
           height: '86vh',
           maxHeight: 900,
-          background: '#252530',
+          background: '#252526',
           border: '1px solid #2a2a35',
           boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
         }}
@@ -95,7 +95,7 @@ export default function UpgradePanel({ open, onClose, onRecharge, onTeam }: Upgr
           <div />
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[#6a6a7a] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-[#e0e0e0] transition-all hover:text-white hover:bg-white/5 hover:border-[#2a2a35] border border-transparent"
           >
             <X className="w-4 h-4" />
           </button>
@@ -242,7 +242,7 @@ export default function UpgradePanel({ open, onClose, onRecharge, onTeam }: Upgr
                     style={
                       plan.buttonDisabled
                         ? { background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid #2a2a35' }
-                        : { background: '#fff', color: '#0a0a0f' }
+                        : { background: '#f0f0f0', color: '#0a0a0f' }
                     }
                   >
                     {purchasing === plan.id ? '处理中...' : plan.buttonText}

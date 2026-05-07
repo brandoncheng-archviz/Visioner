@@ -42,7 +42,7 @@ export default function Gallery() {
 
         {/* Search */}
         <div className="relative flex-shrink-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6a6a7a]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#e0e0e0]" />
           <input
             type="text"
             value={searchQuery}

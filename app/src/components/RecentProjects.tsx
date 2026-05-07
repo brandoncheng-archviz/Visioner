@@ -102,25 +102,25 @@ export default function RecentProjects() {
                       <div
                         className="absolute right-0 top-9 w-36 py-1.5 rounded-lg z-10"
                         style={{
-                          background: '#252530',
+                          background: '#252526',
                           border: '1px solid #2a2a35',
                           boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                         }}
                       >
                         <button className="w-full px-3 py-1.5 text-left text-xs text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
-                          <FolderOpen className="w-3.5 h-3.5" />
+                          <FolderOpen className="w-3.5 h-3.5 text-[#e0e0e0]" />
                           打开
                         </button>
                         <button className="w-full px-3 py-1.5 text-left text-xs text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
-                          <Copy className="w-3.5 h-3.5" />
+                          <Copy className="w-3.5 h-3.5 text-[#e0e0e0]" />
                           重命名
                         </button>
                         <button className="w-full px-3 py-1.5 text-left text-xs text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
-                          <Copy className="w-3.5 h-3.5" />
+                          <Copy className="w-3.5 h-3.5 text-[#e0e0e0]" />
                           创建副本
                         </button>
                         <button className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-[#1e1e28] hover:text-red-300 transition-colors flex items-center gap-2">
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5 text-[#e0e0e0]" />
                           删除项目
                         </button>
                       </div>

@@ -102,7 +102,7 @@ export default function Navbar({ variant = 'home', projectName = '未命名' }: 
               建筑可视化大赛
             </button>
 
-            <button className="w-8 h-8 rounded-full flex items-center justify-center text-[#a0a0b0] hover:text-white hover:bg-[#1e1e28] transition-all">
+            <button className="w-8 h-8 rounded-full flex items-center justify-center text-[#e0e0e0] hover:text-white hover:bg-[#1e1e28] transition-all">
               <Trophy className="w-4 h-4" />
             </button>
 
@@ -117,21 +117,21 @@ export default function Navbar({ variant = 'home', projectName = '未命名' }: 
                 <div
                   className="absolute right-0 top-10 w-44 py-2 rounded-xl animate-in fade-in slide-in-from-top-1 duration-150"
                   style={{
-                    background: '#252530',
+                    background: '#252526',
                     border: '1px solid #2a2a35',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                   }}
                 >
                   <button className="w-full px-3 py-2 text-left text-sm text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4 text-[#e0e0e0]" />
                     使用教程
                   </button>
                   <button className="w-full px-3 py-2 text-left text-sm text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
-                    <Settings className="w-4 h-4" />
+                    <Settings className="w-4 h-4 text-[#e0e0e0]" />
                     备案信息
                   </button>
                   <button className="w-full px-3 py-2 text-left text-sm text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4" />
+                    <HelpCircle className="w-4 h-4 text-[#e0e0e0]" />
                     联系客服
                   </button>
                 </div>
@@ -141,23 +141,23 @@ export default function Navbar({ variant = 'home', projectName = '未命名' }: 
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="relative w-8 h-8 rounded-full flex items-center justify-center text-[#a0a0b0] hover:text-white hover:bg-[#1e1e28] transition-all"
+                className="relative w-8 h-8 rounded-full flex items-center justify-center text-[#e0e0e0] hover:text-white hover:bg-[#1e1e28] transition-all"
               >
-                <Bell className="w-4 h-4" />
+                <Bell className="w-4 h-4 text-[#e0e0e0]" />
                 <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
               </button>
               {notifOpen && (
                 <div
                   className="absolute right-0 top-10 w-80 py-2 rounded-xl animate-in fade-in slide-in-from-top-1 duration-150"
                   style={{
-                    background: '#252530',
+                    background: '#252526',
                     border: '1px solid #2a2a35',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
                   }}
                 >
                   <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a35]">
                     <span className="text-sm font-medium text-white">通知</span>
-                    <button onClick={() => setNotifOpen(false)} className="text-[#6a6a7a] hover:text-white">
+                    <button onClick={() => setNotifOpen(false)} className="text-[#e0e0e0] hover:text-white">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -216,7 +216,7 @@ export default function Navbar({ variant = 'home', projectName = '未命名' }: 
             <div
               className="absolute right-0 top-11 w-56 py-2 rounded-xl animate-in fade-in slide-in-from-top-1 duration-150"
               style={{
-                background: '#252530',
+                background: '#252526',
                 border: '1px solid rgba(255,255,255,0.08)',
                 boxShadow: '0 24px 48px rgba(0,0,0,0.5)',
               }}
@@ -232,47 +232,47 @@ export default function Navbar({ variant = 'home', projectName = '未命名' }: 
                 onClick={() => { setUserMenuOpen(false); setUpgradeOpen(true); }}
                 className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]"
               >
-                <Star className="w-4 h-4 opacity-70" />
+                <Star className="w-4 h-4 text-[#e0e0e0]" />
                 升级
               </button>
               <button className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]">
-                <Users className="w-4 h-4 opacity-70" />
+                <Users className="w-4 h-4 text-[#e0e0e0]" />
                 创建团队
               </button>
               <button
                 onClick={() => { setUserMenuOpen(false); setAccountOpen(true); }}
                 className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]"
               >
-                <User className="w-4 h-4 opacity-70" />
+                <User className="w-4 h-4 text-[#e0e0e0]" />
                 账户管理
               </button>
 
               <div className="border-t border-[#2a2a35] my-1.5 mx-3" />
 
               <button className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]">
-                <HelpCircle className="w-4 h-4 opacity-70" />
+                <HelpCircle className="w-4 h-4 text-[#e0e0e0]" />
                 使用教程
               </button>
               <button className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]">
-                <Keyboard className="w-4 h-4 opacity-70" />
+                <Keyboard className="w-4 h-4 text-[#e0e0e0]" />
                 快捷键
               </button>
               <button className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]">
-                <Mail className="w-4 h-4 opacity-70" />
+                <Mail className="w-4 h-4 text-[#e0e0e0]" />
                 联系我们
               </button>
 
               <div className="border-t border-[#2a2a35] my-1.5 mx-3" />
 
               <button className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]">
-                <Globe className="w-4 h-4 opacity-70" />
+                <Globe className="w-4 h-4 text-[#e0e0e0]" />
                 简体中文
               </button>
 
               <div className="border-t border-[#2a2a35] my-1.5 mx-3" />
 
               <button className="w-full px-3 py-2 text-left text-[13px] text-[#a0a0b0] hover:bg-white/[0.06] hover:text-white transition-colors flex items-center gap-2.5 rounded-md mx-1 w-[calc(100%-8px)]">
-                <LogOut className="w-4 h-4 opacity-70" />
+                <LogOut className="w-4 h-4 text-[#e0e0e0]" />
                 退出登录
               </button>
             </div>
