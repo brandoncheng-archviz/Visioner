@@ -1,0 +1,368 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Visioner Dark Theme */
+
+/* ReactFlow cursor override */
+.react-flow__pane {
+  cursor: default !important;
+}
+.react-flow__pane.dragging {
+  cursor: grabbing !important;
+}
+
+/* ReactFlow Controls buttons dark theme */
+.react-flow__controls {
+  background: #252530 !important;
+  border: 1px solid #2a2a35 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.react-flow__controls-button {
+  background: #252530 !important;
+  color: #a0a0b0 !important;
+  border-bottom: 1px solid #2a2a35 !important;
+}
+.react-flow__controls-button:hover {
+  background: #1e1e28 !important;
+  color: #ffffff !important;
+}
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+.react-flow__controls-button svg {
+  fill: currentColor !important;
+}
+
+/* ReactFlow selected edge highlight */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3px !important;
+}
+.react-flow__edge .react-flow__edge-path {
+  transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+/* Connection line while dragging */
+.react-flow__connection .react-flow__connection-path {
+  stroke-width: 2px !important;
+  filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
+}
+
+/* ── Typed port connection line colors ── */
+.react-flow__connection[data-porttype="IMAGE"] .react-flow__connection-path {
+  stroke: #22d3ee !important;
+  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.5));
+}
+.react-flow__connection[data-porttype="PROMPT"] .react-flow__connection-path {
+  stroke: #a855f7 !important;
+  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.5));
+}
+.react-flow__connection[data-porttype="LATENT"] .react-flow__connection-path {
+  stroke: #f59e0b !important;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.5));
+}
+.react-flow__connection[data-porttype="MODEL"] .react-flow__connection-path {
+  stroke: #3b82f6 !important;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
+}
+.react-flow__connection[data-porttype="NUMBER"] .react-flow__connection-path {
+  stroke: #22c55e !important;
+  filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.5));
+}
+
+/* Invalid connection line (type mismatch or cycle) */
+.react-flow__connection.invalid .react-flow__connection-path {
+  stroke: #ef4444 !important;
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+}
+
+/* Custom range input thumb */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  border: 2px solid #0a0a0f;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  border: 2px solid #0a0a0f;
+}
+
+/* ============================================
+   ReactFlow Custom Handle Styles (Typed)
+   ============================================ */
+
+/* Hide default connection indicator */
+.react-flow__handle::after {
+  content: none !important;
+}
+
+/* Tiny interaction anchor centered on the node border. */
+.react-flow__handle {
+  width: 2px !important;
+  height: 2px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+}
+
+/* Center the anchor on the border */
+.react-flow__handle[data-handlepos="left"] {
+  transform: translate(-50%, -50%) !important;
+}
+.react-flow__handle[data-handlepos="right"] {
+  transform: translate(50%, -50%) !important;
+}
+
+/* Fade in on node hover or when node is selected */
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle {
+  opacity: 1;
+}
+
+/* Visual connector dot - sits fully outside the node */
+.react-flow__handle::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  top: 50%;
+  background-color: #1e1e28;
+  border: 2px solid #4a4a55;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+/* Left handle: dot fully to the left of the node border */
+.react-flow__handle[data-handlepos="left"]::before {
+  left: -17px;
+  transform: translateY(-50%);
+}
+
+/* Right handle: dot fully to the right of the node border */
+.react-flow__handle[data-handlepos="right"]::before {
+  left: 1px;
+  transform: translateY(-50%);
+}
+
+/* ── Typed port colors ── */
+/* IMAGE: cyan #22d3ee */
+.react-flow__handle[data-porttype="IMAGE"]::before {
+  border-color: #22d3ee;
+  box-shadow: 0 0 6px rgba(34, 211, 238, 0.2);
+}
+/* PROMPT: purple #a855f7 */
+.react-flow__handle[data-porttype="PROMPT"]::before {
+  border-color: #a855f7;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.2);
+}
+/* LATENT: orange #f59e0b */
+.react-flow__handle[data-porttype="LATENT"]::before {
+  border-color: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.2);
+}
+/* MODEL: blue #3b82f6 */
+.react-flow__handle[data-porttype="MODEL"]::before {
+  border-color: #3b82f6;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.2);
+}
+/* NUMBER: green #22c55e */
+.react-flow__handle[data-porttype="NUMBER"]::before {
+  border-color: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.2);
+}
+
+/* Hover handle: glow with port color */
+.react-flow__handle:hover::before {
+  background-color: #252530;
+  transform: translateY(-50%) scale(1.15);
+}
+.react-flow__handle[data-porttype="IMAGE"]:hover::before {
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
+}
+.react-flow__handle[data-porttype="PROMPT"]:hover::before {
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+.react-flow__handle[data-porttype="LATENT"]:hover::before {
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+.react-flow__handle[data-porttype="MODEL"]:hover::before {
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+}
+.react-flow__handle[data-porttype="NUMBER"]:hover::before {
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+}
+
+/* Selected node handles: bright port color fill */
+.react-flow__node.selected .react-flow__handle[data-porttype="IMAGE"]::before {
+  background-color: rgba(34, 211, 238, 0.15);
+}
+.react-flow__node.selected .react-flow__handle[data-porttype="PROMPT"]::before {
+  background-color: rgba(168, 85, 247, 0.15);
+}
+.react-flow__node.selected .react-flow__handle[data-porttype="LATENT"]::before {
+  background-color: rgba(245, 158, 11, 0.15);
+}
+.react-flow__node.selected .react-flow__handle[data-porttype="MODEL"]::before {
+  background-color: rgba(59, 130, 246, 0.15);
+}
+.react-flow__node.selected .react-flow__handle[data-porttype="NUMBER"]::before {
+  background-color: rgba(34, 197, 94, 0.15);
+}
+
+/* Connecting state - source handle being dragged */
+.react-flow__handle.connecting {
+  opacity: 1 !important;
+}
+.react-flow__handle.connecting::before {
+  background-color: #00d4ff;
+  border-color: #00d4ff;
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+}
+
+/* Connectingto state - potential target handles */
+.react-flow__handle.connectingto {
+  opacity: 1 !important;
+}
+.react-flow__handle.connectingto::before {
+  background-color: #252530;
+  border-color: #00d4ff;
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
+}
+
+/* Valid connection target - fully highlighted with port color */
+.react-flow__handle.connectingto.valid::before {
+  background-color: #00d4ff;
+  border-color: #00d4ff;
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.6);
+}
+
+/* Invalid target (type mismatch / cycle) */
+.react-flow__handle.connectingto.invalid::before {
+  background-color: #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+
+/* ── Node border highlight when a connection is approaching ── */
+.react-flow__node:has(.react-flow__handle.connectingto) {
+  border-color: #00d4ff !important;
+}
+.react-flow__node:has(.react-flow__handle.connectingto.invalid) {
+  border-color: #ef4444 !important;
+}
+
+/* ── Execution state indicators on nodes ── */
+.react-flow__node[data-execution="running"] {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.3) !important;
+}
+.react-flow__node[data-execution="success"] {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3) !important;
+}
+.react-flow__node[data-execution="error"] {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3) !important;
+}
+
+    --background: 240 14% 4%;
+    --foreground: 0 0% 100%;
+    --card: 240 12% 9%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 11% 13%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 195 100% 50%;
+    --primary-foreground: 240 14% 4%;
+    --secondary: 240 8% 14%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 8% 14%;
+    --muted-foreground: 240 5% 45%;
+    --accent: 240 8% 14%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 8% 18%;
+    --input: 240 8% 18%;
+    --ring: 195 100% 50%;
+    --radius: 0.5rem;
+
+    /* Custom colors */
+    --brand-cyan: 195 100% 50%;
+    --brand-gold: 37 91% 55%;
+    --bg-primary: 240 14% 4%;
+    --bg-secondary: 240 12% 9%;
+    --bg-tertiary: 240 11% 14%;
+    --bg-elevated: 240 11% 16%;
+    --text-primary: 0 0% 100%;
+    --text-secondary: 240 5% 70%;
+    --text-tertiary: 240 5% 45%;
+    --border-default: 240 8% 18%;
+    --border-hover: 240 8% 28%;
+  }
+
+  body {
+    @apply bg-[#0a0a0f] text-white antialiased;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a35;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3a4a;
+  }
+}
+
+@layer utilities {
+  .glow-cyan {
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.2);
+  }
+
+  .text-shadow {
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  .bg-grid-pattern {
+    background-image: radial-gradient(circle, #1e1e28 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .glass-effect {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .gradient-overlay {
+    background: linear-gradient(transparent 40%, rgba(0, 0, 0, 0.7) 100%);
+  }
+}
