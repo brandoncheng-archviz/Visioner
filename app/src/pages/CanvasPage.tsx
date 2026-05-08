@@ -121,11 +121,7 @@ function PromptPanel() {
   const modelOptions = [
     { name: 'Nano Banana 2', icon: 'G', iconBg: '#4285f4', tags: ['Precise', 'Quality', 'Fast'], time: '25s' },
     { name: 'Nano Banana Pro', icon: 'G', iconBg: '#34a853', tags: ['Precise', 'Quality'], time: '50s' },
-    { name: 'Flux 2 Pro', icon: '△', iconBg: '#f5a623', tags: ['Quality'], time: '60s' },
-    { name: 'GPT Image 1.5', icon: '◎', iconBg: '#10a37f', tags: ['Style', 'Precise'], time: '45s' },
     { name: 'GPT Image 2', icon: '◎', iconBg: '#10a37f', tags: ['Style'], time: '40s' },
-    { name: 'Nano Banana', icon: '◐', iconBg: '#ea4335', tags: ['Fast', 'Quality'], time: '20s' },
-    { name: 'Seedream v4.5', icon: '▓', iconBg: '#a855f7', tags: ['Cheap', 'Quality'], time: '15s', badge: '积分5折' },
   ];
 
   const resolutions = ['1K', '2K', '4K'];
@@ -149,7 +145,7 @@ function PromptPanel() {
   const selectedModel = modelOptions.find(m => m.name === model) || modelOptions[0];
 
   return (
-    <div className="mt-3 rounded-[20px]" style={{ width: 640, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div className="mt-3 rounded-[20px] nowheel" style={{ width: 640, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }} onWheel={(e) => e.stopPropagation()}>
       {/* Top bar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 16px' }}>
         <div className="flex items-center gap-2">
@@ -198,7 +194,7 @@ function PromptPanel() {
               {model}
             </button>
             {showModelMenu && (
-              <div className="absolute bottom-full left-0 mb-1 py-1 rounded-xl z-30 overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 280, maxHeight: 320, overflowY: 'auto' }}>
+              <div className="absolute bottom-full left-0 mb-1 py-1 rounded-xl z-30 overflow-hidden nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 280, maxHeight: 320, overflowY: 'auto', overscrollBehavior: 'contain' }} onWheel={(e) => e.stopPropagation()}>
                 {modelOptions.map((m) => (
                   <button
                     key={m.name}
@@ -245,7 +241,7 @@ function PromptPanel() {
               <Maximize className="w-3 h-3" /> {aspectRatio} · {resolution}
             </button>
             {showRatioMenu && (
-              <div className="absolute bottom-full left-0 mb-1 py-3 rounded-xl z-30" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 240 }}>
+              <div className="absolute bottom-full left-0 mb-1 py-3 rounded-xl z-30 nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 240, overscrollBehavior: 'contain' }} onWheel={(e) => e.stopPropagation()}>
                 {/* Resolution */}
                 <div className="px-3 pb-2">
                   <div className="text-[10px] text-[#6a6a7a] mb-2">分辨率</div>
@@ -303,7 +299,7 @@ function PromptPanel() {
               {count}
             </button>
             {showCountMenu && (
-              <div className="absolute bottom-full right-0 mb-1 py-1 rounded-lg z-30" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="absolute bottom-full right-0 mb-1 py-1 rounded-lg z-30 nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', overscrollBehavior: 'contain' }} onWheel={(e) => e.stopPropagation()}>
                 {counts.map((c) => (
                   <button key={c} onClick={() => { setCount(c); setShowCountMenu(false); }} className="w-full px-3 py-2 text-left text-[12px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors">
                     {c}
@@ -529,6 +525,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
             width: 640,
             transform: `scale(${inverseScale})`,
             transformOrigin: 'top center',
+            zIndex: 20,
           }}
         >
           <PromptPanel />
@@ -1128,7 +1125,7 @@ function FlowCanvas() {
       {/* Side Panel */}
       {activePanel && (
         <div
-          className="fixed z-10 overflow-y-auto"
+          className="fixed z-10 overflow-y-auto nowheel"
           style={{
             left: 72,
             top: 56,
@@ -1137,6 +1134,7 @@ function FlowCanvas() {
             background: '#252526',
             borderRight: '1px solid #2a2a35',
           }}
+          onWheel={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a35]">
             <span className="text-sm font-medium text-white">
