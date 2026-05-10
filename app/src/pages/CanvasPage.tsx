@@ -329,6 +329,7 @@ function PromptPanel() {
 function ImageNode({ data, selected, id }: NodeProps) {
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
+  const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
 
   const img = data.image as string;
   const fileRef = useRef<HTMLInputElement>(null);
@@ -516,7 +517,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
       </div>
 
       {/* Prompt panel — centered under card, shown when selected, fixed screen size */}
-      {selected && (
+      {selected && selectedNodeCount === 1 && (
         <div
           className="absolute"
           style={{
@@ -644,7 +645,7 @@ function FlowCanvas() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [tempLine, setTempLine] = useState<{ sourceNodeId: string; currentX: number; currentY: number } | null>(null);
   const [createMenu, setCreateMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number }; sourceNodeId: string } | null>(null);
-  const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number } | null>(null);
+  const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number; message: string } | null>(null);
   const isDrawingRef = useRef(false);
 
   const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -684,6 +685,32 @@ function FlowCanvas() {
     nodePositionsRef.current = posMap;
     setTempLine({ sourceNodeId: nodeId, currentX: screenX, currentY: screenY });
 
+    const clearHoverClasses = () => {
+      document.querySelectorAll('.react-flow__node').forEach((n) => {
+        n.classList.remove('can-connect', 'cannot-connect');
+      });
+    };
+
+    const validateTarget = (targetId: string | null | undefined, inputHandle: Element | null | undefined): string | null => {
+      if (!targetId) return '未找到目标节点';
+      if (targetId === nodeId) return '不能将节点连接到自身';
+
+      const effectiveInputHandle = inputHandle ?? document.querySelector(`.react-flow__node[data-id="${targetId}"] .image-node-handle.input-port`);
+      const targetPortType = effectiveInputHandle?.getAttribute('data-port-type');
+      if (targetPortType !== 'input') return '只能从输出端口连接到输入端口';
+
+      const sourceDataType = (document.querySelector(`.react-flow__node[data-id="${nodeId}"] .output-port`) as HTMLElement | null)?.getAttribute('data-data-type');
+      const targetDataType = (effectiveInputHandle as HTMLElement | null)?.getAttribute('data-data-type');
+      if (sourceDataType !== targetDataType) return '只能连接相同类型的端口';
+
+      if (wouldCreateCycle(nodeId, targetId, edges)) return '连接会形成环路';
+
+      const alreadyConnected = edges.some((e) => e.source === nodeId && e.target === targetId);
+      if (alreadyConnected) return '两个节点之间已存在连接';
+
+      return null;
+    };
+
     const handleMouseMove = (e: PointerEvent) => {
       if (!isDrawingRef.current) return;
       setTempLine((prev) => prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null);
@@ -692,6 +719,26 @@ function FlowCanvas() {
         const original = nodePositionsRef.current.get(n.id);
         return original ? { ...n, position: original } : n;
       }));
+
+      // 清除之前的 hover 状态
+      clearHoverClasses();
+
+      // 检测当前鼠标下方的节点，实时显示可连接/不可连接反馈
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const nodeEl = el?.closest('.react-flow__node');
+      const targetId = nodeEl?.getAttribute('data-id');
+      if (targetId) {
+        const error = validateTarget(targetId, null);
+        if (error) {
+          nodeEl.classList.add('cannot-connect');
+          setRejectTooltip({ x: e.clientX, y: e.clientY, message: '无法连接' });
+        } else {
+          nodeEl.classList.add('can-connect');
+          setRejectTooltip(null);
+        }
+      } else {
+        setRejectTooltip(null);
+      }
     };
 
     const handleMouseUp = (e: PointerEvent) => {
@@ -700,17 +747,18 @@ function FlowCanvas() {
 
       window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('pointerup', handleMouseUp);
+      clearHoverClasses();
 
-      // 检测落点是否精确落在某个节点的 Input Port 上
+      // 检测落点是否落在某个节点上（不限于 input port）
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const inputHandle = el?.closest('.image-node-handle');
-      const nodeEl = inputHandle?.closest('.react-flow__node');
+      const nodeEl = inputHandle?.closest('.react-flow__node') ?? el?.closest('.react-flow__node');
       const targetId = nodeEl?.getAttribute('data-id');
 
       // ─── Connection validation ───
       const fail = (_reason: string) => {
-        setRejectTooltip({ x: e.clientX, y: e.clientY });
-        setTimeout(() => setRejectTooltip((prev) => (prev ? null : prev)), 1500);
+        setRejectTooltip({ x: e.clientX, y: e.clientY, message: '无法连接' });
+        setTimeout(() => setRejectTooltip((prev) => (prev ? null : prev)), 500);
         setTempLine(null);
       };
 
@@ -720,30 +768,11 @@ function FlowCanvas() {
         return;
       }
 
-      // 1. 不能自己连接自己
-      if (targetId === nodeId) {
-        fail('不能将节点连接到自身');
-        return;
-      }
-
-      // 2 & 3. 落点必须是 input port（防止反向连接）
-      const targetPortType = inputHandle?.getAttribute('data-port-type');
-      if (targetPortType !== 'input') {
-        fail('只能从输出端口连接到输入端口');
-        return;
-      }
-
-      // 4. 只能同类型连接
-      const sourceDataType = (document.querySelector(`.react-flow__node[data-id="${nodeId}"] .output-port`) as HTMLElement | null)?.getAttribute('data-data-type');
-      const targetDataType = (inputHandle as HTMLElement | null)?.getAttribute('data-data-type');
-      if (sourceDataType !== targetDataType) {
-        fail('只能连接相同类型的端口');
-        return;
-      }
-
-      // 5. 不能形成环路
-      if (wouldCreateCycle(nodeId, targetId, edges)) {
-        fail('连接会形成环路，操作已取消');
+      // 如果没有直接落在 input port 上，从目标节点中自动查找 input port
+      const effectiveInputHandle = inputHandle ?? nodeEl.querySelector('.image-node-handle.input-port');
+      const error = validateTarget(targetId, effectiveInputHandle);
+      if (error) {
+        fail(error);
         return;
       }
 
@@ -754,7 +783,7 @@ function FlowCanvas() {
 
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('pointerup', handleMouseUp);
-  }, [screenToFlowPosition, nodes]);
+  }, [screenToFlowPosition, nodes, edges, wouldCreateCycle]);
 
   // Update edge styles when node selection changes (connected edges turn cyan)
   const selectedIdsRef = useRef('');
@@ -973,6 +1002,20 @@ function FlowCanvas() {
         .react-flow__edge .react-flow__edge-interaction {
           stroke: transparent;
         }
+        /* Hide the persistent selection rect around selected nodes after box selection */
+        .react-flow__nodesselection-rect {
+          border: none !important;
+          background: transparent !important;
+        }
+        /* Connection hover feedback on nodes */
+        .react-flow__node.can-connect {
+          box-shadow: 0 0 0 2px #00d4ff, 0 0 16px rgba(0, 212, 255, 0.5) !important;
+          border-radius: 16px;
+        }
+        .react-flow__node.cannot-connect {
+          box-shadow: 0 0 0 2px #ff4444, 0 0 20px rgba(255, 68, 68, 0.6) !important;
+          border-radius: 16px;
+        }
       `}</style>
 
       {/* Canvas */}
@@ -1005,7 +1048,7 @@ function FlowCanvas() {
               border: '1px solid rgba(255,255,255,0.1)',
             }}
           >
-            无法连接
+            {rejectTooltip.message}
           </div>
         )}
 
