@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import {
   ReactFlow,
@@ -47,6 +48,11 @@ import {
   Bug,
   Download,
   Maximize2,
+  Crop,
+  Box,
+  Pencil,
+  Lightbulb,
+  MoreHorizontal,
 } from 'lucide-react';
 import { getProjectCanvasData, recentProjects } from '../data/siteData';
 
@@ -106,6 +112,142 @@ function TextNode({ data, selected }: NodeProps) {
   );
 }
 
+/* ─── Image Toolbar (shown when image node has an image and is selected) ─── */
+function ImageToolbar({ onFullscreen }: { onFullscreen: () => void }) {
+  const tools = [
+    { icon: Crop, label: '裁剪' },
+    { icon: Box, label: '视角' },
+    { icon: Pencil, label: '重绘' },
+    { icon: Lightbulb, label: '灯光' },
+    { icon: MoreHorizontal, label: '更多' },
+    { icon: Maximize, label: '扩展' },
+    { icon: Download, label: '下载' },
+  ];
+
+  return (
+    <div
+      className="flex items-center gap-1 px-2 py-1.5 rounded-full nodrag nowheel"
+      style={{
+        background: '#252526',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+      }}
+    >
+      {tools.map((tool) => (
+        <button
+          key={tool.label}
+          className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
+          style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
+          title={tool.label}
+        >
+          <tool.icon className="w-4 h-4" />
+        </button>
+      ))}
+      <button
+        onClick={onFullscreen}
+        className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
+        style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
+        title="全屏"
+      >
+        <Maximize2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+/* ─── Image Preview Modal (fullscreen preview for image nodes) ─── */
+function ImagePreviewModal({
+  imageUrl,
+  nodeName,
+  imgSize,
+  onClose,
+}: {
+  imageUrl: string;
+  nodeName: string;
+  imgSize: { width: number; height: number } | null;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex" style={{ background: '#0a0a0f' }}>
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-10 flex items-center justify-center rounded-full transition-colors hover:bg-white/10"
+        style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.6)' }}
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Image area */}
+      <div className="flex-1 flex items-center justify-center" style={{ padding: 40 }}>
+        <img
+          src={imageUrl}
+          alt=""
+          className="max-w-full max-h-full object-contain rounded-lg"
+          style={{ maxHeight: 'calc(100vh - 80px)' }}
+        />
+      </div>
+
+      {/* Info panel */}
+      <div className="flex flex-col" style={{ width: 320, background: '#14141a', borderLeft: '1px solid #2a2a35' }}>
+        <div className="flex-1 overflow-y-auto p-5">
+          {/* Prompt section */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-white mb-3">提示词</h3>
+            <div
+              className="rounded-lg p-3 text-sm"
+              style={{ background: '#1e1e28', color: '#a0a0b0', minHeight: 80 }}
+            >
+              暂无提示词
+            </div>
+          </div>
+
+          {/* Info section */}
+          <div>
+            <h3 className="text-sm font-medium text-white mb-3">信息</h3>
+            <div className="rounded-lg p-4 space-y-2.5" style={{ background: '#1e1e28' }}>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#6a6a7a' }}>质量</span>
+                <span style={{ color: '#a0a0b0' }}>2k</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#6a6a7a' }}>文件大小</span>
+                <span style={{ color: '#a0a0b0' }}>31 KB</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#6a6a7a' }}>日期</span>
+                <span style={{ color: '#a0a0b0' }}>2026/05/08</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#6a6a7a' }}>创建者</span>
+                <span style={{ color: '#a0a0b0' }}>brandonchan0307</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Download button */}
+        <div className="p-5" style={{ borderTop: '1px solid #2a2a35' }}>
+          <button
+            className="w-full py-2.5 rounded-lg text-sm font-medium text-white transition-colors hover:bg-[#3a3a4a]"
+            style={{ background: '#252530' }}
+            onClick={() => {
+              const a = document.createElement('a');
+              a.href = imageUrl;
+              a.download = nodeName || 'image';
+              a.click();
+            }}
+          >
+            下载
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Prompt Panel (Component 2 inside ImageNode) ─── */
 function PromptPanel() {
   const [prompt, setPrompt] = useState('');
@@ -145,7 +287,7 @@ function PromptPanel() {
   const selectedModel = modelOptions.find(m => m.name === model) || modelOptions[0];
 
   return (
-    <div className="mt-3 rounded-[20px] nowheel" style={{ width: 640, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }} onWheel={(e) => e.stopPropagation()}>
+    <div className="mt-3 rounded-[20px] nowheel nodrag" style={{ width: 640, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }} onWheel={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       {/* Top bar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 16px' }}>
         <div className="flex items-center gap-2">
@@ -171,6 +313,7 @@ function PromptPanel() {
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
           placeholder="描述任何你想要生成的内容"
           className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.25)]"
           style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 1.5, minHeight: expanded ? 160 : 52 }}
@@ -330,6 +473,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
+  const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
 
   const img = data.image as string;
   const fileRef = useRef<HTMLInputElement>(null);
@@ -337,6 +481,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const [previewImage, setPreviewImage] = useState(img);
   const [editingName, setEditingName] = useState(false);
   const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { setNodes } = useReactFlow();
 
@@ -371,6 +516,13 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
   return (
     <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
+      {/* Toolbar — shown above title when image exists and node is selected */}
+      {displayImage && selected && (
+        <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
+          <ImageToolbar onFullscreen={() => setShowPreview(true)} />
+        </div>
+      )}
+
       {/* Title label — fixed screen size, width matches card screen width */}
       <div className="absolute z-20" style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}>
         <div className="flex items-center justify-between" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
@@ -402,8 +554,8 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
       {/* Image card wrapper — relative for handles/upload positioning */}
       <div className="relative" style={{ width: cardWidth }}>
-        {/* Upload icon — inside card top-right, scales with canvas */}
-        {selected && (
+        {/* Upload icon — inside card top-right, hidden when node has input connection */}
+        {selected && !hasInputConnection && (
           <>
             <button
               onClick={() => fileRef.current?.click()}
@@ -449,31 +601,33 @@ function ImageNode({ data, selected, id }: NodeProps) {
           )}
         </div>
 
-        {/* Left visual handle — Input */}
-        <div
-          className="image-node-handle input-port"
-          data-port-type="input"
-          data-data-type="image"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 28,
-            height: 28,
-            background: 'rgba(20,20,26,0.45)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: '1.5px solid rgba(255,255,255,0.25)',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10,
-          }}
-        >
-          <Plus style={{ width: 14, height: 14, color: 'white' }} />
-        </div>
+        {/* Left visual handle — Input (hidden when image exists) */}
+        {!displayImage && (
+          <div
+            className="image-node-handle input-port"
+            data-port-type="input"
+            data-data-type="image"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 28,
+              height: 28,
+              background: 'rgba(20,20,26,0.45)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1.5px solid rgba(255,255,255,0.25)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+            }}
+          >
+            <Plus style={{ width: 14, height: 14, color: 'white' }} />
+          </div>
+        )}
 
         {/* Right visual handle — Output */}
         <div
@@ -516,8 +670,8 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
       </div>
 
-      {/* Prompt panel — centered under card, shown when selected, fixed screen size */}
-      {selected && selectedNodeCount === 1 && (
+      {/* Prompt panel — centered under card, shown only for empty image nodes when selected */}
+      {!displayImage && selected && selectedNodeCount === 1 && (
         <div
           className="absolute"
           style={{
@@ -531,6 +685,17 @@ function ImageNode({ data, selected, id }: NodeProps) {
         >
           <PromptPanel />
         </div>
+      )}
+
+      {/* Fullscreen preview modal — rendered via portal to escape node bounds */}
+      {showPreview && displayImage && createPortal(
+        <ImagePreviewModal
+          imageUrl={displayImage}
+          nodeName={nodeName}
+          imgSize={imgSize}
+          onClose={() => setShowPreview(false)}
+        />,
+        document.body
       )}
     </div>
   );
@@ -911,6 +1076,11 @@ function FlowCanvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // ─── Drag & Drop State ───
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadToast, setUploadToast] = useState<{ msg: string; type: 'loading' | 'success' } | null>(null);
+  const dragLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ─── Toolbar State ───
   const [showMinimap, setShowMinimap] = useState(true);
   const [snapGrid, setSnapGrid] = useState(false);
@@ -952,6 +1122,52 @@ function FlowCanvas() {
       setContextMenu(null);
     },
     [setNodes]
+  );
+
+  const handleDropFiles = useCallback(
+    (files: FileList, screenX: number, screenY: number) => {
+      const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      if (imageFiles.length === 0) return;
+
+      const basePos = screenToFlowPosition({ x: screenX, y: screenY });
+      setUploadToast({ msg: '上传中...', type: 'loading' });
+
+      Promise.all(
+        imageFiles.map((file, index) => {
+          return new Promise<void>((resolve) => {
+            const url = URL.createObjectURL(file);
+            const imgEl = new window.Image();
+            imgEl.onload = () => {
+              const offsetX = index * 40;
+              const offsetY = index * 40;
+              const position = { x: basePos.x + offsetX, y: basePos.y + offsetY };
+              const newNode: Node = {
+                id: `image-${Date.now()}-${index}`,
+                type: 'image',
+                position,
+                data: {
+                  label: file.name.replace(/\.[^/.]+$/, ''),
+                  image: url,
+                  width: imgEl.width,
+                  height: imgEl.height,
+                },
+                selected: index === 0,
+              };
+              setNodes((nds) => [
+                ...nds.map((n) => ({ ...n, selected: false })),
+                newNode,
+              ]);
+              resolve();
+            };
+            imgEl.src = url;
+          });
+        })
+      ).then(() => {
+        setUploadToast({ msg: '上传并成功创建节点', type: 'success' });
+        setTimeout(() => setUploadToast(null), 2500);
+      });
+    },
+    [screenToFlowPosition, setNodes]
   );
 
 
@@ -1031,7 +1247,37 @@ function FlowCanvas() {
           const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
           setContextMenu({ x: e.clientX, y: e.clientY, flowPos: pos });
         }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          if (dragLeaveTimer.current) clearTimeout(dragLeaveTimer.current);
+          setIsDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (dragLeaveTimer.current) clearTimeout(dragLeaveTimer.current);
+          dragLeaveTimer.current = setTimeout(() => setIsDragOver(false), 50);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+          handleDropFiles(e.dataTransfer.files, e.clientX, e.clientY);
+        }}
       >
+        {/* Drop overlay */}
+        {isDragOver && (
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center"
+            style={{ background: 'rgba(10,10,15,0.75)', backdropFilter: 'blur(4px)' }}
+          >
+            <div
+              className="px-6 py-4 rounded-2xl text-sm font-medium"
+              style={{ background: '#252526', border: '1px solid #2a2a35', color: '#fff' }}
+            >
+              Drop images or videos here to upload
+            </div>
+          </div>
+        )}
+
         {/* Temporary connection line (drawn while dragging from output port) */}
         <TempConnectionLine tempLine={tempLine} />
 
@@ -1112,6 +1358,30 @@ function FlowCanvas() {
             </div>
           </Panel>
         </ReactFlow>
+
+        {/* Upload status toast */}
+        {uploadToast && (
+          <div
+            className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-2"
+            style={{
+              background: '#252526',
+              border: '1px solid #2a2a35',
+              color: uploadToast.type === 'success' ? '#22c55e' : '#fff',
+            }}
+          >
+            {uploadToast.type === 'loading' && (
+              <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+            )}
+            {uploadToast.type === 'success' && (
+              <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: '#22c55e' }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5L4 7L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+            {uploadToast.msg}
+          </div>
+        )}
       </div>
 
       {/* Left Sidebar Pill */}
