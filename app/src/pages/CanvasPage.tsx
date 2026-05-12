@@ -799,6 +799,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const cardWidth = 240;
   const aspectRatio = imgSize ? imgSize.width / imgSize.height : ((data.width as number) || 1) / ((data.height as number) || 1);
   const cardHeight = displayImage ? Math.min(Math.round(cardWidth / aspectRatio), 320) : cardWidth;
+  const showTitleMeta = zoom >= 0.35;
 
   return (
     <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
@@ -810,9 +811,9 @@ function ImageNode({ data, selected, id }: NodeProps) {
       )}
 
       {/* Title label — fixed screen size, width matches card screen width */}
-      <div className="absolute z-20" style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}>
-        <div className="flex items-center justify-between" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
-          <div className="flex items-center gap-1 overflow-hidden" style={{ minWidth: 0 }}>
+      <div className="absolute z-20 overflow-hidden" style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}>
+        <div className="flex items-center justify-between overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
+          <div className="flex flex-1 items-center gap-1 overflow-hidden" style={{ minWidth: 0 }}>
             <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
             {editingName ? (
               <input
@@ -825,12 +826,12 @@ function ImageNode({ data, selected, id }: NodeProps) {
                 style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, minWidth: 0, flex: 1, borderBottom: '1px solid rgba(255,255,255,0.2)' }}
               />
             ) : (
-              <span onClick={() => setEditingName(true)} className="cursor-pointer hover:text-white transition-colors truncate" style={{ fontSize: 11 }}>
+              <span onClick={() => setEditingName(true)} className="min-w-0 cursor-pointer truncate transition-colors hover:text-white" style={{ fontSize: 11 }}>
                 {nodeName}
               </span>
             )}
           </div>
-          {displayImage && (
+          {displayImage && showTitleMeta && (
             <span className="flex-shrink-0 ml-2" style={{ fontSize: 11 }}>
               {imgSize ? `${imgSize.width}×${imgSize.height}` : `${(data.width as number) || 1024}×${(data.height as number) || 1024}`}
             </span>
@@ -1730,7 +1731,7 @@ function FlowCanvas() {
           panOnDrag={[1, 2]}
           fitView
           fitViewOptions={{ maxZoom: 1 }}
-          minZoom={0.35}
+          minZoom={0.2}
           maxZoom={4}
           attributionPosition="bottom-right"
           multiSelectionKeyCode={['Shift']}

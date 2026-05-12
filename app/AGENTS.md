@@ -32,7 +32,7 @@ app/
 │   └── images/              # Static image assets (banners, show covers, project thumbs)
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # shadcn/ui components (40+ primitives: button, dialog, form, etc.)
+│   │   ├── ui/              # shadcn/ui components (50+ primitives: button, dialog, form, etc.)
 │   │   ├── NodeEditor/      # Custom 2D canvas node editor (NodeEditorCanvas.tsx, NodeRegistry.ts)
 │   │   ├── AccountPanel.tsx
 │   │   ├── CanvasEdge.tsx
@@ -45,20 +45,21 @@ app/
 │   │   ├── TVShow.tsx       # Video gallery with category filter and search
 │   │   └── UpgradePanel.tsx
 │   ├── data/
-│   │   └── siteData.ts      # Static mock data: banners, projects, TV shows, canvas nodes/edges
+│   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas nodes/edges
 │   ├── hooks/
 │   │   └── use-mobile.ts    # useIsMobile hook (breakpoint 768px)
 │   ├── lib/
 │   │   ├── nodeEditor/
-│   │   │   ├── dag.ts       # Cycle detection, topological sort, execution batches
-│   │   │   └── types.ts     # Port types, EditorNode, EditorEdge, connection validation
+│   │   │   ├── dag.ts       # Cycle detection, topological sort, execution batches, input hashing
+│   │   │   └── types.ts     # Port types, EditorNode, EditorEdge, Camera, connection validation
 │   │   ├── nodeSystem.ts    # Node port config & DAG execution engine for React Flow canvas
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   └── CanvasPage.tsx   # Visual node editor (React Flow based)
+│   │   └── CanvasPage.tsx   # Visual node editor (React Flow based, ~2200 lines)
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
+│   ├── App.css              # Minimal root-level styles
 │   ├── App.tsx              # Root router with BrowserRouter, Routes for / and /canvas
 │   ├── main.tsx             # React root render with StrictMode
 │   └── index.css            # Global styles, Tailwind directives, ReactFlow custom CSS, CSS variables
@@ -126,7 +127,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
   - Muted text: `#6a6a7a`
 - **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
 - **TypeScript**: Strict mode is enabled. `noUnusedLocals` and `noUnusedParameters` are active; unused variables will fail the build.
-- **ESLint**: The project disables `@typescript-eslint/no-explicit-any` in a few places (`CanvasPage.tsx`, `nodeSystem.ts`) for React Flow node type definitions. Prefer avoiding `any` in new code.
+- **ESLint**: The project disables `@typescript-eslint/no-explicit-any` in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
 
 ---
 
@@ -134,7 +135,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx`)
 
-A node-based editor built on `@xyflow/react` supporting six custom node types:
+A node-based editor built on `@xyflow/react` supporting seven custom node types:
 
 - `image` — Displays an image with optional prompt text, editable name, file upload, and a floating prompt panel on selection.
 - `video` — Video placeholder with model/seed info on selection.
@@ -142,6 +143,7 @@ A node-based editor built on `@xyflow/react` supporting six custom node types:
 - `audio` — Audio waveform visualization placeholder.
 - `script` — Script processing placeholder.
 - `video-merge` — Video composition placeholder.
+- `upscale` — Image upscaling placeholder.
 
 Features:
 - Left sidebar tool panel (add nodes, AI toolbox, assets, history, tutorial, support).
@@ -156,12 +158,12 @@ Features:
 
 ### Custom 2D Canvas Node Editor (`src/components/NodeEditor/`)
 
-An independent canvas-based node editor rendered on a raw `<canvas>` element:
+An independent canvas-based node editor rendered on a raw `<canvas>` element. **Note:** This module is not currently wired into any route; it is a standalone subsystem.
 
 - `NodeEditorCanvas.tsx` — Main component handling pan, zoom, selection, connection dragging, and rendering.
 - `NodeRegistry.ts` — Node templates (`PromptInput`, `LoadModel`, `TextEncode`, `EmptyLatent`, `KSampler`, `VAEDecode`, `PreviewImage`) with typed ports.
 - `src/lib/nodeEditor/types.ts` — Core types (`EditorNode`, `EditorEdge`, `PortType`, `Camera`, `ConnectionPreview`) and connection validation (`canConnect`).
-- `src/lib/nodeEditor/dag.ts` — Cycle detection (DFS), topological sort (Kahn), execution batching, and input hashing.
+- `src/lib/nodeEditor/dag.ts` — Cycle detection (DFS), topological sort (Kahn), execution batching, input hashing, and node input building.
 
 Port types and colors:
 - `IMAGE` — cyan `#22d3ee`
@@ -177,9 +179,11 @@ Port types and colors:
 ### Data Layer (`src/data/siteData.ts`)
 
 All content is currently static/mock data. This file exports:
+
 - `banners` — Hero carousel slides.
 - `recentProjects` — Project cards for the home page, each with an optional `canvasNodes` array.
-- `galleryData` / `galleryCategories` — Gallery items and filter tabs.
+- `galleryData` / `galleryCategories` — Gallery items and filter tabs for the TVShow section.
+- `blankCanvasNodes` — Empty canvas node array helper.
 - `getProjectCanvasData(projectId)` — Returns nodes for a given project ID.
 
 There is no backend API integration at this time.
@@ -202,7 +206,7 @@ If you add tests, the conventional location would be alongside source files (e.g
 
 - **@xyflow/react** — React Flow canvas; its CSS must be imported (`@xyflow/react/dist/style.css`).
 - **embla-carousel-react** — Lightweight carousel for the hero banner.
-- **next-themes** — Present in dependencies but not actively used (shadcn/ui scaffold default).
+- **next-themes** — Used by the `sonner` toast component for theme-aware rendering.
 - **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
 - **zustand** — Present in dependencies but not actively used in current source.
 

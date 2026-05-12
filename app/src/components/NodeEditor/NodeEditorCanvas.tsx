@@ -19,7 +19,7 @@ const NODE_RADIUS = 12;
 const BG_COLOR = '#09090b';
 const GRID_COLOR = 'rgba(255,255,255,0.03)';
 const GRID_SIZE = 40;
-const ZOOM_MIN = 0.1;
+const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 3.0;
 
 /* ─── Helpers ─── */
