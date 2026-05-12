@@ -10,7 +10,7 @@ export interface BannerItem {
 
 export interface CanvasNodeType {
   id: string;
-  type: 'text' | 'image' | 'video' | 'video-merge' | 'audio' | 'script';
+  type: 'text' | 'image' | 'video' | 'video-merge' | 'audio' | 'script' | 'upscale';
   label: string;
   position: { x: number; y: number };
   data: Record<string, unknown>;
