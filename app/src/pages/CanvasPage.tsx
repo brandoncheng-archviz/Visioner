@@ -41,7 +41,14 @@ import {
   ArrowUp,
   Mic,
   ClipboardPaste,
-
+  Check,
+  ChevronDown,
+  Building2,
+  Layers,
+  Leaf,
+  Palette,
+  Sun,
+  Cloud,
   Maximize,
   Copy,
   Trash2,
@@ -754,6 +761,218 @@ function UpscaleParamPanel() {
   );
 }
 
+type ImageRole =
+  | 'primary_building'
+  | 'overall_reference'
+  | 'plant_reference'
+  | 'material_reference'
+  | 'lighting_reference'
+  | 'sky_reference';
+
+const imageRoleOptions: {
+  value: ImageRole;
+  label: string;
+  description: string;
+  detail: string;
+  constraints: string[];
+  Icon: typeof Building2;
+}[] = [
+  {
+    value: 'primary_building',
+    label: '主体建筑',
+    description: '保持结构 / 保持视角 / 保持构图',
+    detail: '作为主体建筑参考，AI 将保持结构、视角与构图不变。',
+    constraints: ['保持结构', '保持视角', '保持构图'],
+    Icon: Building2,
+  },
+  {
+    value: 'overall_reference',
+    label: '整体参考',
+    description: '参考整体氛围 / 色调 / 真实度',
+    detail: '参考整体氛围、时间段、灯光、色调、真实度和艺术化感觉。',
+    constraints: ['整体氛围', '色调', '真实度'],
+    Icon: Layers,
+  },
+  {
+    value: 'plant_reference',
+    label: '植物参考',
+    description: '仅参考植物与景观感觉',
+    detail: '仅参考植物、景观、绿化的风格与质感。',
+    constraints: ['植物', '景观', '绿化'],
+    Icon: Leaf,
+  },
+  {
+    value: 'material_reference',
+    label: '材质参考',
+    description: '仅参考材质质感',
+    detail: '仅参考材质质感，例如玻璃、混凝土、木材、金属、石材等。',
+    constraints: ['玻璃', '混凝土', '金属'],
+    Icon: Palette,
+  },
+  {
+    value: 'lighting_reference',
+    label: '灯光参考',
+    description: '参考时间段 / 光照 / 明暗关系',
+    detail: '参考时间段、太阳方向、光照强弱、明暗关系和室内外灯光。',
+    constraints: ['时间段', '光照', '明暗'],
+    Icon: Sun,
+  },
+  {
+    value: 'sky_reference',
+    label: '天空参考',
+    description: '仅参考天空与天气氛围',
+    detail: '仅参考天空、云层、天气、霞光、蓝调或夜景氛围。',
+    constraints: ['天空', '云层', '天气'],
+    Icon: Cloud,
+  },
+];
+
+const roleColorMap: Record<ImageRole | 'null', string> = {
+  primary_building: '#4aa3ff',
+  overall_reference: '#a78bfa',
+  plant_reference: '#4ade80',
+  material_reference: '#fb923c',
+  lighting_reference: '#facc15',
+  sky_reference: '#7dd3fc',
+  null: 'rgba(255,255,255,0.35)',
+};
+
+function getRoleData(role: ImageRole | null) {
+  const isPrimary = role === 'primary_building';
+  return {
+    role,
+    preserveStructure: isPrimary,
+    preserveCamera: isPrimary,
+    preserveComposition: isPrimary,
+  };
+}
+
+function ImageRoleTag({
+  role,
+  onChange,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  role: ImageRole | null;
+  onChange: (role: ImageRole) => void;
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+  const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedOption = imageRoleOptions.find((option) => option.value === role);
+  const previewOption = imageRoleOptions.find((option) => option.value === (hoveredRole || role));
+  const DisplayIcon = selectedOption?.Icon || Building2;
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as HTMLElement)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutside);
+    return () => document.removeEventListener('pointerdown', closeOnOutside);
+  }, [open]);
+
+  return (
+    <div
+      ref={rootRef}
+      className="absolute z-30 nodrag nowheel"
+      style={{ top: 8, left: 8 }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="image-role-tag-button flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors"
+          style={{
+            background: selectedOption ? 'rgba(27, 36, 52, 0.82)' : 'rgba(20, 22, 28, 0.78)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: `1px solid ${selectedOption ? 'rgba(56,149,255,0.72)' : 'rgba(255,255,255,0.2)'}`,
+            color: selectedOption ? '#eaf7ff' : 'rgba(255,255,255,0.8)',
+            boxShadow: selectedOption ? '0 0 0 1px rgba(0,212,255,0.08), 0 10px 24px rgba(0,0,0,0.34)' : '0 8px 18px rgba(0,0,0,0.28)',
+          }}
+        >
+          <DisplayIcon className="h-2.5 w-2.5" style={{ color: selectedOption ? '#4aa3ff' : 'rgba(255,255,255,0.68)' }} />
+          <span>{selectedOption?.label || '定义用途'}</span>
+          <ChevronDown className="h-2.5 w-2.5" style={{ color: selectedOption ? '#79baff' : 'rgba(255,255,255,0.6)' }} />
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="absolute left-0 top-[28px] w-[214px] overflow-hidden rounded-[14px] p-1.5"
+          style={{
+            background: 'linear-gradient(180deg, rgba(42,45,52,0.96), rgba(24,26,31,0.96))',
+            backdropFilter: 'blur(18px)',
+            WebkitBackdropFilter: 'blur(18px)',
+            border: '1px solid rgba(255,255,255,0.16)',
+            boxShadow: '0 18px 42px rgba(0,0,0,0.58), inset 0 1px 0 rgba(255,255,255,0.08)',
+          }}
+        >
+          {imageRoleOptions.map((option) => {
+            const active = option.value === role;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onMouseEnter={() => setHoveredRole(option.value)}
+                onMouseLeave={() => setHoveredRole(null)}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors"
+                style={{
+                  background: active ? 'rgba(55, 124, 214, 0.22)' : 'transparent',
+                  color: active ? '#4aa3ff' : 'rgba(255,255,255,0.82)',
+                }}
+              >
+                <option.Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="flex-1 font-medium">{option.label}</span>
+                {active && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
+              </button>
+            );
+          })}
+          <div
+            className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[12px] leading-relaxed"
+            style={{
+              borderColor: 'rgba(255,255,255,0.08)',
+              color: 'rgba(255,255,255,0.54)',
+            }}
+          >
+            <div>{previewOption?.detail || '选择图片在建筑可视化流程中的参考角色。'}</div>
+            {previewOption && (
+              <div className="mt-2 flex gap-1">
+                {previewOption.constraints.map((constraint) => (
+                  <span
+                    key={constraint}
+                    className="rounded-md px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                    style={{
+                      background: 'rgba(255,255,255,0.07)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: 'rgba(225,245,255,0.76)',
+                    }}
+                  >
+                    <span style={{ color: '#4aa3ff' }}>•</span> {constraint}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Image Node ─── */
 function ImageNode({ data, selected, id }: NodeProps) {
   const zoom = useStore((state) => state.transform[2]);
@@ -762,12 +981,14 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
 
   const img = data.image as string;
+  const role = (data.role as ImageRole | null | undefined) ?? null;
   const fileRef = useRef<HTMLInputElement>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || 'Image');
   const [previewImage, setPreviewImage] = useState(img);
   const [editingName, setEditingName] = useState(false);
   const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { setNodes } = useReactFlow();
 
@@ -780,7 +1001,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
     const imgEl = new window.Image();
     imgEl.onload = () => {
       setImgSize({ width: imgEl.width, height: imgEl.height });
-      setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, image: url, label: name, width: imgEl.width, height: imgEl.height } } : n));
+      setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, image: url, label: name, width: imgEl.width, height: imgEl.height, ...getRoleData(null) } } : n));
     };
     imgEl.src = url;
 
@@ -795,11 +1016,21 @@ function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, label: newName } } : n));
   };
 
+  const handleRoleChange = (nextRole: ImageRole) => {
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole) } } : n));
+  };
+
+  const stopTitleInteraction = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
   const displayImage = previewImage || img;
   const cardWidth = 240;
   const aspectRatio = imgSize ? imgSize.width / imgSize.height : ((data.width as number) || 1) / ((data.height as number) || 1);
   const cardHeight = displayImage ? Math.min(Math.round(cardWidth / aspectRatio), 320) : cardWidth;
   const showTitleMeta = zoom >= 0.35;
+  const roleOption = role ? imageRoleOptions.find((o) => o.value === role) : null;
+  const RoleIconForTitle = roleOption?.Icon;
 
   return (
     <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
@@ -811,10 +1042,32 @@ function ImageNode({ data, selected, id }: NodeProps) {
       )}
 
       {/* Title label — fixed screen size, width matches card screen width */}
-      <div className="absolute z-20 overflow-hidden" style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}>
+      <div
+        className="absolute z-20 overflow-hidden nodrag"
+        onPointerDownCapture={stopTitleInteraction}
+        onMouseDownCapture={stopTitleInteraction}
+        onClick={stopTitleInteraction}
+        style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}
+      >
         <div className="flex items-center justify-between overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
-          <div className="flex flex-1 items-center gap-1 overflow-hidden" style={{ minWidth: 0 }}>
+          <div className="flex flex-1 items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
             <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
+            {displayImage && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRoleMenuOpen(true);
+                }}
+                className="flex-shrink-0 cursor-pointer select-none transition-all hover:brightness-125"
+                style={{ color: roleColorMap[role ?? 'null'], fontSize: 11 }}
+                title="点击设置图片用途"
+              >
+                {RoleIconForTitle && (
+                  <RoleIconForTitle className="inline-block" style={{ width: 11, height: 11, marginRight: 3, verticalAlign: '-0.1em' }} />
+                )}
+                {roleOption?.label || '未定义用途'}
+              </span>
+            )}
             {editingName ? (
               <input
                 ref={nameInputRef}
@@ -822,11 +1075,19 @@ function ImageNode({ data, selected, id }: NodeProps) {
                 autoFocus
                 onBlur={handleNameSave}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleNameSave(); }}
-                className="bg-transparent outline-none truncate"
+                onPointerDown={stopTitleInteraction}
+                onMouseDown={stopTitleInteraction}
+                onClick={stopTitleInteraction}
+                onDoubleClick={stopTitleInteraction}
+                className="bg-transparent outline-none truncate nodrag nowheel select-text"
                 style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, minWidth: 0, flex: 1, borderBottom: '1px solid rgba(255,255,255,0.2)' }}
               />
             ) : (
-              <span onClick={() => setEditingName(true)} className="min-w-0 cursor-pointer truncate transition-colors hover:text-white" style={{ fontSize: 11 }}>
+              <span
+                onClick={() => setEditingName(true)}
+                className="min-w-0 cursor-pointer truncate transition-colors hover:text-white nodrag"
+                style={{ fontSize: 11 }}
+              >
                 {nodeName}
               </span>
             )}
@@ -850,16 +1111,20 @@ function ImageNode({ data, selected, id }: NodeProps) {
               style={{
                 top: 8,
                 right: 8,
-                width: 28,
-                height: 28,
+                width: 22,
+                height: 22,
                 background: 'rgba(37,37,48,0.9)',
                 border: '1px solid rgba(255,255,255,0.1)',
               }}
             >
-              <Upload style={{ width: 14, height: 14, color: 'rgba(255,255,255,0.7)' }} />
+              <Upload style={{ width: 11, height: 11, color: 'rgba(255,255,255,0.7)' }} />
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
           </>
+        )}
+
+        {displayImage && (selected || roleMenuOpen) && (
+          <ImageRoleTag role={role} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}
@@ -1493,7 +1758,7 @@ function FlowCanvas() {
   const dragLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Toolbar State ───
-  const [showMinimap, setShowMinimap] = useState(true);
+  const [showMinimap, setShowMinimap] = useState(false);
   const [snapGrid, setSnapGrid] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showHelp, setShowHelp] = useState(false);
@@ -1528,7 +1793,7 @@ function FlowCanvas() {
         id: `${type}-${Date.now()}`,
         type,
         position,
-        data: { label: customLabel || labels[type] || type },
+        data: { label: customLabel || labels[type] || type, ...(type === 'image' ? getRoleData(null) : {}) },
       };
       setNodes((nds) => [...nds, newNode]);
       setContextMenu(null);
@@ -1562,6 +1827,7 @@ function FlowCanvas() {
                   image: url,
                   width: imgEl.width,
                   height: imgEl.height,
+                  ...getRoleData(null),
                 },
                 selected: index === 0,
               };
@@ -1615,6 +1881,10 @@ function FlowCanvas() {
         .react-flow__node.selected .image-node-handle,
         .image-node-handle:hover {
           opacity: 1;
+        }
+        .image-role-tag-button:hover {
+          border-color: rgba(0,212,255,0.62) !important;
+          color: #ffffff !important;
         }
         /* Edge colors — gray by default, cyan when selected */
         .react-flow__edge-path {
@@ -2003,7 +2273,7 @@ function FlowCanvas() {
                   id: newNodeId,
                   type: 'image',
                   position: createMenu.flowPos,
-                  data: { label: '图片节点' },
+                  data: { label: '图片节点', ...getRoleData(null) },
                 };
                 setNodes((nds) => [...nds, newNode]);
                 setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId }]);
