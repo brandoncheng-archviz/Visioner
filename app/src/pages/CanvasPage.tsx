@@ -39,7 +39,6 @@ import {
   Upload,
   Zap,
   ArrowUp,
-  Mic,
   ClipboardPaste,
   Check,
   ChevronDown,
@@ -50,6 +49,7 @@ import {
   Sun,
   Cloud,
   Maximize,
+  Bookmark,
   Copy,
   Trash2,
   Bug,
@@ -60,8 +60,111 @@ import {
   Pencil,
   Lightbulb,
   MoreHorizontal,
+  MapPin,
 } from 'lucide-react';
 import { getProjectCanvasData, recentProjects } from '../data/siteData';
+
+const IMAGE_NODE_PREVIEW_WIDTH = 410;
+const IMAGE_NODE_EMPTY_HEIGHT = 230;
+const IMAGE_NODE_MIN_IMAGE_SIZE = 180;
+const IMAGE_NODE_MAX_IMAGE_WIDTH = 520;
+const IMAGE_NODE_MAX_IMAGE_HEIGHT = 360;
+const IMAGE_NODE_CONTROL_WIDTH = 640;
+const IMAGE_NODE_CONTROL_HEIGHT = 252;
+const IMAGE_NODE_CONTROL_EXPANDED_HEIGHT = 344;
+const FLOATING_PANEL_BACKGROUND = '#252526';
+const FLOATING_PANEL_BORDER = '1px solid rgba(255,255,255,0.08)';
+
+const browserWindow = typeof window !== 'undefined'
+  ? window as typeof window & { __visionerFullscreenDropForwarder?: boolean }
+  : null;
+
+if (browserWindow && !browserWindow.__visionerFullscreenDropForwarder) {
+  browserWindow.__visionerFullscreenDropForwarder = true;
+
+  const showFullscreenDropHint = () => {
+    let hint = document.getElementById('visioner-fullscreen-drop-hint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'visioner-fullscreen-drop-hint';
+      hint.textContent = '拖放图片或视频以上传';
+      Object.assign(hint.style, {
+        position: 'fixed',
+        inset: '0',
+        zIndex: '9999',
+        display: 'none',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(3,3,7,0.62)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        color: '#ffffff',
+        fontSize: '15px',
+        fontWeight: '700',
+        pointerEvents: 'none',
+      });
+      const text = document.createElement('div');
+      text.textContent = '拖放图片或视频以上传';
+      Object.assign(text.style, {
+        padding: '18px 28px',
+        borderRadius: '14px',
+        background: '#252526',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 16px 40px rgba(0,0,0,0.45)',
+      });
+      hint.textContent = '';
+      hint.appendChild(text);
+      document.body.appendChild(hint);
+    }
+    hint.style.display = 'flex';
+  };
+
+  const hideFullscreenDropHint = () => {
+    const hint = document.getElementById('visioner-fullscreen-drop-hint');
+    if (hint) hint.style.display = 'none';
+  };
+
+  browserWindow.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+    showFullscreenDropHint();
+  }, true);
+
+  browserWindow.addEventListener('drop', (event) => {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    if ((event as DragEvent & { __visionerForwardedDrop?: boolean }).__visionerForwardedDrop) {
+      hideFullscreenDropHint();
+      return;
+    }
+
+    hideFullscreenDropHint();
+    const pane = document.querySelector('.react-flow__pane');
+    if (!pane) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const forwardedDrop = new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      dataTransfer: event.dataTransfer,
+    });
+    Object.defineProperty(forwardedDrop, '__visionerForwardedDrop', { value: true });
+    pane.dispatchEvent(forwardedDrop);
+  }, true);
+
+  browserWindow.addEventListener('dragleave', (event) => {
+    if (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= browserWindow.innerWidth || event.clientY >= browserWindow.innerHeight) {
+      hideFullscreenDropHint();
+    }
+  }, true);
+
+  browserWindow.addEventListener('dragend', hideFullscreenDropHint, true);
+}
 
 /* ─── Toast ─── */
 function useToast() {
@@ -260,225 +363,6 @@ function ImagePreviewModal({
 }
 
 /* ─── Prompt Panel (Component 2 inside ImageNode) ─── */
-function PromptPanel() {
-  const [prompt, setPrompt] = useState('');
-  const [expanded, setExpanded] = useState(false);
-  const [showModelMenu, setShowModelMenu] = useState(false);
-  const [showRatioMenu, setShowRatioMenu] = useState(false);
-  const [showCountMenu, setShowCountMenu] = useState(false);
-  const [model, setModel] = useState('Nano Banana 2');
-  const [resolution, setResolution] = useState('2K');
-  const [aspectRatio, setAspectRatio] = useState('1:1');
-  const [count, setCount] = useState('1x');
-
-  const modelOptions: { name: string; icon: string; iconBg: string; tags: string[]; time: string; badge?: string }[] = [
-    { name: 'Nano Banana 2', icon: 'G', iconBg: '#4285f4', tags: ['Precise', 'Quality', 'Fast'], time: '25s' },
-    { name: 'Nano Banana Pro', icon: 'G', iconBg: '#34a853', tags: ['Precise', 'Quality'], time: '50s' },
-    { name: 'GPT Image 2', icon: '◎', iconBg: '#10a37f', tags: ['Style'], time: '40s' },
-  ];
-
-  const resolutions = ['1K', '2K', '4K'];
-
-  const aspectRatios = [
-    { value: '自适应', icon: 'auto' },
-    { value: '1:1', icon: 'square' },
-    { value: '9:16', icon: 'portrait' },
-    { value: '16:9', icon: 'landscape' },
-    { value: '3:4', icon: 'portrait' },
-    { value: '4:3', icon: 'landscape' },
-    { value: '3:2', icon: 'landscape' },
-    { value: '2:3', icon: 'portrait' },
-    { value: '4:5', icon: 'portrait' },
-    { value: '5:4', icon: 'landscape' },
-    { value: '21:9', icon: 'ultrawide' },
-  ];
-
-  const counts = ['1x', '2x', '4x'];
-
-  const selectedModel = modelOptions.find(m => m.name === model) || modelOptions[0];
-
-  return (
-    <div className="mt-3 rounded-[20px] nowheel nodrag" style={{ width: 640, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }} onWheel={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-      {/* Top bar */}
-      <div className="flex items-center justify-between" style={{ padding: '12px 16px' }}>
-        <div className="flex items-center gap-2">
-          <button className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: 8, background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.06)' }} title="引用图片">
-            <Image className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.5)' }} />
-          </button>
-          <button className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: 8, background: '#2a2a2a', border: '1px solid rgba(255,255,255,0.06)' }} title="添加">
-            <Plus className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.5)' }} />
-          </button>
-        </div>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center justify-center hover:text-white transition-colors"
-          style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.4)' }}
-          title={expanded ? '收起' : '展开'}
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Text input */}
-      <div style={{ padding: '0 16px 12px 16px' }}>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onPointerDown={(e) => e.stopPropagation()}
-          placeholder="描述任何你想要生成的内容"
-          className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.25)]"
-          style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 1.5, minHeight: expanded ? 160 : 52 }}
-          rows={expanded ? 5 : 2}
-        />
-      </div>
-
-      {/* Bottom toolbar */}
-      <div className="flex items-center justify-between" style={{ padding: '12px 16px' }}>
-        <div className="flex items-center">
-          {/* Model selector */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowModelMenu(!showModelMenu); setShowRatioMenu(false); setShowCountMenu(false); }}
-              className="flex items-center gap-1.5 transition-colors hover:text-white"
-              style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}
-            >
-              <span className="flex items-center justify-center rounded text-[10px] font-bold text-white" style={{ width: 16, height: 16, background: selectedModel.iconBg }}>
-                {selectedModel.icon}
-              </span>
-              {model}
-            </button>
-            {showModelMenu && (
-              <div className="absolute bottom-full left-0 mb-1 py-1 rounded-xl z-30 overflow-hidden nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 280, maxHeight: 320, overflowY: 'auto', overscrollBehavior: 'contain' }} onWheel={(e) => e.stopPropagation()}>
-                {modelOptions.map((m) => (
-                  <button
-                    key={m.name}
-                    onClick={() => { setModel(m.name); setShowModelMenu(false); }}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors ${model === m.name ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                  >
-                    <span className="flex-shrink-0 flex items-center justify-center rounded text-[10px] font-bold text-white" style={{ width: 28, height: 28, background: m.iconBg }}>
-                      {m.icon}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] text-white font-medium">{m.name}</div>
-                      {m.tags && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          {m.tags.map(tag => (
-                            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {m.badge && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: '#f5a623', color: '#0a0a0f' }}>{m.badge}</span>
-                      )}
-                      {m.time && (
-                        <span className="text-[11px] text-[#6a6a7a]">{m.time}</span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.1)', margin: '0 10px' }} />
-
-          {/* Ratio selector */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowRatioMenu(!showRatioMenu); setShowModelMenu(false); setShowCountMenu(false); }}
-              className="flex items-center gap-1 transition-colors hover:text-white"
-              style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}
-            >
-              <Maximize className="w-3 h-3" /> {aspectRatio} · {resolution}
-            </button>
-            {showRatioMenu && (
-              <div className="absolute bottom-full left-0 mb-1 py-3 rounded-xl z-30 nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', width: 240, overscrollBehavior: 'contain' }} onWheel={(e) => e.stopPropagation()}>
-                {/* Resolution */}
-                <div className="px-3 pb-2">
-                  <div className="text-[10px] text-[#6a6a7a] mb-2">分辨率</div>
-                  <div className="flex items-center gap-2">
-                    {resolutions.map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => setResolution(r)}
-                        className={`flex-1 py-1.5 rounded-lg text-[12px] transition-colors ${resolution === r ? 'text-white border border-white/30' : 'text-[#a0a0b0] border border-transparent hover:bg-white/5'}`}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* Aspect Ratio */}
-                <div className="px-3 pt-2 border-t border-white/5">
-                  <div className="text-[10px] text-[#6a6a7a] mb-2">比例</div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {aspectRatios.map((ar) => (
-                      <button
-                        key={ar.value}
-                        onClick={() => { setAspectRatio(ar.value); setShowRatioMenu(false); }}
-                        className={`flex flex-col items-center justify-center gap-1 py-2 rounded-lg transition-colors ${aspectRatio === ar.value ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}
-                      >
-                        <div className="flex items-center justify-center" style={{ width: 16, height: 16 }}>
-                          <div
-                            className="border border-current rounded-sm"
-                            style={{
-                              width: ar.icon === 'portrait' ? 8 : ar.icon === 'landscape' ? 14 : ar.icon === 'ultrawide' ? 16 : 10,
-                              height: ar.icon === 'portrait' ? 12 : ar.icon === 'landscape' ? 8 : ar.icon === 'ultrawide' ? 6 : 10,
-                              opacity: 0.6
-                            }}
-                          />
-                        </div>
-                        <span className="text-[10px]">{ar.value}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center" style={{ gap: 16 }}>
-          {/* Voice input */}
-          <button className="flex items-center justify-center transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.4)' }} title="语音输入">
-            <Mic className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Count selector */}
-          <div className="relative">
-            <button onClick={() => { setShowCountMenu(!showCountMenu); setShowModelMenu(false); setShowRatioMenu(false); }} className="transition-colors hover:text-white" style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-              {count}
-            </button>
-            {showCountMenu && (
-              <div className="absolute bottom-full right-0 mb-1 py-1 rounded-lg z-30 nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', overscrollBehavior: 'contain' }} onWheel={(e) => e.stopPropagation()}>
-                {counts.map((c) => (
-                  <button key={c} onClick={() => { setCount(c); setShowCountMenu(false); }} className="w-full px-3 py-2 text-left text-[12px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors">
-                    {c}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Credits pill */}
-          <div className="flex items-center gap-1 rounded-full" style={{ background: '#333333', padding: '4px 10px' }}>
-            <Zap className="w-3 h-3" style={{ color: 'rgba(255,255,255,0.7)' }} />
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>5</span>
-          </div>
-
-          {/* Send button */}
-          <button className="flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: 'rgba(255,255,255,0.9)', marginLeft: -10 }} title="生成">
-            <ArrowUp className="w-4 h-4 text-black" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ─── Upscale Param Panel ─── */
 type UpscaleSliderProps = {
   value: number;
@@ -837,6 +721,157 @@ const roleColorMap: Record<ImageRole | 'null', string> = {
   null: 'rgba(255,255,255,0.35)',
 };
 
+/* ─── Prompt Presets ─── */
+const PROMPT_PRESETS: { name: string; content: string }[] = [
+  {
+    name: '照片般真实',
+    content:
+      '提升画面的照片级真实度，优化建筑材质、玻璃反射、光影层次与环境细节，减少 AI 感，使整体更接近真实建筑摄影与高质量建筑可视化表现。',
+  },
+  {
+    name: '黄昏氛围',
+    content:
+      '营造温暖的黄昏光线氛围，增强天空霞光与建筑表面的金色反射，优化光影过渡与冷暖对比，使画面呈现宁静而富有感染力的傍晚情绪。',
+  },
+  {
+    name: '清晨雾气',
+    content:
+      '添加柔和的清晨薄雾效果，降低远景对比度，增强空气透视感，使建筑在朦胧晨光中呈现诗意的氛围与层次感。',
+  },
+  {
+    name: '夜景灯光',
+    content:
+      '转为夜景表现，增强室内灯光与建筑外立面照明效果，优化夜晚天空的深蓝调与城市光污染的层次，突出建筑在夜间的标识性。',
+  },
+  {
+    name: '雪景覆盖',
+    content:
+      '添加积雪覆盖效果，优化雪的质感与厚度分布，增强冬季冷色调氛围，处理建筑与雪地之间的光影反射关系。',
+  },
+  {
+    name: '植物丰富',
+    content:
+      '增强场景中的植物丰富度与多样性，优化树木、灌木、草地的层次搭配，使景观更加自然饱满，提升整体生态感。',
+  },
+  {
+    name: '材质强化',
+    content:
+      '强化建筑材质的表现力，优化玻璃反射、金属光泽、混凝土纹理、木材肌理等细节，提升材质的触感与真实度。',
+  },
+];
+
+/* ─── Style Options ─── */
+const STYLE_OPTIONS = [
+  { value: 'photorealistic', label: '写实照片级' },
+  { value: 'concept', label: '概念草图' },
+  { value: 'watercolor', label: '水彩手绘' },
+  { value: 'lineart', label: '线稿表现' },
+  { value: 'oil', label: '油画风格' },
+  { value: 'night', label: '夜间表现' },
+  { value: 'snow', label: '雪景氛围' },
+];
+
+/* ─── Mark System ─── */
+type MarkAction = 'reference' | 'keep' | 'enhance' | 'weaken' | 'replace' | 'delete' | 'constraint';
+
+interface MarkItem {
+  id: string;
+  name: string;
+  action: MarkAction;
+  sourceIndex: number;
+  description: string;
+}
+
+const MARK_ACTION_LABELS: Record<MarkAction, string> = {
+  reference: '参考',
+  keep: '保留',
+  enhance: '强化',
+  weaken: '弱化',
+  replace: '替换',
+  delete: '删除',
+  constraint: '约束',
+};
+
+const MARK_ACTION_COLORS: Record<MarkAction, string> = {
+  reference: '#4aa3ff',
+  keep: '#4ade80',
+  enhance: '#f59e0b',
+  weaken: '#a78bfa',
+  replace: '#fb923c',
+  delete: '#ef4444',
+  constraint: '#22d3ee',
+};
+
+/* ─── Model Params ─── */
+interface ModelParams {
+  model: string;
+  ratio: string;
+  resolution: string;
+  lens: string;
+  count: string;
+}
+
+const DEFAULT_MODEL_PARAMS: ModelParams = {
+  model: 'Nano Banana 2',
+  ratio: '1:1',
+  resolution: '2K',
+  lens: '标准',
+  count: '1张',
+};
+
+const MODEL_OPTIONS = [
+  { name: 'Nano Banana 2', icon: 'G', iconBg: '#4285f4', tags: ['Precise', 'Quality', 'Fast'], time: '25s' },
+  { name: 'Nano Banana Pro', icon: 'G', iconBg: '#34a853', tags: ['Precise', 'Quality'], time: '50s' },
+  { name: 'GPT Image 2', icon: '◎', iconBg: '#10a37f', tags: ['Style'], time: '40s' },
+];
+
+const RESOLUTION_OPTIONS = ['1K', '2K', '4K'];
+
+const RATIO_OPTIONS = [
+  { value: '自适应', icon: 'auto' },
+  { value: '1:1', icon: 'square' },
+  { value: '9:16', icon: 'portrait' },
+  { value: '16:9', icon: 'landscape' },
+  { value: '3:4', icon: 'portrait' },
+  { value: '4:3', icon: 'landscape' },
+  { value: '3:2', icon: 'landscape' },
+  { value: '2:3', icon: 'portrait' },
+  { value: '4:5', icon: 'portrait' },
+  { value: '5:4', icon: 'landscape' },
+  { value: '21:9', icon: 'ultrawide' },
+];
+
+const COUNT_OPTIONS = ['1张', '2张', '4张'];
+
+/* ─── Reference Info Type ─── */
+interface ReferenceInfo {
+  nodeId: string;
+  index: number;
+  role: ImageRole | null;
+  roleLabel: string;
+  imageUrl: string;
+}
+
+function getReferencePromptText(reference: ReferenceInfo) {
+  const label = reference.roleLabel || '引用素材';
+  if (reference.role === 'primary_building' || label.includes('主体建筑')) {
+    return `@${label}（@${reference.index}） 保持建筑结构、视角、构图。`;
+  }
+  if (label.includes('整体')) {
+    return `@${label}（@${reference.index}） 参考整体氛围、时间段、灯光。`;
+  }
+  if (label.includes('天空')) {
+    return `@${label}（@${reference.index}） 参考天空颜色、云层和光照氛围。`;
+  }
+  if (label.includes('材质')) {
+    return `@${label}（@${reference.index}） 参考材质纹理、反射和细节质感。`;
+  }
+  if (label.includes('景观') || label.includes('植物')) {
+    return `@${label}（@${reference.index}） 参考景观层次、植物配置和环境氛围。`;
+  }
+  return `@${label}（@${reference.index}） 参考该素材的关键视觉特征。`;
+}
+
 function getRoleData(role: ImageRole | null) {
   const isPrimary = role === 'primary_building';
   return {
@@ -910,7 +945,7 @@ function ImageRoleTag({
         <div
           className="absolute left-0 top-[28px] w-[214px] overflow-hidden rounded-[14px] p-1.5"
           style={{
-            background: 'linear-gradient(180deg, rgba(42,45,52,0.96), rgba(24,26,31,0.96))',
+            background: FLOATING_PANEL_BACKGROUND,
             backdropFilter: 'blur(18px)',
             WebkitBackdropFilter: 'blur(18px)',
             border: '1px solid rgba(255,255,255,0.16)',
@@ -973,11 +1008,545 @@ function ImageRoleTag({
   );
 }
 
+/* ─── Image Node Control Panel ─── */
+function ImageNodeControlPanel({
+  promptText,
+  onPromptChange,
+  style,
+  onStyleChange,
+  marks,
+  onMarksChange,
+  activePreset,
+  onPresetChange,
+  modelParams,
+  onModelParamsChange,
+  onGenerate,
+  canGenerate,
+  references,
+  onRemoveReference,
+  onUseReference,
+  onAssignReferenceRole,
+}: {
+  promptText: string;
+  onPromptChange: (value: string) => void;
+  style: string;
+  onStyleChange: (value: string) => void;
+  marks: MarkItem[];
+  onMarksChange: (marks: MarkItem[]) => void;
+  activePreset: string;
+  onPresetChange: (preset: string) => void;
+  modelParams: ModelParams;
+  onModelParamsChange: (params: ModelParams) => void;
+  onGenerate: () => void;
+  canGenerate: boolean;
+  references: ReferenceInfo[];
+  onRemoveReference: (nodeId: string) => void;
+  onUseReference: (reference: ReferenceInfo) => void;
+  onAssignReferenceRole: (nodeId: string, role: ImageRole) => ReferenceInfo | null;
+}) {
+  const [showStyleMenu, setShowStyleMenu] = useState(false);
+  const [showMarkPanel, setShowMarkPanel] = useState(false);
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [showModelMenu, setShowModelMenu] = useState(false);
+  const [showRatioMenu, setShowRatioMenu] = useState(false);
+  const [showCountMenu, setShowCountMenu] = useState(false);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [showReferenceMenu, setShowReferenceMenu] = useState(false);
+  const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
+  const [pendingReference, setPendingReference] = useState<ReferenceInfo | null>(null);
+  const [markName, setMarkName] = useState('');
+  const [markAction, setMarkAction] = useState<MarkAction>('enhance');
+  const [markDesc, setMarkDesc] = useState('');
+  const promptInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
+
+  const applyPreset = (presetName: string) => {
+    const preset = PROMPT_PRESETS.find((p) => p.name === presetName);
+    if (!preset) return;
+    onPresetChange(presetName);
+    const newText = promptText ? `${promptText}\n\n${preset.content}` : preset.content;
+    onPromptChange(newText);
+    setShowPresetMenu(false);
+  };
+
+  const addMark = () => {
+    if (!markName.trim()) return;
+    const newMark: MarkItem = {
+      id: `mark-${Date.now()}`,
+      name: markName.trim(),
+      action: markAction,
+      sourceIndex: 1,
+      description: markDesc.trim(),
+    };
+    onMarksChange([...marks, newMark]);
+    // 只插入元素锚点，不自动追加动作描述
+    const markPrompt = `@${newMark.name}（@${newMark.sourceIndex}）`;
+    const newText = promptText ? `${promptText}\n\n${markPrompt}` : markPrompt;
+    onPromptChange(newText);
+    setMarkName('');
+    setMarkDesc('');
+    setShowMarkPanel(false);
+  };
+
+  const removeMark = (markId: string) => {
+    onMarksChange(marks.filter((m) => m.id !== markId));
+  };
+
+  const closeReferenceMenus = () => {
+    setShowReferenceMenu(false);
+    setPendingReference(null);
+  };
+
+  const focusReferencePrompt = (reference: ReferenceInfo) => {
+    const text = getReferencePromptText(reference);
+    const existingIndex = promptText.indexOf(text);
+    if (existingIndex < 0) return false;
+
+    requestAnimationFrame(() => {
+      promptInputRef.current?.focus();
+      promptInputRef.current?.setSelectionRange(existingIndex, existingIndex + text.length);
+    });
+    return true;
+  };
+
+  const insertReferencePrompt = (reference: ReferenceInfo) => {
+    const text = getReferencePromptText(reference);
+    if (focusReferencePrompt(reference)) {
+      closeReferenceMenus();
+      return;
+    }
+
+    const input = promptInputRef.current;
+    const selectionStart = input?.selectionStart ?? promptText.length;
+    const selectionEnd = input?.selectionEnd ?? selectionStart;
+    const atStart = selectionStart > 0 && promptText[selectionStart - 1] === '@' ? selectionStart - 1 : selectionStart;
+    const prefix = promptText.slice(0, atStart);
+    const suffix = promptText.slice(selectionEnd);
+    const spacerBefore = prefix.trim().length > 0 && !prefix.endsWith('\n') ? '\n\n' : '';
+    const spacerAfter = suffix.trim().length > 0 && !suffix.startsWith('\n') ? '\n\n' : '';
+    const nextText = `${prefix}${spacerBefore}${text}${spacerAfter}${suffix}`;
+    const nextCursor = prefix.length + spacerBefore.length + text.length;
+
+    onPromptChange(nextText);
+    closeReferenceMenus();
+    requestAnimationFrame(() => {
+      promptInputRef.current?.focus();
+      promptInputRef.current?.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
+
+  const requestReferenceInsert = (reference: ReferenceInfo) => {
+    if (!reference.role) {
+      setPendingReference(reference);
+      setShowReferenceMenu(false);
+      return;
+    }
+    onUseReference(reference);
+    insertReferencePrompt(reference);
+  };
+
+  const handleReferenceRoleSelect = (role: ImageRole) => {
+    if (!pendingReference) return;
+    const roleLabel = imageRoleOptions.find((option) => option.value === role)?.label || pendingReference.roleLabel;
+    const updatedReference = onAssignReferenceRole(pendingReference.nodeId, role) || { ...pendingReference, role, roleLabel };
+    requestReferenceInsert(updatedReference);
+  };
+
+  const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showReferenceMenu && references.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setActiveReferenceIndex((index) => (index + 1) % references.length);
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setActiveReferenceIndex((index) => (index - 1 + references.length) % references.length);
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        requestReferenceInsert(references[activeReferenceIndex]);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeReferenceMenus();
+      }
+    }
+
+    if (pendingReference && event.key === 'Escape') {
+      event.preventDefault();
+      closeReferenceMenus();
+    }
+  };
+
+  const handlePromptChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const nextText = event.target.value;
+    const cursor = event.target.selectionStart;
+    onPromptChange(nextText);
+
+    if (nextText[cursor - 1] === '@' && references.length > 0) {
+      setActiveReferenceIndex(0);
+      setPendingReference(null);
+      setShowReferenceMenu(true);
+      return;
+    }
+    if (showReferenceMenu && nextText[cursor - 1] !== '@') {
+      setShowReferenceMenu(false);
+    }
+  };
+
+  return (
+    <div
+      className="nodrag nowheel"
+      style={{
+        width: IMAGE_NODE_CONTROL_WIDTH,
+        minHeight: promptExpanded ? IMAGE_NODE_CONTROL_EXPANDED_HEIGHT : IMAGE_NODE_CONTROL_HEIGHT,
+        background: FLOATING_PANEL_BACKGROUND,
+        border: FLOATING_PANEL_BORDER,
+        borderRadius: 12,
+        marginTop: 8,
+        boxShadow: '0 16px 40px rgba(0,0,0,0.42)',
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {/* Top toolbar */}
+      <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
+        <div className="flex items-center gap-2">
+          {/* 风格 */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowStyleMenu(!showStyleMenu); setShowMarkPanel(false); setShowPresetMenu(false); }}
+              className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
+              style={{ width: 54, height: 50, padding: '4px', background: style ? 'rgba(74,163,255,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
+            >
+              <Box className="w-4 h-4" style={{ color: style ? '#4aa3ff' : 'rgba(255,255,255,0.7)' }} />
+              <span style={{ fontSize: 12, color: style ? '#4aa3ff' : 'rgba(255,255,255,0.72)' }}>风格</span>
+            </button>
+            {showStyleMenu && (
+              <div className="absolute top-full left-0 mt-1 py-1 rounded-lg z-30 overflow-hidden" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 120 }}>
+                {STYLE_OPTIONS.map((s) => (
+                  <button key={s.value} onClick={() => { onStyleChange(s.value); setShowStyleMenu(false); }} className={`w-full text-left px-3 py-2 text-[13px] transition-colors ${style === s.value ? 'text-[#4aa3ff] bg-white/5' : 'text-white/75 hover:bg-white/5'}`}>{s.label}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* 标记 */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowStyleMenu(false); setShowPresetMenu(false); }}
+              className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
+              style={{ width: 54, height: 50, padding: '4px', background: marks.length > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
+            >
+              <MapPin className="w-4 h-4" style={{ color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.7)' }} />
+              <span style={{ fontSize: 12, color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>标记</span>
+            </button>
+            {showMarkPanel && (
+              <div className="absolute top-full left-0 mt-1 p-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 220 }}>
+                <div className="text-[12px] text-white/55 mb-2">添加元素标记</div>
+                <input value={markName} onChange={(e) => setMarkName(e.target.value)} placeholder="元素名称" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
+                <select value={markAction} onChange={(e) => setMarkAction(e.target.value as MarkAction)} className="w-full bg-transparent text-[13px] mb-2 outline-none" style={{ color: 'rgba(255,255,255,0.9)', background: FLOATING_PANEL_BACKGROUND }} onPointerDown={(e) => e.stopPropagation()}>
+                  {Object.entries(MARK_ACTION_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
+                </select>
+                <input value={markDesc} onChange={(e) => setMarkDesc(e.target.value)} placeholder="动作描述" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
+                <button onClick={addMark} className="w-full text-center text-[12px] py-1.5 rounded bg-white/10 text-white/90 hover:bg-white/15 transition-colors">添加</button>
+                {marks.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {marks.map((m) => (
+                      <div key={m.id} className="flex items-center justify-between text-[12px]">
+                        <span style={{ color: MARK_ACTION_COLORS[m.action] }}>@{m.name}（{MARK_ACTION_LABELS[m.action]}）</span>
+                        <button onClick={() => removeMark(m.id)} className="text-white/30 hover:text-white/60">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {/* 预设 */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowPresetMenu(!showPresetMenu); setShowStyleMenu(false); setShowMarkPanel(false); }}
+              className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
+              style={{ width: 54, height: 50, padding: '4px', background: activePreset ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
+            >
+              <Bookmark className="w-4 h-4" style={{ color: activePreset ? '#a78bfa' : 'rgba(255,255,255,0.7)' }} />
+              <span style={{ fontSize: 12, color: activePreset ? '#a78bfa' : 'rgba(255,255,255,0.72)' }}>预设</span>
+            </button>
+            {showPresetMenu && (
+              <div className="absolute top-full left-0 mt-1 py-1 rounded-lg z-30 overflow-hidden" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 170 }}>
+                {PROMPT_PRESETS.map((p) => (
+                  <button key={p.name} onClick={() => applyPreset(p.name)} className={`w-full text-left px-3 py-2 text-[13px] transition-colors ${activePreset === p.name ? 'text-[#a78bfa] bg-white/5' : 'text-white/75 hover:bg-white/5'}`}>/ {p.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* 引用缩略图 */}
+          <div className="flex items-center gap-1 ml-1">
+            {references.slice(0, 3).map((ref) => (
+              <div
+                key={ref.nodeId}
+                role="button"
+                tabIndex={0}
+                onClick={() => requestReferenceInsert(ref)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') requestReferenceInsert(ref);
+                }}
+                className="group/ref relative flex-shrink-0 cursor-pointer rounded-md outline-none"
+                title={`${ref.roleLabel}（@${ref.index}）`}
+              >
+                {ref.imageUrl && (
+                  <div
+                    className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 overflow-hidden rounded-xl group-hover/ref:block"
+                    style={{
+                      width: 156,
+                      background: FLOATING_PANEL_BACKGROUND,
+                      border: FLOATING_PANEL_BORDER,
+                      boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
+                    }}
+                  >
+                    <img src={ref.imageUrl} alt="" className="h-[94px] w-full object-cover" />
+                    <div className="truncate px-2 py-1.5 text-[12px]" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                      @{ref.roleLabel || '引用素材'}
+                    </div>
+                  </div>
+                )}
+                {ref.imageUrl ? (
+                  <img src={ref.imageUrl} alt="" className="rounded-md object-cover" style={{ width: 36, height: 36 }} />
+                ) : (
+                  <div className="rounded-md flex items-center justify-center" style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.05)' }}>
+                    <Image className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                  </div>
+                )}
+                <span className="absolute -top-1 -right-1 flex items-center justify-center text-[8px] font-bold rounded-full" style={{ width: 14, height: 14, background: '#fff', color: '#000' }}>{ref.index}</span>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveReference(ref.nodeId);
+                  }}
+                  className="absolute -right-1.5 -top-1.5 hidden items-center justify-center rounded-full text-white transition-colors hover:bg-black group-hover/ref:flex"
+                  style={{ width: 16, height: 16, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
+                  title="删除引用"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Expand */}
+        <button
+          onClick={() => setPromptExpanded((value) => !value)}
+          className="flex items-center justify-center rounded-md transition-colors hover:bg-white/5"
+          style={{ width: 32, height: 32, color: promptExpanded ? '#ffffff' : 'rgba(255,255,255,0.45)' }}
+          title={promptExpanded ? '收起提示词框' : '展开提示词框'}
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Prompt input */}
+      <div style={{ padding: '4px 14px 12px' }}>
+        <div className="relative">
+        <textarea
+          ref={promptInputRef}
+          value={promptText}
+          onChange={handlePromptChange}
+          onKeyDown={handlePromptKeyDown}
+          placeholder="描述你想要生成的画面内容，按/呼出指令，@引用素材"
+          className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
+          style={{ color: 'rgba(255,255,255,0.94)', fontSize: 14, lineHeight: 1.58, minHeight: promptExpanded ? 176 : 104 }}
+          rows={promptExpanded ? 7 : 4}
+          onPointerDown={(e) => e.stopPropagation()}
+        />
+        {showReferenceMenu && references.length > 0 && (
+          <div
+            className="absolute left-0 top-7 z-40 overflow-hidden rounded-xl py-1"
+            style={{
+              width: 260,
+              background: FLOATING_PANEL_BACKGROUND,
+              border: FLOATING_PANEL_BORDER,
+              boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
+            }}
+          >
+            {references.map((reference, index) => (
+              <button
+                key={reference.nodeId}
+                onMouseEnter={() => setActiveReferenceIndex(index)}
+                onClick={() => requestReferenceInsert(reference)}
+                className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors"
+                style={{
+                  background: activeReferenceIndex === index ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  color: 'rgba(255,255,255,0.9)',
+                }}
+              >
+                {reference.imageUrl ? (
+                  <img src={reference.imageUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded object-cover" />
+                ) : (
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <Image className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.45)' }} />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{reference.roleLabel || '未定义用途'}</span>
+                <span className="flex-shrink-0 text-[13px]" style={{ color: 'rgba(255,255,255,0.52)' }}>
+                  (@{reference.index})
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {pendingReference && (
+          <div
+            className="absolute left-0 top-7 z-40 overflow-hidden rounded-xl py-1"
+            style={{
+              width: 260,
+              maxHeight: 300,
+              overflowY: 'auto',
+              background: FLOATING_PANEL_BACKGROUND,
+              border: FLOATING_PANEL_BORDER,
+              boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
+            }}
+          >
+            <div className="px-3 py-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.58)' }}>选择图片用途</div>
+            {imageRoleOptions.map((option) => {
+              const RoleIcon = option.Icon;
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => handleReferenceRoleSelect(option.value)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] transition-colors hover:bg-white/5"
+                  style={{ color: 'rgba(255,255,255,0.86)' }}
+                >
+                  <RoleIcon className="h-4 w-4" style={{ color: roleColorMap[option.value] }} />
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        </div>
+      </div>
+
+      {/* Bottom params bar */}
+      <div className="flex items-center justify-between" style={{ padding: '4px 14px 14px' }}>
+        <div className="flex items-center gap-4">
+          {/* Model */}
+          <div className="relative">
+            <button onClick={() => { setShowModelMenu(!showModelMenu); setShowRatioMenu(false); setShowCountMenu(false); }} className="flex items-center gap-1.5 transition-colors hover:text-white" style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)' }}>
+              <span style={{ color: 'rgba(255,255,255,0.72)' }}>×</span>
+              <span className="truncate" style={{ maxWidth: 150 }}>{selectedModel.name}</span>
+              <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
+            </button>
+            {showModelMenu && (
+              <div className="absolute bottom-full left-0 mb-1 py-1 rounded-lg z-30 overflow-hidden" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 190 }}>
+                {MODEL_OPTIONS.map((m) => (
+                  <button key={m.name} onClick={() => { onModelParamsChange({ ...modelParams, model: m.name }); setShowModelMenu(false); }} className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left transition-colors ${modelParams.model === m.name ? 'bg-white/10' : 'hover:bg-white/5'}`}>
+                    <span className="flex-shrink-0 flex items-center justify-center rounded text-[8px] font-bold text-white" style={{ width: 18, height: 18, background: m.iconBg }}>{m.icon}</span>
+                    <span className="text-[13px] text-white/85">{m.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Ratio · Resolution */}
+          <div className="relative">
+            <button onClick={() => { setShowRatioMenu(!showRatioMenu); setShowModelMenu(false); setShowCountMenu(false); }} className="flex items-center gap-1.5 transition-colors hover:text-white" style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)' }}>
+              <Maximize className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.68)' }} />
+              <span>{modelParams.ratio} · {modelParams.resolution}</span>
+              <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
+            </button>
+            {showRatioMenu && (
+              <div className="absolute bottom-full left-0 mb-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 16px 34px rgba(0,0,0,0.48)', width: 326, padding: 8 }}>
+                <div className="pb-2">
+                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>分辨率</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {RESOLUTION_OPTIONS.map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => onModelParamsChange({ ...modelParams, resolution: r })}
+                        className="h-9 rounded-md text-[14px] font-medium transition-colors"
+                        style={{
+                          color: modelParams.resolution === r ? '#ffffff' : 'rgba(255,255,255,0.54)',
+                          background: 'rgba(255,255,255,0.035)',
+                          border: modelParams.resolution === r ? '1px solid rgba(255,255,255,0.9)' : FLOATING_PANEL_BORDER,
+                        }}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="pt-1">
+                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>比例</div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {RATIO_OPTIONS.map((ar) => (
+                      <button
+                        key={ar.value}
+                        onClick={() => { onModelParamsChange({ ...modelParams, ratio: ar.value }); setShowRatioMenu(false); }}
+                        className="flex h-[64px] flex-col items-center justify-center gap-2 rounded-md transition-colors"
+                        style={{
+                          color: modelParams.ratio === ar.value ? '#ffffff' : 'rgba(255,255,255,0.58)',
+                          background: 'rgba(255,255,255,0.035)',
+                          border: modelParams.ratio === ar.value ? '1px solid rgba(255,255,255,0.9)' : FLOATING_PANEL_BORDER,
+                        }}
+                      >
+                        <div className="border border-current rounded-[2px]" style={{ width: ar.icon === 'portrait' ? 9 : ar.icon === 'landscape' ? 14 : ar.icon === 'ultrawide' ? 17 : 11, height: ar.icon === 'portrait' ? 15 : ar.icon === 'landscape' ? 8 : ar.icon === 'ultrawide' ? 5 : 11, opacity: 0.78 }} />
+                        <span className="text-[13px]">{ar.value}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Generate button */}
+        <div className="relative flex items-center gap-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: FLOATING_PANEL_BORDER, padding: '5px 6px 5px 12px' }}>
+          <button
+            onClick={() => { setShowCountMenu(!showCountMenu); setShowModelMenu(false); setShowRatioMenu(false); }}
+            className="flex items-center gap-1 transition-colors hover:text-white"
+            style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}
+          >
+            {modelParams.count}
+            <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
+          </button>
+          {showCountMenu && (
+            <div className="absolute bottom-full right-10 mb-2 py-1 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', minWidth: 80 }}>
+              {COUNT_OPTIONS.map((c) => (
+                <button key={c} onClick={() => { onModelParamsChange({ ...modelParams, count: c }); setShowCountMenu(false); }} className={`w-full px-3 py-2 text-left text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}>{c}</button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.62)' }}>
+            <Zap className="w-3.5 h-3.5" />
+            <span style={{ fontSize: 15 }}>14</span>
+          </div>
+          <button
+            onClick={onGenerate}
+            disabled={!canGenerate}
+            className="flex items-center justify-center rounded-lg transition-colors"
+            style={{
+              width: 34,
+              height: 34,
+              background: canGenerate ? '#ffffff' : 'rgba(255,255,255,0.14)',
+              opacity: canGenerate ? 1 : 0.45,
+            }}
+            title="生成"
+          >
+            <ArrowUp className="w-4 h-4 text-black" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Image Node ─── */
 function ImageNode({ data, selected, id }: NodeProps) {
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
-  const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
   const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
 
   const img = data.image as string;
@@ -990,7 +1559,95 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const { setNodes } = useReactFlow();
+  const { setNodes, setEdges } = useReactFlow();
+
+  /* ─── Extended node state ─── */
+  const [promptText, setPromptText] = useState((data.prompt as string) || '');
+  const [style, setStyle] = useState((data.style as string) || '');
+  const [marks, setMarks] = useState<MarkItem[]>((data.marks as MarkItem[]) || []);
+  const [activePreset, setActivePreset] = useState((data.preset as string) || '');
+  const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
+  const [generatedImages, setGeneratedImages] = useState<string[]>((data.generatedImages as string[]) || []);
+
+  /* ─── Reference tracking ─── */
+  const allEdges = useStore((state) => state.edges);
+  const allNodes = useStore((state) => state.nodes);
+  const inputEdges = allEdges.filter((e) => e.target === id);
+  const references: ReferenceInfo[] = inputEdges.map((edge, idx) => {
+    const sourceNode = allNodes.find((n) => n.id === edge.source);
+    const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
+    const roleOpt = sourceRole ? imageRoleOptions.find((o) => o.value === sourceRole) : null;
+    return {
+      nodeId: edge.source,
+      index: idx + 1,
+      role: sourceRole,
+      roleLabel: roleOpt?.label || '未定义用途',
+      imageUrl: sourceNode?.data?.image as string,
+    };
+  });
+
+  const canGenerate = references.length > 0 || role !== null || marks.length > 0 || activePreset !== '' || promptText.trim().length > 0;
+
+  const handleGenerate = () => {
+    const mockResult = `/images/show-cover-${Math.floor(Math.random() * 5) + 1}.jpg`;
+    const nextGeneratedImages = [...generatedImages, mockResult];
+    setPreviewImage(mockResult);
+    setGeneratedImages(nextGeneratedImages);
+    const resultImage = new window.Image();
+    resultImage.onload = () => {
+      setImgSize({ width: resultImage.width, height: resultImage.height });
+    };
+    resultImage.src = mockResult;
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, image: mockResult, generatedImages: nextGeneratedImages, width: 1024, height: 1024 } } : n));
+  };
+
+  const handlePromptChange = (value: string) => {
+    setPromptText(value);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, prompt: value } } : n));
+  };
+
+  const handleStyleChange = (value: string) => {
+    setStyle(value);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, style: value } } : n));
+  };
+
+  const handleMarksChange = (newMarks: MarkItem[]) => {
+    setMarks(newMarks);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, marks: newMarks } } : n));
+  };
+
+  const handlePresetChange = (preset: string) => {
+    setActivePreset(preset);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, preset } } : n));
+  };
+
+  const handleModelParamsChange = (params: ModelParams) => {
+    setModelParams(params);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, modelParams: params } } : n));
+  };
+
+  const handleRemoveReference = (sourceNodeId: string) => {
+    setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === id)));
+  };
+
+  const handleUseReference = (_reference: ReferenceInfo) => {
+    // Shared entry point for top thumbnails and the @ reference menu.
+  };
+
+  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole) => {
+    const roleOption = imageRoleOptions.find((option) => option.value === nextRole);
+    setNodes((nds) => nds.map((node) => (
+      node.id === sourceNodeId ? { ...node, data: { ...node.data, ...getRoleData(nextRole) } } : node
+    )));
+
+    const existingReference = references.find((reference) => reference.nodeId === sourceNodeId);
+    if (!existingReference) return null;
+    return {
+      ...existingReference,
+      role: nextRole,
+      roleLabel: roleOption?.label || existingReference.roleLabel,
+    };
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1025,9 +1682,23 @@ function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const displayImage = previewImage || img;
-  const cardWidth = 240;
-  const aspectRatio = imgSize ? imgSize.width / imgSize.height : ((data.width as number) || 1) / ((data.height as number) || 1);
-  const cardHeight = displayImage ? Math.min(Math.round(cardWidth / aspectRatio), 320) : cardWidth;
+  const sourceWidth = imgSize?.width || (data.width as number) || 1;
+  const sourceHeight = imgSize?.height || (data.height as number) || 1;
+  const aspectRatio = sourceWidth / sourceHeight;
+  const imageDisplayScale = displayImage
+    ? Math.min(
+        IMAGE_NODE_MAX_IMAGE_WIDTH / sourceWidth,
+        IMAGE_NODE_MAX_IMAGE_HEIGHT / sourceHeight,
+        Math.max(
+          IMAGE_NODE_MIN_IMAGE_SIZE / sourceWidth,
+          IMAGE_NODE_MIN_IMAGE_SIZE / sourceHeight,
+        ),
+      )
+    : 1;
+  const cardWidth = displayImage ? Math.round(sourceWidth * imageDisplayScale) : IMAGE_NODE_PREVIEW_WIDTH;
+  const cardHeight = displayImage
+    ? Math.max(120, Math.min(Math.round(cardWidth / aspectRatio), 320))
+    : IMAGE_NODE_EMPTY_HEIGHT;
   const showTitleMeta = zoom >= 0.35;
   const roleOption = role ? imageRoleOptions.find((o) => o.value === role) : null;
   const RoleIconForTitle = roleOption?.Icon;
@@ -1129,17 +1800,17 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
-          className="w-full rounded-[16px] flex items-center justify-center transition-all overflow-hidden"
+          className="w-full rounded-xl flex items-center justify-center transition-all overflow-hidden"
           style={{
             width: cardWidth,
-            height: cardHeight,
-            background: '#1a1a1a',
-            border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
+            height: displayImage ? Math.round(sourceHeight * imageDisplayScale) : cardHeight,
+            background: '#252526',
+            border: `1px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.06)'}`,
             boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
           }}
         >
           {displayImage ? (
-            <img src={displayImage} alt="" className="w-full h-full object-cover" />
+            <img src={displayImage} alt="" className="w-full h-full object-contain" />
           ) : (
             <div className="flex items-center justify-center">
               {/* Clean placeholder icon */}
@@ -1222,21 +1893,42 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
       </div>
 
-      {/* Prompt panel — centered under card, shown only for empty image nodes when selected */}
-      {!displayImage && selected && selectedNodeCount === 1 && (
-        <div
-          className="absolute"
-          style={{
-            left: -(640 - cardWidth) / 2,
-            top: cardHeight + 12 / zoom,
-            width: 640,
-            transform: `scale(${inverseScale})`,
-            transformOrigin: 'top center',
-            zIndex: 20,
-          }}
-        >
-          <PromptPanel />
-        </div>
+      {/* Control panel — below the preview area */}
+      {/* 空节点或有生成历史的节点才显示控制面板；纯上传/拖入的素材节点隐藏 */}
+      {selected && (!displayImage || generatedImages.length > 0) && (
+        <>
+      <div
+        className="absolute z-30"
+        style={{
+          top: cardHeight + 12 / zoom,
+          left: cardWidth / 2,
+          width: IMAGE_NODE_CONTROL_WIDTH,
+          transform: `translateX(-50%) scale(${inverseScale})`,
+          transformOrigin: 'top center',
+        }}
+      >
+        <ImageNodeControlPanel
+          promptText={promptText}
+          onPromptChange={handlePromptChange}
+          style={style}
+          onStyleChange={handleStyleChange}
+          marks={marks}
+          onMarksChange={handleMarksChange}
+          activePreset={activePreset}
+          onPresetChange={handlePresetChange}
+          modelParams={modelParams}
+          onModelParamsChange={handleModelParamsChange}
+              onGenerate={handleGenerate}
+              canGenerate={canGenerate}
+              references={references}
+              onRemoveReference={handleRemoveReference}
+              onUseReference={handleUseReference}
+              onAssignReferenceRole={handleAssignReferenceRole}
+            />
+      </div>
+
+      <div style={{ height: (IMAGE_NODE_CONTROL_HEIGHT + 22) / zoom }} />
+        </>
       )}
 
       {/* Fullscreen preview modal — rendered via portal to escape node bounds */}
@@ -1259,7 +1951,16 @@ function UpscaleNode({ data, selected, id }: NodeProps) {
   const inverseScale = 1 / zoom;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
 
-  const cardWidth = 240;
+  const cardWidth = displayImage
+    ? Math.round(((imgSize?.width || (data.width as number) || 1) * Math.min(
+        IMAGE_NODE_MAX_IMAGE_WIDTH / (imgSize?.width || (data.width as number) || 1),
+        IMAGE_NODE_MAX_IMAGE_HEIGHT / (imgSize?.height || (data.height as number) || 1),
+        Math.max(
+          IMAGE_NODE_MIN_IMAGE_SIZE / (imgSize?.width || (data.width as number) || 1),
+          IMAGE_NODE_MIN_IMAGE_SIZE / (imgSize?.height || (data.height as number) || 1),
+        ),
+      )))
+    : IMAGE_NODE_PREVIEW_WIDTH;
   const cardHeight = 240;
 
   return (
@@ -1955,7 +2656,7 @@ function FlowCanvas() {
               className="px-6 py-4 rounded-2xl text-sm font-medium"
               style={{ background: '#252526', border: '1px solid #2a2a35', color: '#fff' }}
             >
-              Drop images or videos here to upload
+              拖放图片或视频以上传
             </div>
           </div>
         )}

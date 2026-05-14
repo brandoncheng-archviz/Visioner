@@ -654,7 +654,7 @@ export default function NodeEditorCanvas() {
       {/* Node Search Panel */}
       {showSearch && (
         <div className="absolute inset-0 z-40 flex items-center justify-center" onClick={() => setShowSearch(false)}>
-          <div className="w-80 rounded-xl overflow-hidden" style={{ background: '#13131f', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 24px 48px rgba(0,0,0,0.6)' }}
+          <div className="w-80 rounded-xl overflow-hidden" style={{ background: '#252526', border: '1px solid #2a2a35', boxShadow: '0 24px 48px rgba(0,0,0,0.6)' }}
             onClick={(e) => e.stopPropagation()}>
             <div className="px-3 py-2 border-b border-white/5">
               <input
@@ -704,8 +704,8 @@ export default function NodeEditorCanvas() {
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
-            background: '#13131f',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: '#252526',
+            border: '1px solid #2a2a35',
             boxShadow: '0 16px 32px rgba(0,0,0,0.5)',
             minWidth: 140,
           }}

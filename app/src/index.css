@@ -281,9 +281,9 @@ input[type="range"]::-moz-range-thumb {
 
     --background: 240 14% 4%;
     --foreground: 0 0% 100%;
-    --card: 0 0% 15%;
+    --card: 240 11% 14%;
     --card-foreground: 0 0% 100%;
-    --popover: 0 0% 15%;
+    --popover: 240 11% 14%;
     --popover-foreground: 0 0% 100%;
     --primary: 195 100% 50%;
     --primary-foreground: 240 14% 4%;
@@ -291,7 +291,7 @@ input[type="range"]::-moz-range-thumb {
     --secondary-foreground: 0 0% 100%;
     --muted: 240 8% 14%;
     --muted-foreground: 240 5% 45%;
-    --accent: 0 0% 12%;
+    --accent: 240 11% 18%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
