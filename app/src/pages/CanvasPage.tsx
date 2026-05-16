@@ -16,6 +16,7 @@ import {
   type Edge,
   Handle,
   Position,
+  SelectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import Navbar from '../components/Navbar';
@@ -198,7 +199,7 @@ function NodeShell({ label, selected, children }: { label: string; selected: boo
 
       {/* Card body */}
       <div
-        className="rounded-xl overflow-hidden min-w-[200px] max-w-[260px] transition-all"
+        className="node-preview-card rounded-xl overflow-hidden min-w-[200px] max-w-[260px] transition-all"
         style={{
           background: '#1a1a24',
           border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
@@ -225,6 +226,33 @@ function TextNode({ data, selected }: NodeProps) {
         </div>
       </div>
     </NodeShell>
+  );
+}
+
+/* ─── Shortcut keycap row for help panel ─── */
+function ShortcutRow({ label, keys }: { label: string; keys: string[] }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span style={{ color: '#b0b0b8' }}>{label}</span>
+      <div className="flex items-center gap-1">
+        {keys.map((k) => (
+          <span
+            key={k}
+            className="inline-flex items-center justify-center rounded-md text-[12px] font-medium"
+            style={{
+              background: '#2a2a35',
+              color: '#e0e0e8',
+              padding: '3px 8px',
+              minWidth: 24,
+              height: 24,
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            {k}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1282,6 +1310,8 @@ interface ReferenceInfo {
   role: ImageRole | null;
   roleLabel: string;
   imageUrl: string;
+  width?: number;
+  height?: number;
 }
 
 function getReferencePromptText(reference: ReferenceInfo) {
@@ -1454,6 +1484,7 @@ function ImageNodeControlPanel({
   canGenerate,
   references,
   onRemoveReference,
+  onReorderReferences,
   onUseReference,
   onAssignReferenceRole,
 }: {
@@ -1469,6 +1500,7 @@ function ImageNodeControlPanel({
   canGenerate: boolean;
   references: ReferenceInfo[];
   onRemoveReference: (nodeId: string) => void;
+  onReorderReferences: (newOrder: string[]) => void;
   onUseReference: (reference: ReferenceInfo) => void;
   onAssignReferenceRole: (nodeId: string, role: ImageRole) => ReferenceInfo | null;
 }) {
@@ -1489,6 +1521,123 @@ function ImageNodeControlPanel({
   const [slashQuery, setSlashQuery] = useState('');
   const [slashIndex, setSlashIndex] = useState(0);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
+
+  /* ─── Reference thumbnail drag-and-drop reorder ─── */
+  const [orderedRefs, setOrderedRefs] = useState(references);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggingRefIndex, setDraggingRefIndex] = useState<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const pointerDragIndexRef = useRef<number | null>(null);
+  const pointerDragMovedRef = useRef(false);
+
+  useEffect(() => {
+    const currentIds = new Set(orderedRefs.map((r) => r.nodeId));
+    const newIds = new Set(references.map((r) => r.nodeId));
+    if (currentIds.size !== newIds.size || !references.every((r) => currentIds.has(r.nodeId))) {
+      setOrderedRefs(references);
+    }
+  }, [references]);
+
+  const handleRefDragStart = (index: number) => (e: React.DragEvent) => {
+    isDraggingRef.current = true;
+    setDraggingRefIndex(index);
+    e.dataTransfer.setData('text/plain', String(index));
+    e.dataTransfer.setData('application/x-visioner-reference-reorder', 'true');
+    e.dataTransfer.effectAllowed = 'move';
+    const dragImage = document.createElement('div');
+    dragImage.style.position = 'fixed';
+    dragImage.style.left = '-1000px';
+    dragImage.style.top = '-1000px';
+    dragImage.style.width = '1px';
+    dragImage.style.height = '1px';
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 0, 0);
+    window.setTimeout(() => dragImage.remove(), 0);
+    e.stopPropagation();
+  };
+
+  const handleRefDragOver = (index: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleRefDrop = (targetIndex: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    if (sourceIndex === targetIndex || Number.isNaN(sourceIndex)) {
+      setDragOverIndex(null);
+      return;
+    }
+    const newRefs = [...orderedRefs];
+    const [moved] = newRefs.splice(sourceIndex, 1);
+    newRefs.splice(targetIndex, 0, moved);
+    setOrderedRefs(newRefs);
+    onReorderReferences(newRefs.map((r) => r.nodeId));
+    setDragOverIndex(null);
+  };
+
+  const handleRefDragEnd = () => {
+    setDragOverIndex(null);
+    setDraggingRefIndex(null);
+    setTimeout(() => { isDraggingRef.current = false; }, 50);
+  };
+
+  const reorderReferences = (sourceIndex: number, targetIndex: number) => {
+    if (sourceIndex === targetIndex) return;
+    const newRefs = [...orderedRefs];
+    const [moved] = newRefs.splice(sourceIndex, 1);
+    newRefs.splice(targetIndex, 0, moved);
+    setOrderedRefs(newRefs);
+    onReorderReferences(newRefs.map((r) => r.nodeId));
+  };
+
+  const resetPointerReferenceDrag = (keepClickBlocked = true) => {
+    pointerDragIndexRef.current = null;
+    pointerDragMovedRef.current = false;
+    setDragOverIndex(null);
+    setDraggingRefIndex(null);
+    if (keepClickBlocked) {
+      window.setTimeout(() => { isDraggingRef.current = false; }, 50);
+    } else {
+      isDraggingRef.current = false;
+    }
+  };
+
+  const handleRefPointerDown = (index: number) => (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    pointerDragIndexRef.current = index;
+    pointerDragMovedRef.current = false;
+    isDraggingRef.current = true;
+    setDraggingRefIndex(index);
+    event.stopPropagation();
+  };
+
+  const handleRefPointerEnter = (index: number) => {
+    const sourceIndex = pointerDragIndexRef.current;
+    if (sourceIndex === null || sourceIndex === index) return;
+    pointerDragMovedRef.current = true;
+    setDragOverIndex(index);
+  };
+
+  const handleRefPointerUp = (index: number) => (event: React.PointerEvent<HTMLDivElement>) => {
+    const sourceIndex = pointerDragIndexRef.current;
+    event.stopPropagation();
+    if (sourceIndex === null) return;
+    if (sourceIndex !== index) {
+      reorderReferences(sourceIndex, index);
+      resetPointerReferenceDrag(true);
+      return;
+    }
+    resetPointerReferenceDrag(pointerDragMovedRef.current);
+  };
+
+  const handleThumbnailClick = (ref: ReferenceInfo) => {
+    if (isDraggingRef.current) return;
+    requestReferenceInsert(ref);
+  };
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const visiblePresets = useMemo(
@@ -1556,7 +1705,7 @@ function ImageNodeControlPanel({
     onMarksChange([...marks, newMark]);
     // 只插入元素锚点，不自动追加动作描述
     const markPrompt = `@${newMark.name}（@${newMark.sourceIndex}）`;
-    const newText = promptText ? `${promptText}\n\n${markPrompt}` : markPrompt;
+    const newText = promptText ? `${promptText}\n${markPrompt}` : markPrompt;
     onPromptChange(newText);
     setMarkName('');
     setMarkDesc('');
@@ -1597,8 +1746,8 @@ function ImageNodeControlPanel({
     const atStart = selectionStart > 0 && promptText[selectionStart - 1] === '@' ? selectionStart - 1 : selectionStart;
     const prefix = promptText.slice(0, atStart);
     const suffix = promptText.slice(selectionEnd);
-    const spacerBefore = prefix.trim().length > 0 && !prefix.endsWith('\n') ? '\n\n' : '';
-    const spacerAfter = suffix.trim().length > 0 && !suffix.startsWith('\n') ? '\n\n' : '';
+    const spacerBefore = prefix.trim().length > 0 && !prefix.endsWith('\n') ? '\n' : '';
+    const spacerAfter = suffix.trim().length > 0 && !suffix.startsWith('\n') ? '\n' : '';
     const nextText = `${prefix}${spacerBefore}${text}${spacerAfter}${suffix}`;
     const nextCursor = prefix.length + spacerBefore.length + text.length;
 
@@ -1767,38 +1916,6 @@ function ImageNodeControlPanel({
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
         <div className="flex items-center gap-2">
-          {/* 标记 */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowPresetMenu(false); }}
-              className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
-              style={{ width: 54, height: 50, padding: '4px', background: marks.length > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
-            >
-              <MapPin className="w-4 h-4" style={{ color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.7)' }} />
-              <span style={{ fontSize: 12, color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>标记</span>
-            </button>
-            {showMarkPanel && (
-              <div className="absolute top-full left-0 mt-1 p-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 220 }}>
-                <div className="text-[12px] text-white/55 mb-2">添加元素标记</div>
-                <input value={markName} onChange={(e) => setMarkName(e.target.value)} placeholder="元素名称" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
-                <select value={markAction} onChange={(e) => setMarkAction(e.target.value as MarkAction)} className="w-full bg-transparent text-[13px] mb-2 outline-none" style={{ color: 'rgba(255,255,255,0.9)', background: FLOATING_PANEL_BACKGROUND }} onPointerDown={(e) => e.stopPropagation()}>
-                  {Object.entries(MARK_ACTION_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
-                </select>
-                <input value={markDesc} onChange={(e) => setMarkDesc(e.target.value)} placeholder="动作描述" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
-                <button onClick={addMark} className="w-full text-center text-[12px] py-1.5 rounded bg-white/10 text-white/90 hover:bg-white/15 transition-colors">添加</button>
-                {marks.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {marks.map((m) => (
-                      <div key={m.id} className="flex items-center justify-between text-[12px]">
-                        <span style={{ color: MARK_ACTION_COLORS[m.action] }}>@{m.name}（{MARK_ACTION_LABELS[m.action]}）</span>
-                        <button onClick={() => removeMark(m.id)} className="text-white/30 hover:text-white/60">×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
           {/* 预设 */}
           <div className="relative">
             <button
@@ -1915,20 +2032,71 @@ function ImageNodeControlPanel({
               </div>
             )}
           </div>
-          {/* 引用缩略图 */}
-          <div className="flex items-center gap-2 ml-1">
-            {references.slice(0, 3).map((ref) => (
+          {/* 标记 */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowPresetMenu(false); }}
+              className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
+              style={{ width: 54, height: 50, padding: '4px', background: marks.length > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
+            >
+              <MapPin className="w-4 h-4" style={{ color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.7)' }} />
+              <span style={{ fontSize: 12, color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>标记</span>
+            </button>
+            {showMarkPanel && (
+              <div className="absolute top-full left-0 mt-1 p-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 220 }}>
+                <div className="text-[12px] text-white/55 mb-2">添加元素标记</div>
+                <input value={markName} onChange={(e) => setMarkName(e.target.value)} placeholder="元素名称" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
+                <select value={markAction} onChange={(e) => setMarkAction(e.target.value as MarkAction)} className="w-full bg-transparent text-[13px] mb-2 outline-none" style={{ color: 'rgba(255,255,255,0.9)', background: FLOATING_PANEL_BACKGROUND }} onPointerDown={(e) => e.stopPropagation()}>
+                  {Object.entries(MARK_ACTION_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
+                </select>
+                <input value={markDesc} onChange={(e) => setMarkDesc(e.target.value)} placeholder="动作描述" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
+                <button onClick={addMark} className="w-full text-center text-[12px] py-1.5 rounded bg-white/10 text-white/90 hover:bg-white/15 transition-colors">添加</button>
+                {marks.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {marks.map((m) => (
+                      <div key={m.id} className="flex items-center justify-between text-[12px]">
+                        <span style={{ color: MARK_ACTION_COLORS[m.action] }}>@{m.name}（{MARK_ACTION_LABELS[m.action]}）</span>
+                        <button onClick={() => removeMark(m.id)} className="text-white/30 hover:text-white/60">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          {/* 引用缩略图 — 支持拖拽排序 */}
+          <div
+            className="flex items-center gap-2 ml-1"
+          >
+            {orderedRefs.map((ref, idx) => (
               <div
                 key={ref.nodeId}
                 role="button"
                 tabIndex={0}
-                onClick={() => requestReferenceInsert(ref)}
+                draggable={false}
+                onClick={() => handleThumbnailClick(ref)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') requestReferenceInsert(ref);
                 }}
-                className="group/ref relative flex-shrink-0 cursor-pointer rounded-md outline-none"
+                onPointerDown={handleRefPointerDown(idx)}
+                onPointerEnter={() => handleRefPointerEnter(idx)}
+                onPointerUp={handleRefPointerUp(idx)}
+                onPointerCancel={() => resetPointerReferenceDrag(true)}
+                onDragStart={handleRefDragStart(idx)}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onDragOver={handleRefDragOver(idx)}
+                onDrop={handleRefDrop(idx)}
+                onDragEnd={(event) => {
+                  event.stopPropagation();
+                  handleRefDragEnd();
+                }}
+                className="nodrag nowheel group/ref relative flex-shrink-0 cursor-grab rounded-md outline-none active:cursor-grabbing"
+                style={{ width: 54, height: 50, opacity: dragOverIndex === idx ? 0.5 : 1, transition: 'opacity 0.15s' }}
               >
-                {ref.imageUrl && (
+                {ref.imageUrl && draggingRefIndex === null && (
                   <div
                     className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 overflow-hidden rounded-xl group-hover/ref:block"
                     style={{
@@ -1938,27 +2106,62 @@ function ImageNodeControlPanel({
                       boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
                     }}
                   >
-                    <img src={ref.imageUrl} alt="" className="h-[94px] w-full object-cover" />
-                    <div className="truncate px-2 py-1.5 text-[12px]" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                    <img
+                      src={ref.imageUrl}
+                      alt=""
+                      className="w-full object-contain"
+                      style={{
+                        maxHeight: 200,
+                        aspectRatio: ref.width && ref.height ? `${ref.width}/${ref.height}` : '1/1',
+                      }}
+                    />
+                    <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: roleColorMap[ref.role ?? 'null'] }}>
                       @{ref.roleLabel || '引用素材'}
                     </div>
                   </div>
                 )}
                 {ref.imageUrl ? (
-                  <img src={ref.imageUrl} alt="" className="rounded-md object-cover" style={{ width: 50, height: 50 }} />
+                  <div className="flex h-full w-full items-center justify-center">
+                    <img src={ref.imageUrl} alt="" className="rounded-md object-cover" draggable={false} style={{ width: 42, height: 42 }} />
+                  </div>
                 ) : (
-                  <div className="rounded-md flex items-center justify-center" style={{ width: 50, height: 50, background: 'rgba(255,255,255,0.05)' }}>
+                  <div className="flex h-full w-full items-center justify-center rounded-md" style={{ background: 'rgba(255,255,255,0.05)' }}>
                     <Image className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
                   </div>
                 )}
-                <span className="absolute -top-1 -right-1 flex items-center justify-center text-[8px] font-bold rounded-full" style={{ width: 14, height: 14, background: '#fff', color: '#000' }}>{ref.index}</span>
+                <span className="pointer-events-none absolute -top-1 -right-1 flex items-center justify-center text-[8px] font-bold rounded-full" style={{ width: 14, height: 14, background: '#fff', color: '#000' }}>{idx + 1}</span>
                 <button
-                  onClick={(event) => {
+                  draggable={false}
+                  type="button"
+                  onPointerDownCapture={(event) => {
+                    pointerDragIndexRef.current = null;
+                    pointerDragMovedRef.current = false;
+                    isDraggingRef.current = false;
+                    setDraggingRefIndex(null);
+                    setDragOverIndex(null);
+                    event.stopPropagation();
+                  }}
+                  onMouseDownCapture={(event) => {
+                    event.stopPropagation();
+                  }}
+                  onClickCapture={(event) => {
+                    event.preventDefault();
                     event.stopPropagation();
                     onRemoveReference(ref.nodeId);
                   }}
-                  className="absolute -right-1.5 -top-1.5 hidden items-center justify-center rounded-full text-white transition-colors hover:bg-black group-hover/ref:flex"
-                  style={{ width: 16, height: 16, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                  onDragStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  className="nodrag nowheel absolute -right-1.5 -top-1.5 hidden items-center justify-center rounded-full text-white transition-colors hover:bg-black group-hover/ref:flex"
+                  style={{ width: 16, height: 16, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)', zIndex: 5 }}
                   title="删除引用"
                 >
                   <X className="h-2.5 w-2.5" />
@@ -2235,18 +2438,31 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const allEdges = useStore((state) => state.edges);
   const allNodes = useStore((state) => state.nodes);
   const inputEdges = allEdges.filter((e) => e.target === id);
-  const references: ReferenceInfo[] = inputEdges.map((edge, idx) => {
+  const referenceOrder = (data.referenceOrder as string[]) || [];
+  const rawReferences = inputEdges.map((edge) => {
     const sourceNode = allNodes.find((n) => n.id === edge.source);
     const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
     const roleOpt = sourceRole ? imageRoleOptions.find((o) => o.value === sourceRole) : null;
     return {
       nodeId: edge.source,
-      index: idx + 1,
+      index: 0,
       role: sourceRole,
       roleLabel: roleOpt?.label || '未定义用途',
       imageUrl: sourceNode?.data?.image as string,
+      width: (sourceNode?.data?.width as number) || undefined,
+      height: (sourceNode?.data?.height as number) || undefined,
     };
   });
+  const references: ReferenceInfo[] = rawReferences
+    .sort((a, b) => {
+      const aIndex = referenceOrder.indexOf(a.nodeId);
+      const bIndex = referenceOrder.indexOf(b.nodeId);
+      if (aIndex >= 0 && bIndex >= 0) return aIndex - bIndex;
+      if (aIndex >= 0) return -1;
+      if (bIndex >= 0) return 1;
+      return 0;
+    })
+    .map((ref, idx) => ({ ...ref, index: idx + 1 }));
 
   const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || promptText.trim().length > 0;
 
@@ -2286,6 +2502,15 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
   const handleRemoveReference = (sourceNodeId: string) => {
     setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === id)));
+    setNodes((nds) => nds.map((n) => {
+      if (n.id !== id) return n;
+      const referenceOrder = ((n.data.referenceOrder as string[]) || []).filter((nodeId) => nodeId !== sourceNodeId);
+      return { ...n, data: { ...n.data, referenceOrder } };
+    }));
+  };
+
+  const handleReorderReferences = (newOrder: string[]) => {
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, referenceOrder: newOrder } } : n));
   };
 
   const handleUseReference = () => {
@@ -2360,11 +2585,13 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const showTitleMeta = zoom >= 0.35;
   const roleOption = role ? imageRoleOptions.find((o) => o.value === role) : null;
   const RoleIconForTitle = roleOption?.Icon;
+  const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
+  const isOnlySelected = selected && selectedNodeCount === 1;
 
   return (
     <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
       {/* Toolbar — shown above title when image exists and node is selected */}
-      {displayImage && selected && (
+      {displayImage && isOnlySelected && (
         <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar onFullscreen={() => setShowPreview(true)} />
         </div>
@@ -2432,7 +2659,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
       {/* Image card wrapper — relative for handles/upload positioning */}
       <div className="relative" style={{ width: cardWidth }}>
         {/* Upload icon — inside card top-right, hidden when node has input connection */}
-        {selected && !hasInputConnection && (
+        {isOnlySelected && !hasInputConnection && (
           <>
             <button
               onClick={() => fileRef.current?.click()}
@@ -2452,13 +2679,13 @@ function ImageNode({ data, selected, id }: NodeProps) {
           </>
         )}
 
-        {displayImage && (selected || roleMenuOpen) && (
+        {displayImage && (isOnlySelected || roleMenuOpen) && (
           <ImageRoleTag role={role} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
-          className="w-full rounded-xl flex items-center justify-center transition-all overflow-hidden"
+          className="node-preview-card w-full rounded-xl flex items-center justify-center transition-all overflow-hidden"
           style={{
             width: cardWidth,
             height: displayImage ? Math.round(sourceHeight * imageDisplayScale) : cardHeight,
@@ -2552,8 +2779,8 @@ function ImageNode({ data, selected, id }: NodeProps) {
       </div>
 
       {/* Control panel — below the preview area */}
-      {/* 空节点或有生成历史的节点才显示控制面板；纯上传/拖入的素材节点隐藏 */}
-      {selected && (!displayImage || generatedImages.length > 0) && (
+      {/* 空节点或有生成历史的节点才显示控制面板；纯上传/拖入的素材节点隐藏；多选时也不显示 */}
+      {isOnlySelected && (!displayImage || generatedImages.length > 0) && (
         <>
       <div
         className="absolute z-30"
@@ -2578,6 +2805,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
               canGenerate={canGenerate}
               references={references}
               onRemoveReference={handleRemoveReference}
+              onReorderReferences={handleReorderReferences}
               onUseReference={handleUseReference}
               onAssignReferenceRole={handleAssignReferenceRole}
             />
@@ -2635,7 +2863,7 @@ function UpscaleNode({ data, selected, id }: NodeProps) {
       {/* Main card */}
       <div className="relative" style={{ width: cardWidth }}>
         <div
-          className="w-full rounded-[16px] flex items-center justify-center transition-all overflow-hidden"
+          className="node-preview-card w-full rounded-[16px] flex items-center justify-center transition-all overflow-hidden"
           style={{
             width: cardWidth,
             height: cardHeight,
@@ -3069,6 +3297,62 @@ function FlowCanvas() {
     setNodeContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
   }, []);
 
+  // ─── Selection Marquee Pre-highlight ───
+  const isSelectingRef = useRef(false);
+  const rAFIdRef = useRef<number | null>(null);
+
+  const clearPreselection = useCallback(() => {
+    document.querySelectorAll('.react-flow__node.preselected').forEach((el) => {
+      el.classList.remove('preselected');
+    });
+  }, []);
+
+  const updatePreselection = useCallback(() => {
+    if (!isSelectingRef.current) return;
+    const selectionEl = document.querySelector('.react-flow__selection') as HTMLElement | null;
+    if (!selectionEl) {
+      clearPreselection();
+      rAFIdRef.current = requestAnimationFrame(updatePreselection);
+      return;
+    }
+    const selRect = selectionEl.getBoundingClientRect();
+    const preselected = new Set<string>();
+
+    document.querySelectorAll('.react-flow__node').forEach((el) => {
+      const nodeRect = el.getBoundingClientRect();
+      const intersects = !(
+        selRect.right < nodeRect.left ||
+        selRect.left > nodeRect.right ||
+        selRect.bottom < nodeRect.top ||
+        selRect.top > nodeRect.bottom
+      );
+      const id = (el as HTMLElement).dataset.id;
+      if (intersects && id) {
+        preselected.add(id);
+        el.classList.add('preselected');
+      } else {
+        el.classList.remove('preselected');
+      }
+    });
+
+    rAFIdRef.current = requestAnimationFrame(updatePreselection);
+  }, [clearPreselection]);
+
+  const onSelectionStart = useCallback(() => {
+    isSelectingRef.current = true;
+    if (rAFIdRef.current) cancelAnimationFrame(rAFIdRef.current);
+    rAFIdRef.current = requestAnimationFrame(updatePreselection);
+  }, [updatePreselection]);
+
+  const onSelectionEnd = useCallback(() => {
+    isSelectingRef.current = false;
+    if (rAFIdRef.current) {
+      cancelAnimationFrame(rAFIdRef.current);
+      rAFIdRef.current = null;
+    }
+    clearPreselection();
+  }, [clearPreselection]);
+
   // ─── Keyboard Shortcuts ───
   const copyRef = useRef(copyNodes);
   const pasteRef = useRef(pasteNodes);
@@ -3091,6 +3375,10 @@ function FlowCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const tag = target.tagName.toLowerCase();
+      const isEditing = tag === 'input' || tag === 'textarea' || target.isContentEditable;
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         copyRef.current();
@@ -3100,17 +3388,47 @@ function FlowCanvas() {
         pasteRef.current();
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const target = e.target as HTMLElement;
-        const tag = target.tagName.toLowerCase();
-        const isEditing = tag === 'input' || tag === 'textarea' || target.isContentEditable;
         if (!isEditing) {
           deleteRef.current();
         }
       }
+
+      // Canvas navigation shortcuts (skip when editing text)
+      if (isEditing) return;
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const step = 40 / zoomRef.current;
+        const current = getViewport();
+        let dx = 0;
+        let dy = 0;
+        if (e.key === 'ArrowUp') dy = step;
+        if (e.key === 'ArrowDown') dy = -step;
+        if (e.key === 'ArrowLeft') dx = step;
+        if (e.key === 'ArrowRight') dx = -step;
+        setViewport({ x: current.x + dx, y: current.y + dy, zoom: current.zoom }, { duration: 0 });
+      }
+
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        const current = getViewport();
+        setViewport({ ...current, zoom: Math.min(current.zoom * 1.15, 4) }, { duration: 0 });
+      }
+
+      if (e.key === '-') {
+        e.preventDefault();
+        const current = getViewport();
+        setViewport({ ...current, zoom: Math.max(current.zoom / 1.15, 0.2) }, { duration: 0 });
+      }
+
+      if (e.key === '0') {
+        e.preventDefault();
+        fitView({ duration: 400 });
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [getViewport, setViewport, fitView]);
 
   // ─── Drag & Drop State ───
   const [isDragOver, setIsDragOver] = useState(false);
@@ -3121,6 +3439,8 @@ function FlowCanvas() {
   const [showMinimap, setShowMinimap] = useState(false);
   const [snapGrid, setSnapGrid] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
   const [showHelp, setShowHelp] = useState(false);
 
   const onViewportChange = useCallback((v: { x: number; y: number; zoom: number }) => {
@@ -3290,6 +3610,12 @@ function FlowCanvas() {
           setContextMenu({ x: e.clientX, y: e.clientY, flowPos: pos });
         }}
         onDragOver={(e) => {
+          if (
+            e.dataTransfer.types.includes('application/x-visioner-reference-reorder') ||
+            !e.dataTransfer.types.includes('Files')
+          ) {
+            return;
+          }
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
           if (dragLeaveTimer.current) clearTimeout(dragLeaveTimer.current);
@@ -3300,6 +3626,13 @@ function FlowCanvas() {
           dragLeaveTimer.current = setTimeout(() => setIsDragOver(false), 50);
         }}
         onDrop={(e) => {
+          if (
+            e.dataTransfer.types.includes('application/x-visioner-reference-reorder') ||
+            !e.dataTransfer.types.includes('Files')
+          ) {
+            setIsDragOver(false);
+            return;
+          }
           e.preventDefault();
           setIsDragOver(false);
           handleDropFiles(e.dataTransfer.files, e.clientX, e.clientY);
@@ -3340,7 +3673,7 @@ function FlowCanvas() {
           </div>
         )}
 
-        <ReactFlow
+          <ReactFlow
           nodes={nodesWithCallbacks}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -3354,12 +3687,28 @@ function FlowCanvas() {
             setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
             setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
           }}
+          onSelectionStart={onSelectionStart}
+          onSelectionEnd={onSelectionEnd}
+          onDragOverCapture={(event) => {
+            if (event.dataTransfer.types.includes('application/x-visioner-reference-reorder')) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
+          onDropCapture={(event) => {
+            if (event.dataTransfer.types.includes('application/x-visioner-reference-reorder')) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
           nodeTypes={nodeTypes}
           snapToGrid={snapGrid}
           snapGrid={[24, 24]}
-          selectionOnDrag
+            selectionOnDrag
+          selectionMode={SelectionMode.Partial}
           panOnDrag={[1, 2]}
-          fitView
+          zoomOnPinch
+            fitView
           fitViewOptions={{ maxZoom: 1 }}
           minZoom={0.2}
           maxZoom={4}
@@ -3820,33 +4169,58 @@ function FlowCanvas() {
       {showHelp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowHelp(false)}>
           <div
-            className="w-72 rounded-xl p-5"
-            style={{ background: '#252526', border: '1px solid #2a2a35', boxShadow: '0 24px 48px rgba(0,0,0,0.5)' }}
+            className="relative rounded-2xl p-6"
+            style={{
+              background: '#1e1e24',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
+              minWidth: 520,
+              maxWidth: 600,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-white">快捷键</h3>
-              <button onClick={() => setShowHelp(false)} className="text-[#e0e0e0] hover:text-white transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-2.5 text-xs">
-              {[
-                { key: '滚轮', action: '缩放画布' },
-                { key: '中键拖拽', action: '平移画布' },
-                { key: '左键拖拽空白处', action: '框选节点' },
-                { key: 'Shift + 点击', action: '多选节点' },
-                { key: 'Ctrl + C', action: '复制选中节点' },
-                { key: 'Ctrl + V', action: '粘贴节点' },
-                { key: 'Delete / Backspace', action: '删除选中节点' },
-                { key: '右键画布', action: '添加节点菜单' },
-                { key: '拖拽连接点', action: '建立连线' },
-              ].map((item) => (
-                <div key={item.key} className="flex justify-between">
-                  <span className="text-[#6a6a7a]">{item.key}</span>
-                  <span className="text-white">{item.action}</span>
+            {/* Close */}
+            <button
+              onClick={() => setShowHelp(false)}
+              className="absolute top-4 right-4 flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+              style={{ width: 28, height: 28, color: '#888' }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex gap-10">
+              {/* ─── Left Column ─── */}
+              <div className="flex-1">
+                <h4 className="text-[13px] font-medium mb-4" style={{ color: '#888' }}>基础</h4>
+                <div className="space-y-3 text-[13px]">
+                  <ShortcutRow label="复制" keys={['Ctrl', 'C']} />
+                  <ShortcutRow label="粘贴" keys={['Ctrl', 'V']} />
+                  <ShortcutRow label="删除" keys={['Del']} />
+                  <ShortcutRow label="多选" keys={['Shift', '点击']} />
+                  <ShortcutRow label="框选" keys={['左键拖拽空白处']} />
+                  <ShortcutRow label="添加节点" keys={['右键画布']} />
+                  <ShortcutRow label="建立连线" keys={['拖拽连接点']} />
                 </div>
-              ))}
+
+                <h4 className="text-[13px] font-medium mt-6 mb-4" style={{ color: '#888' }}>缩放</h4>
+                <div className="space-y-3 text-[13px]">
+                  <ShortcutRow label="放大" keys={['+']} />
+                  <ShortcutRow label="缩小" keys={['-']} />
+                  <ShortcutRow label="重置" keys={['0']} />
+                  <ShortcutRow label="鼠标滚轮" keys={['滚轮']} />
+                  <ShortcutRow label="触控板" keys={['双指捏合']} />
+                </div>
+              </div>
+
+              {/* ─── Right Column ─── */}
+              <div className="flex-1">
+                <h4 className="text-[13px] font-medium mb-4" style={{ color: '#888' }}>移动画布</h4>
+                <div className="space-y-3 text-[13px]">
+                  <ShortcutRow label="键盘" keys={['↑', '↓', '←', '→']} />
+                  <ShortcutRow label="中键拖拽" keys={['中键拖拽']} />
+                  <ShortcutRow label="空格 + 拖拽" keys={['Space', '拖拽']} />
+                </div>
+              </div>
             </div>
           </div>
         </div>

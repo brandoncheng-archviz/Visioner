@@ -10,6 +10,15 @@
 .react-flow__pane {
   cursor: default !important;
 }
+
+.group\/ref > img {
+  object-fit: cover !important;
+}
+
+.group\/ref > [style*="background-image"] {
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+}
 .react-flow__pane.dragging {
   cursor: grabbing !important;
 }
@@ -77,6 +86,12 @@
 .react-flow__connection.invalid .react-flow__connection-path {
   stroke: #ef4444 !important;
   filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+}
+
+/* Selection pre-highlight: preview card border turns cyan when marquee touches node boundary */
+.react-flow__node.preselected .node-preview-card {
+  border-color: #00d4ff !important;
+  box-shadow: 0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12) !important;
 }
 
 /* Custom range input thumb */
