@@ -43,6 +43,7 @@ import {
   ClipboardPaste,
   Check,
   ChevronDown,
+  Search,
   Building2,
   Layers,
   Leaf,
@@ -820,7 +821,7 @@ function getImageRoleColor(role: ImageRole | null | undefined) {
 interface PresetItem {
   id: string;
   name: string;
-  tabs: PresetTab[];
+  tabs: string[];
   category: 'realism' | 'mood' | 'environment' | 'perspective' | 'style';
   group: string;
   selectType: 'single' | 'multi';
@@ -830,7 +831,7 @@ interface PresetItem {
   thumbnail: string;
 }
 
-const PRESET_TABS = ['常用', '变真实', '换氛围', '换环境', '换视角', '风格', '我的'] as const;
+const PRESET_TABS = ['常用', '变真实', '换氛围', '换环境', '换视角', '我的'] as const;
 type PresetTab = typeof PRESET_TABS[number];
 
 const MAX_MULTI_PRESETS_BY_GROUP: Partial<Record<PresetItem['group'], number>> = {
@@ -1282,6 +1283,131 @@ const PRESET_BY_ID = new Map(PRESET_DATA.map((preset) => [preset.id, preset]));
 
 const getPresetById = (id: string) => PRESET_BY_ID.get(id);
 
+type StylePreset = {
+  id: string;
+  type: 'style';
+  title: string;
+  description: string;
+  thumbnail: string;
+  heroImage?: string;
+  sampleImages: string[];
+  tags: string[];
+  prompt: string;
+  selectionMode: 'single';
+  strength: 'high';
+};
+
+const STYLE_PRESETS: StylePreset[] = [
+  {
+    id: 'mir_atmosphere',
+    type: 'style',
+    title: 'MIR 氛围感',
+    description: '低饱和、叙事性、强氛围的建筑可视化表达，适合竞赛表现、文化建筑、景观氛围和概念方案。',
+    thumbnail: '/images/show-cover-8.jpg',
+    heroImage: '/images/show-cover-8.jpg',
+    sampleImages: ['/images/show-cover-8.jpg', '/images/show-cover-13.jpg', '/images/show-cover-12.jpg', '/images/show-cover-16.jpg'],
+    tags: ['低饱和', '叙事性', '强氛围', '空气感'],
+    prompt: '全局风格采用 MIR 氛围感表达：低饱和、叙事性、强氛围和空气感，但不得覆盖用户硬约束、主体建筑、自定义用途和具体参考图用途。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+  {
+    id: 'binyan_estate',
+    type: 'style',
+    title: 'Binyan 商业地产感',
+    description: '明亮、高端、地产写实的商业建筑表现，强调清晰材质、空间品质和销售展示感。',
+    thumbnail: '/images/show-cover-9.jpg',
+    heroImage: '/images/show-cover-9.jpg',
+    sampleImages: ['/images/show-cover-9.jpg', '/images/show-cover-1.jpg', '/images/show-cover-2.jpg', '/images/show-cover-14.jpg'],
+    tags: ['明亮', '高端', '地产写实', '商业'],
+    prompt: '全局风格采用 Binyan 商业地产感表达：明亮、高端、干净、商业写实，但不得覆盖用户硬约束和具体参考图控制。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+  {
+    id: 'luxigon_drama',
+    type: 'style',
+    title: 'Luxigon 戏剧感',
+    description: '高对比、情绪化、强光影的建筑视觉表达，适合概念方案和有冲击力的展示图。',
+    thumbnail: '/images/show-cover-10.jpg',
+    heroImage: '/images/show-cover-10.jpg',
+    sampleImages: ['/images/show-cover-10.jpg', '/images/show-cover-7.jpg', '/images/show-cover-11.jpg', '/images/show-cover-15.jpg'],
+    tags: ['高对比', '情绪化', '强光影', '戏剧'],
+    prompt: '全局风格采用 Luxigon 戏剧感表达：高对比、情绪化、强光影和视觉冲击，但不得覆盖更高优先级的参考图用途。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+  {
+    id: 'real_estate_photo',
+    type: 'style',
+    title: '写实地产效果图',
+    description: '干净、商业、摄影感的地产效果图表达，强调真实材质、清晰光线和稳定构图。',
+    thumbnail: '/images/show-cover-1.jpg',
+    heroImage: '/images/show-cover-1.jpg',
+    sampleImages: ['/images/show-cover-1.jpg', '/images/show-cover-2.jpg', '/images/show-cover-3.jpg', '/images/show-cover-4.jpg'],
+    tags: ['干净', '商业', '摄影感', '写实'],
+    prompt: '全局风格采用写实地产效果图表达：干净、商业、摄影感和真实材质表现，但服从用户硬约束和参考图用途。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+  {
+    id: 'soft_grey',
+    type: 'style',
+    title: '低饱和高级灰',
+    description: '克制、高级、低对比的灰调建筑表达，适合现代住宅、办公与精品商业方案。',
+    thumbnail: '/images/show-cover-14.jpg',
+    heroImage: '/images/show-cover-14.jpg',
+    sampleImages: ['/images/show-cover-14.jpg', '/images/show-cover-12.jpg', '/images/show-cover-13.jpg', '/images/show-cover-16.jpg'],
+    tags: ['克制', '高级', '低对比', '灰调'],
+    prompt: '全局风格采用低饱和高级灰表达：克制、高级、低对比和细腻灰调，但不得覆盖具体参考图控制。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+  {
+    id: 'japanese_minimal',
+    type: 'style',
+    title: '日系极简',
+    description: '自然、留白、柔和的极简建筑表达，强调材料安静质感和自然光。',
+    thumbnail: '/images/show-cover-11.jpg',
+    heroImage: '/images/show-cover-11.jpg',
+    sampleImages: ['/images/show-cover-11.jpg', '/images/show-cover-20.jpg', '/images/show-cover-3.jpg', '/images/show-cover-6.jpg'],
+    tags: ['自然', '留白', '柔和', '极简'],
+    prompt: '全局风格采用日系极简表达：自然、留白、柔和和安静材质，但服从用户硬约束、主体建筑和局部参考。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+  {
+    id: 'cinematic_arch_photo',
+    type: 'style',
+    title: '电影感建筑摄影',
+    description: '叙事、光影、真实的建筑摄影语言，强调镜头感、情绪层次和自然画面。',
+    thumbnail: '/images/show-cover-7.jpg',
+    heroImage: '/images/show-cover-7.jpg',
+    sampleImages: ['/images/show-cover-7.jpg', '/images/show-cover-10.jpg', '/images/show-cover-15.jpg', '/images/show-cover-19.jpg'],
+    tags: ['叙事', '光影', '真实', '镜头感'],
+    prompt: '全局风格采用电影感建筑摄影表达：叙事、光影、真实和镜头感，但不得推翻具体参考图与预设目标。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+  {
+    id: 'fresh_natural_residential',
+    type: 'style',
+    title: '清新自然住宅感',
+    description: '柔和、景观、自然光的住宅表现，强调生活气息、绿化融合和亲和力。',
+    thumbnail: '/images/show-cover-20.jpg',
+    heroImage: '/images/show-cover-20.jpg',
+    sampleImages: ['/images/show-cover-20.jpg', '/images/show-cover-1.jpg', '/images/show-cover-5.jpg', '/images/show-cover-11.jpg'],
+    tags: ['柔和', '景观', '自然光', '住宅'],
+    prompt: '全局风格采用清新自然住宅感表达：柔和、景观、自然光和生活亲和力，但不能覆盖人物、植物、天空等具体参考用途。',
+    selectionMode: 'single',
+    strength: 'high',
+  },
+];
+
+const STYLE_PRESET_BY_ID = new Map(STYLE_PRESETS.map((style) => [style.id, style]));
+
+const getStylePresetById = (id: string | null | undefined) => (id ? STYLE_PRESET_BY_ID.get(id) || null : null);
+
 type PromptContent =
   | { type: 'text'; text: string }
   | {
@@ -1352,36 +1478,44 @@ function createImageReferenceBlock(reference: ReferenceInfo): ImageReferenceProm
   };
 }
 
-function joinPromptSegments(segments: string[]) {
-  return segments
-    .map((segment) => segment.trim())
-    .filter(Boolean)
-    .reduce((result, segment) => {
-      if (!result) return segment;
-      return /[。.!！?？]$/.test(result) ? `${result}${segment}` : `${result}。${segment}`;
-    }, '');
-}
-
-function buildPromptSubmission(userText: string, promptContent: PromptContent[], selectedPresetIds: string[]) {
+function buildPromptSubmission(userText: string, promptContent: PromptContent[], selectedPresetIds: string[], selectedStyle: StylePreset | null) {
   const trimmedUserText = userText.trim();
-  const contentPrompts = promptContent
-    .map((block) => (block.type === 'text' ? block.text : block.promptText))
-    .filter(Boolean);
+  const imageRefBlocks = promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference');
+
+  // 按用途分类图片引用（优先级由高到低）
+  const primaryBuilding = imageRefBlocks.filter((b) => b.usage?.includes('主体建筑'));
+  const customUsages = imageRefBlocks.filter((b) => b.usage?.includes('自定义'));
+  const localRefs = imageRefBlocks.filter((b) => b.usage?.includes('植物') || b.usage?.includes('人物') || b.usage?.includes('天空'));
+  const atmosphereRefs = imageRefBlocks.filter((b) => b.usage?.includes('氛围'));
+  const undefinedRefs = imageRefBlocks.filter((b) => !b.usage || b.usage === '未定义用途');
+
   const presetPrompts = selectedPresetIds
     .map(getPresetById)
     .filter((preset): preset is PresetItem => Boolean(preset))
     .map((preset) => preset.promptTemplate);
-  const imageReferences = promptContent
-    .filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference')
-    .map((block) => ({
+
+  const sections: string[] = [];
+  if (trimmedUserText) sections.push(`用户明确要求：${trimmedUserText}`);
+  if (primaryBuilding.length) sections.push(`主体建筑约束：${primaryBuilding.map((b) => b.promptText).join('；')}`);
+  if (customUsages.length) sections.push(`自定义用途约束：${customUsages.map((b) => b.promptText).join('；')}`);
+  if (localRefs.length) sections.push(`局部参考：${localRefs.map((b) => b.promptText).join('；')}`);
+  if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((b) => b.promptText).join('；')}`);
+  if (presetPrompts.length) sections.push(`预设增强：${presetPrompts.join('。')}`);
+  if (selectedStyle) sections.push(`全局风格：${selectedStyle.prompt}`);
+  if (undefinedRefs.length) sections.push(`未定义参考：${undefinedRefs.map((b) => b.promptText).join('；')}`);
+
+  return {
+    textPrompt: sections.join('\n\n'),
+    imageReferences: imageRefBlocks.map((block) => ({
       imageId: block.imageId,
       sourceNodeId: block.sourceNodeId,
       usage: block.usage,
-    }));
-
-  return {
-    textPrompt: joinPromptSegments([trimmedUserText, ...contentPrompts, ...presetPrompts]),
-    imageReferences,
+    })),
+    globalStyle: selectedStyle ? {
+      id: selectedStyle.id,
+      title: selectedStyle.title,
+      prompt: selectedStyle.prompt,
+    } : null,
   };
 }
 
@@ -1668,6 +1802,199 @@ function ImageRoleTag({
   );
 }
 
+function StylePickerModal({
+  open,
+  selectedStyleId,
+  onApply,
+  onClose,
+}: {
+  open: boolean;
+  selectedStyleId: string | null;
+  onApply: (styleId: string | null) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [draftStyleId, setDraftStyleId] = useState<string | null>(selectedStyleId);
+  const entryStyleIdRef = useRef<string | null>(selectedStyleId);
+  const previewStyle = getStylePresetById(draftStyleId) || STYLE_PRESETS[0];
+  const selectedStyle = getStylePresetById(selectedStyleId);
+
+  useEffect(() => {
+    if (!open) return;
+    entryStyleIdRef.current = selectedStyleId;
+    setQuery('');
+    setDraftStyleId(selectedStyleId || STYLE_PRESETS[0]?.id || null);
+  }, [open, selectedStyleId]);
+
+  const handleCancel = () => {
+    onApply(entryStyleIdRef.current);
+    onClose();
+  };
+
+  const filteredStyles = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return STYLE_PRESETS;
+    return STYLE_PRESETS.filter((style) => (
+      style.title.toLowerCase().includes(normalizedQuery)
+      || style.description.toLowerCase().includes(normalizedQuery)
+      || style.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery))
+    ));
+  }, [query]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) handleCancel();
+      }}
+    >
+      <div
+        className="flex max-h-[680px] w-[960px] max-w-[calc(100vw-48px)] flex-col overflow-hidden rounded-xl"
+        style={{
+          background: FLOATING_PANEL_BACKGROUND,
+          border: FLOATING_PANEL_BORDER,
+          boxShadow: '0 24px 70px rgba(0,0,0,0.62)',
+        }}
+      >
+        <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div>
+            <div className="text-[16px] font-semibold text-white/92">选择风格</div>
+            <div className="mt-1 text-[12px]" style={{ color: 'rgba(255,255,255,0.48)' }}>风格样图仅用于展示风格，不作为参考图。</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/8"
+            style={{ color: 'rgba(255,255,255,0.58)' }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr]">
+          <div className="flex min-h-0 flex-col border-r p-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+            <div className="mb-3 flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: 'rgba(255,255,255,0.055)', border: FLOATING_PANEL_BORDER }}>
+              <Search className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.4)' }} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索风格、标签"
+                className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-white/30"
+                style={{ color: 'rgba(255,255,255,0.86)' }}
+              />
+            </div>
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+              {filteredStyles.map((style) => {
+                const previewing = previewStyle.id === style.id;
+                const applied = selectedStyleId === style.id;
+                return (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setDraftStyleId(style.id)}
+                    className="flex w-full items-center gap-2 rounded-lg border p-2 text-left transition-colors"
+                    style={{
+                      background: previewing ? 'rgba(167,139,250,0.16)' : 'rgba(255,255,255,0.025)',
+                      borderColor: previewing ? 'rgba(167,139,250,0.42)' : 'rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <img src={style.thumbnail} alt="" className="h-11 w-11 flex-shrink-0 rounded-md object-cover" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium text-white/88">{style.title}</span>
+                      <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.44)' }}>{style.tags.slice(0, 3).join(' / ')}</span>
+                    </span>
+                    {applied && <Check className="h-4 w-4 flex-shrink-0" style={{ color: '#a78bfa' }} />}
+                  </button>
+                );
+              })}
+              {filteredStyles.length === 0 && (
+                <div className="py-8 text-center text-[13px] text-white/35">无匹配风格</div>
+              )}
+            </div>
+          </div>
+
+          <div className="min-h-0 overflow-y-auto p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[18px] font-semibold text-white/92">{previewStyle.title}</h3>
+                  {selectedStyleId === previewStyle.id && (
+                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'rgba(167,139,250,0.18)', color: '#c4b5fd' }}>当前风格</span>
+                  )}
+                </div>
+                <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.58)' }}>{previewStyle.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onApply(previewStyle.id)}
+                className="rounded-lg px-3 py-2 text-[13px] font-medium transition-colors hover:brightness-110"
+                style={{ background: '#a78bfa', color: '#111' }}
+              >
+                应用风格
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {previewStyle.tags.map((tag) => (
+                <span key={tag} className="rounded-md px-2 py-1 text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.62)', border: FLOATING_PANEL_BORDER }}>{tag}</span>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onApply(previewStyle.id)}
+              className="mt-4 block w-full overflow-hidden rounded-xl border text-left transition-all hover:border-[#a78bfa]"
+              style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.025)' }}
+            >
+              <img src={previewStyle.heroImage || previewStyle.thumbnail} alt="" className="h-[260px] w-full object-cover" />
+            </button>
+
+            <div className="mt-3 grid grid-cols-6 gap-2">
+              {previewStyle.sampleImages.slice(0, 6).map((image, index) => (
+                <button
+                  key={`${previewStyle.id}-${image}-${index}`}
+                  type="button"
+                  onClick={() => onApply(previewStyle.id)}
+                  className="overflow-hidden rounded-lg border transition-all hover:border-[#a78bfa]"
+                  style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+                  title="应用该风格"
+                >
+                  <img src={image} alt="" className="h-16 w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t px-5 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-[12px] text-white/40">当前选择：</span>
+            {selectedStyle ? (
+              <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px]" style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.24)' }}>
+                {selectedStyle.title}
+                <button type="button" onClick={() => onApply(null)} className="rounded-full hover:bg-white/10">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : (
+              <span className="text-[12px] text-white/32">无风格</span>
+            )}
+            <button type="button" onClick={() => onApply(null)} className="text-[12px] transition-colors hover:text-white/70" style={{ color: 'rgba(255,255,255,0.42)' }}>清除风格</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={handleCancel} className="rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/8" style={{ color: 'rgba(255,255,255,0.62)' }}>取消</button>
+            <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-[13px] font-medium" style={{ background: 'rgba(255,255,255,0.9)', color: '#111' }}>确认选择</button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /* ─── Image Node Control Panel ─── */
 function ImageNodeControlPanel({
   promptText,
@@ -1678,6 +2005,8 @@ function ImageNodeControlPanel({
   onMarksChange,
   selectedPresets,
   onPresetsChange,
+  selectedStyleId,
+  onStyleChange,
   modelParams,
   onModelParamsChange,
   onGenerate,
@@ -1696,6 +2025,8 @@ function ImageNodeControlPanel({
   onMarksChange: (marks: MarkItem[]) => void;
   selectedPresets: string[];
   onPresetsChange: (presets: string[]) => void;
+  selectedStyleId: string | null;
+  onStyleChange: (styleId: string | null) => void;
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void;
@@ -1708,6 +2039,7 @@ function ImageNodeControlPanel({
 }) {
   const [showMarkPanel, setShowMarkPanel] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [showStylePicker, setShowStylePicker] = useState(false);
   const [activePresetTab, setActivePresetTab] = useState<PresetTab>('常用');
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
@@ -1908,15 +2240,17 @@ function ImageNodeControlPanel({
   const imageReferenceBlocks = promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference');
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
+  const selectedStyle = getStylePresetById(selectedStyleId);
   const visiblePresets = useMemo(
-    () => PRESET_DATA.filter((preset) => preset.tabs.includes(activePresetTab)),
+    () => PRESET_DATA.filter((preset) => preset.category !== 'style' && preset.tabs.includes(activePresetTab)),
     [activePresetTab],
   );
   const slashFilteredPresets = useMemo(() => {
     const query = slashQuery.trim().toLowerCase();
-    if (!query) return PRESET_DATA;
+    const presetPool = PRESET_DATA.filter((preset) => preset.category !== 'style');
+    if (!query) return presetPool;
 
-    return PRESET_DATA.filter((preset) => (
+    return presetPool.filter((preset) => (
       preset.name.toLowerCase().includes(query)
       || preset.tags.some((tag) => tag.toLowerCase().includes(query))
     ));
@@ -1924,7 +2258,7 @@ function ImageNodeControlPanel({
 
   const selectPreset = (presetId: string) => {
     const preset = getPresetById(presetId);
-    if (!preset) return;
+    if (!preset || preset.category === 'style') return;
 
     if (selectedPresets.includes(presetId)) {
       removePreset(presetId);
@@ -1933,7 +2267,7 @@ function ImageNodeControlPanel({
 
     let nextPresets = selectedPresets.filter((id) => {
       const selectedPreset = getPresetById(id);
-      if (!selectedPreset) return false;
+      if (!selectedPreset || selectedPreset.category === 'style') return false;
       if (selectedPreset.group !== preset.group) return true;
       return preset.selectType === 'multi';
     });
@@ -2229,7 +2563,7 @@ function ImageNodeControlPanel({
           {/* 预设 */}
           <div className="relative">
             <button
-              onClick={() => { setShowPresetMenu(!showPresetMenu); setShowMarkPanel(false); }}
+              onClick={() => { setShowPresetMenu(!showPresetMenu); setShowMarkPanel(false); setShowStylePicker(false); }}
               className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
               style={{ width: 54, height: 50, padding: '4px', background: selectedPresets.length > 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
             >
@@ -2245,7 +2579,7 @@ function ImageNodeControlPanel({
                 <div className="flex items-center gap-1 px-3 pt-3 pb-2 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                   {PRESET_TABS.map((tab) => {
                     const isActive = activePresetTab === tab;
-                    const TabIcon = tab === '常用' ? Star : tab === '变真实' ? Eye : tab === '换氛围' ? Sun : tab === '换环境' ? Mountain : tab === '换视角' ? ScanEye : tab === '风格' ? Palette : User;
+                    const TabIcon = tab === '常用' ? Star : tab === '变真实' ? Eye : tab === '换氛围' ? Sun : tab === '换环境' ? Mountain : tab === '换视角' ? ScanEye : User;
                     return (
                       <button
                         key={tab}
@@ -2345,7 +2679,7 @@ function ImageNodeControlPanel({
           {/* 标记 */}
           <div className="relative">
             <button
-              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowPresetMenu(false); }}
+              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowPresetMenu(false); setShowStylePicker(false); }}
               className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
               style={{ width: 54, height: 50, padding: '4px', background: marks.length > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
             >
@@ -2373,6 +2707,45 @@ function ImageNodeControlPanel({
                 )}
               </div>
             )}
+          </div>
+          {/* 风格 */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowStylePicker(true); setShowPresetMenu(false); setShowMarkPanel(false); }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setShowStylePicker(true);
+                setShowPresetMenu(false);
+                setShowMarkPanel(false);
+              }}
+              className="group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
+              style={{
+                width: 54,
+                height: 50,
+                padding: selectedStyle ? 0 : '4px',
+                background: selectedStyle ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)',
+                border: selectedStyle ? '1px solid rgba(167,139,250,0.7)' : FLOATING_PANEL_BORDER,
+              }}
+              title="选择整体视觉风格"
+            >
+              {selectedStyle ? (
+                <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
+                  <img src={selectedStyle.thumbnail} alt="" className="h-full w-full object-cover opacity-90" draggable={false} />
+                </span>
+              ) : (
+                <>
+                  <Palette className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.7)' }} />
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>风格</span>
+                </>
+              )}
+              {selectedStyle && (
+                <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-xl p-2.5 text-left group-hover/style-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
+                  <div className="text-[12px] font-medium text-white/90">{selectedStyle.title}</div>
+                  <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.56)' }}>{selectedStyle.description}</div>
+                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(167,139,250,0.86)' }}>点击更换风格 / 移除风格</div>
+                </div>
+              )}
+            </button>
           </div>
           {/* 引用缩略图 — 支持拖拽排序 */}
           <div
@@ -2815,6 +3188,12 @@ function ImageNodeControlPanel({
           </button>
         </div>
       </div>
+      <StylePickerModal
+        open={showStylePicker}
+        selectedStyleId={selectedStyleId}
+        onApply={onStyleChange}
+        onClose={() => setShowStylePicker(false)}
+      />
     </div>
   );
 }
@@ -2843,6 +3222,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const [promptContent, setPromptContent] = useState<PromptContent[]>((data.promptContent as PromptContent[]) || []);
   const [marks, setMarks] = useState<MarkItem[]>((data.marks as MarkItem[]) || []);
   const [selectedPresets, setSelectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<string[]>((data.generatedImages as string[]) || []);
 
@@ -2877,10 +3257,11 @@ function ImageNode({ data, selected, id }: NodeProps) {
     })
     .map((ref, idx) => ({ ...ref, index: idx + 1 }));
 
-  const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || promptText.trim().length > 0 || promptContent.length > 0;
+  const selectedStyle = getStylePresetById(selectedStyleId);
+  const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0;
 
   const handleGenerate = () => {
-    const { textPrompt, imageReferences } = buildPromptSubmission(promptText, promptContent, selectedPresets);
+    const { textPrompt, imageReferences, globalStyle } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle);
     const mockResult = `/images/show-cover-${Math.floor(Math.random() * 5) + 1}.jpg`;
     const nextGeneratedImages = [...generatedImages, mockResult];
     setPreviewImage(mockResult);
@@ -2890,7 +3271,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
       setImgSize({ width: resultImage.width, height: resultImage.height });
     };
     resultImage.src = mockResult;
-    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, image: mockResult, finalPrompt: textPrompt, textPrompt, imageReferences, promptContent, generatedImages: nextGeneratedImages, width: 1024, height: 1024 } } : n));
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, image: mockResult, finalPrompt: textPrompt, textPrompt, imageReferences, globalStyle, promptContent, generatedImages: nextGeneratedImages, width: 1024, height: 1024 } } : n));
   };
 
   const handlePromptChange = (value: string) => {
@@ -2909,8 +3290,14 @@ function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const handlePresetsChange = (presets: string[]) => {
-    setSelectedPresets(presets);
-    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, selectedPresets: presets } } : n));
+    const presetOnly = presets.filter((presetId) => getPresetById(presetId)?.category !== 'style');
+    setSelectedPresets(presetOnly);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, selectedPresets: presetOnly } } : n));
+  };
+
+  const handleStyleChange = (styleId: string | null) => {
+    setSelectedStyleId(styleId);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, selectedStyleId: styleId } } : n));
   };
 
   const handleModelParamsChange = (params: ModelParams) => {
@@ -3220,6 +3607,8 @@ function ImageNode({ data, selected, id }: NodeProps) {
           onMarksChange={handleMarksChange}
           selectedPresets={selectedPresets}
           onPresetsChange={handlePresetsChange}
+          selectedStyleId={selectedStyleId}
+          onStyleChange={handleStyleChange}
           modelParams={modelParams}
           onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
