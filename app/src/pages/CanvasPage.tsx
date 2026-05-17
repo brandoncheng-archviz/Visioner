@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useMemo, useRef, useEffect, type ChangeEvent } from 'react';
+import { memo, useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import {
@@ -46,6 +46,7 @@ import {
   Building2,
   Layers,
   Leaf,
+  Users,
   Palette,
   Sun,
   Cloud,
@@ -681,10 +682,14 @@ function UpscaleParamPanel() {
 
 type ImageRole =
   | 'primary_building'
-  | 'overall_reference'
-  | 'plant_reference'
+  | 'atmosphere_reference'
+  | 'vegetation_reference'
+  | 'people_reference'
+  | 'custom_reference'
   | 'material_reference'
   | 'lighting_reference'
+  | 'overall_reference'
+  | 'plant_reference'
   | 'sky_reference';
 
 const imageRoleOptions: {
@@ -694,59 +699,70 @@ const imageRoleOptions: {
   detail: string;
   constraints: string[];
   Icon: typeof Building2;
+  color: string;
 }[] = [
   {
     value: 'primary_building',
     label: '主体建筑',
-    description: '保持结构 / 保持视角 / 保持构图',
-    detail: '作为主体建筑参考，AI 将保持结构、视角与构图不变。',
-    constraints: ['保持结构', '保持视角', '保持构图'],
+    description: '参考建筑本体的体块、特征与主要材质',
+    detail: '作为主体建筑参考，AI 将优先参考建筑体块、轮廓比例、立面关系、建筑特征，以及外立面的主要材质与纹理表达。',
+    constraints: ['建筑体块', '轮廓比例', '立面语言', '开窗节奏', '建筑特征', '主要材质纹理'],
     Icon: Building2,
+    color: '#4aa3ff',
   },
   {
-    value: 'overall_reference',
+    value: 'atmosphere_reference',
     label: '氛围参考',
     description: '参考整体氛围 / 色调 / 真实度',
-    detail: '参考整体氛围、时间段、灯光、色调、真实度和艺术化感觉。',
-    constraints: ['整体氛围', '色调', '真实度'],
+    detail: '作为氛围参考，AI 将主要参考整体时间段、天气状态、色调、光影情绪、曝光关系、对比度和真实度，不复制具体建筑内容。',
+    constraints: ['时间段', '天气', '色调', '光影情绪', '曝光', '对比度', '真实度', '整体画面气质'],
     Icon: Layers,
+    color: '#a78bfa',
   },
   {
-    value: 'plant_reference',
+    value: 'vegetation_reference',
     label: '植物参考',
-    description: '仅参考植物与景观感觉',
-    detail: '仅参考植物、景观、绿化的风格与质感。',
-    constraints: ['植物', '景观', '绿化'],
+    description: '参考植物类型与绿化层次',
+    detail: '作为植物参考，AI 将主要参考植物类型、树形、种植密度、景观层次、季节感、地域感和绿化风格，不改变主体建筑。',
+    constraints: ['植物类型', '树形', '种植密度', '草坪', '灌木', '花境', '季节感', '绿化层次'],
     Icon: Leaf,
+    color: '#4ade80',
   },
   {
-    value: 'material_reference',
-    label: '材质参考',
-    description: '仅参考材质质感',
-    detail: '仅参考材质质感，例如玻璃、混凝土、木材、金属、石材等。',
-    constraints: ['玻璃', '混凝土', '金属'],
-    Icon: Palette,
-  },
-  {
-    value: 'lighting_reference',
-    label: '灯光参考',
-    description: '参考时间段 / 光照 / 明暗关系',
-    detail: '参考时间段、太阳方向、光照强弱、明暗关系和室内外灯光。',
-    constraints: ['时间段', '光照', '明暗'],
-    Icon: Sun,
+    value: 'people_reference',
+    label: '人物参考',
+    description: '参考人物尺度 / 密度 / 活动状态',
+    detail: '作为人物参考，AI 将主要参考人物密度、尺度关系、活动状态、生活方式和场景活力，不参考具体人物长相，不让人物成为视觉中心。',
+    constraints: ['人物数量', '人物密度', '尺度关系', '活动状态', '生活方式', '服装季节', '场景活力'],
+    Icon: Users,
+    color: '#f59e0b',
   },
   {
     value: 'sky_reference',
     label: '天空参考',
-    description: '仅参考天空与天气氛围',
-    detail: '仅参考天空、云层、天气、霞光、蓝调或夜景氛围。',
-    constraints: ['天空', '云层', '天气'],
+    description: '参考天空 / 云层 / 天气背景',
+    detail: '作为天空参考，AI 将主要参考天空颜色、云层形态、天气状态、日落层次和天空明暗关系，不改变主体建筑和画面构图。',
+    constraints: ['天空颜色', '云层形态', '天气状态', '日落晚霞', '蓝天白云', '阴天天空', '明暗层次'],
     Icon: Cloud,
+    color: '#7dd3fc',
+  },
+  {
+    value: 'custom_reference',
+    label: '自定义用途...',
+    description: '自定义具体局部参考内容',
+    detail: '用于定义具体局部参考内容，例如铺装、水景、入口、栏杆、灯带、室内家具、立面肌理、商业招牌等。',
+    constraints: ['用户输入的具体局部内容'],
+    Icon: Pencil,
+    color: '#cbd5e1',
   },
 ];
 
 const roleColorMap: Record<ImageRole | 'null', string> = {
   primary_building: '#4aa3ff',
+  atmosphere_reference: '#a78bfa',
+  vegetation_reference: '#4ade80',
+  people_reference: '#f59e0b',
+  custom_reference: '#cbd5e1',
   overall_reference: '#a78bfa',
   plant_reference: '#4ade80',
   material_reference: '#fb923c',
@@ -754,6 +770,51 @@ const roleColorMap: Record<ImageRole | 'null', string> = {
   sky_reference: '#7dd3fc',
   null: 'rgba(255,255,255,0.35)',
 };
+
+const legacyImageRoleOptions: Partial<Record<ImageRole, (typeof imageRoleOptions)[number]>> = {
+  overall_reference: imageRoleOptions.find((option) => option.value === 'atmosphere_reference'),
+  plant_reference: imageRoleOptions.find((option) => option.value === 'vegetation_reference'),
+  material_reference: {
+    value: 'material_reference',
+    label: '材质参考',
+    description: '旧数据兼容：材质参考',
+    detail: '旧数据兼容显示为材质参考。新建用途请使用自定义用途。',
+    constraints: ['材质参考'],
+    Icon: Palette,
+    color: '#fb923c',
+  },
+  lighting_reference: {
+    value: 'lighting_reference',
+    label: '灯光参考',
+    description: '旧数据兼容：灯光参考',
+    detail: '旧数据兼容显示为灯光参考。新建用途请使用自定义用途。',
+    constraints: ['灯光参考'],
+    Icon: Sun,
+    color: '#facc15',
+  },
+};
+
+function normalizeCustomReferenceLabel(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return trimmed.endsWith('参考') ? trimmed : `${trimmed}参考`;
+}
+
+function getImageRoleOption(role: ImageRole | null | undefined, customLabel?: string) {
+  if (!role) return null;
+  const option = imageRoleOptions.find((item) => item.value === role) || legacyImageRoleOptions[role] || null;
+  if (role !== 'custom_reference' || !option) return option;
+  const label = customLabel?.trim() || option.label;
+  return { ...option, label };
+}
+
+function getImageRoleLabel(role: ImageRole | null | undefined, customLabel?: string) {
+  return getImageRoleOption(role, customLabel)?.label || '未定义用途';
+}
+
+function getImageRoleColor(role: ImageRole | null | undefined) {
+  return roleColorMap[role ?? 'null'] || roleColorMap.null;
+}
 
 /* ─── Preset System ─── */
 interface PresetItem {
@@ -1221,14 +1282,107 @@ const PRESET_BY_ID = new Map(PRESET_DATA.map((preset) => [preset.id, preset]));
 
 const getPresetById = (id: string) => PRESET_BY_ID.get(id);
 
-function buildFinalPrompt(userText: string, selectedPresetIds: string[]): string {
+type PromptContent =
+  | { type: 'text'; text: string }
+  | {
+      type: 'image_reference';
+      id: string;
+      imageId: string;
+      sourceNodeId: string;
+      usage: string;
+      thumbnailUrl: string;
+      promptText: string;
+    }
+  | {
+      type: 'preset';
+      id: string;
+      title: string;
+      promptText: string;
+    }
+  | {
+      type: 'style';
+      id: string;
+      title: string;
+      promptText: string;
+    };
+
+type ImageReferencePromptBlock = Extract<PromptContent, { type: 'image_reference' }>;
+
+function getImageReferencePromptText(reference: ReferenceInfo) {
+  if (reference.role === 'primary_building' || reference.roleLabel.includes('主体建筑')) {
+    return '保持建筑结构、体块比例、立面关系、相机角度和构图比例不变。';
+  }
+  if (reference.role === 'atmosphere_reference' || reference.role === 'overall_reference' || reference.roleLabel.includes('氛围')) {
+    return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
+  }
+  if (reference.role === 'vegetation_reference' || reference.role === 'plant_reference' || reference.roleLabel.includes('植物')) {
+    return '参考植物种类、种植密度、层次关系、季节状态和景观氛围。';
+  }
+  if (reference.role === 'people_reference' || reference.roleLabel.includes('人物')) {
+    return '参考人物类型、姿态、尺度关系、活动状态和画面中的生活感。';
+  }
+  if (reference.role === 'sky_reference' || reference.roleLabel.includes('天空')) {
+    return '参考天空状态、云量、光线方向、大气透明度和整体天气感。';
+  }
+  if (reference.role === 'custom_reference') {
+    const customUsage = reference.customRoleLabel?.trim() || reference.roleLabel.trim();
+    if (customUsage && customUsage !== '自定义用途...' && customUsage !== '未定义用途') {
+      return `参考该图片中的${customUsage.replace(/参考$/, '')}视觉信息。`;
+    }
+    return '参考该图片中用户指定的自定义视觉信息。';
+  }
+  if (reference.role === 'material_reference' || reference.roleLabel.includes('材质')) {
+    return '参考该图片中的材质纹理、反射关系和细节质感。';
+  }
+  if (reference.role === 'lighting_reference' || reference.roleLabel.includes('灯光')) {
+    return '参考该图片中的时间段、光照强弱和明暗关系。';
+  }
+  return '参考该图片中的关键视觉信息。';
+}
+
+function createImageReferenceBlock(reference: ReferenceInfo): ImageReferencePromptBlock {
+  return {
+    type: 'image_reference',
+    id: `image-ref-${reference.nodeId}`,
+    imageId: reference.nodeId,
+    sourceNodeId: reference.nodeId,
+    usage: reference.roleLabel || '未定义用途',
+    thumbnailUrl: reference.imageUrl,
+    promptText: getImageReferencePromptText(reference),
+  };
+}
+
+function joinPromptSegments(segments: string[]) {
+  return segments
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .reduce((result, segment) => {
+      if (!result) return segment;
+      return /[。.!！?？]$/.test(result) ? `${result}${segment}` : `${result}。${segment}`;
+    }, '');
+}
+
+function buildPromptSubmission(userText: string, promptContent: PromptContent[], selectedPresetIds: string[]) {
   const trimmedUserText = userText.trim();
+  const contentPrompts = promptContent
+    .map((block) => (block.type === 'text' ? block.text : block.promptText))
+    .filter(Boolean);
   const presetPrompts = selectedPresetIds
     .map(getPresetById)
     .filter((preset): preset is PresetItem => Boolean(preset))
     .map((preset) => preset.promptTemplate);
+  const imageReferences = promptContent
+    .filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference')
+    .map((block) => ({
+      imageId: block.imageId,
+      sourceNodeId: block.sourceNodeId,
+      usage: block.usage,
+    }));
 
-  return [trimmedUserText, ...presetPrompts].filter(Boolean).join('。');
+  return {
+    textPrompt: joinPromptSegments([trimmedUserText, ...contentPrompts, ...presetPrompts]),
+    imageReferences,
+  };
 }
 
 /* ─── Mark System ─── */
@@ -1309,35 +1463,17 @@ interface ReferenceInfo {
   index: number;
   role: ImageRole | null;
   roleLabel: string;
+  customRoleLabel?: string;
   imageUrl: string;
   width?: number;
   height?: number;
 }
 
-function getReferencePromptText(reference: ReferenceInfo) {
-  const label = reference.roleLabel || '引用素材';
-  if (reference.role === 'primary_building' || label.includes('主体建筑')) {
-    return `@${label}（@${reference.index}） 保持建筑结构、视角、构图。`;
-  }
-  if (label.includes('整体')) {
-    return `@${label}（@${reference.index}） 参考整体氛围、时间段、灯光。`;
-  }
-  if (label.includes('天空')) {
-    return `@${label}（@${reference.index}） 参考天空颜色、云层和光照氛围。`;
-  }
-  if (label.includes('材质')) {
-    return `@${label}（@${reference.index}） 参考材质纹理、反射和细节质感。`;
-  }
-  if (label.includes('景观') || label.includes('植物')) {
-    return `@${label}（@${reference.index}） 参考景观层次、植物配置和环境氛围。`;
-  }
-  return `@${label}（@${reference.index}） 参考该素材的关键视觉特征。`;
-}
-
-function getRoleData(role: ImageRole | null) {
+function getRoleData(role: ImageRole | null, customRoleLabel?: string) {
   const isPrimary = role === 'primary_building';
   return {
     role,
+    customRoleLabel: role === 'custom_reference' ? customRoleLabel : undefined,
     preserveStructure: isPrimary,
     preserveCamera: isPrimary,
     preserveComposition: isPrimary,
@@ -1346,12 +1482,14 @@ function getRoleData(role: ImageRole | null) {
 
 function ImageRoleTag({
   role,
+  customRoleLabel,
   onChange,
   open: controlledOpen,
   onOpenChange,
 }: {
   role: ImageRole | null;
-  onChange: (role: ImageRole) => void;
+  customRoleLabel?: string;
+  onChange: (role: ImageRole, customRoleLabel?: string) => void;
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
 }) {
@@ -1359,10 +1497,38 @@ function ImageRoleTag({
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customInput, setCustomInput] = useState('');
+  const customInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const selectedOption = imageRoleOptions.find((option) => option.value === role);
-  const previewOption = imageRoleOptions.find((option) => option.value === (hoveredRole || role));
+  const selectedOption = getImageRoleOption(role, customRoleLabel);
+  const previewOption = getImageRoleOption(hoveredRole || role, hoveredRole === 'custom_reference' ? customInput : customRoleLabel);
   const DisplayIcon = selectedOption?.Icon || Building2;
+
+  useEffect(() => {
+    if (!open) {
+      setShowCustomInput(false);
+      setHoveredRole(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (showCustomInput) {
+      customInputRef.current?.focus();
+    }
+  }, [showCustomInput]);
+
+  const submitCustomRole = () => {
+    const label = normalizeCustomReferenceLabel(customInput);
+    if (!label) {
+      setShowCustomInput(false);
+      return;
+    }
+    onChange('custom_reference', label);
+    setCustomInput('');
+    setShowCustomInput(false);
+    setOpen(false);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -1392,14 +1558,14 @@ function ImageRoleTag({
             background: selectedOption ? 'rgba(27, 36, 52, 0.82)' : 'rgba(20, 22, 28, 0.78)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
-            border: `1px solid ${selectedOption ? 'rgba(56,149,255,0.72)' : 'rgba(255,255,255,0.2)'}`,
+            border: `1px solid ${selectedOption ? selectedOption.color : 'rgba(255,255,255,0.2)'}`,
             color: selectedOption ? '#eaf7ff' : 'rgba(255,255,255,0.8)',
             boxShadow: selectedOption ? '0 0 0 1px rgba(0,212,255,0.08), 0 10px 24px rgba(0,0,0,0.34)' : '0 8px 18px rgba(0,0,0,0.28)',
           }}
         >
-          <DisplayIcon className="h-2.5 w-2.5" style={{ color: selectedOption ? '#4aa3ff' : 'rgba(255,255,255,0.68)' }} />
+          <DisplayIcon className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
           <span>{selectedOption?.label || '定义用途'}</span>
-          <ChevronDown className="h-2.5 w-2.5" style={{ color: selectedOption ? '#79baff' : 'rgba(255,255,255,0.6)' }} />
+          <ChevronDown className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.6)' }} />
         </button>
       </div>
 
@@ -1423,21 +1589,53 @@ function ImageRoleTag({
                 onMouseEnter={() => setHoveredRole(option.value)}
                 onMouseLeave={() => setHoveredRole(null)}
                 onClick={() => {
+                  if (option.value === 'custom_reference') {
+                    setShowCustomInput(true);
+                    setCustomInput('');
+                    return;
+                  }
                   onChange(option.value);
                   setOpen(false);
                 }}
                 className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors"
                 style={{
                   background: active ? 'rgba(55, 124, 214, 0.22)' : 'transparent',
-                  color: active ? '#4aa3ff' : 'rgba(255,255,255,0.82)',
+                  color: active ? option.color : 'rgba(255,255,255,0.82)',
                 }}
               >
-                <option.Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                <option.Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />
                 <span className="flex-1 font-medium">{option.label}</span>
                 {active && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
               </button>
             );
           })}
+          {showCustomInput && (
+            <div className="px-2.5 py-2">
+              <input
+                ref={customInputRef}
+                value={customInput}
+                onChange={(event) => setCustomInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submitCustomRole();
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setShowCustomInput(false);
+                  }
+                }}
+                onBlur={submitCustomRole}
+                placeholder="这张图主要参考什么？例如：铺装 / 水景 / 入口 / 栏杆"
+                className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'rgba(255,255,255,0.9)',
+                }}
+              />
+            </div>
+          )}
           <div
             className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[12px] leading-relaxed"
             style={{
@@ -1445,9 +1643,9 @@ function ImageRoleTag({
               color: 'rgba(255,255,255,0.54)',
             }}
           >
-            <div>{previewOption?.detail || '选择图片在建筑可视化流程中的参考角色。'}</div>
+            <div>{previewOption?.detail || '选择图片在建筑可视化流程中的参考角色。具体局部内容可使用自定义用途。'}</div>
             {previewOption && (
-              <div className="mt-2 flex gap-1">
+              <div className="mt-2 flex flex-wrap gap-1">
                 {previewOption.constraints.map((constraint) => (
                   <span
                     key={constraint}
@@ -1458,7 +1656,7 @@ function ImageRoleTag({
                       color: 'rgba(225,245,255,0.76)',
                     }}
                   >
-                    <span style={{ color: '#4aa3ff' }}>•</span> {constraint}
+                    <span style={{ color: previewOption.color }}>•</span> {constraint}
                   </span>
                 ))}
               </div>
@@ -1474,6 +1672,8 @@ function ImageRoleTag({
 function ImageNodeControlPanel({
   promptText,
   onPromptChange,
+  promptContent,
+  onPromptContentChange,
   marks,
   onMarksChange,
   selectedPresets,
@@ -1490,6 +1690,8 @@ function ImageNodeControlPanel({
 }: {
   promptText: string;
   onPromptChange: (value: string) => void;
+  promptContent: PromptContent[];
+  onPromptContentChange: (content: PromptContent[]) => void;
   marks: MarkItem[];
   onMarksChange: (marks: MarkItem[]) => void;
   selectedPresets: string[];
@@ -1502,7 +1704,7 @@ function ImageNodeControlPanel({
   onRemoveReference: (nodeId: string) => void;
   onReorderReferences: (newOrder: string[]) => void;
   onUseReference: (reference: ReferenceInfo) => void;
-  onAssignReferenceRole: (nodeId: string, role: ImageRole) => ReferenceInfo | null;
+  onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string) => ReferenceInfo | null;
 }) {
   const [showMarkPanel, setShowMarkPanel] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
@@ -1514,6 +1716,9 @@ function ImageNodeControlPanel({
   const [showReferenceMenu, setShowReferenceMenu] = useState(false);
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
   const [pendingReference, setPendingReference] = useState<ReferenceInfo | null>(null);
+  const [pendingCustomInput, setPendingCustomInput] = useState(false);
+  const [pendingCustomValue, setPendingCustomValue] = useState('');
+  const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [markName, setMarkName] = useState('');
   const [markAction, setMarkAction] = useState<MarkAction>('enhance');
   const [markDesc, setMarkDesc] = useState('');
@@ -1521,123 +1726,186 @@ function ImageNodeControlPanel({
   const [slashQuery, setSlashQuery] = useState('');
   const [slashIndex, setSlashIndex] = useState(0);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
+  const pendingCustomInputRef = useRef<HTMLInputElement>(null);
+  const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   /* ─── Reference thumbnail drag-and-drop reorder ─── */
   const [orderedRefs, setOrderedRefs] = useState(references);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const [draggingRefIndex, setDraggingRefIndex] = useState<number | null>(null);
+  const [draggingRefId, setDraggingRefId] = useState<string | null>(null);
   const isDraggingRef = useRef(false);
-  const pointerDragIndexRef = useRef<number | null>(null);
-  const pointerDragMovedRef = useRef(false);
+  const orderedRefsRef = useRef(references);
+  const referenceItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const referenceRectsBeforeUpdateRef = useRef<Map<string, DOMRect> | null>(null);
+  const referenceDragRef = useRef<{
+    nodeId: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
 
   useEffect(() => {
-    const currentIds = new Set(orderedRefs.map((r) => r.nodeId));
-    const newIds = new Set(references.map((r) => r.nodeId));
-    if (currentIds.size !== newIds.size || !references.every((r) => currentIds.has(r.nodeId))) {
+    const latestById = new Map(references.map((reference) => [reference.nodeId, reference]));
+    const currentIds = new Set(orderedRefs.map((reference) => reference.nodeId));
+    const idsChanged = currentIds.size !== references.length || !references.every((reference) => currentIds.has(reference.nodeId));
+
+    if (idsChanged) {
       setOrderedRefs(references);
-    }
-  }, [references]);
-
-  const handleRefDragStart = (index: number) => (e: React.DragEvent) => {
-    isDraggingRef.current = true;
-    setDraggingRefIndex(index);
-    e.dataTransfer.setData('text/plain', String(index));
-    e.dataTransfer.setData('application/x-visioner-reference-reorder', 'true');
-    e.dataTransfer.effectAllowed = 'move';
-    const dragImage = document.createElement('div');
-    dragImage.style.position = 'fixed';
-    dragImage.style.left = '-1000px';
-    dragImage.style.top = '-1000px';
-    dragImage.style.width = '1px';
-    dragImage.style.height = '1px';
-    document.body.appendChild(dragImage);
-    e.dataTransfer.setDragImage(dragImage, 0, 0);
-    window.setTimeout(() => dragImage.remove(), 0);
-    e.stopPropagation();
-  };
-
-  const handleRefDragOver = (index: number) => (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverIndex(index);
-  };
-
-  const handleRefDrop = (targetIndex: number) => (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-    if (sourceIndex === targetIndex || Number.isNaN(sourceIndex)) {
-      setDragOverIndex(null);
       return;
     }
-    const newRefs = [...orderedRefs];
-    const [moved] = newRefs.splice(sourceIndex, 1);
-    newRefs.splice(targetIndex, 0, moved);
-    setOrderedRefs(newRefs);
-    onReorderReferences(newRefs.map((r) => r.nodeId));
-    setDragOverIndex(null);
-  };
 
-  const handleRefDragEnd = () => {
-    setDragOverIndex(null);
-    setDraggingRefIndex(null);
-    setTimeout(() => { isDraggingRef.current = false; }, 50);
-  };
+    const syncedRefs = orderedRefs.map((reference) => latestById.get(reference.nodeId) || reference);
+    const contentChanged = syncedRefs.some((reference, index) => reference !== orderedRefs[index]);
+    if (contentChanged) {
+      setOrderedRefs(syncedRefs);
+    }
+  }, [orderedRefs, references]);
 
-  const reorderReferences = (sourceIndex: number, targetIndex: number) => {
+  useEffect(() => {
+    orderedRefsRef.current = orderedRefs;
+  }, [orderedRefs]);
+
+  useLayoutEffect(() => {
+    const previousRects = referenceRectsBeforeUpdateRef.current;
+    if (!previousRects) return;
+    referenceRectsBeforeUpdateRef.current = null;
+
+    orderedRefsRef.current.forEach((ref) => {
+      if (ref.nodeId === draggingRefId) return;
+      const element = referenceItemRefs.current.get(ref.nodeId);
+      const previousRect = previousRects.get(ref.nodeId);
+      if (!element || !previousRect) return;
+
+      const nextRect = element.getBoundingClientRect();
+      const deltaX = previousRect.left - nextRect.left;
+      const deltaY = previousRect.top - nextRect.top;
+      if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+
+      element.style.transition = 'none';
+      element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+      requestAnimationFrame(() => {
+        element.style.transition = 'transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 120ms ease';
+        element.style.transform = 'translate(0, 0)';
+      });
+    });
+  }, [orderedRefs, draggingRefId]);
+
+  const captureReferenceRects = useCallback(() => {
+    const rects = new Map<string, DOMRect>();
+    orderedRefsRef.current.forEach((ref) => {
+      const element = referenceItemRefs.current.get(ref.nodeId);
+      if (element) rects.set(ref.nodeId, element.getBoundingClientRect());
+    });
+    referenceRectsBeforeUpdateRef.current = rects;
+  }, []);
+
+  const reorderReferences = useCallback((sourceIndex: number, targetIndex: number) => {
     if (sourceIndex === targetIndex) return;
-    const newRefs = [...orderedRefs];
+    captureReferenceRects();
+    const newRefs = [...orderedRefsRef.current];
     const [moved] = newRefs.splice(sourceIndex, 1);
     newRefs.splice(targetIndex, 0, moved);
+    orderedRefsRef.current = newRefs;
     setOrderedRefs(newRefs);
     onReorderReferences(newRefs.map((r) => r.nodeId));
-  };
+  }, [captureReferenceRects, onReorderReferences]);
 
-  const resetPointerReferenceDrag = (keepClickBlocked = true) => {
-    pointerDragIndexRef.current = null;
-    pointerDragMovedRef.current = false;
-    setDragOverIndex(null);
-    setDraggingRefIndex(null);
+  const resetPointerReferenceDrag = useCallback((keepClickBlocked = true) => {
+    referenceDragRef.current = null;
+    setDraggingRefId(null);
     if (keepClickBlocked) {
       window.setTimeout(() => { isDraggingRef.current = false; }, 50);
     } else {
       isDraggingRef.current = false;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const drag = referenceDragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+
+      event.preventDefault();
+      const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+      if (distance > 3) drag.moved = true;
+
+      let swapped = false;
+      do {
+        swapped = false;
+        const currentRefs = orderedRefsRef.current;
+        const currentIndex = currentRefs.findIndex((ref) => ref.nodeId === drag.nodeId);
+        if (currentIndex < 0) return;
+
+        const prevRef = currentRefs[currentIndex - 1];
+        const nextRef = currentRefs[currentIndex + 1];
+        const prevEl = prevRef ? referenceItemRefs.current.get(prevRef.nodeId) : null;
+        const nextEl = nextRef ? referenceItemRefs.current.get(nextRef.nodeId) : null;
+
+        if (prevEl) {
+          const prevRect = prevEl.getBoundingClientRect();
+          if (event.clientX < prevRect.left + prevRect.width / 2) {
+            reorderReferences(currentIndex, currentIndex - 1);
+            swapped = true;
+            continue;
+          }
+        }
+
+        if (nextEl) {
+          const nextRect = nextEl.getBoundingClientRect();
+          if (event.clientX > nextRect.left + nextRect.width / 2) {
+            reorderReferences(currentIndex, currentIndex + 1);
+            swapped = true;
+          }
+        }
+      } while (swapped);
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      const drag = referenceDragRef.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      event.preventDefault();
+      resetPointerReferenceDrag(drag.moved);
+    };
+
+    const handleWindowBlur = () => resetPointerReferenceDrag(true);
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerEnd, { passive: false });
+    window.addEventListener('pointercancel', handlePointerEnd, { passive: false });
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerEnd);
+      window.removeEventListener('pointercancel', handlePointerEnd);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [reorderReferences, resetPointerReferenceDrag]);
 
   const handleRefPointerDown = (index: number) => (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
-    pointerDragIndexRef.current = index;
-    pointerDragMovedRef.current = false;
+    const ref = orderedRefsRef.current[index];
+    if (!ref) return;
+    referenceDragRef.current = {
+      nodeId: ref.nodeId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
     isDraggingRef.current = true;
-    setDraggingRefIndex(index);
+    setDraggingRefId(ref.nodeId);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
     event.stopPropagation();
-  };
-
-  const handleRefPointerEnter = (index: number) => {
-    const sourceIndex = pointerDragIndexRef.current;
-    if (sourceIndex === null || sourceIndex === index) return;
-    pointerDragMovedRef.current = true;
-    setDragOverIndex(index);
-  };
-
-  const handleRefPointerUp = (index: number) => (event: React.PointerEvent<HTMLDivElement>) => {
-    const sourceIndex = pointerDragIndexRef.current;
-    event.stopPropagation();
-    if (sourceIndex === null) return;
-    if (sourceIndex !== index) {
-      reorderReferences(sourceIndex, index);
-      resetPointerReferenceDrag(true);
-      return;
-    }
-    resetPointerReferenceDrag(pointerDragMovedRef.current);
   };
 
   const handleThumbnailClick = (ref: ReferenceInfo) => {
     if (isDraggingRef.current) return;
     requestReferenceInsert(ref);
   };
+
+  const imageReferenceBlocks = promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference');
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const visiblePresets = useMemo(
@@ -1719,44 +1987,68 @@ function ImageNodeControlPanel({
   const closeReferenceMenus = () => {
     setShowReferenceMenu(false);
     setPendingReference(null);
+    setPendingCustomInput(false);
+    setPendingCustomValue('');
   };
 
-  const focusReferencePrompt = (reference: ReferenceInfo) => {
-    const text = getReferencePromptText(reference);
-    const existingIndex = promptText.indexOf(text);
-    if (existingIndex < 0) return false;
-
-    requestAnimationFrame(() => {
-      promptInputRef.current?.focus();
-      promptInputRef.current?.setSelectionRange(existingIndex, existingIndex + text.length);
+  useEffect(() => {
+    const referencesById = new Map(references.map((reference) => [reference.nodeId, reference]));
+    let changed = false;
+    const nextContent = promptContent.map((block) => {
+      if (block.type !== 'image_reference') return block;
+      const reference = referencesById.get(block.sourceNodeId);
+      if (!reference) return block;
+      const nextBlock = createImageReferenceBlock(reference);
+      const updatedBlock = { ...block, usage: nextBlock.usage, thumbnailUrl: nextBlock.thumbnailUrl, promptText: nextBlock.promptText };
+      if (updatedBlock.usage !== block.usage || updatedBlock.thumbnailUrl !== block.thumbnailUrl || updatedBlock.promptText !== block.promptText) {
+        changed = true;
+      }
+      return updatedBlock;
     });
-    return true;
+    if (changed) {
+      onPromptContentChange(nextContent);
+    }
+  }, [onPromptContentChange, promptContent, references]);
+
+  const removePendingAtMarker = () => {
+    const input = promptInputRef.current;
+    const cursor = input?.selectionStart ?? promptText.length;
+    if (cursor > 0 && promptText[cursor - 1] === '@') {
+      const nextText = `${promptText.slice(0, cursor - 1)}${promptText.slice(cursor)}`;
+      onPromptChange(nextText);
+      requestAnimationFrame(() => {
+        promptInputRef.current?.focus();
+        promptInputRef.current?.setSelectionRange(cursor - 1, cursor - 1);
+      });
+    }
   };
 
-  const insertReferencePrompt = (reference: ReferenceInfo) => {
-    const text = getReferencePromptText(reference);
-    if (focusReferencePrompt(reference)) {
+  const flashPromptBlock = (blockId: string) => {
+    setHighlightedPromptBlockId(blockId);
+    promptBlockRefs.current.get(blockId)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    window.setTimeout(() => {
+      setHighlightedPromptBlockId((currentId) => (currentId === blockId ? null : currentId));
+    }, 900);
+  };
+
+  const insertReferenceBlock = (reference: ReferenceInfo) => {
+    const existingBlock = imageReferenceBlocks.find((block) => block.sourceNodeId === reference.nodeId);
+    if (existingBlock) {
+      flashPromptBlock(existingBlock.id);
+      removePendingAtMarker();
       closeReferenceMenus();
       return;
     }
 
-    const input = promptInputRef.current;
-    const selectionStart = input?.selectionStart ?? promptText.length;
-    const selectionEnd = input?.selectionEnd ?? selectionStart;
-    const atStart = selectionStart > 0 && promptText[selectionStart - 1] === '@' ? selectionStart - 1 : selectionStart;
-    const prefix = promptText.slice(0, atStart);
-    const suffix = promptText.slice(selectionEnd);
-    const spacerBefore = prefix.trim().length > 0 && !prefix.endsWith('\n') ? '\n' : '';
-    const spacerAfter = suffix.trim().length > 0 && !suffix.startsWith('\n') ? '\n' : '';
-    const nextText = `${prefix}${spacerBefore}${text}${spacerAfter}${suffix}`;
-    const nextCursor = prefix.length + spacerBefore.length + text.length;
-
-    onPromptChange(nextText);
+    const nextBlock = createImageReferenceBlock(reference);
+    onPromptContentChange([...promptContent, nextBlock]);
+    setHighlightedPromptBlockId(nextBlock.id);
+    window.setTimeout(() => {
+      setHighlightedPromptBlockId((currentId) => (currentId === nextBlock.id ? null : currentId));
+    }, 900);
+    removePendingAtMarker();
     closeReferenceMenus();
-    requestAnimationFrame(() => {
-      promptInputRef.current?.focus();
-      promptInputRef.current?.setSelectionRange(nextCursor, nextCursor);
-    });
+    requestAnimationFrame(() => promptInputRef.current?.focus());
   };
 
   const requestReferenceInsert = (reference: ReferenceInfo) => {
@@ -1766,14 +2058,32 @@ function ImageNodeControlPanel({
       return;
     }
     onUseReference(reference);
-    insertReferencePrompt(reference);
+    insertReferenceBlock(reference);
   };
 
-  const handleReferenceRoleSelect = (role: ImageRole) => {
+  useEffect(() => {
+    if (pendingCustomInput) {
+      pendingCustomInputRef.current?.focus();
+    }
+  }, [pendingCustomInput]);
+
+  const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string) => {
     if (!pendingReference) return;
-    const roleLabel = imageRoleOptions.find((option) => option.value === role)?.label || pendingReference.roleLabel;
-    const updatedReference = onAssignReferenceRole(pendingReference.nodeId, role) || { ...pendingReference, role, roleLabel };
+    const roleLabel = getImageRoleLabel(role, customRoleLabel);
+    const updatedReference = onAssignReferenceRole(pendingReference.nodeId, role, customRoleLabel) || { ...pendingReference, role, roleLabel, customRoleLabel };
+    setPendingReference(null);
+    setPendingCustomInput(false);
+    setPendingCustomValue('');
     requestReferenceInsert(updatedReference);
+  };
+
+  const submitPendingCustomRole = () => {
+    const label = normalizeCustomReferenceLabel(pendingCustomValue);
+    if (!label) {
+      setPendingCustomInput(false);
+      return;
+    }
+    handleReferenceRoleSelect('custom_reference', label);
   };
 
   const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -2066,11 +2376,18 @@ function ImageNodeControlPanel({
           </div>
           {/* 引用缩略图 — 支持拖拽排序 */}
           <div
-            className="flex items-center gap-2 ml-1"
+            className="flex items-center gap-2"
           >
             {orderedRefs.map((ref, idx) => (
               <div
                 key={ref.nodeId}
+                ref={(element) => {
+                  if (element) {
+                    referenceItemRefs.current.set(ref.nodeId, element);
+                  } else {
+                    referenceItemRefs.current.delete(ref.nodeId);
+                  }
+                }}
                 role="button"
                 tabIndex={0}
                 draggable={false}
@@ -2079,24 +2396,18 @@ function ImageNodeControlPanel({
                   if (event.key === 'Enter') requestReferenceInsert(ref);
                 }}
                 onPointerDown={handleRefPointerDown(idx)}
-                onPointerEnter={() => handleRefPointerEnter(idx)}
-                onPointerUp={handleRefPointerUp(idx)}
                 onPointerCancel={() => resetPointerReferenceDrag(true)}
-                onDragStart={handleRefDragStart(idx)}
-                onDragEnter={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
+                className="nodrag nowheel group/ref relative flex-shrink-0 cursor-grab rounded-lg outline-none active:cursor-grabbing"
+                style={{
+                  width: 54,
+                  height: 50,
+                  opacity: draggingRefId === ref.nodeId ? 0.48 : 1,
+                  transform: draggingRefId === ref.nodeId ? 'scale(0.96)' : 'scale(1)',
+                  transition: 'transform 160ms ease, opacity 120ms ease',
+                  touchAction: 'none',
                 }}
-                onDragOver={handleRefDragOver(idx)}
-                onDrop={handleRefDrop(idx)}
-                onDragEnd={(event) => {
-                  event.stopPropagation();
-                  handleRefDragEnd();
-                }}
-                className="nodrag nowheel group/ref relative flex-shrink-0 cursor-grab rounded-md outline-none active:cursor-grabbing"
-                style={{ width: 54, height: 50, opacity: dragOverIndex === idx ? 0.5 : 1, transition: 'opacity 0.15s' }}
               >
-                {ref.imageUrl && draggingRefIndex === null && (
+                {ref.imageUrl && draggingRefId === null && (
                   <div
                     className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 overflow-hidden rounded-xl group-hover/ref:block"
                     style={{
@@ -2115,57 +2426,48 @@ function ImageNodeControlPanel({
                         aspectRatio: ref.width && ref.height ? `${ref.width}/${ref.height}` : '1/1',
                       }}
                     />
-                    <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: roleColorMap[ref.role ?? 'null'] }}>
+                    <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: getImageRoleColor(ref.role) }}>
                       @{ref.roleLabel || '引用素材'}
                     </div>
                   </div>
                 )}
-                {ref.imageUrl ? (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <img src={ref.imageUrl} alt="" className="rounded-md object-cover" draggable={false} style={{ width: 42, height: 42 }} />
-                  </div>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center rounded-md" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    <Image className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
-                  </div>
-                )}
-                <span className="pointer-events-none absolute -top-1 -right-1 flex items-center justify-center text-[8px] font-bold rounded-full" style={{ width: 14, height: 14, background: '#fff', color: '#000' }}>{idx + 1}</span>
-                <button
-                  draggable={false}
-                  type="button"
-                  onPointerDownCapture={(event) => {
-                    pointerDragIndexRef.current = null;
-                    pointerDragMovedRef.current = false;
-                    isDraggingRef.current = false;
-                    setDraggingRefIndex(null);
-                    setDragOverIndex(null);
-                    event.stopPropagation();
-                  }}
-                  onMouseDownCapture={(event) => {
-                    event.stopPropagation();
-                  }}
-                  onClickCapture={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onRemoveReference(ref.nodeId);
-                  }}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                  }}
-                  onDragStart={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  className="nodrag nowheel absolute -right-1.5 -top-1.5 hidden items-center justify-center rounded-full text-white transition-colors hover:bg-black group-hover/ref:flex"
-                  style={{ width: 16, height: 16, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)', zIndex: 5 }}
-                  title="删除引用"
+                <div
+                  className="relative h-full w-full overflow-hidden rounded-lg"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: FLOATING_PANEL_BORDER }}
                 >
-                  <X className="h-2.5 w-2.5" />
-                </button>
+                  {ref.imageUrl ? (
+                    <img src={ref.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <Image className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                    </div>
+                  )}
+                  <button
+                    draggable={false}
+                    type="button"
+                    onPointerDownCapture={(event) => {
+                      referenceDragRef.current = null;
+                      isDraggingRef.current = false;
+                      setDraggingRefId(null);
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClickCapture={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onRemoveReference(ref.nodeId);
+                    }}
+                    onDragStart={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    className="nodrag nowheel absolute right-1 top-1 hidden items-center justify-center rounded-full text-white transition-colors hover:bg-black group-hover/ref:flex"
+                    style={{ width: 16, height: 16, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)', zIndex: 5 }}
+                    title="删除引用"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -2184,6 +2486,83 @@ function ImageNodeControlPanel({
       {/* Prompt input */}
       <div style={{ padding: '4px 14px 12px' }}>
         <div className="relative">
+        {imageReferenceBlocks.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {imageReferenceBlocks.map((block) => {
+              const reference = references.find((item) => item.nodeId === block.sourceNodeId);
+              const previewImage = reference?.imageUrl || block.thumbnailUrl;
+              const blockColor = getImageRoleColor(reference?.role ?? null);
+              const highlighted = highlightedPromptBlockId === block.id;
+
+              return (
+                <div
+                  key={block.id}
+                  ref={(element) => {
+                    if (element) {
+                      promptBlockRefs.current.set(block.id, element);
+                    } else {
+                      promptBlockRefs.current.delete(block.id);
+                    }
+                  }}
+                  className="group/prompt-ref relative inline-flex max-w-full items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[12px] transition-all"
+                  style={{
+                    background: highlighted ? 'rgba(0,212,255,0.18)' : 'rgba(255,255,255,0.055)',
+                    borderColor: highlighted ? 'rgba(0,212,255,0.55)' : 'rgba(255,255,255,0.1)',
+                    boxShadow: highlighted ? '0 0 0 1px rgba(0,212,255,0.2)' : 'none',
+                    color: 'rgba(255,255,255,0.86)',
+                  }}
+                >
+                  {previewImage ? (
+                    <img src={previewImage} alt="" className="h-6 w-6 flex-shrink-0 rounded object-cover" draggable={false} />
+                  ) : (
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
+                    </span>
+                  )}
+                  <span className="flex-shrink-0 font-medium" style={{ color: blockColor }}>{block.usage}</span>
+                  <span className="min-w-0 truncate" style={{ maxWidth: 360, color: 'rgba(255,255,255,0.66)' }}>{block.promptText}</span>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onPromptContentChange(promptContent.filter((item) => item.type === 'text' || item.id !== block.id));
+                    }}
+                    className="ml-0.5 hidden h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 group-hover/prompt-ref:flex"
+                    style={{ color: 'rgba(255,255,255,0.58)' }}
+                    title="删除图片引用"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                  {previewImage && (
+                    <div
+                      className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden overflow-hidden rounded-xl group-hover/prompt-ref:block"
+                      style={{
+                        width: 188,
+                        background: FLOATING_PANEL_BACKGROUND,
+                        border: FLOATING_PANEL_BORDER,
+                        boxShadow: '0 16px 34px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      <img
+                        src={previewImage}
+                        alt=""
+                        className="w-full object-contain"
+                        style={{
+                          maxHeight: 220,
+                          aspectRatio: reference?.width && reference?.height ? `${reference.width}/${reference.height}` : '1/1',
+                        }}
+                      />
+                      <div className="px-2 py-1.5">
+                        <div className="text-[12px] font-medium" style={{ color: blockColor }}>{block.usage}</div>
+                        <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.62)' }}>{block.promptText}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
         <textarea
           ref={promptInputRef}
           value={promptText}
@@ -2256,9 +2635,6 @@ function ImageNodeControlPanel({
                   </span>
                 )}
                 <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{reference.roleLabel || '未定义用途'}</span>
-                <span className="flex-shrink-0 text-[13px]" style={{ color: 'rgba(255,255,255,0.52)' }}>
-                  (@{reference.index})
-                </span>
               </button>
             ))}
           </div>
@@ -2281,15 +2657,49 @@ function ImageNodeControlPanel({
               return (
                 <button
                   key={option.value}
-                  onClick={() => handleReferenceRoleSelect(option.value)}
+                  onClick={() => {
+                    if (option.value === 'custom_reference') {
+                      setPendingCustomInput(true);
+                      setPendingCustomValue('');
+                      return;
+                    }
+                    handleReferenceRoleSelect(option.value);
+                  }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] transition-colors hover:bg-white/5"
                   style={{ color: 'rgba(255,255,255,0.86)' }}
                 >
-                  <RoleIcon className="h-4 w-4" style={{ color: roleColorMap[option.value] }} />
+                  <RoleIcon className="h-4 w-4" style={{ color: option.color }} />
                   {option.label}
                 </button>
               );
             })}
+            {pendingCustomInput && (
+              <div className="px-3 py-2">
+                <input
+                  ref={pendingCustomInputRef}
+                  value={pendingCustomValue}
+                  onChange={(event) => setPendingCustomValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      submitPendingCustomRole();
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setPendingCustomInput(false);
+                    }
+                  }}
+                  onBlur={submitPendingCustomRole}
+                  placeholder="这张图主要参考什么？例如：铺装 / 水景 / 入口 / 栏杆"
+                  className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: 'rgba(255,255,255,0.9)',
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
         </div>
@@ -2417,6 +2827,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
   const img = data.image as string;
   const role = (data.role as ImageRole | null | undefined) ?? null;
+  const customRoleLabel = data.customRoleLabel as string | undefined;
   const fileRef = useRef<HTMLInputElement>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || 'Image');
   const [previewImage, setPreviewImage] = useState(img);
@@ -2429,6 +2840,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
 
   /* ─── Extended node state ─── */
   const [promptText, setPromptText] = useState((data.prompt as string) || '');
+  const [promptContent, setPromptContent] = useState<PromptContent[]>((data.promptContent as PromptContent[]) || []);
   const [marks, setMarks] = useState<MarkItem[]>((data.marks as MarkItem[]) || []);
   const [selectedPresets, setSelectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
@@ -2442,12 +2854,13 @@ function ImageNode({ data, selected, id }: NodeProps) {
   const rawReferences = inputEdges.map((edge) => {
     const sourceNode = allNodes.find((n) => n.id === edge.source);
     const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
-    const roleOpt = sourceRole ? imageRoleOptions.find((o) => o.value === sourceRole) : null;
+    const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
     return {
       nodeId: edge.source,
       index: 0,
       role: sourceRole,
-      roleLabel: roleOpt?.label || '未定义用途',
+      roleLabel: getImageRoleLabel(sourceRole, sourceCustomRoleLabel),
+      customRoleLabel: sourceCustomRoleLabel,
       imageUrl: sourceNode?.data?.image as string,
       width: (sourceNode?.data?.width as number) || undefined,
       height: (sourceNode?.data?.height as number) || undefined,
@@ -2464,10 +2877,10 @@ function ImageNode({ data, selected, id }: NodeProps) {
     })
     .map((ref, idx) => ({ ...ref, index: idx + 1 }));
 
-  const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || promptText.trim().length > 0;
+  const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || promptText.trim().length > 0 || promptContent.length > 0;
 
   const handleGenerate = () => {
-    const finalPrompt = buildFinalPrompt(promptText, selectedPresets);
+    const { textPrompt, imageReferences } = buildPromptSubmission(promptText, promptContent, selectedPresets);
     const mockResult = `/images/show-cover-${Math.floor(Math.random() * 5) + 1}.jpg`;
     const nextGeneratedImages = [...generatedImages, mockResult];
     setPreviewImage(mockResult);
@@ -2477,12 +2890,17 @@ function ImageNode({ data, selected, id }: NodeProps) {
       setImgSize({ width: resultImage.width, height: resultImage.height });
     };
     resultImage.src = mockResult;
-    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, image: mockResult, finalPrompt, generatedImages: nextGeneratedImages, width: 1024, height: 1024 } } : n));
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, image: mockResult, finalPrompt: textPrompt, textPrompt, imageReferences, promptContent, generatedImages: nextGeneratedImages, width: 1024, height: 1024 } } : n));
   };
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
     setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, prompt: value } } : n));
+  };
+
+  const handlePromptContentChange = (content: PromptContent[]) => {
+    setPromptContent(content);
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, promptContent: content } } : n));
   };
 
   const handleMarksChange = (newMarks: MarkItem[]) => {
@@ -2517,10 +2935,10 @@ function ImageNode({ data, selected, id }: NodeProps) {
     // Shared entry point for top thumbnails and the @ reference menu.
   };
 
-  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole) => {
-    const roleOption = imageRoleOptions.find((option) => option.value === nextRole);
+  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string) => {
+    const roleOption = getImageRoleOption(nextRole, nextCustomRoleLabel);
     setNodes((nds) => nds.map((node) => (
-      node.id === sourceNodeId ? { ...node, data: { ...node.data, ...getRoleData(nextRole) } } : node
+      node.id === sourceNodeId ? { ...node, data: { ...node.data, ...getRoleData(nextRole, nextCustomRoleLabel) } } : node
     )));
 
     const existingReference = references.find((reference) => reference.nodeId === sourceNodeId);
@@ -2528,6 +2946,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
     return {
       ...existingReference,
       role: nextRole,
+      customRoleLabel: nextCustomRoleLabel,
       roleLabel: roleOption?.label || existingReference.roleLabel,
     };
   };
@@ -2556,8 +2975,8 @@ function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, label: newName } } : n));
   };
 
-  const handleRoleChange = (nextRole: ImageRole) => {
-    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole) } } : n));
+  const handleRoleChange = (nextRole: ImageRole, nextCustomRoleLabel?: string) => {
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole, nextCustomRoleLabel) } } : n));
   };
 
   const stopTitleInteraction = (event: React.SyntheticEvent) => {
@@ -2583,7 +3002,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
     ? Math.max(120, Math.min(Math.round(cardWidth / aspectRatio), 320))
     : IMAGE_NODE_EMPTY_HEIGHT;
   const showTitleMeta = zoom >= 0.35;
-  const roleOption = role ? imageRoleOptions.find((o) => o.value === role) : null;
+  const roleOption = getImageRoleOption(role, customRoleLabel);
   const RoleIconForTitle = roleOption?.Icon;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
   const isOnlySelected = selected && selectedNodeCount === 1;
@@ -2615,7 +3034,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
                   setRoleMenuOpen(true);
                 }}
                 className="flex-shrink-0 cursor-pointer select-none transition-all hover:brightness-125"
-                style={{ color: roleColorMap[role ?? 'null'], fontSize: 11 }}
+                style={{ color: getImageRoleColor(role), fontSize: 11 }}
                 title="点击设置图片用途"
               >
                 {RoleIconForTitle && (
@@ -2680,7 +3099,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
         )}
 
         {displayImage && (isOnlySelected || roleMenuOpen) && (
-          <ImageRoleTag role={role} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
+          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}
@@ -2792,9 +3211,11 @@ function ImageNode({ data, selected, id }: NodeProps) {
           transformOrigin: 'top center',
         }}
       >
-        <ImageNodeControlPanel
+          <ImageNodeControlPanel
           promptText={promptText}
           onPromptChange={handlePromptChange}
+          promptContent={promptContent}
+          onPromptContentChange={handlePromptContentChange}
           marks={marks}
           onMarksChange={handleMarksChange}
           selectedPresets={selectedPresets}

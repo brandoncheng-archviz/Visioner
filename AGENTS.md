@@ -2,25 +2,25 @@
 
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
-**Important:** All application source code, configuration, and build assets live inside the `app/` subdirectory. The repository root only contains `.git/` and the `app/` folder. Every command below should be run from `app/` unless noted otherwise.
+**Important:** All application source code, configuration, and build assets live inside the `app/` subdirectory. The repository root only contains `.git/`, `package-lock.json`, and the `app/` folder. Every command below should be run from `app/` unless noted otherwise.
 
 ---
 
 ## Technology Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| Framework | React | 19.2 |
-| Language | TypeScript | ~5.9 |
-| Build Tool | Vite | 7.2 |
-| Styling | Tailwind CSS | 3.4 |
+| Layer | Technology | Version (from `package.json`) |
+|-------|-----------|-------------------------------|
+| Framework | React | ^19.2.0 |
+| Language | TypeScript | ~5.9.3 |
+| Build Tool | Vite | ^7.2.4 |
+| Styling | Tailwind CSS | ^3.4.19 |
 | UI Components | shadcn/ui (New York style) | — |
-| Router | react-router-dom | 7.x |
-| Canvas | @xyflow/react + custom 2D canvas | 12.10 |
-| Carousel | embla-carousel-react | 8.6 |
-| Icons | lucide-react | 0.562 |
-| Forms | react-hook-form + zod | 7.70 / 4.3 |
-| Charts | recharts | 2.15 |
+| Router | react-router-dom | ^7.14.2 |
+| Canvas | @xyflow/react | ^12.10.2 |
+| Carousel | embla-carousel-react | ^8.6.0 |
+| Icons | lucide-react | ^0.562.0 |
+| Forms | react-hook-form + zod | ^7.70.0 / ^4.3.5 |
+| Charts | recharts | ^2.15.4 |
 
 ---
 
@@ -33,7 +33,7 @@ app/
 ├── src/
 │   ├── components/
 │   │   ├── ui/              # shadcn/ui components (50+ primitives: button, dialog, form, etc.)
-│   │   ├── NodeEditor/      # Custom 2D canvas node editor (NodeEditorCanvas.tsx, NodeRegistry.ts)
+│   │   ├── NodeEditor/      # Custom 2D canvas node editor (standalone, not wired to routes)
 │   │   ├── AccountPanel.tsx
 │   │   ├── CanvasEdge.tsx
 │   │   ├── CustomConnectionLine.tsx
@@ -56,7 +56,8 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   └── CanvasPage.tsx   # Visual node editor (React Flow based, ~2200 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor (React Flow based, ~4240 lines)
+│   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
 │   ├── App.css              # Minimal root-level styles
@@ -67,7 +68,7 @@ app/
 ├── vite.config.ts           # Vite config: base './', port 3000, @/ -> ./src alias
 ├── tailwind.config.js       # Custom theme extending shadcn color tokens, animations
 ├── tsconfig.json            # Project references to tsconfig.app.json & tsconfig.node.json
-├── tsconfig.app.json        # Strict TypeScript: noUnusedLocals, noUnusedParameters
+├── tsconfig.app.json        # Strict TypeScript: noUnusedLocals, noUnusedParameters, verbatimModuleSyntax
 ├── tsconfig.node.json       # Node-side config for Vite
 ├── eslint.config.js         # ESLint flat config: TS + react-hooks + react-refresh
 └── postcss.config.js        # Tailwind + autoprefixer
@@ -126,7 +127,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
   - Secondary text: `#a0a0b0`
   - Muted text: `#6a6a7a`
 - **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
-- **TypeScript**: Strict mode is enabled. `noUnusedLocals` and `noUnusedParameters` are active; unused variables will fail the build.
+- **TypeScript**: Strict mode is enabled. `noUnusedLocals` and `noUnusedParameters` are active; unused variables will fail the build. `verbatimModuleSyntax` is also enabled, so type-only imports must use the `type` keyword (e.g., `import type { Foo } from '...'` or `import { type Foo } from '...'`).
 - **ESLint**: The project disables `@typescript-eslint/no-explicit-any` in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
 
 ---
@@ -158,7 +159,7 @@ Features:
 
 ### Custom 2D Canvas Node Editor (`src/components/NodeEditor/`)
 
-An independent canvas-based node editor rendered on a raw `<canvas>` element. **Note:** This module is not currently wired into any route; it is a standalone subsystem.
+An independent canvas-based node editor rendered on a raw `<canvas>` element. **Note:** This module is not currently imported or wired into any route; it is a standalone subsystem.
 
 - `NodeEditorCanvas.tsx` — Main component handling pan, zoom, selection, connection dragging, and rendering.
 - `NodeRegistry.ts` — Node templates (`PromptInput`, `LoadModel`, `TextEncode`, `EmptyLatent`, `KSampler`, `VAEDecode`, `PreviewImage`) with typed ports.
@@ -204,11 +205,11 @@ If you add tests, the conventional location would be alongside source files (e.g
 
 ## Dependencies of Note
 
-- **@xyflow/react** — React Flow canvas; its CSS must be imported (`@xyflow/react/dist/style.css`).
+- **@xyflow/react** — React Flow canvas; its CSS must be imported (`@xyflow/react/dist/style.css`). Transitive dependencies include `zustand` (state management used internally by React Flow, not directly by application code).
 - **embla-carousel-react** — Lightweight carousel for the hero banner.
 - **next-themes** — Used by the `sonner` toast component for theme-aware rendering.
 - **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
-- **zustand** — Present in dependencies but not actively used in current source.
+- **react-router-dom** — Client-side routing. Note: `react-router` is also listed in `dependencies` but all imports in source use `react-router-dom`.
 
 ---
 
