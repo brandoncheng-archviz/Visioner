@@ -176,14 +176,26 @@ if (browserWindow && !browserWindow.__visionerFullscreenDropForwarder) {
 }
 
 /* ─── Toast ─── */
+const toastListeners = new Set<(text: string) => void>();
+
 function useToast() {
   const [msg, setMsg] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const show = useCallback((text: string) => {
-    if (timer.current) clearTimeout(timer.current);
-    setMsg(text);
-    timer.current = setTimeout(() => setMsg(null), 2500);
+
+  useEffect(() => {
+    const listener = (text: string) => {
+      if (timer.current) clearTimeout(timer.current);
+      setMsg(text);
+      timer.current = setTimeout(() => setMsg(null), 2500);
+    };
+    toastListeners.add(listener);
+    return () => { toastListeners.delete(listener); };
   }, []);
+
+  const show = useCallback((text: string) => {
+    toastListeners.forEach((listener) => listener(text));
+  }, []);
+
   return { msg, show };
 }
 
@@ -709,7 +721,7 @@ const imageRoleOptions: {
     detail: '作为主体建筑参考，AI 将优先参考建筑体块、轮廓比例、立面关系、建筑特征，以及外立面的主要材质与纹理表达。',
     constraints: ['建筑体块', '轮廓比例', '立面语言', '开窗节奏', '建筑特征', '主要材质纹理'],
     Icon: Building2,
-    color: '#4aa3ff',
+    color: '#3B82F6',
   },
   {
     value: 'atmosphere_reference',
@@ -718,7 +730,7 @@ const imageRoleOptions: {
     detail: '作为氛围参考，AI 将主要参考整体时间段、天气状态、色调、光影情绪、曝光关系、对比度和真实度，不复制具体建筑内容。',
     constraints: ['时间段', '天气', '色调', '光影情绪', '曝光', '对比度', '真实度', '整体画面气质'],
     Icon: Layers,
-    color: '#a78bfa',
+    color: '#8B5CF6',
   },
   {
     value: 'vegetation_reference',
@@ -727,7 +739,7 @@ const imageRoleOptions: {
     detail: '作为植物参考，AI 将主要参考植物类型、树形、种植密度、景观层次、季节感、地域感和绿化风格，不改变主体建筑。',
     constraints: ['植物类型', '树形', '种植密度', '草坪', '灌木', '花境', '季节感', '绿化层次'],
     Icon: Leaf,
-    color: '#4ade80',
+    color: '#22C55E',
   },
   {
     value: 'people_reference',
@@ -736,7 +748,7 @@ const imageRoleOptions: {
     detail: '作为人物参考，AI 将主要参考人物密度、尺度关系、活动状态、生活方式和场景活力，不参考具体人物长相，不让人物成为视觉中心。',
     constraints: ['人物数量', '人物密度', '尺度关系', '活动状态', '生活方式', '服装季节', '场景活力'],
     Icon: Users,
-    color: '#f59e0b',
+    color: '#F97316',
   },
   {
     value: 'sky_reference',
@@ -745,7 +757,7 @@ const imageRoleOptions: {
     detail: '作为天空参考，AI 将主要参考天空颜色、云层形态、天气状态、日落层次和天空明暗关系，不改变主体建筑和画面构图。',
     constraints: ['天空颜色', '云层形态', '天气状态', '日落晚霞', '蓝天白云', '阴天天空', '明暗层次'],
     Icon: Cloud,
-    color: '#7dd3fc',
+    color: '#FACC15',
   },
   {
     value: 'custom_reference',
@@ -754,23 +766,25 @@ const imageRoleOptions: {
     detail: '用于定义具体局部参考内容，例如铺装、水景、入口、栏杆、灯带、室内家具、立面肌理、商业招牌等。',
     constraints: ['用户输入的具体局部内容'],
     Icon: Pencil,
-    color: '#cbd5e1',
+    color: '#EF4444',
   },
 ];
 
 const roleColorMap: Record<ImageRole | 'null', string> = {
-  primary_building: '#4aa3ff',
-  atmosphere_reference: '#a78bfa',
-  vegetation_reference: '#4ade80',
-  people_reference: '#f59e0b',
-  custom_reference: '#cbd5e1',
-  overall_reference: '#a78bfa',
-  plant_reference: '#4ade80',
-  material_reference: '#fb923c',
-  lighting_reference: '#facc15',
-  sky_reference: '#7dd3fc',
-  null: 'rgba(255,255,255,0.35)',
+  primary_building: '#3B82F6',
+  atmosphere_reference: '#8B5CF6',
+  vegetation_reference: '#22C55E',
+  people_reference: '#F97316',
+  custom_reference: '#EF4444',
+  overall_reference: '#8B5CF6',
+  plant_reference: '#22C55E',
+  material_reference: '#EF4444',
+  lighting_reference: '#EF4444',
+  sky_reference: '#FACC15',
+  null: '#9CA3AF',
 };
+
+const UNIQUE_USAGES: ImageRole[] = ['primary_building', 'atmosphere_reference', 'sky_reference'];
 
 const legacyImageRoleOptions: Partial<Record<ImageRole, (typeof imageRoleOptions)[number]>> = {
   overall_reference: imageRoleOptions.find((option) => option.value === 'atmosphere_reference'),
@@ -782,7 +796,7 @@ const legacyImageRoleOptions: Partial<Record<ImageRole, (typeof imageRoleOptions
     detail: '旧数据兼容显示为材质参考。新建用途请使用自定义用途。',
     constraints: ['材质参考'],
     Icon: Palette,
-    color: '#fb923c',
+    color: '#EF4444',
   },
   lighting_reference: {
     value: 'lighting_reference',
@@ -791,7 +805,7 @@ const legacyImageRoleOptions: Partial<Record<ImageRole, (typeof imageRoleOptions
     detail: '旧数据兼容显示为灯光参考。新建用途请使用自定义用途。',
     constraints: ['灯光参考'],
     Icon: Sun,
-    color: '#facc15',
+    color: '#EF4444',
   },
 };
 
@@ -1436,32 +1450,32 @@ type ImageReferencePromptBlock = Extract<PromptContent, { type: 'image_reference
 
 function getImageReferencePromptText(reference: ReferenceInfo) {
   if (reference.role === 'primary_building' || reference.roleLabel.includes('主体建筑')) {
-    return '保持建筑结构、体块比例、立面关系、相机角度和构图比例不变。';
+    return '保持建筑结构、体块比例、立面关系、相机角度和构图比例不变。权重：最高。';
   }
   if (reference.role === 'atmosphere_reference' || reference.role === 'overall_reference' || reference.roleLabel.includes('氛围')) {
-    return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
+    return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。权重：最高。';
   }
   if (reference.role === 'vegetation_reference' || reference.role === 'plant_reference' || reference.roleLabel.includes('植物')) {
-    return '参考植物种类、种植密度、层次关系、季节状态和景观氛围。';
+    return '参考植物种类、种植密度、层次关系、季节状态和景观氛围。权重：中。';
   }
   if (reference.role === 'people_reference' || reference.roleLabel.includes('人物')) {
-    return '参考人物类型、姿态、尺度关系、活动状态和画面中的生活感。';
+    return '参考人物类型、姿态、尺度关系、活动状态和画面中的生活感。权重：中。';
   }
   if (reference.role === 'sky_reference' || reference.roleLabel.includes('天空')) {
-    return '参考天空状态、云量、光线方向、大气透明度和整体天气感。';
+    return '参考天空状态、云量、光线方向、大气透明度和整体天气感。权重：最高。';
   }
   if (reference.role === 'custom_reference') {
     const customUsage = reference.customRoleLabel?.trim() || reference.roleLabel.trim();
     if (customUsage && customUsage !== '自定义用途...' && customUsage !== '未定义用途') {
-      return `参考该图片中的${customUsage.replace(/参考$/, '')}视觉信息。`;
+      return `参考该图片中的${customUsage.replace(/参考$/, '')}视觉信息。维度：由用户定义。`;
     }
-    return '参考该图片中用户指定的自定义视觉信息。';
+    return '参考该图片中用户指定的自定义视觉信息。维度：由用户定义。';
   }
   if (reference.role === 'material_reference' || reference.roleLabel.includes('材质')) {
-    return '参考该图片中的材质纹理、反射关系和细节质感。';
+    return '参考该图片中的材质纹理、反射关系和细节质感。权重：中。';
   }
   if (reference.role === 'lighting_reference' || reference.roleLabel.includes('灯光')) {
-    return '参考该图片中的时间段、光照强弱和明暗关系。';
+    return '参考该图片中的时间段、光照强弱和明暗关系。权重：中。';
   }
   return '参考该图片中的关键视觉信息。';
 }
@@ -1501,7 +1515,6 @@ function buildPromptSubmission(userText: string, promptContent: PromptContent[],
   if (localRefs.length) sections.push(`局部参考：${localRefs.map((b) => b.promptText).join('；')}`);
   if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((b) => b.promptText).join('；')}`);
   if (presetPrompts.length) sections.push(`预设增强：${presetPrompts.join('。')}`);
-  if (selectedStyle) sections.push(`全局风格：${selectedStyle.prompt}`);
   if (undefinedRefs.length) sections.push(`未定义参考：${undefinedRefs.map((b) => b.promptText).join('；')}`);
 
   return {
@@ -1601,6 +1614,21 @@ interface ReferenceInfo {
   imageUrl: string;
   width?: number;
   height?: number;
+}
+
+function areReferencesEqual(a: ReferenceInfo, b: ReferenceInfo) {
+  return a.nodeId === b.nodeId
+    && a.index === b.index
+    && a.role === b.role
+    && a.roleLabel === b.roleLabel
+    && a.customRoleLabel === b.customRoleLabel
+    && a.imageUrl === b.imageUrl
+    && a.width === b.width
+    && a.height === b.height;
+}
+
+function areReferenceListsEqual(a: ReferenceInfo[], b: ReferenceInfo[]) {
+  return a.length === b.length && a.every((reference, index) => areReferencesEqual(reference, b[index]));
 }
 
 function getRoleData(role: ImageRole | null, customRoleLabel?: string) {
@@ -2016,6 +2044,7 @@ function ImageNodeControlPanel({
   onReorderReferences,
   onUseReference,
   onAssignReferenceRole,
+  showToast,
 }: {
   promptText: string;
   onPromptChange: (value: string) => void;
@@ -2036,6 +2065,7 @@ function ImageNodeControlPanel({
   onReorderReferences: (newOrder: string[]) => void;
   onUseReference: (reference: ReferenceInfo) => void;
   onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string) => ReferenceInfo | null;
+  showToast?: (msg: string) => void;
 }) {
   const [showMarkPanel, setShowMarkPanel] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
@@ -2077,21 +2107,15 @@ function ImageNodeControlPanel({
   } | null>(null);
 
   useEffect(() => {
-    const latestById = new Map(references.map((reference) => [reference.nodeId, reference]));
-    const currentIds = new Set(orderedRefs.map((reference) => reference.nodeId));
-    const idsChanged = currentIds.size !== references.length || !references.every((reference) => currentIds.has(reference.nodeId));
+    setOrderedRefs((currentRefs) => {
+      const latestById = new Map(references.map((reference) => [reference.nodeId, reference]));
+      const currentIds = new Set(currentRefs.map((reference) => reference.nodeId));
+      const idsChanged = currentIds.size !== references.length || !references.every((reference) => currentIds.has(reference.nodeId));
+      const nextRefs = idsChanged ? references : currentRefs.map((reference) => latestById.get(reference.nodeId) || reference);
 
-    if (idsChanged) {
-      setOrderedRefs(references);
-      return;
-    }
-
-    const syncedRefs = orderedRefs.map((reference) => latestById.get(reference.nodeId) || reference);
-    const contentChanged = syncedRefs.some((reference, index) => reference !== orderedRefs[index]);
-    if (contentChanged) {
-      setOrderedRefs(syncedRefs);
-    }
-  }, [orderedRefs, references]);
+      return areReferenceListsEqual(currentRefs, nextRefs) ? currentRefs : nextRefs;
+    });
+  }, [references]);
 
   useEffect(() => {
     orderedRefsRef.current = orderedRefs;
@@ -2386,13 +2410,32 @@ function ImageNodeControlPanel({
   };
 
   const requestReferenceInsert = (reference: ReferenceInfo) => {
-    if (!reference.role) {
-      setPendingReference(reference);
+    let targetReference = reference;
+
+    // 自动分配默认用途（规则22）
+    if (!targetReference.role) {
+      const usedRoles = new Set(references.map((ref) => ref.role).filter(Boolean));
+      const autoRole = (['primary_building', 'atmosphere_reference', 'sky_reference', 'vegetation_reference', 'people_reference'] as ImageRole[])
+        .find((role) => !usedRoles.has(role));
+
+      if (autoRole) {
+        const updatedRef = onAssignReferenceRole(targetReference.nodeId, autoRole);
+        if (updatedRef) {
+          targetReference = updatedRef;
+        } else {
+          const roleLabel = getImageRoleLabel(autoRole);
+          targetReference = { ...targetReference, role: autoRole, roleLabel };
+        }
+      }
+    }
+
+    if (!targetReference.role) {
+      setPendingReference(targetReference);
       setShowReferenceMenu(false);
       return;
     }
-    onUseReference(reference);
-    insertReferenceBlock(reference);
+    onUseReference(targetReference);
+    insertReferenceBlock(targetReference);
   };
 
   useEffect(() => {
@@ -2403,6 +2446,19 @@ function ImageNodeControlPanel({
 
   const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string) => {
     if (!pendingReference) return;
+    // 检查唯一用途冲突
+    if (UNIQUE_USAGES.includes(role)) {
+      const conflictingRef = references.find(
+        (ref) => ref.nodeId !== pendingReference.nodeId && ref.role === role
+      );
+      if (conflictingRef) {
+        showToast?.(`该节点已存在【${getImageRoleLabel(role)}】引用，请先删除现有引用或选择其他用途。`);
+        setPendingReference(null);
+        setPendingCustomInput(false);
+        setPendingCustomValue('');
+        return;
+      }
+    }
     const roleLabel = getImageRoleLabel(role, customRoleLabel);
     const updatedReference = onAssignReferenceRole(pendingReference.nodeId, role, customRoleLabel) || { ...pendingReference, role, roleLabel, customRoleLabel };
     setPendingReference(null);
@@ -2415,6 +2471,15 @@ function ImageNodeControlPanel({
     const label = normalizeCustomReferenceLabel(pendingCustomValue);
     if (!label) {
       setPendingCustomInput(false);
+      return;
+    }
+    // 自定义用途名称唯一性校验
+    const existingCustom = references.find(
+      (ref) => ref.role === 'custom_reference' &&
+      ref.customRoleLabel?.toLowerCase() === label.toLowerCase()
+    );
+    if (existingCustom) {
+      showToast?.(`该自定义用途名称"${label}"已被占用，请使用其他名称。`);
       return;
     }
     handleReferenceRoleSelect('custom_reference', label);
@@ -2711,9 +2776,21 @@ function ImageNodeControlPanel({
           {/* 风格 */}
           <div className="relative">
             <button
-              onClick={() => { setShowStylePicker(true); setShowPresetMenu(false); setShowMarkPanel(false); }}
+              onClick={() => {
+                if (selectedPresets.length === 0) {
+                  showToast?.('请先选择预设规则，再勾选风格增强');
+                  return;
+                }
+                setShowStylePicker(true);
+                setShowPresetMenu(false);
+                setShowMarkPanel(false);
+              }}
               onPointerDown={(e) => {
                 e.stopPropagation();
+                if (selectedPresets.length === 0) {
+                  showToast?.('请先选择预设规则，再勾选风格增强');
+                  return;
+                }
                 setShowStylePicker(true);
                 setShowPresetMenu(false);
                 setShowMarkPanel(false);
@@ -2725,8 +2802,9 @@ function ImageNodeControlPanel({
                 padding: selectedStyle ? 0 : '4px',
                 background: selectedStyle ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)',
                 border: selectedStyle ? '1px solid rgba(167,139,250,0.7)' : FLOATING_PANEL_BORDER,
+                opacity: selectedPresets.length === 0 ? 0.45 : 1,
               }}
-              title="选择整体视觉风格"
+              title={selectedPresets.length === 0 ? '请先选择预设规则，再勾选风格增强' : '选择整体视觉风格'}
             >
               {selectedStyle ? (
                 <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
@@ -2799,14 +2877,14 @@ function ImageNodeControlPanel({
                         aspectRatio: ref.width && ref.height ? `${ref.width}/${ref.height}` : '1/1',
                       }}
                     />
-                    <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: getImageRoleColor(ref.role) }}>
-                      @{ref.roleLabel || '引用素材'}
+                    <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                      {ref.roleLabel || '未定义用途'}
                     </div>
                   </div>
                 )}
                 <div
                   className="relative h-full w-full overflow-hidden rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: FLOATING_PANEL_BORDER }}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${getImageRoleColor(ref.role)}` }}
                 >
                   {ref.imageUrl ? (
                     <img src={ref.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
@@ -2822,6 +2900,7 @@ function ImageNodeControlPanel({
                       referenceDragRef.current = null;
                       isDraggingRef.current = false;
                       setDraggingRefId(null);
+                      onRemoveReference(ref.nodeId);
                       event.preventDefault();
                       event.stopPropagation();
                     }}
@@ -2834,8 +2913,8 @@ function ImageNodeControlPanel({
                       event.preventDefault();
                       event.stopPropagation();
                     }}
-                    className="nodrag nowheel absolute right-1 top-1 hidden items-center justify-center rounded-full text-white transition-colors hover:bg-black group-hover/ref:flex"
-                    style={{ width: 16, height: 16, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)', zIndex: 5 }}
+                    className="nodrag nowheel absolute right-0 top-0 z-30 hidden items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/ref:flex"
+                    style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
                     title="删除引用"
                   >
                     <X className="h-2.5 w-2.5" />
@@ -2864,7 +2943,6 @@ function ImageNodeControlPanel({
             {imageReferenceBlocks.map((block) => {
               const reference = references.find((item) => item.nodeId === block.sourceNodeId);
               const previewImage = reference?.imageUrl || block.thumbnailUrl;
-              const blockColor = getImageRoleColor(reference?.role ?? null);
               const highlighted = highlightedPromptBlockId === block.id;
 
               return (
@@ -2892,7 +2970,7 @@ function ImageNodeControlPanel({
                       <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
                     </span>
                   )}
-                  <span className="flex-shrink-0 font-medium" style={{ color: blockColor }}>{block.usage}</span>
+                  <span className="flex-shrink-0 font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>{block.usage}</span>
                   <span className="min-w-0 truncate" style={{ maxWidth: 360, color: 'rgba(255,255,255,0.66)' }}>{block.promptText}</span>
                   <button
                     type="button"
@@ -2926,8 +3004,7 @@ function ImageNodeControlPanel({
                         }}
                       />
                       <div className="px-2 py-1.5">
-                        <div className="text-[12px] font-medium" style={{ color: blockColor }}>{block.usage}</div>
-                        <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.62)' }}>{block.promptText}</div>
+                        <div className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.75)' }}>{block.usage}</div>
                       </div>
                     </div>
                   )}
@@ -3200,6 +3277,7 @@ function ImageNodeControlPanel({
 
 /* ─── Image Node ─── */
 function ImageNode({ data, selected, id }: NodeProps) {
+  const { show: showToast } = useToast();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
   const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
@@ -3312,6 +3390,13 @@ function ImageNode({ data, selected, id }: NodeProps) {
       const referenceOrder = ((n.data.referenceOrder as string[]) || []).filter((nodeId) => nodeId !== sourceNodeId);
       return { ...n, data: { ...n.data, referenceOrder } };
     }));
+    // 同步清理 promptContent 中对应的图片引用块（规则11）
+    const nextPromptContent = promptContent.filter(
+      (item) => item.type !== 'image_reference' || item.sourceNodeId !== sourceNodeId
+    );
+    if (nextPromptContent.length !== promptContent.length) {
+      handlePromptContentChange(nextPromptContent);
+    }
   };
 
   const handleReorderReferences = (newOrder: string[]) => {
@@ -3618,6 +3703,7 @@ function ImageNode({ data, selected, id }: NodeProps) {
               onReorderReferences={handleReorderReferences}
               onUseReference={handleUseReference}
               onAssignReferenceRole={handleAssignReferenceRole}
+              showToast={showToast}
             />
       </div>
 
@@ -3945,6 +4031,20 @@ function FlowCanvas() {
 
       const alreadyConnected = edges.some((e) => e.source === nodeId && e.target === targetId);
       if (alreadyConnected) return '两个节点之间已存在连接';
+
+      // 唯一用途检查
+      const sourceNode = nodes.find((n) => n.id === nodeId);
+      const sourceRole = sourceNode?.data?.role as ImageRole | null;
+      if (sourceRole && UNIQUE_USAGES.includes(sourceRole)) {
+        const targetInputEdges = edges.filter((e) => e.target === targetId);
+        const hasSameRole = targetInputEdges.some((edge) => {
+          const refNode = nodes.find((n) => n.id === edge.source);
+          return refNode?.data?.role === sourceRole;
+        });
+        if (hasSameRole) {
+          return `该节点已存在【${getImageRoleLabel(sourceRole)}】引用，请先删除现有引用。`;
+        }
+      }
 
       return null;
     };

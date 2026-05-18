@@ -10,17 +10,19 @@
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Framework | React | 19.2 |
-| Language | TypeScript | ~5.9 |
-| Build Tool | Vite | 7.2 |
-| Styling | Tailwind CSS | 3.4 |
+| Framework | React | `^19.2.0` |
+| Language | TypeScript | `~5.9.3` |
+| Build Tool | Vite | `^7.2.4` |
+| Styling | Tailwind CSS | `^3.4.19` |
+| PostCSS | autoprefixer | `^10.4.23` |
 | UI Components | shadcn/ui (New York style) | — |
-| Router | react-router-dom | 7.x |
-| Canvas | @xyflow/react + custom 2D canvas | 12.10 |
-| Carousel | embla-carousel-react | 8.6 |
-| Icons | lucide-react | 0.562 |
-| Forms | react-hook-form + zod | 7.70 / 4.3 |
-| Charts | recharts | 2.15 |
+| Router | react-router-dom | `^7.14.2` |
+| Canvas | @xyflow/react | `^12.10.2` |
+| Carousel | embla-carousel-react | `^8.6.0` |
+| Icons | lucide-react | `^0.562.0` |
+| Forms | react-hook-form + zod | `^7.70.0` / `^4.3.5` |
+| Charts | recharts | `^2.15.4` |
+| Dev Plugin | kimi-plugin-inspect-react | `^1.0.3` |
 
 ---
 
@@ -32,8 +34,10 @@ app/
 │   └── images/              # Static image assets (banners, show covers, project thumbs)
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # shadcn/ui components (50+ primitives: button, dialog, form, etc.)
-│   │   ├── NodeEditor/      # Custom 2D canvas node editor (NodeEditorCanvas.tsx, NodeRegistry.ts)
+│   │   ├── ui/              # 53+ shadcn/ui primitives (button, dialog, form, carousel, etc.)
+│   │   ├── NodeEditor/      # Custom 2D canvas node editor (not wired to any route)
+│   │   │   ├── NodeEditorCanvas.tsx
+│   │   │   └── NodeRegistry.ts
 │   │   ├── AccountPanel.tsx
 │   │   ├── CanvasEdge.tsx
 │   │   ├── CustomConnectionLine.tsx
@@ -45,7 +49,7 @@ app/
 │   │   ├── TVShow.tsx       # Video gallery with category filter and search
 │   │   └── UpgradePanel.tsx
 │   ├── data/
-│   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas nodes/edges
+│   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas presets
 │   ├── hooks/
 │   │   └── use-mobile.ts    # useIsMobile hook (breakpoint 768px)
 │   ├── lib/
@@ -56,18 +60,22 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   └── CanvasPage.tsx   # Visual node editor (React Flow based, ~2200 lines)
+│   │   ├── CanvasPage.tsx   # React Flow node editor (~5,050 lines)
+│   │   └── add_thumbnails.py # Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
 │   ├── App.css              # Minimal root-level styles
 │   ├── App.tsx              # Root router with BrowserRouter, Routes for / and /canvas
-│   ├── main.tsx             # React root render with StrictMode
-│   └── index.css            # Global styles, Tailwind directives, ReactFlow custom CSS, CSS variables
+│   ├── index.css            # Global styles, Tailwind directives, ReactFlow custom CSS, CSS variables
+│   └── main.tsx             # React root render with StrictMode
+├── AGENTS.md                # Agent-focused project documentation
+├── README.md                # Generic Vite + React README
+├── info.md                  # Setup notes (Node 20, Tailwind v3.4.19, Vite v7.2.4)
 ├── components.json          # shadcn/ui configuration
 ├── vite.config.ts           # Vite config: base './', port 3000, @/ -> ./src alias
 ├── tailwind.config.js       # Custom theme extending shadcn color tokens, animations
 ├── tsconfig.json            # Project references to tsconfig.app.json & tsconfig.node.json
-├── tsconfig.app.json        # Strict TypeScript: noUnusedLocals, noUnusedParameters
+├── tsconfig.app.json        # Strict TypeScript app config
 ├── tsconfig.node.json       # Node-side config for Vite
 ├── eslint.config.js         # ESLint flat config: TS + react-hooks + react-refresh
 └── postcss.config.js        # Tailwind + autoprefixer
@@ -104,30 +112,13 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ## Routing
 
+Handled in `src/App.tsx` via `react-router-dom`:
+
 | Route | Component | Description |
 |-------|-----------|-------------|
 | `/` | `Home` | Landing page with discovery content |
 | `/canvas` | `CanvasPage` | New or existing canvas editor |
 | `/canvas/:projectId` | `CanvasPage` | Canvas editor for a specific project |
-
----
-
-## Code Style Guidelines
-
-- **Language**: UI labels and user-facing text are in Chinese. Code comments, variable names, and file names are in English.
-- **Imports**: Use the `@/` path alias for all internal imports (e.g., `@/components/ui/button`, `@/lib/utils`).
-- **Styling**: The project uses a custom dark theme. Tailwind utility classes are primary, but inline `style` props are used for dynamic values (especially in the canvas editor) and hardcoded palette colors.
-- **Theme colors** (hardcoded across the app):
-  - Background: `#0a0a0f`
-  - Surface/card: `#14141a`
-  - Elevated: `#1e1e28`, `#252530`
-  - Border: `#2a2a35`
-  - Primary accent: `#00d4ff` (cyan)
-  - Secondary text: `#a0a0b0`
-  - Muted text: `#6a6a7a`
-- **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
-- **TypeScript**: Strict mode is enabled. `noUnusedLocals` and `noUnusedParameters` are active; unused variables will fail the build.
-- **ESLint**: The project disables `@typescript-eslint/no-explicit-any` in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
 
 ---
 
@@ -194,6 +185,30 @@ Mock API service for user account features (profile, credits, usage, billing, de
 
 ---
 
+## Code Style Guidelines
+
+- **Language**: UI labels and user-facing text are in Chinese. Code comments, variable names, and file names are in English.
+- **Imports**: Use the `@/` path alias for all internal imports (e.g., `@/components/ui/button`, `@/lib/utils`).
+- **Styling**: The project uses a custom dark theme. Tailwind utility classes are primary, but inline `style` props are used for dynamic values (especially in the canvas editor) and hardcoded palette colors.
+- **Theme colors** (hardcoded across the app):
+  - Background: `#0a0a0f`
+  - Surface/card: `#14141a`
+  - Elevated: `#1e1e28`, `#252530`
+  - Border: `#2a2a35`
+  - Primary accent: `#00d4ff` (cyan)
+  - Secondary text: `#a0a0b0`
+  - Muted text: `#6a6a7a`
+- **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
+- **TypeScript**: Strict mode is enabled with the following additional checks:
+  - `noUnusedLocals: true`
+  - `noUnusedParameters: true`
+  - `verbatimModuleSyntax: true` (type-only imports must use the `type` keyword)
+  - `erasableSyntaxOnly: true`
+  - `noUncheckedSideEffectImports: true`
+- **ESLint**: Flat config using `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, and `eslint-plugin-react-refresh`. The `@typescript-eslint/no-explicit-any` rule is disabled only in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
+
+---
+
 ## Testing
 
 There are **no test files** in the project currently. No test runner (Jest, Vitest, Playwright, etc.) is installed.
@@ -202,13 +217,12 @@ If you add tests, the conventional location would be alongside source files (e.g
 
 ---
 
-## Dependencies of Note
+## Deployment & Build Process
 
-- **@xyflow/react** — React Flow canvas; its CSS must be imported (`@xyflow/react/dist/style.css`).
-- **embla-carousel-react** — Lightweight carousel for the hero banner.
-- **next-themes** — Used by the `sonner` toast component for theme-aware rendering.
-- **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
-- **zustand** — Present in dependencies but not actively used in current source.
+- The app is a **client-side only SPA** with no server-side rendering.
+- No CI/CD configuration files exist (no `.github/workflows`, `.gitlab-ci.yml`, etc.).
+- No Docker, `netlify.toml`, `vercel.json`, or deployment scripts exist at the project root.
+- Production build is a standard Vite static output (`dist/`) with `base: './'`, suitable for any static host or subpath deployment.
 
 ---
 
@@ -218,6 +232,16 @@ If you add tests, the conventional location would be alongside source files (e.g
 - No API keys or secrets are present in the source code.
 - `zod` is available for runtime schema validation if backend APIs are introduced later.
 - All images are loaded from the local `public/images/` directory or external avatar URLs (`dicebear.com`).
+
+---
+
+## Dependencies of Note
+
+- **@xyflow/react** — React Flow canvas; its CSS must be imported (`@xyflow/react/dist/style.css`).
+- **embla-carousel-react** — Lightweight carousel for the hero banner.
+- **next-themes** — Used by the `sonner` toast component for theme-aware rendering.
+- **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
+- **zustand** — Present as a transitive dependency of `@xyflow/react` but not directly used in application code.
 
 ---
 
