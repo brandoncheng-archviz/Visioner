@@ -50,6 +50,14 @@ app/
 │   │   └── UpgradePanel.tsx
 │   ├── data/
 │   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas presets
+│   ├── features/
+│   │   └── canvas/          # Canvas 模块：组件、节点、hooks、类型、常量、工具函数
+│   │       ├── components/  # Canvas 通用 UI（Stage, Sidebar, Toolbar, ContextMenus, GlobalDropForwarder）
+│   │       ├── constants/   # Canvas 常量、配置、预设
+│   │       ├── hooks/       # Canvas 相关 hooks
+│   │       ├── nodes/       # 所有节点类型（ImageNode, TextNode, VideoNode 等）
+│   │       ├── types/       # 类型定义
+│   │       └── utils/       # 纯工具函数
 │   ├── hooks/
 │   │   └── use-mobile.ts    # useIsMobile hook (breakpoint 768px)
 │   ├── lib/
@@ -60,7 +68,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # React Flow node editor (~5,050 lines)
+│   │   ├── CanvasPage.tsx   # Canvas 页面入口，核心逻辑已迁移至 src/features/canvas/
 │   │   └── add_thumbnails.py # Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -124,9 +132,11 @@ Handled in `src/App.tsx` via `react-router-dom`:
 
 ## Key Modules
 
-### React Flow Canvas Editor (`src/pages/CanvasPage.tsx`)
+### React Flow Canvas Editor
 
-A node-based editor built on `@xyflow/react` supporting seven custom node types:
+画布核心逻辑已拆分到 `src/features/canvas/`，`src/pages/CanvasPage.tsx` 仅保留页面入口和核心状态管理。
+
+基于 `@xyflow/react` 的节点编辑器，支持以下自定义节点类型：
 
 - `image` — Displays an image with optional prompt text, editable name, file upload, and a floating prompt panel on selection.
 - `video` — Video placeholder with model/seed info on selection.
@@ -254,3 +264,7 @@ npx shadcn add <component-name>
 ```
 
 The CLI will place it in `src/components/ui/` and follow the existing alias conventions (`@/lib/utils`, `@/components/ui`).
+
+## 补充规则
+
+Canvas 模块的 AI 编码规则见 `CANVAS_RULES.md`，请同时遵守。
