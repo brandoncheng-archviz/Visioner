@@ -1,0 +1,510 @@
+import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Image, Plus, Upload } from 'lucide-react';
+import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
+import { useToast } from '../../hooks/useToast';
+import type { ImageRole, PromptContent, ReferenceInfo } from '../../types/imageNode.types';
+import type { MarkItem, ModelParams } from '../../types/canvas.types';
+import {
+  IMAGE_NODE_PREVIEW_WIDTH,
+  IMAGE_NODE_EMPTY_HEIGHT,
+  IMAGE_NODE_MIN_IMAGE_SIZE,
+  IMAGE_NODE_MAX_IMAGE_WIDTH,
+  IMAGE_NODE_MAX_IMAGE_HEIGHT,
+  IMAGE_NODE_CONTROL_WIDTH,
+  IMAGE_NODE_CONTROL_HEIGHT,
+  DEFAULT_MODEL_PARAMS,
+} from '../../constants/canvasConstants';
+import { getImageRoleOption, getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
+import { getStylePresetById, getPresetById } from '../../constants/presets';
+import { buildPromptSubmission } from '../../utils/promptUtils';
+import { getRoleData } from '../../utils/referenceUtils';
+import { ImageToolbar } from '../../components/ImageToolbar';
+import { ImagePreviewModal } from '../../components/ImagePreviewModal';
+import { ImageRoleTag } from '../../components/ImageRoleTag';
+import { ImageNodeControlPanel } from './ImageNodeControlPanel';
+
+export function ImageNode({ data, selected, id }: NodeProps) {
+  const { show: showToast } = useToast();
+  const zoom = useStore((state) => state.transform[2]);
+  const inverseScale = 1 / zoom;
+  const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
+
+  const img = data.image as string;
+  const role = (data.role as ImageRole | null | undefined) ?? null;
+  const customRoleLabel = data.customRoleLabel as string | undefined;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [nodeName, setNodeName] = useState((data.label as string) || 'Image');
+  const [previewImage, setPreviewImage] = useState(img);
+  const [editingName, setEditingName] = useState(false);
+  const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const { setNodes, setEdges } = useReactFlow();
+
+  /* ─── Extended node state ─── */
+  const [promptText, setPromptText] = useState((data.prompt as string) || '');
+  const [promptContent, setPromptContent] = useState<PromptContent[]>((data.promptContent as PromptContent[]) || []);
+  const [marks, setMarks] = useState<MarkItem[]>((data.marks as MarkItem[]) || []);
+  const [selectedPresets, setSelectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
+  const [selectedStyleId, setSelectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
+  const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
+  const [generatedImages, setGeneratedImages] = useState<string[]>((data.generatedImages as string[]) || []);
+
+  /* ─── Reference tracking ─── */
+  const allEdges = useStore((state) => state.edges);
+  const allNodes = useStore((state) => state.nodes);
+  const inputEdges = allEdges.filter((e) => e.target === id);
+  const referenceOrder = (data.referenceOrder as string[]) || [];
+  const rawReferences = inputEdges.map((edge) => {
+    const sourceNode = allNodes.find((n) => n.id === edge.source);
+    const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
+    const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
+    return {
+      nodeId: edge.source,
+      index: 0,
+      role: sourceRole,
+      roleLabel: getImageRoleLabel(sourceRole, sourceCustomRoleLabel),
+      customRoleLabel: sourceCustomRoleLabel,
+      imageUrl: sourceNode?.data?.image as string,
+      width: (sourceNode?.data?.width as number) || undefined,
+      height: (sourceNode?.data?.height as number) || undefined,
+    };
+  });
+  const references: ReferenceInfo[] = rawReferences
+    .sort((a, b) => {
+      const aIndex = referenceOrder.indexOf(a.nodeId);
+      const bIndex = referenceOrder.indexOf(b.nodeId);
+      if (aIndex >= 0 && bIndex >= 0) return aIndex - bIndex;
+      if (aIndex >= 0) return -1;
+      if (bIndex >= 0) return 1;
+      return 0;
+    })
+    .map((ref, idx) => ({ ...ref, index: idx + 1 }));
+
+  const selectedStyle = getStylePresetById(selectedStyleId);
+  const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0;
+
+  const handleGenerate = () => {
+    const { textPrompt, imageReferences, globalStyle } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle);
+    const mockResult = `/images/show-cover-${Math.floor(Math.random() * 5) + 1}.jpg`;
+    const nextGeneratedImages = [...generatedImages, mockResult];
+    setPreviewImage(mockResult);
+    setGeneratedImages(nextGeneratedImages);
+    const resultImage = new window.Image();
+    resultImage.onload = () => {
+      setImgSize({ width: resultImage.width, height: resultImage.height });
+    };
+    resultImage.src = mockResult;
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                image: mockResult,
+                finalPrompt: textPrompt,
+                textPrompt,
+                imageReferences,
+                globalStyle,
+                promptContent,
+                generatedImages: nextGeneratedImages,
+                width: 1024,
+                height: 1024,
+              },
+            }
+          : n,
+      ),
+    );
+  };
+
+  const handlePromptChange = (value: string) => {
+    setPromptText(value);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, prompt: value } } : n)));
+  };
+
+  const handlePromptContentChange = (content: PromptContent[]) => {
+    setPromptContent(content);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, promptContent: content } } : n)));
+  };
+
+  const handleMarksChange = (newMarks: MarkItem[]) => {
+    setMarks(newMarks);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, marks: newMarks } } : n)));
+  };
+
+  const handlePresetsChange = (presets: string[]) => {
+    const presetOnly = presets.filter((presetId) => getPresetById(presetId)?.category !== 'style');
+    setSelectedPresets(presetOnly);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, selectedPresets: presetOnly } } : n)));
+  };
+
+  const handleStyleChange = (styleId: string | null) => {
+    setSelectedStyleId(styleId);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, selectedStyleId: styleId } } : n)));
+  };
+
+  const handleModelParamsChange = (params: ModelParams) => {
+    setModelParams(params);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, modelParams: params } } : n)));
+  };
+
+  const handleRemoveReference = (sourceNodeId: string) => {
+    setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === id)));
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== id) return n;
+        const referenceOrder = ((n.data.referenceOrder as string[]) || []).filter((nodeId) => nodeId !== sourceNodeId);
+        return { ...n, data: { ...n.data, referenceOrder } };
+      }),
+    );
+    // 同步清理 promptContent 中对应的图片引用块（规则11）
+    const nextPromptContent = promptContent.filter((item) => item.type !== 'image_reference' || item.sourceNodeId !== sourceNodeId);
+    if (nextPromptContent.length !== promptContent.length) {
+      handlePromptContentChange(nextPromptContent);
+    }
+  };
+
+  const handleReorderReferences = (newOrder: string[]) => {
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, referenceOrder: newOrder } } : n)));
+  };
+
+  const handleUseReference = () => {
+    // Shared entry point for top thumbnails and the @ reference menu.
+  };
+
+  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string) => {
+    const roleOption = getImageRoleOption(nextRole, nextCustomRoleLabel);
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === sourceNodeId ? { ...node, data: { ...node.data, ...getRoleData(nextRole, nextCustomRoleLabel) } } : node,
+      ),
+    );
+
+    const existingReference = references.find((reference) => reference.nodeId === sourceNodeId);
+    if (!existingReference) return null;
+    return {
+      ...existingReference,
+      role: nextRole,
+      customRoleLabel: nextCustomRoleLabel,
+      roleLabel: roleOption?.label || existingReference.roleLabel,
+    };
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const name = file.name.replace(/\.[^/.]+$/, '');
+    const url = URL.createObjectURL(file);
+
+    const imgEl = new window.Image();
+    imgEl.onload = () => {
+      setImgSize({ width: imgEl.width, height: imgEl.height });
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  image: url,
+                  label: name,
+                  width: imgEl.width,
+                  height: imgEl.height,
+                  ...getRoleData(null),
+                },
+              }
+            : n,
+        ),
+      );
+    };
+    imgEl.src = url;
+
+    setNodeName(name);
+    setPreviewImage(url);
+  };
+
+  const handleNameSave = () => {
+    const newName = nameInputRef.current?.value.trim() || nodeName;
+    setNodeName(newName);
+    setEditingName(false);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label: newName } } : n)));
+  };
+
+  const handleRoleChange = (nextRole: ImageRole, nextCustomRoleLabel?: string) => {
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole, nextCustomRoleLabel) } } : n)));
+  };
+
+  const stopTitleInteraction = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
+  const displayImage = previewImage || img;
+  const sourceWidth = imgSize?.width || (data.width as number) || 1;
+  const sourceHeight = imgSize?.height || (data.height as number) || 1;
+  const aspectRatio = sourceWidth / sourceHeight;
+  const imageDisplayScale = displayImage
+    ? Math.min(
+        IMAGE_NODE_MAX_IMAGE_WIDTH / sourceWidth,
+        IMAGE_NODE_MAX_IMAGE_HEIGHT / sourceHeight,
+        Math.max(IMAGE_NODE_MIN_IMAGE_SIZE / sourceWidth, IMAGE_NODE_MIN_IMAGE_SIZE / sourceHeight),
+      )
+    : 1;
+  const cardWidth = displayImage ? Math.round(sourceWidth * imageDisplayScale) : IMAGE_NODE_PREVIEW_WIDTH;
+  const cardHeight = displayImage
+    ? Math.max(120, Math.min(Math.round(cardWidth / aspectRatio), 320))
+    : IMAGE_NODE_EMPTY_HEIGHT;
+  const showTitleMeta = zoom >= 0.35;
+  const roleOption = getImageRoleOption(role, customRoleLabel);
+  const RoleIconForTitle = roleOption?.Icon;
+  const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
+  const isOnlySelected = selected && selectedNodeCount === 1;
+
+  return (
+    <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
+      {/* Toolbar — shown above title when image exists and node is selected */}
+      {displayImage && isOnlySelected && (
+        <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
+          <ImageToolbar onFullscreen={() => setShowPreview(true)} />
+        </div>
+      )}
+
+      {/* Title label — fixed screen size, width matches card screen width */}
+      <div
+        className="absolute z-20 overflow-hidden nodrag"
+        onPointerDownCapture={stopTitleInteraction}
+        onMouseDownCapture={stopTitleInteraction}
+        onClick={stopTitleInteraction}
+        style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}
+      >
+        <div className="flex items-center justify-between overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
+          <div className="flex flex-1 items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
+            <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
+            {displayImage && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRoleMenuOpen(true);
+                }}
+                className="flex-shrink-0 cursor-pointer select-none transition-all hover:brightness-125"
+                style={{ color: getImageRoleColor(role), fontSize: 11 }}
+                title="点击设置图片用途"
+              >
+                {RoleIconForTitle && (
+                  <RoleIconForTitle className="inline-block" style={{ width: 11, height: 11, marginRight: 3, verticalAlign: '-0.1em' }} />
+                )}
+                {roleOption?.label || '未定义用途'}
+              </span>
+            )}
+            {editingName ? (
+              <input
+                ref={nameInputRef}
+                defaultValue={nodeName}
+                autoFocus
+                onBlur={handleNameSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleNameSave();
+                }}
+                onPointerDown={stopTitleInteraction}
+                onMouseDown={stopTitleInteraction}
+                onClick={stopTitleInteraction}
+                onDoubleClick={stopTitleInteraction}
+                className="bg-transparent outline-none truncate nodrag nowheel select-text"
+                style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, minWidth: 0, flex: 1, borderBottom: '1px solid rgba(255,255,255,0.2)' }}
+              />
+            ) : (
+              <span
+                onClick={() => setEditingName(true)}
+                className="min-w-0 cursor-pointer truncate transition-colors hover:text-white nodrag"
+                style={{ fontSize: 11 }}
+              >
+                {nodeName}
+              </span>
+            )}
+          </div>
+          {displayImage && showTitleMeta && (
+            <span className="flex-shrink-0 ml-2" style={{ fontSize: 11 }}>
+              {imgSize ? `${imgSize.width}×${imgSize.height}` : `${(data.width as number) || 1024}×${(data.height as number) || 1024}`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Image card wrapper — relative for handles/upload positioning */}
+      <div className="relative" style={{ width: cardWidth }}>
+        {/* Upload icon — inside card top-right, hidden when node has input connection */}
+        {isOnlySelected && !hasInputConnection && (
+          <>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="absolute z-20 flex items-center justify-center rounded-lg transition-colors cursor-pointer"
+              style={{
+                top: 8,
+                right: 8,
+                width: 22,
+                height: 22,
+                background: 'rgba(37,37,48,0.9)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <Upload style={{ width: 11, height: 11, color: 'rgba(255,255,255,0.7)' }} />
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+          </>
+        )}
+
+        {displayImage && (isOnlySelected || roleMenuOpen) && (
+          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
+        )}
+
+        {/* Main card — aspect ratio adapts to uploaded image */}
+        <div
+          className="node-preview-card w-full rounded-xl flex items-center justify-center transition-all overflow-hidden"
+          style={{
+            width: cardWidth,
+            height: displayImage ? Math.round(sourceHeight * imageDisplayScale) : cardHeight,
+            background: '#252526',
+            border: `1px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.06)'}`,
+            boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+          }}
+        >
+          {displayImage ? (
+            <img src={displayImage} alt="" className="w-full h-full object-contain" />
+          ) : (
+            <div className="flex items-center justify-center">
+              {/* Clean placeholder icon */}
+              <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+                <rect x="4" y="4" width="48" height="48" rx="12" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                <path d="M16 38L24 26L30 34L36 28L40 32" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="38" cy="20" r="4" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+                <path d="M12 42C18 36 26 36 32 40C38 44 44 40 48 36" stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeLinecap="round" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Left visual handle — Input (hidden when image exists) */}
+        {!displayImage && (
+          <div
+            className="image-node-handle input-port"
+            data-port-type="input"
+            data-data-type="image"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 28,
+              height: 28,
+              background: 'rgba(20,20,26,0.45)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1.5px solid rgba(255,255,255,0.25)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+            }}
+          >
+            <Plus style={{ width: 14, height: 14, color: 'white' }} />
+          </div>
+        )}
+
+        {/* Right visual handle — Output */}
+        <div
+          className="image-node-handle output-port"
+          data-port-type="output"
+          data-data-type="image"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            e.nativeEvent.stopImmediatePropagation();
+            const onStart = data.onStartLineDraw as ((nodeId: string, x: number, y: number) => void) | undefined;
+            if (!onStart) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+          }}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '50%',
+            transform: 'translate(50%, -50%)',
+            width: 28,
+            height: 28,
+            background: 'rgba(20,20,26,0.45)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1.5px solid rgba(255,255,255,0.25)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+          }}
+        >
+          <Plus style={{ width: 14, height: 14, color: 'white' }} />
+        </div>
+
+        {/* React Flow handles — positioned to overlap visual handles exactly */}
+        <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%' }} />
+        <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%' }} />
+      </div>
+
+      {/* Control panel — below the preview area */}
+      {/* 空节点或有生成历史的节点才显示控制面板；纯上传/拖入的素材节点隐藏；多选时也不显示 */}
+      {isOnlySelected && (!displayImage || generatedImages.length > 0) && (
+        <>
+          <div
+            className="absolute z-30"
+            style={{
+              top: cardHeight + 12 / zoom,
+              left: cardWidth / 2,
+              width: IMAGE_NODE_CONTROL_WIDTH,
+              transform: `translateX(-50%) scale(${inverseScale})`,
+              transformOrigin: 'top center',
+            }}
+          >
+            <ImageNodeControlPanel
+              promptText={promptText}
+              onPromptChange={handlePromptChange}
+              promptContent={promptContent}
+              onPromptContentChange={handlePromptContentChange}
+              marks={marks}
+              onMarksChange={handleMarksChange}
+              selectedPresets={selectedPresets}
+              onPresetsChange={handlePresetsChange}
+              selectedStyleId={selectedStyleId}
+              onStyleChange={handleStyleChange}
+              modelParams={modelParams}
+              onModelParamsChange={handleModelParamsChange}
+              onGenerate={handleGenerate}
+              canGenerate={canGenerate}
+              references={references}
+              onRemoveReference={handleRemoveReference}
+              onReorderReferences={handleReorderReferences}
+              onUseReference={handleUseReference}
+              onAssignReferenceRole={handleAssignReferenceRole}
+              showToast={showToast}
+            />
+          </div>
+
+          <div style={{ height: (IMAGE_NODE_CONTROL_HEIGHT + 22) / zoom }} />
+        </>
+      )}
+
+      {/* Fullscreen preview modal — rendered via portal to escape node bounds */}
+      {showPreview && displayImage && createPortal(
+        <ImagePreviewModal
+          imageUrl={displayImage}
+          nodeName={nodeName}
+          imgSize={imgSize}
+          onClose={() => setShowPreview(false)}
+        />,
+        document.body,
+      )}
+    </div>
+  );
+}
