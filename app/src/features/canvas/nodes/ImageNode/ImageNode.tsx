@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Image, Plus, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
@@ -59,14 +59,18 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const referenceOrder = (data.referenceOrder as string[]) || [];
   const rawReferences = inputEdges.map((edge) => {
     const sourceNode = allNodes.find((n) => n.id === edge.source);
+    const edgeRole = edge.data?.role as ImageRole | null | undefined;
+    const edgeCustomRoleLabel = edge.data?.customRoleLabel as string | undefined;
     const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
     const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
+    const referenceRole = edgeRole ?? sourceRole;
+    const referenceCustomRoleLabel = edgeCustomRoleLabel ?? sourceCustomRoleLabel;
     return {
       nodeId: edge.source,
       index: 0,
-      role: sourceRole,
-      roleLabel: getImageRoleLabel(sourceRole, sourceCustomRoleLabel),
-      customRoleLabel: sourceCustomRoleLabel,
+      role: referenceRole,
+      roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel),
+      customRoleLabel: referenceCustomRoleLabel,
       imageUrl: sourceNode?.data?.image as string,
       width: (sourceNode?.data?.width as number) || undefined,
       height: (sourceNode?.data?.height as number) || undefined,
@@ -86,7 +90,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const selectedStyle = getStylePresetById(selectedStyleId);
   const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0;
 
-  const handleGenerate = () => {
+  const handleGenerate = useCallback(() => {
     const { textPrompt, imageReferences, globalStyle } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle);
     const mockResult = `/images/show-cover-${Math.floor(Math.random() * 5) + 1}.jpg`;
     const nextGeneratedImages = [...generatedImages, mockResult];
@@ -118,7 +122,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           : n,
       ),
     );
-  };
+  }, [promptText, promptContent, selectedPresets, selectedStyle, generatedImages, id, setNodes]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
@@ -152,7 +156,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const handleRemoveReference = (sourceNodeId: string) => {
-    setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === id)));
+    const removeReferenceEdge = data.onRemoveReferenceEdge as ((targetNodeId: string, sourceNodeId: string) => void) | undefined;
+    if (removeReferenceEdge) {
+      removeReferenceEdge(id, sourceNodeId);
+    } else {
+      setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === id)));
+    }
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id !== id) return n;
@@ -177,11 +186,20 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string) => {
     const roleOption = getImageRoleOption(nextRole, nextCustomRoleLabel);
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.id === sourceNodeId ? { ...node, data: { ...node.data, ...getRoleData(nextRole, nextCustomRoleLabel) } } : node,
-      ),
-    );
+    const roleData = getRoleData(nextRole, nextCustomRoleLabel);
+    const assignReferenceEdgeRole = data.onAssignReferenceEdgeRole as ((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string) => void) | undefined;
+    if (assignReferenceEdgeRole) {
+      assignReferenceEdgeRole(id, sourceNodeId, nextRole, nextCustomRoleLabel);
+    } else {
+      setEdges((eds) =>
+        eds.map((edge) =>
+          edge.source === sourceNodeId && edge.target === id
+            ? { ...edge, data: { ...edge.data, ...roleData } }
+            : edge,
+        ),
+      );
+      setNodes((nds) => nds.map((node) => (node.id === sourceNodeId ? { ...node, data: { ...node.data, ...roleData } } : node)));
+    }
 
     const existingReference = references.find((reference) => reference.nodeId === sourceNodeId);
     if (!existingReference) return null;
@@ -261,6 +279,21 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const RoleIconForTitle = roleOption?.Icon;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
   const isOnlySelected = selected && selectedNodeCount === 1;
+
+  // Global Ctrl+G / Cmd+G shortcut for generation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (isOnlySelected && canGenerate) {
+          handleGenerate();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOnlySelected, canGenerate, handleGenerate]);
 
   return (
     <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>

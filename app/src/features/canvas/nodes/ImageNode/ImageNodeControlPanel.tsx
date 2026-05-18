@@ -48,7 +48,7 @@ import {
   getStylePresetById,
 } from '../../constants/presets';
 import { createImageReferenceBlock } from '../../utils/promptUtils';
-import { areReferenceListsEqual } from '../../utils/referenceUtils';
+import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUtils';
 import { StylePickerModal } from '../../components/StylePickerModal';
 
 export function ImageNodeControlPanel({
@@ -108,6 +108,7 @@ export function ImageNodeControlPanel({
   const [pendingCustomInput, setPendingCustomInput] = useState(false);
   const [pendingCustomValue, setPendingCustomValue] = useState('');
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
+  const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
   const [markName, setMarkName] = useState('');
   const [markAction, setMarkAction] = useState<MarkAction>('enhance');
   const [markDesc, setMarkDesc] = useState('');
@@ -448,33 +449,13 @@ export function ImageNodeControlPanel({
   };
 
   const requestReferenceInsert = (reference: ReferenceInfo) => {
-    let targetReference = reference;
-
-    // 自动分配默认用途（规则22）
-    if (!targetReference.role) {
-      const usedRoles = new Set(references.map((ref) => ref.role).filter(Boolean));
-      const autoRole = (['primary_building', 'atmosphere_reference', 'sky_reference', 'vegetation_reference', 'people_reference'] as ImageRole[]).find(
-        (role) => !usedRoles.has(role),
-      );
-
-      if (autoRole) {
-        const updatedRef = onAssignReferenceRole(targetReference.nodeId, autoRole);
-        if (updatedRef) {
-          targetReference = updatedRef;
-        } else {
-          const roleLabel = getImageRoleLabel(autoRole);
-          targetReference = { ...targetReference, role: autoRole, roleLabel };
-        }
-      }
-    }
-
-    if (!targetReference.role) {
-      setPendingReference(targetReference);
+    if (!hasDefinedUsage(reference)) {
+      setPendingReference(reference);
       setShowReferenceMenu(false);
       return;
     }
-    onUseReference(targetReference);
-    insertReferenceBlock(targetReference);
+    onUseReference(reference);
+    insertReferenceBlock(reference);
   };
 
   useEffect(() => {
@@ -501,7 +482,8 @@ export function ImageNodeControlPanel({
     setPendingReference(null);
     setPendingCustomInput(false);
     setPendingCustomValue('');
-    requestReferenceInsert(updatedReference);
+    onUseReference(updatedReference);
+    insertReferenceBlock(updatedReference);
   };
 
   const submitPendingCustomRole = () => {
@@ -522,6 +504,8 @@ export function ImageNodeControlPanel({
   };
 
   const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing) return;
+
     if (showSlashMenu) {
       if (slashFilteredPresets.length === 0) {
         if (event.key === 'Escape') {
@@ -581,6 +565,23 @@ export function ImageNodeControlPanel({
     if (pendingReference && event.key === 'Escape') {
       event.preventDefault();
       closeReferenceMenus();
+    }
+
+    // Prompt input line break shortcuts (when no menu is open)
+    if (!showSlashMenu && !showReferenceMenu && !pendingReference) {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || event.shiftKey)) {
+        event.preventDefault();
+        const input = promptInputRef.current;
+        if (input) {
+          const start = input.selectionStart ?? promptText.length;
+          const end = input.selectionEnd ?? promptText.length;
+          const newText = promptText.slice(0, start) + '\n' + promptText.slice(end);
+          onPromptChange(newText);
+          requestAnimationFrame(() => {
+            input.selectionStart = input.selectionEnd = start + 1;
+          });
+        }
+      }
     }
   };
 
@@ -675,6 +676,7 @@ export function ImageNodeControlPanel({
               <div
                 className="absolute top-full left-0 mt-1 rounded-xl z-30 overflow-hidden flex flex-col"
                 style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 16px 40px rgba(0,0,0,0.48)', width: 420, maxHeight: 520 }}
+                onWheel={(e) => e.stopPropagation()}
               >
                 {/* Tabs */}
                 <div className="flex items-center gap-1 px-3 pt-3 pb-2 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
@@ -695,7 +697,7 @@ export function ImageNodeControlPanel({
                   })}
                 </div>
                 {/* Cards */}
-                <div className="p-3 overflow-y-auto">
+                <div className="p-3 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
                   {activePresetTab === '我的' ? (
                     <div className="flex flex-col items-center justify-center py-10 text-center">
                       <Bookmark className="w-10 h-10 text-white/10 mb-3" />
@@ -878,7 +880,7 @@ export function ImageNodeControlPanel({
                 draggable={false}
                 onClick={() => handleThumbnailClick(ref)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter') requestReferenceInsert(ref);
+                  if (event.key === 'Enter') handleThumbnailClick(ref);
                 }}
                 onPointerDown={handleRefPointerDown(idx)}
                 onPointerCancel={() => resetPointerReferenceDrag(true)}
@@ -934,7 +936,6 @@ export function ImageNodeControlPanel({
                       referenceDragRef.current = null;
                       isDraggingRef.current = false;
                       setDraggingRefId(null);
-                      onRemoveReference(ref.nodeId);
                       event.preventDefault();
                       event.stopPropagation();
                     }}
@@ -978,6 +979,8 @@ export function ImageNodeControlPanel({
                 const reference = references.find((item) => item.nodeId === block.sourceNodeId);
                 const previewImage = reference?.imageUrl || block.thumbnailUrl;
                 const highlighted = highlightedPromptBlockId === block.id;
+                const hovered = hoveredPromptBlockId === block.id;
+                const usageColor = getImageRoleColor(reference?.role ?? null);
 
                 return (
                   <div
@@ -989,23 +992,40 @@ export function ImageNodeControlPanel({
                         promptBlockRefs.current.delete(block.id);
                       }
                     }}
+                    onMouseEnter={() => setHoveredPromptBlockId(block.id)}
+                    onMouseLeave={() => setHoveredPromptBlockId((currentId) => (currentId === block.id ? null : currentId))}
                     className="group/prompt-ref relative inline-flex max-w-full items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[12px] transition-all"
                     style={{
-                      background: highlighted ? 'rgba(0,212,255,0.18)' : 'rgba(255,255,255,0.055)',
-                      borderColor: highlighted ? 'rgba(0,212,255,0.55)' : 'rgba(255,255,255,0.1)',
-                      boxShadow: highlighted ? '0 0 0 1px rgba(0,212,255,0.2)' : 'none',
-                      color: 'rgba(255,255,255,0.86)',
+                      background: hovered || highlighted ? 'rgba(255,255,255,0.052)' : 'rgba(255,255,255,0.035)',
+                      borderColor: highlighted ? `${usageColor}66` : hovered ? `${usageColor}52` : 'rgba(255,255,255,0.10)',
+                      boxShadow: 'none',
+                      color: 'rgba(255,255,255,0.82)',
                     }}
                   >
                     {previewImage ? (
-                      <img src={previewImage} alt="" className="h-6 w-6 flex-shrink-0 rounded object-cover" draggable={false} />
+                      <img
+                        src={previewImage}
+                        alt=""
+                        className="h-6 w-6 flex-shrink-0 rounded object-cover"
+                        draggable={false}
+                        style={{ border: `1px solid ${usageColor}` }}
+                      />
                     ) : (
-                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${usageColor}` }}>
                         <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
                       </span>
                     )}
-                    <span className="flex-shrink-0 font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>{block.usage}</span>
-                    <span className="min-w-0 truncate" style={{ maxWidth: 360, color: 'rgba(255,255,255,0.66)' }}>{block.promptText}</span>
+                    <span
+                      className="flex-shrink-0 rounded px-1.5 py-0.5 font-medium leading-none"
+                      style={{
+                        color: 'rgba(255,255,255,0.72)',
+                        background: 'rgba(255,255,255,0.045)',
+                        border: `1px solid ${hovered || highlighted ? `${usageColor}52` : `${usageColor}38`}`,
+                      }}
+                    >
+                      {block.usage}
+                    </span>
+                    <span className="min-w-0 truncate" style={{ maxWidth: 360, color: 'rgba(255,255,255,0.62)' }}>{block.promptText}</span>
                     <button
                       type="button"
                       onClick={(event) => {
@@ -1031,14 +1051,14 @@ export function ImageNodeControlPanel({
                         <img
                           src={previewImage}
                           alt=""
-                          className="w-full object-contain"
+                          className="block w-full object-cover"
                           style={{
-                            maxHeight: 220,
+                            height: 220,
                             aspectRatio: reference?.width && reference?.height ? `${reference.width}/${reference.height}` : '1/1',
                           }}
                         />
-                        <div className="px-2 py-1.5">
-                          <div className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.75)' }}>{block.usage}</div>
+                        <div className="px-2 py-1.5 text-center">
+                          <div className="text-[12px] font-medium leading-5" style={{ color: 'rgba(255,255,255,0.75)' }}>{block.usage}</div>
                         </div>
                       </div>
                     )}
@@ -1071,6 +1091,7 @@ export function ImageNodeControlPanel({
                 border: FLOATING_PANEL_BORDER,
                 boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
               }}
+              onWheel={(e) => e.stopPropagation()}
             >
               {(() => {
                 if (slashFilteredPresets.length === 0) {
@@ -1134,6 +1155,7 @@ export function ImageNodeControlPanel({
                 border: FLOATING_PANEL_BORDER,
                 boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
               }}
+              onWheel={(e) => e.stopPropagation()}
             >
               <div className="px-3 py-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.58)' }}>选择图片用途</div>
               {imageRoleOptions.map((option) => {

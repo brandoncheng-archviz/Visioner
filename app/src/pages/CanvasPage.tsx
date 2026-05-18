@@ -219,12 +219,33 @@ function FlowCanvas() {
     }));
   }, [nodes]);
 
+  const removeReferenceEdge = useCallback((targetNodeId: string, sourceNodeId: string) => {
+    setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === targetNodeId)));
+  }, []);
+
+  const assignReferenceEdgeRole = useCallback((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string) => {
+    const roleData = getRoleData(role, customRoleLabel);
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.source === sourceNodeId && edge.target === targetNodeId
+          ? { ...edge, data: { ...edge.data, ...roleData } }
+          : edge,
+      ),
+    );
+    setNodes((nds) => nds.map((node) => (node.id === sourceNodeId ? { ...node, data: { ...node.data, ...roleData } } : node)));
+  }, []);
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
       ...n,
-      data: { ...n.data, onStartLineDraw: startLineDraw },
+      data: {
+        ...n.data,
+        onStartLineDraw: startLineDraw,
+        onRemoveReferenceEdge: removeReferenceEdge,
+        onAssignReferenceEdgeRole: assignReferenceEdgeRole,
+      },
     }));
-  }, [nodes, startLineDraw]);
+  }, [nodes, startLineDraw, removeReferenceEdge, assignReferenceEdgeRole]);
 
   // ─── Copy / Paste / Delete ───
   const clipboardRef = useRef<{ type: string; data: Record<string, unknown>; position: { x: number; y: number } }[]>([]);
@@ -262,6 +283,62 @@ function FlowCanvas() {
     setNodes((nds) => nds.filter((n) => !n.selected));
     setEdges((eds) => eds.filter((e) => !e.selected));
   }, [nodes, edges, setNodes, setEdges]);
+
+  // ─── History (Undo / Redo) ───
+  const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
+  const historyIndexRef = useRef(-1);
+  const skipHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (skipHistoryRef.current) {
+      skipHistoryRef.current = false;
+      return;
+    }
+    const last = historyRef.current[historyIndexRef.current];
+    if (
+      last &&
+      JSON.stringify(last.nodes) === JSON.stringify(nodes) &&
+      JSON.stringify(last.edges) === JSON.stringify(edges)
+    ) {
+      return;
+    }
+    historyIndexRef.current += 1;
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current);
+    historyRef.current.push({ nodes: [...nodes], edges: [...edges] });
+    if (historyRef.current.length > 50) {
+      historyRef.current.shift();
+      historyIndexRef.current -= 1;
+    }
+  }, [nodes, edges]);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      historyIndexRef.current -= 1;
+      const state = historyRef.current[historyIndexRef.current];
+      skipHistoryRef.current = true;
+      setNodes(state.nodes);
+      setEdges(state.edges);
+    }
+  }, [setNodes, setEdges]);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      historyIndexRef.current += 1;
+      const state = historyRef.current[historyIndexRef.current];
+      skipHistoryRef.current = true;
+      setNodes(state.nodes);
+      setEdges(state.edges);
+    }
+  }, [setNodes, setEdges]);
+
+  const selectAll = useCallback(() => {
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: true })));
+  }, [setNodes]);
+
+  const deselectAll = useCallback(() => {
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+  }, [setNodes, setEdges]);
 
   const duplicateNode = useCallback((id: string) => {
     const node = nodes.find((n) => n.id === id);
@@ -338,13 +415,24 @@ function FlowCanvas() {
     clearPreselection();
   }, [clearPreselection]);
 
+  // ─── Toolbar State (showHelp used in keyboard shortcuts) ───
+  const [showHelp, setShowHelp] = useState(false);
+
   // ─── Keyboard Shortcuts ───
   const copyRef = useRef(copyNodes);
   const pasteRef = useRef(pasteNodes);
   const deleteRef = useRef(deleteSelected);
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  const selectAllRef = useRef(selectAll);
+  const deselectAllRef = useRef(deselectAll);
   useEffect(() => { copyRef.current = copyNodes; }, [copyNodes]);
   useEffect(() => { pasteRef.current = pasteNodes; }, [pasteNodes]);
   useEffect(() => { deleteRef.current = deleteSelected; }, [deleteSelected]);
+  useEffect(() => { undoRef.current = undo; }, [undo]);
+  useEffect(() => { redoRef.current = redo; }, [redo]);
+  useEffect(() => { selectAllRef.current = selectAll; }, [selectAll]);
+  useEffect(() => { deselectAllRef.current = deselectAll; }, [deselectAll]);
 
   // Prevent browser context menu on canvas area
   useEffect(() => {
@@ -360,26 +448,66 @@ function FlowCanvas() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+
       const target = e.target as HTMLElement;
       const tag = target.tagName.toLowerCase();
       const isEditing = tag === 'input' || tag === 'textarea' || target.isContentEditable;
 
+      // Copy / Paste (global)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         copyRef.current();
+        return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault();
         pasteRef.current();
+        return;
       }
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (!isEditing) {
-          deleteRef.current();
+
+      // Esc closes help panel first, then deselects
+      if (e.key === 'Escape') {
+        if (showHelp) {
+          e.preventDefault();
+          setShowHelp(false);
+          return;
         }
       }
 
-      // Canvas navigation shortcuts (skip when editing text)
+      // Canvas shortcuts (skip when editing text)
       if (isEditing) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteRef.current();
+        return;
+      }
+
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redoRef.current();
+        } else {
+          undoRef.current();
+        }
+        return;
+      }
+
+      // Select All
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        selectAllRef.current();
+        return;
+      }
+
+      // Escape deselects
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        deselectAllRef.current();
+        return;
+      }
 
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
@@ -392,28 +520,32 @@ function FlowCanvas() {
         if (e.key === 'ArrowLeft') dx = step;
         if (e.key === 'ArrowRight') dx = -step;
         setViewport({ x: current.x + dx, y: current.y + dy, zoom: current.zoom }, { duration: 0 });
+        return;
       }
 
       if (e.key === '+' || e.key === '=') {
         e.preventDefault();
         const current = getViewport();
         setViewport({ ...current, zoom: Math.min(current.zoom * 1.15, 4) }, { duration: 0 });
+        return;
       }
 
       if (e.key === '-') {
         e.preventDefault();
         const current = getViewport();
         setViewport({ ...current, zoom: Math.max(current.zoom / 1.15, 0.2) }, { duration: 0 });
+        return;
       }
 
-      if (e.key === '0') {
+      if (e.key === '0' || e.key === 'f' || e.key === 'F' || e.key === '1') {
         e.preventDefault();
         fitView({ duration: 400 });
+        return;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [getViewport, setViewport, fitView]);
+  }, [getViewport, setViewport, fitView, showHelp]);
 
   // ─── Drag & Drop State ───
   const [isDragOver, setIsDragOver] = useState(false);
@@ -426,7 +558,6 @@ function FlowCanvas() {
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
-  const [showHelp, setShowHelp] = useState(false);
 
   const onViewportChange = useCallback((v: { x: number; y: number; zoom: number }) => {
     setZoom(v.zoom);

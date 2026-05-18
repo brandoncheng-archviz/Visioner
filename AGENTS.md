@@ -2,7 +2,7 @@
 
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
-**Important:** All application source code, configuration, and build assets live inside the `app/` subdirectory. The repository root only contains `.git/`, `package-lock.json`, and the `app/` folder. Every command below should be run from `app/` unless noted otherwise.
+**Important:** All application source code, configuration, and build assets live inside the `app/` subdirectory. The repository root only contains `.git/`, `package-lock.json`, `CANVAS_RULES.md`, and the `app/` folder. Every command below should be run from `app/` unless noted otherwise.
 
 ---
 
@@ -44,6 +44,13 @@ app/
 │   │   ├── TeamModal.tsx
 │   │   ├── TVShow.tsx       # Video gallery with category filter and search
 │   │   └── UpgradePanel.tsx
+│   ├── features/canvas/     # Canvas editor feature module (refactored from CanvasPage.tsx)
+│   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus)
+│   │   ├── constants/       # Canvas constants, presets, image usage configs
+│   │   ├── hooks/           # Canvas-specific hooks (useToast, etc.)
+│   │   ├── nodes/           # Node type components (ImageNode, VideoNode, TextNode, etc.)
+│   │   ├── types/           # Canvas-specific TypeScript types
+│   │   └── utils/           # Pure utility functions (prompt utils, reference utils)
 │   ├── data/
 │   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas nodes/edges
 │   ├── hooks/
@@ -56,7 +63,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor (React Flow based, ~4240 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor page entry (~768 lines, post-refactor)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -134,17 +141,50 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ## Key Modules
 
-### React Flow Canvas Editor (`src/pages/CanvasPage.tsx`)
+### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-A node-based editor built on `@xyflow/react` supporting seven custom node types:
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~768 lines) now acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
-- `image` — Displays an image with optional prompt text, editable name, file upload, and a floating prompt panel on selection.
-- `video` — Video placeholder with model/seed info on selection.
-- `text` — Checklist for text-generation tasks.
-- `audio` — Audio waveform visualization placeholder.
-- `script` — Script processing placeholder.
-- `video-merge` — Video composition placeholder.
-- `upscale` — Image upscaling placeholder.
+**`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
+- Page entry and React Flow provider wrapper
+- Core `nodes` / `edges` / `tempLine` state management
+- Line drawing logic (custom connection lines from output ports)
+- Copy / paste / duplicate / delete logic
+- Keyboard shortcuts (`Ctrl+C` / `Ctrl+V`, `Delete` / `Backspace`)
+- Drag-and-drop upload handling
+- Box-selection pre-highlight logic
+- Context menu state
+- Node registration and menu/drag/shortcut entry wiring
+
+**Extracted UI components (`src/features/canvas/components/`):**
+- `CanvasStage.tsx` — React Flow container, Background, MiniMap, drop overlay, temp connection line, reject tooltip, upload toast
+- `CanvasSidebar.tsx` — Left sidebar pill, expanded panels (add, AI toolbox, assets, history, support)
+- `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
+- `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
+- `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`
+
+**Node components (`src/features/canvas/nodes/`):**
+- `ImageNode/` — Image node with control panel, prompt box, reference image area
+- `VideoNode.tsx`
+- `TextNode.tsx`
+- `AudioNode.tsx`
+- `ScriptNode.tsx`
+- `VideoMergeNode.tsx`
+- `UpscaleNode.tsx`
+
+**Supporting modules:**
+- `types/` — `canvas.types.ts`, `imageNode.types.ts`
+- `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
+- `utils/` — `promptUtils.ts`, `referenceUtils.ts`
+- `hooks/` — `useToast.ts`
+
+**Canvas architecture rules (from `CANVAS_RULES.md`):**
+- Do **not** put new node UI, new panel UI, new toolbar UI, or new business logic back into `CanvasPage.tsx`.
+- New canvas features should be placed in the appropriate `src/features/canvas/` subfolder.
+- `CanvasPage.tsx` should only receive minimal wiring (node registration, menu entry, shortcut entry, state bridging).
+- Do not actively perform large-scale hook extractions (e.g., `useLineDrawing`, `useCanvasClipboard`) unless explicitly required.
+- Prefer small, low-risk changes that keep the current architecture stable.
 
 Features:
 - Left sidebar tool panel (add nodes, AI toolbox, assets, history, tutorial, support).

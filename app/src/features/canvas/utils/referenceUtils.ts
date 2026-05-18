@@ -1,5 +1,20 @@
 import type { ImageRole, ReferenceInfo } from '../types/imageNode.types';
 
+const UNDEFINED_USAGE_VALUES = new Set(['', 'unknown', 'unassigned', 'undefined', 'null', '未定义用途']);
+
+function isDefinedUsageValue(value: unknown) {
+  if (typeof value !== 'string') return value !== undefined && value !== null;
+  return !UNDEFINED_USAGE_VALUES.has(value.trim().toLowerCase());
+}
+
+export function hasDefinedUsage(reference: ReferenceInfo) {
+  if (!isDefinedUsageValue(reference.role)) return false;
+  if (reference.role === 'custom_reference') {
+    return isDefinedUsageValue(reference.customRoleLabel) && reference.customRoleLabel !== '自定义用途...';
+  }
+  return isDefinedUsageValue(reference.roleLabel);
+}
+
 export function areReferencesEqual(a: ReferenceInfo, b: ReferenceInfo) {
   return (
     a.nodeId === b.nodeId &&

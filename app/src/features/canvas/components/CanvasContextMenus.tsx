@@ -1,5 +1,5 @@
 import { Image, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
-import type { Node } from '@xyflow/react';
+
 
 /* ─── Canvas Context Menu (right-click on empty canvas) ─── */
 

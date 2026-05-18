@@ -5,11 +5,13 @@ import {
   MiniMap,
   Panel,
   SelectionMode,
+  useReactFlow,
   type Node,
   type Edge,
   type OnNodesChange,
   type Viewport,
 } from '@xyflow/react';
+import { useCallback } from 'react';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
 import { AudioNode } from '../nodes/AudioNode';
@@ -76,6 +78,42 @@ export function CanvasStage({
   onDragOverCapture,
   onDropCapture,
 }: CanvasStageProps) {
+  const { getViewport, setViewport } = useReactFlow();
+
+  const handleWheel = useCallback(
+    (event: React.WheelEvent) => {
+      // Ignore wheel events from MiniMap and Controls
+      const target = event.target as HTMLElement;
+      if (target.closest('.react-flow__minimap') || target.closest('.react-flow__controls')) {
+        return;
+      }
+
+      event.preventDefault();
+      const { deltaX, deltaY, ctrlKey, metaKey, shiftKey, clientX, clientY } = event;
+      const current = getViewport();
+
+      if (ctrlKey || metaKey) {
+        // Zoom centered on mouse pointer
+        const factor = deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.min(Math.max(current.zoom * factor, 0.2), 4);
+        const zoomRatio = newZoom / current.zoom;
+        const newX = clientX - (clientX - current.x) * zoomRatio;
+        const newY = clientY - (clientY - current.y) * zoomRatio;
+        setViewport({ x: newX, y: newY, zoom: newZoom }, { duration: 0 });
+      } else if (shiftKey) {
+        // Horizontal pan ( Shift + wheel )
+        const newX = current.x - deltaY;
+        setViewport({ x: newX, y: current.y, zoom: current.zoom }, { duration: 0 });
+      } else {
+        // Free pan (mouse wheel vertical / trackpad two-finger)
+        const newX = current.x - deltaX;
+        const newY = current.y - deltaY;
+        setViewport({ x: newX, y: newY, zoom: current.zoom }, { duration: 0 });
+      }
+    },
+    [getViewport, setViewport],
+  );
+
   return (
     <div
       className="absolute inset-0"
@@ -139,6 +177,9 @@ export function CanvasStage({
         selectionMode={SelectionMode.Partial}
         panOnDrag={[1, 2]}
         zoomOnPinch
+        zoomOnScroll={false}
+        panOnScroll={false}
+        onWheel={handleWheel}
         fitView
         fitViewOptions={{ maxZoom: 1 }}
         minZoom={0.2}
