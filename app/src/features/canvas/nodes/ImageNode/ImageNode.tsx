@@ -452,6 +452,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           data-port-type="output"
           data-data-type="image"
           onPointerDown={(e) => {
+            if (e.button !== 0) return;
             e.stopPropagation();
             e.preventDefault();
             e.nativeEvent.stopImmediatePropagation();

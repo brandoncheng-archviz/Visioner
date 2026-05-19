@@ -809,12 +809,18 @@ function FlowCanvas() {
         }
         /* Connection hover feedback on nodes */
         .react-flow__node.can-connect {
+          box-shadow: none !important;
+        }
+        .react-flow__node.can-connect .node-preview-card {
+          border-color: #00d4ff !important;
           box-shadow: 0 0 0 2px #00d4ff, 0 0 16px rgba(0, 212, 255, 0.5) !important;
-          border-radius: 16px;
         }
         .react-flow__node.cannot-connect {
+          box-shadow: none !important;
+        }
+        .react-flow__node.cannot-connect .node-preview-card {
+          border-color: #ff4444 !important;
           box-shadow: 0 0 0 2px #ff4444, 0 0 20px rgba(255, 68, 68, 0.6) !important;
-          border-radius: 16px;
         }
       `}</style>
 

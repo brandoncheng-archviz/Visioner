@@ -1,4 +1,4 @@
-# Visioner — AI Video Creation Platform
+# Visioner — AI Video & Image Creation Platform
 
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
@@ -10,19 +10,17 @@
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Framework | React | `^19.2.0` |
-| Language | TypeScript | `~5.9.3` |
-| Build Tool | Vite | `^7.2.4` |
-| Styling | Tailwind CSS | `^3.4.19` |
-| PostCSS | autoprefixer | `^10.4.23` |
+| Framework | React | 19.2 |
+| Language | TypeScript | ~5.9 |
+| Build Tool | Vite | 7.2 |
+| Styling | Tailwind CSS | 3.4 |
 | UI Components | shadcn/ui (New York style) | — |
-| Router | react-router-dom | `^7.14.2` |
-| Canvas | @xyflow/react | `^12.10.2` |
-| Carousel | embla-carousel-react | `^8.6.0` |
-| Icons | lucide-react | `^0.562.0` |
-| Forms | react-hook-form + zod | `^7.70.0` / `^4.3.5` |
-| Charts | recharts | `^2.15.4` |
-| Dev Plugin | kimi-plugin-inspect-react | `^1.0.3` |
+| Router | react-router-dom | 7.x |
+| Canvas | @xyflow/react + custom 2D canvas | 12.10 |
+| Carousel | embla-carousel-react | 8.6 |
+| Icons | lucide-react | 0.562 |
+| Forms | react-hook-form + zod | 7.70 / 4.3 |
+| Charts | recharts | 2.15 |
 
 ---
 
@@ -34,8 +32,8 @@ app/
 │   └── images/              # Static image assets (banners, show covers, project thumbs)
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # 53+ shadcn/ui primitives (button, dialog, form, carousel, etc.)
-│   │   ├── NodeEditor/      # Custom 2D canvas node editor (not wired to any route)
+│   │   ├── ui/              # shadcn/ui components (50+ primitives: button, dialog, form, etc.)
+│   │   ├── NodeEditor/      # Custom 2D canvas node editor (standalone subsystem)
 │   │   │   ├── NodeEditorCanvas.tsx
 │   │   │   └── NodeRegistry.ts
 │   │   ├── AccountPanel.tsx
@@ -48,16 +46,47 @@ app/
 │   │   ├── TeamModal.tsx
 │   │   ├── TVShow.tsx       # Video gallery with category filter and search
 │   │   └── UpgradePanel.tsx
-│   ├── data/
-│   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas presets
 │   ├── features/
-│   │   └── canvas/          # Canvas 模块：组件、节点、hooks、类型、常量、工具函数
-│   │       ├── components/  # Canvas 通用 UI（Stage, Sidebar, Toolbar, ContextMenus, GlobalDropForwarder）
-│   │       ├── constants/   # Canvas 常量、配置、预设
-│   │       ├── hooks/       # Canvas 相关 hooks
-│   │       ├── nodes/       # 所有节点类型（ImageNode, TextNode, VideoNode 等）
-│   │       ├── types/       # 类型定义
-│   │       └── utils/       # 纯工具函数
+│   │   └── canvas/          # Canvas editor feature module (React Flow based)
+│   │       ├── components/
+│   │       │   ├── CanvasContextMenus.tsx
+│   │       │   ├── CanvasSidebar.tsx
+│   │       │   ├── CanvasStage.tsx
+│   │       │   ├── CanvasToolbar.tsx
+│   │       │   ├── GlobalDropForwarder.tsx
+│   │       │   ├── ImagePreviewModal.tsx
+│   │       │   ├── ImageRoleTag.tsx
+│   │       │   ├── ImageToolbar.tsx
+│   │       │   ├── NodeShell.tsx
+│   │       │   ├── ShortcutRow.tsx
+│   │       │   ├── StylePickerModal.tsx
+│   │       │   ├── TempConnectionLine.tsx
+│   │       │   └── UpscaleParamPanel.tsx
+│   │       ├── constants/
+│   │       │   ├── canvasConstants.ts
+│   │       │   ├── imageUsages.ts
+│   │       │   └── presets.ts
+│   │       ├── hooks/
+│   │       │   └── useToast.ts
+│   │       ├── nodes/
+│   │       │   ├── AudioNode.tsx
+│   │       │   ├── ImageNode/
+│   │       │   │   ├── ImageNode.tsx
+│   │       │   │   ├── ImageNodeControlPanel.tsx
+│   │       │   │   └── index.ts
+│   │       │   ├── ScriptNode.tsx
+│   │       │   ├── TextNode.tsx
+│   │       │   ├── UpscaleNode.tsx
+│   │       │   ├── VideoMergeNode.tsx
+│   │       │   └── VideoNode.tsx
+│   │       ├── types/
+│   │       │   ├── canvas.types.ts
+│   │       │   └── imageNode.types.ts
+│   │       └── utils/
+│   │           ├── promptUtils.ts
+│   │           └── referenceUtils.ts
+│   ├── data/
+│   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas nodes/edges
 │   ├── hooks/
 │   │   └── use-mobile.ts    # useIsMobile hook (breakpoint 768px)
 │   ├── lib/
@@ -68,22 +97,18 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Canvas 页面入口，核心逻辑已迁移至 src/features/canvas/
-│   │   └── add_thumbnails.py # Helper script to inject thumbnails into CanvasPage preset data
+│   │   └── CanvasPage.tsx   # Visual node editor orchestrator (~900 lines)
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
 │   ├── App.css              # Minimal root-level styles
 │   ├── App.tsx              # Root router with BrowserRouter, Routes for / and /canvas
-│   ├── index.css            # Global styles, Tailwind directives, ReactFlow custom CSS, CSS variables
-│   └── main.tsx             # React root render with StrictMode
-├── AGENTS.md                # Agent-focused project documentation
-├── README.md                # Generic Vite + React README
-├── info.md                  # Setup notes (Node 20, Tailwind v3.4.19, Vite v7.2.4)
+│   ├── main.tsx             # React root render with StrictMode
+│   └── index.css            # Global styles, Tailwind directives, ReactFlow custom CSS, CSS variables
 ├── components.json          # shadcn/ui configuration
 ├── vite.config.ts           # Vite config: base './', port 3000, @/ -> ./src alias
 ├── tailwind.config.js       # Custom theme extending shadcn color tokens, animations
 ├── tsconfig.json            # Project references to tsconfig.app.json & tsconfig.node.json
-├── tsconfig.app.json        # Strict TypeScript app config
+├── tsconfig.app.json        # Strict TypeScript: noUnusedLocals, noUnusedParameters
 ├── tsconfig.node.json       # Node-side config for Vite
 ├── eslint.config.js         # ESLint flat config: TS + react-hooks + react-refresh
 └── postcss.config.js        # Tailwind + autoprefixer
@@ -120,8 +145,6 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ## Routing
 
-Handled in `src/App.tsx` via `react-router-dom`:
-
 | Route | Component | Description |
 |-------|-----------|-------------|
 | `/` | `Home` | Landing page with discovery content |
@@ -130,13 +153,30 @@ Handled in `src/App.tsx` via `react-router-dom`:
 
 ---
 
+## Code Style Guidelines
+
+- **Language**: UI labels and user-facing text are in Chinese. Code comments, variable names, and file names are in English.
+- **Imports**: Use the `@/` path alias for all internal imports (e.g., `@/components/ui/button`, `@/lib/utils`).
+- **Styling**: The project uses a custom dark theme. Tailwind utility classes are primary, but inline `style` props are used for dynamic values (especially in the canvas editor) and hardcoded palette colors.
+- **Theme colors** (hardcoded across the app):
+  - Background: `#0a0a0f`
+  - Surface/card: `#14141a`
+  - Elevated: `#1e1e28`, `#252530`
+  - Border: `#2a2a35`
+  - Primary accent: `#00d4ff` (cyan)
+  - Secondary text: `#a0a0b0`
+  - Muted text: `#6a6a7a`
+- **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
+- **TypeScript**: Strict mode is enabled. `noUnusedLocals` and `noUnusedParameters` are active; unused variables will fail the build.
+- **ESLint**: The project disables `@typescript-eslint/no-explicit-any` in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
+
+---
+
 ## Key Modules
 
-### React Flow Canvas Editor
+### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-画布核心逻辑已拆分到 `src/features/canvas/`，`src/pages/CanvasPage.tsx` 仅保留页面入口和核心状态管理。
-
-基于 `@xyflow/react` 的节点编辑器，支持以下自定义节点类型：
+A node-based editor built on `@xyflow/react` supporting seven custom node types:
 
 - `image` — Displays an image with optional prompt text, editable name, file upload, and a floating prompt panel on selection.
 - `video` — Video placeholder with model/seed info on selection.
@@ -156,6 +196,8 @@ Features:
 - Custom connection line drawing from output ports with cycle detection, type validation, and drop-to-create-node support.
 - Keyboard shortcuts: `Ctrl+C` / `Ctrl+V` for copy/paste, `Delete` / `Backspace` to remove selected nodes/edges.
 - Zoom slider, grid snap toggle, fit view reset, and help panel in the bottom toolbar.
+
+The canvas editor code is organized as a feature module under `src/features/canvas/` with sub-folders for components, nodes, types, constants, hooks, and utils.
 
 ### Custom 2D Canvas Node Editor (`src/components/NodeEditor/`)
 
@@ -195,44 +237,11 @@ Mock API service for user account features (profile, credits, usage, billing, de
 
 ---
 
-## Code Style Guidelines
-
-- **Language**: UI labels and user-facing text are in Chinese. Code comments, variable names, and file names are in English.
-- **Imports**: Use the `@/` path alias for all internal imports (e.g., `@/components/ui/button`, `@/lib/utils`).
-- **Styling**: The project uses a custom dark theme. Tailwind utility classes are primary, but inline `style` props are used for dynamic values (especially in the canvas editor) and hardcoded palette colors.
-- **Theme colors** (hardcoded across the app):
-  - Background: `#0a0a0f`
-  - Surface/card: `#14141a`
-  - Elevated: `#1e1e28`, `#252530`
-  - Border: `#2a2a35`
-  - Primary accent: `#00d4ff` (cyan)
-  - Secondary text: `#a0a0b0`
-  - Muted text: `#6a6a7a`
-- **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
-- **TypeScript**: Strict mode is enabled with the following additional checks:
-  - `noUnusedLocals: true`
-  - `noUnusedParameters: true`
-  - `verbatimModuleSyntax: true` (type-only imports must use the `type` keyword)
-  - `erasableSyntaxOnly: true`
-  - `noUncheckedSideEffectImports: true`
-- **ESLint**: Flat config using `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, and `eslint-plugin-react-refresh`. The `@typescript-eslint/no-explicit-any` rule is disabled only in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
-
----
-
 ## Testing
 
 There are **no test files** in the project currently. No test runner (Jest, Vitest, Playwright, etc.) is installed.
 
 If you add tests, the conventional location would be alongside source files (e.g., `*.test.tsx`) or in a top-level `tests/` directory inside `app/`.
-
----
-
-## Deployment & Build Process
-
-- The app is a **client-side only SPA** with no server-side rendering.
-- No CI/CD configuration files exist (no `.github/workflows`, `.gitlab-ci.yml`, etc.).
-- No Docker, `netlify.toml`, `vercel.json`, or deployment scripts exist at the project root.
-- Production build is a standard Vite static output (`dist/`) with `base: './'`, suitable for any static host or subpath deployment.
 
 ---
 
@@ -245,16 +254,6 @@ If you add tests, the conventional location would be alongside source files (e.g
 
 ---
 
-## Dependencies of Note
-
-- **@xyflow/react** — React Flow canvas; its CSS must be imported (`@xyflow/react/dist/style.css`).
-- **embla-carousel-react** — Lightweight carousel for the hero banner.
-- **next-themes** — Used by the `sonner` toast component for theme-aware rendering.
-- **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
-- **zustand** — Present as a transitive dependency of `@xyflow/react` but not directly used in application code.
-
----
-
 ## Adding shadcn/ui Components
 
 This project uses the shadcn/ui "New York" style with CSS variables. To add a new component from inside `app/`:
@@ -264,7 +263,3 @@ npx shadcn add <component-name>
 ```
 
 The CLI will place it in `src/components/ui/` and follow the existing alias conventions (`@/lib/utils`, `@/components/ui`).
-
-## 补充规则
-
-Canvas 模块的 AI 编码规则见 `CANVAS_RULES.md`，请同时遵守。
