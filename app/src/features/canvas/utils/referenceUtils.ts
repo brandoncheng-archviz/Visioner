@@ -8,6 +8,7 @@ function isDefinedUsageValue(value: unknown) {
 }
 
 export function hasDefinedUsage(reference: ReferenceInfo) {
+  if (reference.role === 'undefined_usage') return true;
   if (!isDefinedUsageValue(reference.role)) return false;
   if (reference.role === 'custom_reference') {
     return isDefinedUsageValue(reference.customRoleLabel) && reference.customRoleLabel !== '自定义用途...';

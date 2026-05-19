@@ -22,6 +22,22 @@
 | Forms | react-hook-form + zod | ^7.70.0 / ^4.3.5 |
 | Charts | recharts | ^2.15.4 |
 
+Additional notable dependencies:
+
+- **@radix-ui/* ** — Headless UI primitives used by shadcn/ui components (accordion, dialog, dropdown-menu, slider, tabs, tooltip, and many more).
+- **class-variance-authority + clsx + tailwind-merge** — Utility stack for component variants and conditional class merging.
+- **sonner + next-themes** — Toast notifications with theme-aware rendering.
+- **react-resizable-panels** — Resizable panel layouts.
+- **cmdk** — Command palette / combobox primitives.
+- **date-fns + react-day-picker** — Date handling and calendar UI.
+- **vaul** — Drawer component primitives.
+- **input-otp** — OTP input component.
+
+Dev dependencies:
+
+- **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
+- **typescript-eslint + eslint-plugin-react-hooks + eslint-plugin-react-refresh** — Linting stack.
+
 ---
 
 ## Project Structure
@@ -63,7 +79,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor page entry (~768 lines, post-refactor)
+│   │   ├── CanvasPage.tsx   # Visual node editor page entry (~905 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -71,7 +87,7 @@ app/
 │   ├── App.tsx              # Root router with BrowserRouter, Routes for / and /canvas
 │   ├── main.tsx             # React root render with StrictMode
 │   └── index.css            # Global styles, Tailwind directives, ReactFlow custom CSS, CSS variables
-├── components.json          # shadcn/ui configuration
+├── components.json          # shadcn/ui configuration (style: new-york, baseColor: slate)
 ├── vite.config.ts           # Vite config: base './', port 3000, @/ -> ./src alias
 ├── tailwind.config.js       # Custom theme extending shadcn color tokens, animations
 ├── tsconfig.json            # Project references to tsconfig.app.json & tsconfig.node.json
@@ -106,7 +122,7 @@ npm run preview
 npm run lint
 ```
 
-The `vite.config.ts` sets `base: './'` so the built app can be served from any subpath.
+The `vite.config.ts` sets `base: './'` so the built app can be served from any subpath. The dev server runs on port 3000.
 
 ---
 
@@ -117,6 +133,8 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 | `/` | `Home` | Landing page with discovery content |
 | `/canvas` | `CanvasPage` | New or existing canvas editor |
 | `/canvas/:projectId` | `CanvasPage` | Canvas editor for a specific project |
+
+`App.tsx` uses `BrowserRouter` with the three routes above. There is no route-level lazy loading currently.
 
 ---
 
@@ -133,6 +151,10 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
   - Primary accent: `#00d4ff` (cyan)
   - Secondary text: `#a0a0b0`
   - Muted text: `#6a6a7a`
+- **CSS variables** (in `src/index.css`) define the shadcn/ui theme using HSL values:
+  - `--background: 240 14% 4%`
+  - `--primary: 195 100% 50%`
+  - `--radius: 0.5rem`
 - **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
 - **TypeScript**: Strict mode is enabled. `noUnusedLocals` and `noUnusedParameters` are active; unused variables will fail the build. `verbatimModuleSyntax` is also enabled, so type-only imports must use the `type` keyword (e.g., `import type { Foo } from '...'` or `import { type Foo } from '...'`).
 - **ESLint**: The project disables `@typescript-eslint/no-explicit-any` in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
@@ -143,7 +165,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~768 lines) now acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~905 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Page entry and React Flow provider wrapper

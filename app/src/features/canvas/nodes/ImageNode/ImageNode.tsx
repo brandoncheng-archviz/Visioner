@@ -15,7 +15,7 @@ import {
   IMAGE_NODE_CONTROL_HEIGHT,
   DEFAULT_MODEL_PARAMS,
 } from '../../constants/canvasConstants';
-import { getImageRoleOption, getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
 import { getStylePresetById, getPresetById } from '../../constants/presets';
 import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
@@ -86,12 +86,49 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       return 0;
     })
     .map((ref, idx) => ({ ...ref, index: idx + 1 }));
+  const referencesSignature = JSON.stringify(
+    references.map((reference) => ({
+      nodeId: reference.nodeId,
+      role: reference.role,
+      roleLabel: reference.roleLabel,
+      customRoleLabel: reference.customRoleLabel,
+      imageUrl: reference.imageUrl,
+      width: reference.width,
+      height: reference.height,
+    })),
+  );
+  const savedReferencesSignature = data.referencesSignature as string | undefined;
+
+  useEffect(() => {
+    if (savedReferencesSignature === referencesSignature) return;
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== id) return n;
+        if ((n.data.referencesSignature as string | undefined) === referencesSignature) return n;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            references,
+            referenceImages: references.map((reference) => ({
+              imageId: reference.nodeId,
+              imageUrl: reference.imageUrl,
+              usageKey: reference.role ?? 'undefined_usage',
+              usageLabel: reference.roleLabel || '未定义用途',
+              customUsageName: reference.customRoleLabel,
+            })),
+            referencesSignature,
+          },
+        };
+      }),
+    );
+  }, [id, references, referencesSignature, savedReferencesSignature, setNodes]);
 
   const selectedStyle = getStylePresetById(selectedStyleId);
   const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0;
 
   const handleGenerate = useCallback(() => {
-    const { textPrompt, imageReferences, globalStyle } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle);
+    const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references);
     const mockResult = `/images/show-cover-${Math.floor(Math.random() * 5) + 1}.jpg`;
     const nextGeneratedImages = [...generatedImages, mockResult];
     setPreviewImage(mockResult);
@@ -112,7 +149,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 finalPrompt: textPrompt,
                 textPrompt,
                 imageReferences,
+                referenceImages,
+                references,
+                promptBlocks,
+                userPrompt,
                 globalStyle,
+                presets,
                 promptContent,
                 generatedImages: nextGeneratedImages,
                 width: 1024,
@@ -122,7 +164,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           : n,
       ),
     );
-  }, [promptText, promptContent, selectedPresets, selectedStyle, generatedImages, id, setNodes]);
+  }, [promptText, promptContent, selectedPresets, selectedStyle, references, generatedImages, id, setNodes]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
@@ -252,6 +294,21 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const handleRoleChange = (nextRole: ImageRole, nextCustomRoleLabel?: string) => {
+    if (UNIQUE_USAGES.includes(nextRole)) {
+      const affectedTargetIds = allEdges.filter((edge) => edge.source === id).map((edge) => edge.target);
+      const conflictingTarget = affectedTargetIds.find((targetId) =>
+        allEdges.some((edge) => {
+          if (edge.target !== targetId || edge.source === id) return false;
+          const sourceNode = allNodes.find((node) => node.id === edge.source);
+          const effectiveRole = (edge.data?.role as ImageRole | null | undefined) ?? ((sourceNode?.data?.role as ImageRole | null | undefined) ?? null);
+          return effectiveRole === nextRole;
+        }),
+      );
+      if (conflictingTarget) {
+        showToast(`下游节点已存在【${getImageRoleLabel(nextRole, nextCustomRoleLabel)}】引用，请先在目标节点中替换或删除现有引用。`);
+        return;
+      }
+    }
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole, nextCustomRoleLabel) } } : n)));
   };
 

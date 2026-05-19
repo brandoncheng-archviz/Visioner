@@ -5,12 +5,13 @@ export type ImageRole =
   | 'atmosphere_reference'
   | 'vegetation_reference'
   | 'people_reference'
+  | 'sky_reference'
   | 'custom_reference'
+  | 'undefined_usage'
   | 'material_reference'
   | 'lighting_reference'
   | 'overall_reference'
-  | 'plant_reference'
-  | 'sky_reference';
+  | 'plant_reference';
 
 export interface PresetItem {
   id: string;
@@ -19,6 +20,7 @@ export interface PresetItem {
   category: 'realism' | 'mood' | 'environment' | 'perspective' | 'style';
   group: string;
   selectType: 'single' | 'multi';
+  presetType?: 'enhancement' | 'modifier';
   shortDescription: string;
   promptTemplate: string;
   tags: string[];

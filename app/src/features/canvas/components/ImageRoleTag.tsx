@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Building2 } from 'lucide-react';
-import { imageRoleOptions, getImageRoleOption, normalizeCustomReferenceLabel } from '../constants/imageUsages';
+import { imageRoleOptions, getImageRoleOption, validateCustomReferenceLabel } from '../constants/imageUsages';
 import { FLOATING_PANEL_BACKGROUND } from '../constants/canvasConstants';
 import type { ImageRole } from '../types/imageNode.types';
 
@@ -43,12 +43,12 @@ export function ImageRoleTag({
   }, [showCustomInput]);
 
   const submitCustomRole = () => {
-    const label = normalizeCustomReferenceLabel(customInput);
-    if (!label) {
+    const result = validateCustomReferenceLabel(customInput);
+    if (!result.ok) {
       setShowCustomInput(false);
       return;
     }
-    onChange('custom_reference', label);
+    onChange('custom_reference', result.label);
     setCustomInput('');
     setShowCustomInput(false);
     setOpen(false);

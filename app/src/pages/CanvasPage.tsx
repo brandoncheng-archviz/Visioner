@@ -116,7 +116,8 @@ function FlowCanvas() {
         const targetInputEdges = edges.filter((e) => e.target === targetId);
         const hasSameRole = targetInputEdges.some((edge) => {
           const refNode = nodes.find((n) => n.id === edge.source);
-          return refNode?.data?.role === sourceRole;
+          const effectiveRole = (edge.data?.role as ImageRole | null | undefined) ?? ((refNode?.data?.role as ImageRole | null | undefined) ?? null);
+          return effectiveRole === sourceRole;
         });
         if (hasSameRole) {
           return `该节点已存在【${getImageRoleLabel(sourceRole)}】引用，请先删除现有引用。`;

@@ -40,7 +40,7 @@ import {
   MARK_ACTION_LABELS,
   MARK_ACTION_COLORS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, imageRoleOptions, getImageRoleLabel, getImageRoleColor, normalizeCustomReferenceLabel } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, imageRoleOptions, getImageRoleLabel, getImageRoleColor, validateCustomReferenceLabel } from '../../constants/imageUsages';
 import {
   PRESET_DATA,
   PRESET_TABS,
@@ -108,6 +108,11 @@ export function ImageNodeControlPanel({
   const [pendingReference, setPendingReference] = useState<ReferenceInfo | null>(null);
   const [pendingCustomInput, setPendingCustomInput] = useState(false);
   const [pendingCustomValue, setPendingCustomValue] = useState('');
+  const [usageConflict, setUsageConflict] = useState<{
+    role: ImageRole;
+    customRoleLabel?: string;
+    conflictingRef: ReferenceInfo;
+  } | null>(null);
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
   const [editingPromptBlockId, setEditingPromptBlockId] = useState<string | null>(null);
@@ -389,15 +394,19 @@ export function ImageNodeControlPanel({
     setPendingReference(null);
     setPendingCustomInput(false);
     setPendingCustomValue('');
+    setUsageConflict(null);
   };
 
   useEffect(() => {
     const referencesById = new Map(references.map((reference) => [reference.nodeId, reference]));
     let changed = false;
-    const nextContent = promptContent.map((block) => {
+    const nextContent = promptContent.flatMap((block) => {
       if (block.type !== 'image_reference') return block;
       const reference = referencesById.get(block.sourceNodeId);
-      if (!reference) return block;
+      if (!reference) {
+        changed = true;
+        return [];
+      }
       const nextBlock = createImageReferenceBlock(reference);
       const updatedBlock = {
         ...block,
@@ -503,43 +512,62 @@ export function ImageNodeControlPanel({
     }
   }, [pendingCustomInput]);
 
+  const applyReferenceRole = (reference: ReferenceInfo, role: ImageRole, customRoleLabel?: string, insertPromptBlock = true) => {
+    const roleLabel = getImageRoleLabel(role, customRoleLabel);
+    const updatedReference = onAssignReferenceRole(reference.nodeId, role, customRoleLabel) || { ...reference, role, roleLabel, customRoleLabel };
+    onUseReference(updatedReference);
+    if (insertPromptBlock) {
+      insertReferenceBlock(updatedReference);
+    } else {
+      removePendingAtMarker();
+      closeReferenceMenus();
+    }
+    return updatedReference;
+  };
+
   const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string) => {
     if (!pendingReference) return;
     // 检查唯一用途冲突
     if (UNIQUE_USAGES.includes(role)) {
       const conflictingRef = references.find((ref) => ref.nodeId !== pendingReference.nodeId && ref.role === role);
       if (conflictingRef) {
-        showToast?.(`该节点已存在【${getImageRoleLabel(role)}】引用，请先删除现有引用或选择其他用途。`);
-        setPendingReference(null);
-        setPendingCustomInput(false);
-        setPendingCustomValue('');
+        setUsageConflict({ role, customRoleLabel, conflictingRef });
         return;
       }
     }
-    const roleLabel = getImageRoleLabel(role, customRoleLabel);
-    const updatedReference = onAssignReferenceRole(pendingReference.nodeId, role, customRoleLabel) || { ...pendingReference, role, roleLabel, customRoleLabel };
-    setPendingReference(null);
-    setPendingCustomInput(false);
-    setPendingCustomValue('');
-    onUseReference(updatedReference);
-    insertReferenceBlock(updatedReference);
+    applyReferenceRole(pendingReference, role, customRoleLabel);
+  };
+
+  const replaceConflictingReference = () => {
+    if (!pendingReference || !usageConflict) return;
+    const oldBlock = imageReferenceBlocks.find((block) => block.sourceNodeId === usageConflict.conflictingRef.nodeId);
+    onRemoveReference(usageConflict.conflictingRef.nodeId);
+    const updatedReference = applyReferenceRole(pendingReference, usageConflict.role, usageConflict.customRoleLabel, false);
+    if (!oldBlock) return;
+    const nextBlock = createImageReferenceBlock(updatedReference);
+    onPromptContentChange(
+      promptContent.map((item) =>
+        item.type === 'image_reference' && item.sourceNodeId === usageConflict.conflictingRef.nodeId
+          ? nextBlock
+          : item,
+      ),
+    );
+    setHighlightedPromptBlockId(nextBlock.id);
+    window.setTimeout(() => {
+      setHighlightedPromptBlockId((currentId) => (currentId === nextBlock.id ? null : currentId));
+    }, 900);
   };
 
   const submitPendingCustomRole = () => {
-    const label = normalizeCustomReferenceLabel(pendingCustomValue);
-    if (!label) {
-      setPendingCustomInput(false);
+    const existingCustomLabels = references
+      .filter((ref) => ref.role === 'custom_reference' && ref.nodeId !== pendingReference?.nodeId)
+      .map((ref) => ref.customRoleLabel || ref.roleLabel);
+    const result = validateCustomReferenceLabel(pendingCustomValue, existingCustomLabels);
+    if (!result.ok) {
+      showToast?.(result.message);
       return;
     }
-    // 自定义用途名称唯一性校验
-    const existingCustom = references.find(
-      (ref) => ref.role === 'custom_reference' && ref.customRoleLabel?.toLowerCase() === label.toLowerCase(),
-    );
-    if (existingCustom) {
-      showToast?.(`该自定义用途名称"${label}"已被占用，请使用其他名称。`);
-      return;
-    }
-    handleReferenceRoleSelect('custom_reference', label);
+    handleReferenceRoleSelect('custom_reference', result.label);
   };
 
   const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -854,20 +882,12 @@ export function ImageNodeControlPanel({
           <div className="relative">
             <button
               onClick={() => {
-                if (selectedPresets.length === 0) {
-                  showToast?.('请先选择预设规则，再勾选风格增强');
-                  return;
-                }
                 setShowStylePicker(true);
                 setShowPresetMenu(false);
                 setShowMarkPanel(false);
               }}
               onPointerDown={(e) => {
                 e.stopPropagation();
-                if (selectedPresets.length === 0) {
-                  showToast?.('请先选择预设规则，再勾选风格增强');
-                  return;
-                }
                 setShowStylePicker(true);
                 setShowPresetMenu(false);
                 setShowMarkPanel(false);
@@ -879,9 +899,9 @@ export function ImageNodeControlPanel({
                 padding: selectedStyle ? 0 : '4px',
                 background: selectedStyle ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)',
                 border: selectedStyle ? '1px solid rgba(167,139,250,0.7)' : FLOATING_PANEL_BORDER,
-                opacity: selectedPresets.length === 0 ? 0.45 : 1,
+                opacity: 1,
               }}
-              title={selectedPresets.length === 0 ? '请先选择预设规则，再勾选风格增强' : '选择整体视觉风格'}
+              title="选择整体视觉风格"
             >
               {selectedStyle ? (
                 <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
@@ -935,9 +955,8 @@ export function ImageNodeControlPanel({
               >
                 {ref.imageUrl && draggingRefId === null && (
                   <div
-                    className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 overflow-hidden rounded-xl group-hover/ref:block"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/ref:block"
                     style={{
-                      width: 156,
                       background: FLOATING_PANEL_BACKGROUND,
                       border: FLOATING_PANEL_BORDER,
                       boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
@@ -946,10 +965,12 @@ export function ImageNodeControlPanel({
                     <img
                       src={ref.imageUrl}
                       alt=""
-                      className="w-full object-contain"
+                      className="block rounded-t-xl"
                       style={{
+                        width: 'auto',
+                        height: 'auto',
+                        maxWidth: 220,
                         maxHeight: 200,
-                        aspectRatio: ref.width && ref.height ? `${ref.width}/${ref.height}` : '1/1',
                       }}
                     />
                     <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: 'rgba(255,255,255,0.75)' }}>
@@ -1136,18 +1157,22 @@ export function ImageNodeControlPanel({
                     </button>
                     {!isEditing && (
                       <div
-                        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden rounded-xl px-3 py-2 text-left group-hover/prompt-ref:block"
+                        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden rounded-xl text-left group-hover/prompt-ref:block"
                         style={{
-                          width: 300,
                           background: FLOATING_PANEL_BACKGROUND,
                           border: FLOATING_PANEL_BORDER,
                           boxShadow: '0 16px 34px rgba(0,0,0,0.5)',
                         }}
                       >
-                        <div>
-                          <div className="text-[12px] font-medium leading-5" style={{ color: 'rgba(255,255,255,0.78)' }}>{block.usage}</div>
-                          <div className="mt-1 max-h-28 overflow-y-auto pr-1 text-[12px] leading-5 nowheel" style={{ color: 'rgba(255,255,255,0.62)' }}>{displayPromptText}</div>
-                        </div>
+                        {previewImage && (
+                          <img
+                            src={previewImage}
+                            alt=""
+                            className="block rounded-t-xl"
+                            style={{ width: 'auto', height: 'auto', maxWidth: 240, maxHeight: 220 }}
+                          />
+                        )}
+                        <div className="px-2 py-1.5 text-center text-[12px] font-medium leading-5" style={{ color: 'rgba(255,255,255,0.78)' }}>{block.usage}</div>
                       </div>
                     )}
                   </div>
@@ -1246,6 +1271,39 @@ export function ImageNodeControlPanel({
               onWheel={(e) => e.stopPropagation()}
             >
               <div className="px-3 py-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.58)' }}>选择图片用途</div>
+              {usageConflict && (
+                <div className="mx-2 mb-1 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                  <div className="text-[12px] leading-5" style={{ color: 'rgba(255,255,255,0.72)' }}>
+                    已有一张「{getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel)}」，该用途同一目标节点最多 1 张。
+                  </div>
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={replaceConflictingReference}
+                      className="rounded-md px-2 py-1 text-[12px] font-medium transition-colors hover:bg-white/15"
+                      style={{ color: '#ffffff', background: 'rgba(255,255,255,0.10)' }}
+                    >
+                      替换
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeReferenceMenus}
+                      className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
+                      style={{ color: 'rgba(255,255,255,0.62)' }}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUsageConflict(null)}
+                      className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
+                      style={{ color: 'rgba(255,255,255,0.62)' }}
+                    >
+                      改用途
+                    </button>
+                  </div>
+                </div>
+              )}
               {imageRoleOptions.map((option) => {
                 const RoleIcon = option.Icon;
                 return (

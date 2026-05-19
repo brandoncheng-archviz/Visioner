@@ -1,5 +1,15 @@
-import { Building2, Layers, Leaf, Users, Cloud, Pencil, Palette, Sun } from 'lucide-react';
+import { Building2, Layers, Leaf, Users, Cloud, Pencil, Palette, Sun, CircleHelp } from 'lucide-react';
 import type { ImageRole, ImageRoleOption } from '../types/imageNode.types';
+
+export const SYSTEM_USAGE_LABELS = [
+  '主体建筑',
+  '氛围参考',
+  '植物参考',
+  '人物参考',
+  '天空参考',
+  '自定义用途',
+  '未定义用途',
+] as const;
 
 export const imageRoleOptions: ImageRoleOption[] = [
   {
@@ -56,6 +66,15 @@ export const imageRoleOptions: ImageRoleOption[] = [
     Icon: Pencil,
     color: '#EF4444',
   },
+  {
+    value: 'undefined_usage',
+    label: '未定义用途',
+    description: '尚未明确控制维度，按中性参考处理',
+    detail: '该图片尚未明确控制哪一类内容，AI 仅按中性的视觉参考处理，不主动覆盖主体、氛围、植物、人物或天空等具体维度。',
+    constraints: ['中性视觉参考'],
+    Icon: CircleHelp,
+    color: '#9CA3AF',
+  },
 ];
 
 export const roleColorMap: Record<ImageRole | 'null', string> = {
@@ -64,6 +83,7 @@ export const roleColorMap: Record<ImageRole | 'null', string> = {
   vegetation_reference: '#22C55E',
   people_reference: '#F97316',
   custom_reference: '#EF4444',
+  undefined_usage: '#9CA3AF',
   overall_reference: '#8B5CF6',
   plant_reference: '#22C55E',
   material_reference: '#EF4444',
@@ -97,10 +117,27 @@ export const legacyImageRoleOptions: Partial<Record<ImageRole, ImageRoleOption>>
   },
 };
 
+export function normalizeUsageNameForCompare(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 export function normalizeCustomReferenceLabel(value: string) {
-  const trimmed = value.trim();
+  const trimmed = value.trim().replace(/\s+/g, ' ');
   if (!trimmed) return '';
-  return trimmed.endsWith('参考') ? trimmed : `${trimmed}参考`;
+  return trimmed.slice(0, 24);
+}
+
+export function validateCustomReferenceLabel(value: string, existingLabels: string[] = []) {
+  const label = normalizeCustomReferenceLabel(value);
+  if (!label) return { ok: false as const, message: '自定义用途不能为空' };
+  const normalized = normalizeUsageNameForCompare(label);
+  if (SYSTEM_USAGE_LABELS.some((reserved) => normalizeUsageNameForCompare(reserved) === normalized)) {
+    return { ok: false as const, message: '不能使用系统保留用途名称' };
+  }
+  if (existingLabels.some((existing) => normalizeUsageNameForCompare(existing) === normalized)) {
+    return { ok: false as const, message: '该自定义用途名称已存在' };
+  }
+  return { ok: true as const, label };
 }
 
 export function getImageRoleOption(role: ImageRole | null | undefined, customLabel?: string) {
