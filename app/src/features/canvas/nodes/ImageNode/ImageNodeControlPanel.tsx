@@ -16,6 +16,7 @@ import {
   Mountain,
   ScanEye,
   User,
+  Pencil,
   Trash2 as TrashIcon,
 } from 'lucide-react';
 import type {
@@ -47,7 +48,7 @@ import {
   getPresetById,
   getStylePresetById,
 } from '../../constants/presets';
-import { createImageReferenceBlock } from '../../utils/promptUtils';
+import { createImageReferenceBlock, stripReferencePromptMetadata } from '../../utils/promptUtils';
 import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUtils';
 import { StylePickerModal } from '../../components/StylePickerModal';
 
@@ -109,6 +110,8 @@ export function ImageNodeControlPanel({
   const [pendingCustomValue, setPendingCustomValue] = useState('');
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
+  const [editingPromptBlockId, setEditingPromptBlockId] = useState<string | null>(null);
+  const [editingPromptText, setEditingPromptText] = useState('');
   const [markName, setMarkName] = useState('');
   const [markAction, setMarkAction] = useState<MarkAction>('enhance');
   const [markDesc, setMarkDesc] = useState('');
@@ -396,7 +399,12 @@ export function ImageNodeControlPanel({
       const reference = referencesById.get(block.sourceNodeId);
       if (!reference) return block;
       const nextBlock = createImageReferenceBlock(reference);
-      const updatedBlock = { ...block, usage: nextBlock.usage, thumbnailUrl: nextBlock.thumbnailUrl, promptText: nextBlock.promptText };
+      const updatedBlock = {
+        ...block,
+        usage: nextBlock.usage,
+        thumbnailUrl: nextBlock.thumbnailUrl,
+        promptText: stripReferencePromptMetadata(block.promptText || nextBlock.promptText),
+      };
       if (updatedBlock.usage !== block.usage || updatedBlock.thumbnailUrl !== block.thumbnailUrl || updatedBlock.promptText !== block.promptText) {
         changed = true;
       }
@@ -446,6 +454,37 @@ export function ImageNodeControlPanel({
     removePendingAtMarker();
     closeReferenceMenus();
     requestAnimationFrame(() => promptInputRef.current?.focus());
+  };
+
+  const removePromptReferenceBlock = (blockId: string) => {
+    onPromptContentChange(promptContent.filter((item) => item.type === 'text' || item.id !== blockId));
+    if (editingPromptBlockId === blockId) {
+      setEditingPromptBlockId(null);
+      setEditingPromptText('');
+    }
+  };
+
+  const startEditPromptReferenceBlock = (block: ImageReferencePromptBlock) => {
+    setEditingPromptBlockId(block.id);
+    setEditingPromptText(stripReferencePromptMetadata(block.promptText));
+  };
+
+  const savePromptReferenceBlock = (blockId: string) => {
+    const nextPromptText = stripReferencePromptMetadata(editingPromptText);
+    onPromptContentChange(
+      promptContent.map((item) =>
+        item.type === 'image_reference' && item.id === blockId
+          ? { ...item, promptText: nextPromptText }
+          : item,
+      ),
+    );
+    setEditingPromptBlockId(null);
+    setEditingPromptText('');
+  };
+
+  const cancelEditPromptReferenceBlock = () => {
+    setEditingPromptBlockId(null);
+    setEditingPromptText('');
   };
 
   const requestReferenceInsert = (reference: ReferenceInfo) => {
@@ -981,6 +1020,8 @@ export function ImageNodeControlPanel({
                 const highlighted = highlightedPromptBlockId === block.id;
                 const hovered = hoveredPromptBlockId === block.id;
                 const usageColor = getImageRoleColor(reference?.role ?? null);
+                const isEditing = editingPromptBlockId === block.id;
+                const displayPromptText = stripReferencePromptMetadata(block.promptText);
 
                 return (
                   <div
@@ -994,7 +1035,7 @@ export function ImageNodeControlPanel({
                     }}
                     onMouseEnter={() => setHoveredPromptBlockId(block.id)}
                     onMouseLeave={() => setHoveredPromptBlockId((currentId) => (currentId === block.id ? null : currentId))}
-                    className="group/prompt-ref relative inline-flex max-w-full items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[12px] transition-all"
+                    className={`group/prompt-ref relative inline-flex max-w-full items-center rounded-lg border px-1.5 py-1 text-[12px] transition-all ${isEditing ? 'w-full flex-wrap gap-1.5' : 'gap-1.5'}`}
                     style={{
                       background: hovered || highlighted ? 'rgba(255,255,255,0.052)' : 'rgba(255,255,255,0.035)',
                       borderColor: highlighted ? `${usageColor}66` : hovered ? `${usageColor}52` : 'rgba(255,255,255,0.10)',
@@ -1025,40 +1066,87 @@ export function ImageNodeControlPanel({
                     >
                       {block.usage}
                     </span>
-                    <span className="min-w-0 truncate" style={{ maxWidth: 360, color: 'rgba(255,255,255,0.62)' }}>{block.promptText}</span>
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          value={editingPromptText}
+                          onChange={(event) => setEditingPromptText(event.target.value)}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          className="basis-full resize-none rounded-md px-2 py-1.5 text-[12px] leading-5 outline-none nowheel"
+                          style={{
+                            minHeight: 74,
+                            background: 'rgba(255,255,255,0.07)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            color: 'rgba(255,255,255,0.86)',
+                          }}
+                        />
+                        <div className="flex basis-full justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              cancelEditPromptReferenceBlock();
+                            }}
+                            className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
+                            style={{ color: 'rgba(255,255,255,0.58)' }}
+                          >
+                            取消
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              savePromptReferenceBlock(block.id);
+                            }}
+                            className="rounded-md px-2 py-1 text-[12px] font-medium transition-colors hover:brightness-110"
+                            style={{ background: 'rgba(0,212,255,0.16)', color: '#ffffff', border: '1px solid rgba(0,212,255,0.35)' }}
+                          >
+                            保存
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="min-w-0 truncate" style={{ maxWidth: 360, color: 'rgba(255,255,255,0.62)' }}>{displayPromptText}</span>
+                    )}
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          startEditPromptReferenceBlock(block);
+                        }}
+                        className="ml-0.5 hidden h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 group-hover/prompt-ref:flex"
+                        style={{ color: 'rgba(255,255,255,0.58)' }}
+                        title="编辑图片引用提示词"
+                      >
+                        <Pencil className="h-2.5 w-2.5" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
-                        onPromptContentChange(promptContent.filter((item) => item.type === 'text' || item.id !== block.id));
+                        removePromptReferenceBlock(block.id);
                       }}
-                      className="ml-0.5 hidden h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 group-hover/prompt-ref:flex"
+                      className={`ml-0.5 h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 ${isEditing ? 'hidden' : 'hidden group-hover/prompt-ref:flex'}`}
                       style={{ color: 'rgba(255,255,255,0.58)' }}
                       title="删除图片引用"
                     >
                       <X className="h-2.5 w-2.5" />
                     </button>
-                    {previewImage && (
+                    {!isEditing && (
                       <div
-                        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden overflow-hidden rounded-xl group-hover/prompt-ref:block"
+                        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden rounded-xl px-3 py-2 text-left group-hover/prompt-ref:block"
                         style={{
-                          width: 188,
+                          width: 300,
                           background: FLOATING_PANEL_BACKGROUND,
                           border: FLOATING_PANEL_BORDER,
                           boxShadow: '0 16px 34px rgba(0,0,0,0.5)',
                         }}
                       >
-                        <img
-                          src={previewImage}
-                          alt=""
-                          className="block w-full object-cover"
-                          style={{
-                            height: 220,
-                            aspectRatio: reference?.width && reference?.height ? `${reference.width}/${reference.height}` : '1/1',
-                          }}
-                        />
-                        <div className="px-2 py-1.5 text-center">
-                          <div className="text-[12px] font-medium leading-5" style={{ color: 'rgba(255,255,255,0.75)' }}>{block.usage}</div>
+                        <div>
+                          <div className="text-[12px] font-medium leading-5" style={{ color: 'rgba(255,255,255,0.78)' }}>{block.usage}</div>
+                          <div className="mt-1 max-h-28 overflow-y-auto pr-1 text-[12px] leading-5 nowheel" style={{ color: 'rgba(255,255,255,0.62)' }}>{displayPromptText}</div>
                         </div>
                       </div>
                     )}
