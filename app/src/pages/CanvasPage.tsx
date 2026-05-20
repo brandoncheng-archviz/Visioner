@@ -8,6 +8,7 @@ import {
   type Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
 import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
@@ -23,11 +24,12 @@ import { CanvasToolbar } from '../features/canvas/components/CanvasToolbar';
 /* ─── Flow Inner ─── */
 
 function FlowCanvas() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId?: string }>();
   const projectName = useMemo(() => {
-    if (!projectId || projectId === 'new') return '未命名项目';
-    return recentProjects.find((p) => p.id === projectId)?.name || '未命名项目';
-  }, [projectId]);
+    if (!projectId || projectId === 'new') return t('canvas.unnamedProject');
+    return recentProjects.find((p) => p.id === projectId)?.name || t('canvas.unnamedProject');
+  }, [projectId, t]);
 
   const defaultData = useMemo(() => {
     if (!projectId || projectId === 'new') return getProjectCanvasData('new');
@@ -93,21 +95,21 @@ function FlowCanvas() {
     };
 
     const validateTarget = (targetId: string | null | undefined, inputHandle: Element | null | undefined): string | null => {
-      if (!targetId) return '未找到目标节点';
-      if (targetId === nodeId) return '不能将节点连接到自身';
+      if (!targetId) return t('error.targetNotFound');
+      if (targetId === nodeId) return t('error.selfConnect');
 
       const effectiveInputHandle = inputHandle ?? document.querySelector(`.react-flow__node[data-id="${targetId}"] .image-node-handle.input-port`);
       const targetPortType = effectiveInputHandle?.getAttribute('data-port-type');
-      if (targetPortType !== 'input') return '只能从输出端口连接到输入端口';
+      if (targetPortType !== 'input') return t('error.wrongPortDirection');
 
       const sourceDataType = (document.querySelector(`.react-flow__node[data-id="${nodeId}"] .output-port`) as HTMLElement | null)?.getAttribute('data-data-type');
       const targetDataType = (effectiveInputHandle as HTMLElement | null)?.getAttribute('data-data-type');
-      if (sourceDataType !== targetDataType) return '只能连接相同类型的端口';
+      if (sourceDataType !== targetDataType) return t('error.portTypeMismatch');
 
-      if (wouldCreateCycle(nodeId, targetId, edges)) return '连接会形成环路';
+      if (wouldCreateCycle(nodeId, targetId, edges)) return t('error.cycleDetected');
 
       const alreadyConnected = edges.some((e) => e.source === nodeId && e.target === targetId);
-      if (alreadyConnected) return '两个节点之间已存在连接';
+      if (alreadyConnected) return t('error.alreadyConnected');
 
       // 唯一用途检查
       const sourceNode = nodes.find((n) => n.id === nodeId);
@@ -120,7 +122,7 @@ function FlowCanvas() {
           return effectiveRole === sourceRole;
         });
         if (hasSameRole) {
-          return `该节点已存在【${getImageRoleLabel(sourceRole)}】引用，请先删除现有引用。`;
+          return t('reference.usageConflict', { role: getImageRoleLabel(sourceRole) });
         }
       }
 
@@ -147,7 +149,7 @@ function FlowCanvas() {
         const error = validateTarget(targetId, null);
         if (error) {
           nodeEl.classList.add('cannot-connect');
-          setRejectTooltip({ x: e.clientX, y: e.clientY, message: '无法连接' });
+          setRejectTooltip({ x: e.clientX, y: e.clientY, message: t('canvas.cannotConnect') });
         } else {
           nodeEl.classList.add('can-connect');
           setRejectTooltip(null);
@@ -173,7 +175,7 @@ function FlowCanvas() {
 
       // ─── Connection validation ───
       const fail = () => {
-        setRejectTooltip({ x: e.clientX, y: e.clientY, message: '无法连接' });
+        setRejectTooltip({ x: e.clientX, y: e.clientY, message: t('canvas.cannotConnect') });
         setTimeout(() => setRejectTooltip((prev) => (prev ? null : prev)), 500);
         setTempLine(null);
       };
@@ -572,13 +574,13 @@ function FlowCanvas() {
     (type: string, pos?: { x: number; y: number }, customLabel?: string) => {
       const position = pos || { x: 400 + Math.random() * 100, y: 200 + Math.random() * 100 };
       const labels: Record<string, string> = {
-        text: '文本节点',
-        image: '图片生成',
-        upscale: '高清放大',
-        video: '视频生成',
-        audio: '音频节点',
-        script: '脚本节点',
-        'video-merge': '视频合成',
+        text: t('canvas.nodeLabels.text'),
+        image: t('canvas.nodeLabels.image'),
+        upscale: t('canvas.nodeLabels.upscale'),
+        video: t('canvas.nodeLabels.video'),
+        audio: t('canvas.nodeLabels.audio'),
+        script: t('canvas.nodeLabels.script'),
+        'video-merge': t('canvas.nodeLabels.video-merge'),
       };
       const newNode: Node = {
         id: `${type}-${Date.now()}`,
@@ -598,7 +600,7 @@ function FlowCanvas() {
       if (imageFiles.length === 0) return;
 
       const basePos = screenToFlowPosition({ x: screenX, y: screenY });
-      setUploadToast({ msg: '上传中...', type: 'loading' });
+      setUploadToast({ msg: t('canvas.uploading'), type: 'loading' });
 
       Promise.all(
         imageFiles.map((file, index) => {
@@ -632,7 +634,7 @@ function FlowCanvas() {
           });
         }),
       ).then(() => {
-        setUploadToast({ msg: '上传并成功创建节点', type: 'success' });
+        setUploadToast({ msg: t('canvas.uploadSuccess'), type: 'success' });
         setTimeout(() => setUploadToast(null), 2500);
       });
     },
@@ -743,7 +745,7 @@ function FlowCanvas() {
       id: newNodeId,
       type,
       position: createMenu.flowPos,
-      data: { label: type === 'image' ? '图片节点' : '高清放大', ...(type === 'image' ? getRoleData(null) : {}) },
+      data: { label: type === 'image' ? t('canvas.nodeLabels.image') : t('canvas.nodeLabels.upscale'), ...(type === 'image' ? getRoleData(null) : {}) },
     };
     setNodes((nds) => [...nds, newNode]);
     setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId }]);

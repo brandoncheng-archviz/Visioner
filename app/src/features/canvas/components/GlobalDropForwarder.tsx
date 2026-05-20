@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function GlobalDropForwarder() {
+  const { t } = useTranslation();
   useEffect(() => {
     const browserWindow = typeof window !== 'undefined'
       ? window as typeof window & { __visionerFullscreenDropForwarder?: boolean }
@@ -15,7 +17,7 @@ export function GlobalDropForwarder() {
       if (!hint) {
         hint = document.createElement('div');
         hint.id = 'visioner-fullscreen-drop-hint';
-        hint.textContent = '拖放图片或视频以上传';
+        hint.textContent = t('canvas.dragImageHere');
         Object.assign(hint.style, {
           position: 'fixed',
           inset: '0',
@@ -33,7 +35,7 @@ export function GlobalDropForwarder() {
           pointerEvents: 'none',
         });
         const text = document.createElement('div');
-        text.textContent = '拖放图片或视频以上传';
+        text.textContent = t('canvas.dragImageHere');
         Object.assign(text.style, {
           padding: '18px 28px',
           borderRadius: '14px',

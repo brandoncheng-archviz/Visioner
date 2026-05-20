@@ -12,6 +12,7 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
 import { AudioNode } from '../nodes/AudioNode';
@@ -78,6 +79,7 @@ export function CanvasStage({
   onDragOverCapture,
   onDropCapture,
 }: CanvasStageProps) {
+  const { t } = useTranslation();
   const { getViewport, setViewport } = useReactFlow();
 
   const handleWheel = useCallback(
@@ -133,7 +135,7 @@ export function CanvasStage({
             className="px-6 py-4 rounded-2xl text-sm font-medium"
             style={{ background: '#252526', border: '1px solid #2a2a35', color: '#fff' }}
           >
-            拖放图片或视频以上传
+            {t('canvas.dragImageHere')}
           </div>
         </div>
       )}

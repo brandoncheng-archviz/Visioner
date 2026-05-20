@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MoreHorizontal, FolderOpen, Copy, Trash2 } from 'lucide-react';
 import { recentProjects } from '../data/siteData';
 
 export default function RecentProjects() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [hoveredProject, setHoveredProject] = useState<string | null>(null);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -12,9 +14,9 @@ export default function RecentProjects() {
     <section className="px-4 md:px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">最近项目</h2>
+        <h2 className="text-lg font-semibold text-white">{t('recentProjects.recentProjects')}</h2>
         <button className="text-sm text-[#00d4ff] hover:brightness-110 transition-all flex items-center gap-0.5">
-          全部项目
+          {t('recentProjects.allProjects')}
           <span className="text-xs">&gt;</span>
         </button>
       </div>
@@ -57,7 +59,7 @@ export default function RecentProjects() {
                     color: hoveredProject === project.id ? '#00d4ff' : '#6a6a7a',
                   }}
                 >
-                  {project.name}
+                  {t('recentProjects.createNewProject')}
                 </span>
               </div>
             ) : (
@@ -109,19 +111,19 @@ export default function RecentProjects() {
                       >
                         <button className="w-full px-3 py-1.5 text-left text-xs text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
                           <FolderOpen className="w-3.5 h-3.5 text-[#e0e0e0]" />
-                          打开
+                          {t('common.open')}
                         </button>
                         <button className="w-full px-3 py-1.5 text-left text-xs text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
                           <Copy className="w-3.5 h-3.5 text-[#e0e0e0]" />
-                          重命名
+                          {t('common.rename')}
                         </button>
                         <button className="w-full px-3 py-1.5 text-left text-xs text-[#a0a0b0] hover:bg-[#1e1e28] hover:text-white transition-colors flex items-center gap-2">
                           <Copy className="w-3.5 h-3.5 text-[#e0e0e0]" />
-                          创建副本
+                          {t('common.createCopy')}
                         </button>
                         <button className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-[#1e1e28] hover:text-red-300 transition-colors flex items-center gap-2">
                           <Trash2 className="w-3.5 h-3.5 text-[#e0e0e0]" />
-                          删除项目
+                          {t('recentProjects.deleteProject')}
                         </button>
                       </div>
                     )}

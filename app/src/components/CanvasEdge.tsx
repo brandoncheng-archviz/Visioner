@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BaseEdge,
   useReactFlow,
@@ -13,6 +14,7 @@ export default function CanvasEdge({
   targetY,
   selected,
 }: EdgeProps) {
+  const { t } = useTranslation();
   const { setEdges } = useReactFlow();
   const [hovered, setHovered] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -77,7 +79,7 @@ export default function CanvasEdge({
             onClick={handleDisconnect}
             className="w-full px-3 py-2 text-left text-[13px] text-[#ef4444] hover:bg-[rgba(239,68,68,0.1)] transition-colors"
           >
-            断开连接
+            {t('canvasEdge.disconnect')}
           </button>
         </div>
       )}

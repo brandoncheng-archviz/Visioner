@@ -1,4 +1,5 @@
 import { memo, useState, useCallback, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Zap, ArrowUp } from 'lucide-react';
 import type { UpscaleSliderProps } from '../types/canvas.types';
 
@@ -43,17 +44,18 @@ const UpscaleSlider = memo(function UpscaleSlider({ value, min, max, onChange }:
 });
 
 export function UpscaleParamPanel() {
+  const { t } = useTranslation();
   const [engine, setEngine] = useState<'topazlabs' | 'magnific-creative' | 'magnific-precision'>('magnific-precision');
   const [showEngineMenu, setShowEngineMenu] = useState(false);
 
   // Topazlabs params
-  const [tlModel, setTlModel] = useState('通用');
+  const [tlModel, setTlModel] = useState('general');
   const [tlScale, setTlScale] = useState<2 | 4 | 6>(4);
   const [showTlModelMenu, setShowTlModelMenu] = useState(false);
 
   // Magnific Creative params
   const [mcUpscale, setMcUpscale] = useState<'2x' | '4x'>('2x');
-  const [mcOptimized, setMcOptimized] = useState('标准');
+  const [mcOptimized, setMcOptimized] = useState('standard');
   const [mcCreativity, setMcCreativity] = useState(0);
   const [mcDetail, setMcDetail] = useState(0);
   const [mcSimilarity, setMcSimilarity] = useState(0);
@@ -74,8 +76,8 @@ export function UpscaleParamPanel() {
     { key: 'topazlabs' as const, label: 'Topazlabs' },
   ];
 
-  const tlModels = ['通用', '低分辨率', '3D动画', '高保真', '文本优化'];
-  const mcOptimizedOptions = ['标准', '柔和人像', '硬朗人像', '艺术与插画', '游戏资产', '自然与风景', '电影与摄影', '3D渲染'];
+  const tlModels = ['general', 'lowRes', 'animation3d', 'highFidelity', 'textOpt'];
+  const mcOptimizedOptions = ['standard', 'softPortrait', 'hardPortrait', 'artIllustration', 'gameAsset', 'natureLandscape', 'filmPhoto', 'render3d'];
 
   const closeAllMenus = () => {
     setShowEngineMenu(false);
@@ -89,13 +91,13 @@ export function UpscaleParamPanel() {
     <div className="mt-3 rounded-[16px] nowheel nodrag" style={{ width: 320, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }} onWheel={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       {/* Title */}
       <div className="px-4 pt-3 pb-2">
-        <div className="text-sm font-medium text-white">高清放大</div>
+        <div className="text-sm font-medium text-white">{t('upscale.title')}</div>
       </div>
 
       <div className="px-4 pb-3 space-y-2.5">
         {/* Engine selector */}
         <div className="relative">
-          <div className="text-[11px] text-[#6a6a7a] mb-1">引擎</div>
+          <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.engine')}</div>
           <button
             onClick={() => { closeAllMenus(); setShowEngineMenu(!showEngineMenu); }}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
@@ -120,27 +122,27 @@ export function UpscaleParamPanel() {
         {engine === 'topazlabs' && (
           <>
             <div className="relative">
-              <div className="text-[11px] text-[#6a6a7a] mb-1">模型</div>
+              <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.model')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowTlModelMenu(!showTlModelMenu); }}
                 className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                {tlModel}
+                {t(`upscale.tlModels.${tlModel}`)}
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showTlModelMenu && (
                 <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
                   {tlModels.map((m) => (
                     <button key={m} onClick={() => { setTlModel(m); setShowTlModelMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors ${tlModel === m ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
-                      {m}
+                      {t(`upscale.tlModels.${m}`)}
                     </button>
                   ))}
                 </div>
               )}
             </div>
             <div>
-              <div className="text-[11px] text-[#6a6a7a] mb-1.5">放大倍数</div>
+              <div className="text-[11px] text-[#6a6a7a] mb-1.5">{t('upscale.upscaleFactor')}</div>
               <div className="flex gap-2">
                 {[2, 4, 6].map((s) => (
                   <button
@@ -161,7 +163,7 @@ export function UpscaleParamPanel() {
         {engine === 'magnific-creative' && (
           <>
             <div className="relative">
-              <div className="text-[11px] text-[#6a6a7a] mb-1">放大倍数</div>
+              <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.upscaleFactor')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowMcUpscaleMenu(!showMcUpscaleMenu); }}
                 className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
@@ -182,13 +184,13 @@ export function UpscaleParamPanel() {
               )}
             </div>
             <div className="relative">
-              <div className="text-[11px] text-[#6a6a7a] mb-1">优化场景</div>
+              <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.optimizeScene')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowMcOptimizedMenu(!showMcOptimizedMenu); }}
                 className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                {mcOptimized}
+                {t(`upscale.mcOptimized.${mcOptimized}`)}
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showMcOptimizedMenu && (
@@ -196,26 +198,26 @@ export function UpscaleParamPanel() {
                   {mcOptimizedOptions.map((o) => (
                     <button key={o} onClick={() => { setMcOptimized(o); setShowMcOptimizedMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${mcOptimized === o ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                       {mcOptimized === o && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
-                      {o}
+                      {t(`upscale.mcOptimized.${o}`)}
                     </button>
                   ))}
                 </div>
               )}
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">创造力</span>
+              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.creativity')}</span>
               <UpscaleSlider value={mcCreativity} min={0} max={100} onChange={setMcCreativity} />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">细节强度</span>
+              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.detailStrength')}</span>
               <UpscaleSlider value={mcDetail} min={0} max={100} onChange={setMcDetail} />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">相似度</span>
+              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.similarity')}</span>
               <UpscaleSlider value={mcSimilarity} min={0} max={100} onChange={setMcSimilarity} />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">提示词强度</span>
+              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.promptStrength')}</span>
               <UpscaleSlider value={mcPromptStr} min={0} max={100} onChange={setMcPromptStr} />
             </div>
           </>
@@ -225,7 +227,7 @@ export function UpscaleParamPanel() {
         {engine === 'magnific-precision' && (
           <>
             <div className="relative">
-              <div className="text-[11px] text-[#6a6a7a] mb-1">放大倍数</div>
+              <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.upscaleFactor')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowMpUpscaleMenu(!showMpUpscaleMenu); }}
                 className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
@@ -246,15 +248,15 @@ export function UpscaleParamPanel() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">锐化</span>
+              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.sharpen')}</span>
               <UpscaleSlider value={mpSharpen} min={0} max={100} onChange={setMpSharpen} />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">智能颗粒</span>
+              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.smartGrain')}</span>
               <UpscaleSlider value={mpGrain} min={0} max={100} onChange={setMpGrain} />
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">超细节</span>
+              <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.ultraDetail')}</span>
               <UpscaleSlider value={mpUltra} min={0} max={100} onChange={setMpUltra} />
             </div>
           </>
@@ -270,7 +272,7 @@ export function UpscaleParamPanel() {
         <button
           className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/20"
           style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.9)' }}
-          title="生成"
+          title={t('common.generate')}
         >
           <ArrowUp className="w-4 h-4 text-black" />
         </button>

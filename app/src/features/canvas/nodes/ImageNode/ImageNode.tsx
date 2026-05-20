@@ -2,9 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Image, Plus, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
 import type { ImageRole, PromptContent, ReferenceInfo } from '../../types/imageNode.types';
 import type { MarkItem, ModelParams } from '../../types/canvas.types';
+import type { GenerationTask } from '../../types/generation.types';
+import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
 import {
   IMAGE_NODE_PREVIEW_WIDTH,
   IMAGE_NODE_EMPTY_HEIGHT,
@@ -25,6 +28,7 @@ import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
 
 export function ImageNode({ data, selected, id }: NodeProps) {
+  const { t } = useTranslation();
   const { show: showToast } = useToast();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
@@ -51,6 +55,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<string[]>((data.generatedImages as string[]) || []);
+  const [generationTask, setGenerationTask] = useState<GenerationTask | null>((data.generationTask as GenerationTask | undefined) || null);
 
   /* ─── Reference tracking ─── */
   const allEdges = useStore((state) => state.edges);
@@ -114,7 +119,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               imageId: reference.nodeId,
               imageUrl: reference.imageUrl,
               usageKey: reference.role ?? 'undefined_usage',
-              usageLabel: reference.roleLabel || '未定义用途',
+              usageLabel: reference.roleLabel || t('imageNode.undefinedUsage'),
               customUsageName: reference.customRoleLabel,
             })),
             referencesSignature,
@@ -125,46 +130,107 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [id, references, referencesSignature, savedReferencesSignature, setNodes]);
 
   const selectedStyle = getStylePresetById(selectedStyleId);
-  const canGenerate = references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0;
+  const isGenerating = generationTask?.status === 'running';
+  const canGenerate = !isGenerating && (references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0);
 
-  const handleGenerate = useCallback(() => {
+  const handleGenerate = useCallback(async () => {
     const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references);
-    const mockResult = `/images/show-cover-${Math.floor(Math.random() * 5) + 1}.jpg`;
-    const nextGeneratedImages = [...generatedImages, mockResult];
-    setPreviewImage(mockResult);
-    setGeneratedImages(nextGeneratedImages);
-    const resultImage = new window.Image();
-    resultImage.onload = () => {
-      setImgSize({ width: resultImage.width, height: resultImage.height });
-    };
-    resultImage.src = mockResult;
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                image: mockResult,
-                finalPrompt: textPrompt,
-                textPrompt,
-                imageReferences,
-                referenceImages,
-                references,
-                promptBlocks,
-                userPrompt,
-                globalStyle,
-                presets,
-                promptContent,
-                generatedImages: nextGeneratedImages,
-                width: 1024,
-                height: 1024,
-              },
-            }
-          : n,
-      ),
-    );
-  }, [promptText, promptContent, selectedPresets, selectedStyle, references, generatedImages, id, setNodes]);
+
+    const task = createGenerationTask({
+      sourceNodeId: id,
+      prompt: textPrompt,
+      inputRefs: referenceImages.map((ref) => ({
+        imageId: ref.imageId,
+        imageUrl: ref.imageUrl,
+        usageKey: ref.usageKey,
+        usageLabel: ref.usageLabel,
+        customUsageName: ref.customUsageName,
+        promptText: ref.promptText,
+      })),
+      modelParams: {
+        model: modelParams.model,
+        ratio: modelParams.ratio,
+        resolution: modelParams.resolution,
+      },
+    });
+    setGenerationTask(task);
+
+    try {
+      const result = await simulateGeneration(
+        {
+          sourceNodeId: id,
+          prompt: textPrompt,
+          inputRefs: task.inputRefs,
+          modelParams: {
+            model: modelParams.model,
+            ratio: modelParams.ratio,
+            resolution: modelParams.resolution,
+          },
+        },
+        {
+          onProgress: (progress) => {
+            setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress, updatedAt: Date.now() } : prev));
+          },
+        },
+      );
+
+      const nextGeneratedImages = [...generatedImages, result.imageUrl];
+      setPreviewImage(result.imageUrl);
+      setGeneratedImages(nextGeneratedImages);
+
+      const resultImage = new window.Image();
+      resultImage.onload = () => {
+        setImgSize({ width: resultImage.width, height: resultImage.height });
+      };
+      resultImage.src = result.imageUrl;
+
+      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'success', progress: 100, result, updatedAt: Date.now() } : prev));
+
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  image: result.imageUrl,
+                  finalPrompt: textPrompt,
+                  textPrompt,
+                  imageReferences,
+                  referenceImages,
+                  references,
+                  promptBlocks,
+                  userPrompt,
+                  globalStyle,
+                  presets,
+                  promptContent,
+                  generatedImages: nextGeneratedImages,
+                  generationTask: { ...task, status: 'success', progress: 100, result, updatedAt: Date.now() },
+                  width: result.width,
+                  height: result.height,
+                },
+              }
+            : n,
+        ),
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '生成失败';
+      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'failed', errorMessage, updatedAt: Date.now() } : prev));
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  generationTask: { ...task, status: 'failed', errorMessage, updatedAt: Date.now() },
+                },
+              }
+            : n,
+        ),
+      );
+    }
+  }, [promptText, promptContent, selectedPresets, selectedStyle, references, generatedImages, id, setNodes, modelParams]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
@@ -305,7 +371,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         }),
       );
       if (conflictingTarget) {
-        showToast(`下游节点已存在【${getImageRoleLabel(nextRole, nextCustomRoleLabel)}】引用，请先在目标节点中替换或删除现有引用。`);
+        showToast(t('reference.downstreamConflict', { role: getImageRoleLabel(nextRole, nextCustomRoleLabel) }));
         return;
       }
     }
@@ -380,12 +446,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 }}
                 className="flex-shrink-0 cursor-pointer select-none transition-all hover:brightness-125"
                 style={{ color: getImageRoleColor(role), fontSize: 11 }}
-                title="点击设置图片用途"
+                title={t('imageNode.setImagePurpose')}
               >
                 {RoleIconForTitle && (
                   <RoleIconForTitle className="inline-block" style={{ width: 11, height: 11, marginRight: 3, verticalAlign: '-0.1em' }} />
                 )}
-                {roleOption?.label || '未定义用途'}
+                {roleOption?.label || t('imageNode.undefinedUsage')}
               </span>
             )}
             {editingName ? (
@@ -573,6 +639,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
               canGenerate={canGenerate}
+              isGenerating={isGenerating}
+              generationTask={generationTask}
               references={references}
               onRemoveReference={handleRemoveReference}
               onReorderReferences={handleReorderReferences}

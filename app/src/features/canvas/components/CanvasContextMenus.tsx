@@ -1,5 +1,5 @@
 import { Image, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
-
+import { useTranslation } from 'react-i18next';
 
 /* ─── Canvas Context Menu (right-click on empty canvas) ─── */
 
@@ -18,10 +18,11 @@ export interface CanvasContextMenuProps {
 
 export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: CanvasContextMenuProps) {
   if (!menu) return null;
+  const { t } = useTranslation();
 
   const items = [
-    { type: 'image', label: '图片节点', icon: Image, color: '#22d3ee' },
-    { type: 'upscale', label: '高清放大', icon: Image, color: '#a855f7' },
+    { type: 'image', label: t('canvas.addImageNode'), icon: Image, color: '#22d3ee' },
+    { type: 'upscale', label: t('canvas.addUpscaleNode'), icon: Image, color: '#a855f7' },
   ];
 
   return (
@@ -41,7 +42,7 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
           onReopen(e.clientX, e.clientY);
         }}
       >
-        <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">添加节点</div>
+        <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
         {items.map((item, index) => (
           <button
             key={`${item.type}-${index}`}
@@ -75,6 +76,7 @@ export interface CreateNodeMenuProps {
 
 export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNodeMenuProps) {
   if (!menu) return null;
+  const { t } = useTranslation();
 
   return (
     <>
@@ -89,18 +91,18 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
           minWidth: 200,
         }}
       >
-        <div className="px-4 py-2 text-[13px] text-[#6a6a7a] uppercase tracking-wider">创建节点并连接</div>
+        <div className="px-4 py-2 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.createNodeAndConnect')}</div>
         <button
           onClick={() => onCreateAndConnect('image')}
           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Image className="w-4 h-4" style={{ color: '#22d3ee' }} /> 图片节点
+          <Image className="w-4 h-4" style={{ color: '#22d3ee' }} /> {t('canvas.createMenuImageNode')}
         </button>
         <button
           onClick={() => onCreateAndConnect('upscale')}
           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Image className="w-4 h-4" style={{ color: '#a855f7' }} /> 高清放大
+          <Image className="w-4 h-4" style={{ color: '#a855f7' }} /> {t('canvas.createMenuUpscaleNode')}
         </button>
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
@@ -136,6 +138,7 @@ export function NodeContextMenu({
   onCopy,
 }: NodeContextMenuProps) {
   if (!menu) return null;
+  const { t } = useTranslation();
 
   return (
     <>
@@ -158,48 +161,48 @@ export function NodeContextMenu({
           onClick={onClose}
           className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Download className="w-3.5 h-3.5" /> 保存到素材库
+          <Download className="w-3.5 h-3.5" /> {t('contextMenu.saveToLibrary')}
         </button>
         <button
           onClick={() => { onDuplicate(menu.nodeId); onClose(); }}
           className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <span className="flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> 复制</span>
+          <span className="flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> {t('common.copy')}</span>
           <span className="text-[11px] text-[#6a6a7a]">Ctrl+C</span>
         </button>
         <button
           onClick={() => { onPaste(); onClose(); }}
           className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <span className="flex items-center gap-2"><ClipboardPaste className="w-3.5 h-3.5" /> 粘贴</span>
+          <span className="flex items-center gap-2"><ClipboardPaste className="w-3.5 h-3.5" /> {t('common.paste')}</span>
           <span className="text-[11px] text-[#6a6a7a]">Ctrl+V</span>
         </button>
         <button
           onClick={() => { onDuplicate(menu.nodeId); onClose(); }}
           className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Copy className="w-3.5 h-3.5" /> 副本
+          <Copy className="w-3.5 h-3.5" /> {t('common.duplicate')}
         </button>
         <div className="mx-3 my-1 h-px bg-white/5" />
         <button
           onClick={() => { onDelete(menu.nodeId); onClose(); }}
           className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#ef4444] hover:bg-[rgba(239,68,68,0.1)] transition-colors"
         >
-          <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> 删除</span>
-          <span className="text-[11px] text-[#6a6a7a]">⌫,del</span>
+          <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> {t('common.delete')}</span>
+          <span className="text-[11px] text-[#6a6a7a]">{t('contextMenu.deleteShortcut')}</span>
         </button>
         <div className="mx-3 my-1 h-px bg-white/5" />
         <button
           onClick={() => { onCopy(); onClose(); }}
           className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Copy className="w-3.5 h-3.5" /> 复制到剪贴板
+          <Copy className="w-3.5 h-3.5" /> {t('contextMenu.copyToClipboard')}
         </button>
         <button
           onClick={onClose}
           className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Bug className="w-3.5 h-3.5" /> 问题反馈
+          <Bug className="w-3.5 h-3.5" /> {t('contextMenu.feedback')}
         </button>
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />

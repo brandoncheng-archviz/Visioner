@@ -12,13 +12,13 @@ export const FLOATING_PANEL_BACKGROUND = '#252526';
 export const FLOATING_PANEL_BORDER = '1px solid rgba(255,255,255,0.08)';
 
 export const MARK_ACTION_LABELS: Record<MarkAction, string> = {
-  reference: '参考',
-  keep: '保留',
-  enhance: '强化',
-  weaken: '弱化',
-  replace: '替换',
-  delete: '删除',
-  constraint: '约束',
+  reference: 'reference',
+  keep: 'keep',
+  enhance: 'enhance',
+  weaken: 'weaken',
+  replace: 'replace',
+  delete: 'delete',
+  constraint: 'constraint',
 };
 
 export const MARK_ACTION_COLORS: Record<MarkAction, string> = {

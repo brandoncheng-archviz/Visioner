@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Image,
   X,
@@ -67,6 +68,8 @@ export function ImageNodeControlPanel({
   onModelParamsChange,
   onGenerate,
   canGenerate,
+  isGenerating,
+  generationTask,
   references,
   onRemoveReference,
   onReorderReferences,
@@ -86,8 +89,10 @@ export function ImageNodeControlPanel({
   onStyleChange: (styleId: string | null) => void;
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
-  onGenerate: () => void;
+  onGenerate: () => void | Promise<void>;
   canGenerate: boolean;
+  isGenerating?: boolean;
+  generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   references: ReferenceInfo[];
   onRemoveReference: (nodeId: string) => void;
   onReorderReferences: (newOrder: string[]) => void;
@@ -95,6 +100,7 @@ export function ImageNodeControlPanel({
   onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string) => ReferenceInfo | null;
   showToast?: (msg: string) => void;
 }) {
+  const { t } = useTranslation();
   const [showMarkPanel, setShowMarkPanel] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showStylePicker, setShowStylePicker] = useState(false);
@@ -325,7 +331,7 @@ export function ImageNodeControlPanel({
 
     return presetPool.filter(
       (preset) =>
-        preset.name.toLowerCase().includes(query) ||
+        t(`preset.${preset.id}.name`).toLowerCase().includes(query) ||
         preset.tags.some((tag) => tag.toLowerCase().includes(query)),
     );
   }, [slashQuery]);
@@ -757,7 +763,7 @@ export function ImageNodeControlPanel({
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
         <div className="flex items-center gap-2">
-          {/* 预设 */}
+          {/* Preset */}
           <div className="relative">
             <button
               onClick={() => { setShowPresetMenu(!showPresetMenu); setShowMarkPanel(false); setShowStylePicker(false); }}
@@ -765,7 +771,7 @@ export function ImageNodeControlPanel({
               style={{ width: 54, height: 50, padding: '4px', background: selectedPresets.length > 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
             >
               <Bookmark className="w-4 h-4" style={{ color: selectedPresets.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.7)' }} />
-              <span style={{ fontSize: 12, color: selectedPresets.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.72)' }}>预设</span>
+              <span style={{ fontSize: 12, color: selectedPresets.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.72)' }}>{t('imageNode.preset')}</span>
             </button>
             {showPresetMenu && (
               <div
@@ -777,7 +783,23 @@ export function ImageNodeControlPanel({
                 <div className="flex items-center gap-1 px-3 pt-3 pb-2 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                   {PRESET_TABS.map((tab) => {
                     const isActive = activePresetTab === tab;
-                    const TabIcon = tab === '常用' ? Star : tab === '变真实' ? Eye : tab === '换氛围' ? Sun : tab === '换环境' ? Mountain : tab === '换视角' ? ScanEye : User;
+                    const tabIcons: Record<PresetTab, typeof Star> = {
+                      '常用': Star,
+                      '变真实': Eye,
+                      '换氛围': Sun,
+                      '换环境': Mountain,
+                      '换视角': ScanEye,
+                      '我的': User,
+                    };
+                    const tabKeys: Record<PresetTab, string> = {
+                      '常用': 'common',
+                      '变真实': 'realism',
+                      '换氛围': 'mood',
+                      '换环境': 'environment',
+                      '换视角': 'perspective',
+                      '我的': 'my',
+                    };
+                    const TabIcon = tabIcons[tab];
                     return (
                       <button
                         key={tab}
@@ -786,7 +808,7 @@ export function ImageNodeControlPanel({
                         style={isActive ? { background: 'rgba(167,139,250,0.18)' } : {}}
                       >
                         <TabIcon className="w-3 h-3" />
-                        {tab}
+                        {t(`preset.tabs.${tabKeys[tab]}`)}
                       </button>
                     );
                   })}
@@ -796,8 +818,8 @@ export function ImageNodeControlPanel({
                   {activePresetTab === '我的' ? (
                     <div className="flex flex-col items-center justify-center py-10 text-center">
                       <Bookmark className="w-10 h-10 text-white/10 mb-3" />
-                      <div className="text-[13px] text-white/40">暂无自定义预设</div>
-                      <div className="text-[11px] text-white/25 mt-1">你可以将当前预设组合保存到这里</div>
+                      <div className="text-[13px] text-white/40">{t('preset.noCustomPresets')}</div>
+                      <div className="text-[11px] text-white/25 mt-1">{t('preset.saveCurrentPresetsHint')}</div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2.5">
@@ -814,7 +836,7 @@ export function ImageNodeControlPanel({
                             <div className="relative w-full overflow-hidden" style={{ height: 88 }}>
                               <img
                                 src={preset.thumbnail}
-                                alt={preset.name}
+                                alt={t(`preset.${preset.id}.name`)}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                               />
                               <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 100%)' }} />
@@ -827,8 +849,8 @@ export function ImageNodeControlPanel({
                             </div>
                             {/* Info */}
                             <div className="p-2">
-                              <div className="text-[12px] font-medium text-white/90 truncate">{preset.name}</div>
-                              <div className="text-[11px] text-white/40 truncate mt-0.5">{preset.shortDescription}</div>
+                              <div className="text-[12px] font-medium text-white/90 truncate">{t(`preset.${preset.id}.name`)}</div>
+                              <div className="text-[11px] text-white/40 truncate mt-0.5">{t(`preset.${preset.id}.shortDescription`)}</div>
                             </div>
                           </button>
                         );
@@ -839,7 +861,7 @@ export function ImageNodeControlPanel({
                 {/* Selected presets footer */}
                 {selectedPresets.length > 0 && (
                   <div className="shrink-0 px-3 py-2.5 border-t flex items-center gap-2" style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
-                    <span className="text-[11px] text-white/35 shrink-0">已选预设</span>
+                    <span className="text-[11px] text-white/35 shrink-0">{t('imageNode.selectedPresets')}</span>
                     <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
                       {selectedPresets.map((presetId) => {
                         const preset = getPresetById(presetId);
@@ -850,7 +872,7 @@ export function ImageNodeControlPanel({
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px]"
                             style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.22)' }}
                           >
-                            {preset.name}
+                            {t(`preset.${preset.id}.name`)}
                             <button
                               onClick={(e) => { e.stopPropagation(); removePreset(presetId); }}
                               className="hover:text-white transition-colors"
@@ -867,14 +889,14 @@ export function ImageNodeControlPanel({
                       className="flex items-center gap-1 text-[11px] text-white/35 hover:text-white/60 transition-colors shrink-0"
                     >
                       <TrashIcon className="w-3 h-3" />
-                      清空
+                      {t('common.clear')}
                     </button>
                   </div>
                 )}
               </div>
             )}
           </div>
-          {/* 标记 */}
+          {/* Mark */}
           <div className="relative">
             <button
               onClick={() => { setShowMarkPanel(!showMarkPanel); setShowPresetMenu(false); setShowStylePicker(false); }}
@@ -882,22 +904,22 @@ export function ImageNodeControlPanel({
               style={{ width: 54, height: 50, padding: '4px', background: marks.length > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
             >
               <MapPin className="w-4 h-4" style={{ color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.7)' }} />
-              <span style={{ fontSize: 12, color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>标记</span>
+              <span style={{ fontSize: 12, color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>{t('imageNode.mark')}</span>
             </button>
             {showMarkPanel && (
               <div className="absolute top-full left-0 mt-1 p-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 220 }}>
-                <div className="text-[12px] text-white/55 mb-2">添加元素标记</div>
-                <input value={markName} onChange={(e) => setMarkName(e.target.value)} placeholder="元素名称" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
+                <div className="text-[12px] text-white/55 mb-2">{t('imageNode.addElementMark')}</div>
+                <input value={markName} onChange={(e) => setMarkName(e.target.value)} placeholder={t('imageNode.elementNamePlaceholder')} className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
                 <select value={markAction} onChange={(e) => setMarkAction(e.target.value as MarkAction)} className="w-full bg-transparent text-[13px] mb-2 outline-none" style={{ color: 'rgba(255,255,255,0.9)', background: FLOATING_PANEL_BACKGROUND }} onPointerDown={(e) => e.stopPropagation()}>
-                  {Object.entries(MARK_ACTION_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
+                  {Object.entries(MARK_ACTION_LABELS).map(([key]) => (<option key={key} value={key}>{t(`mark.${key}`)}</option>))}
                 </select>
-                <input value={markDesc} onChange={(e) => setMarkDesc(e.target.value)} placeholder="动作描述" className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
-                <button onClick={addMark} className="w-full text-center text-[12px] py-1.5 rounded bg-white/10 text-white/90 hover:bg-white/15 transition-colors">添加</button>
+                <input value={markDesc} onChange={(e) => setMarkDesc(e.target.value)} placeholder={t('imageNode.actionDescPlaceholder')} className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
+                <button onClick={addMark} className="w-full text-center text-[12px] py-1.5 rounded bg-white/10 text-white/90 hover:bg-white/15 transition-colors">{t('imageNode.add')}</button>
                 {marks.length > 0 && (
                   <div className="mt-2 space-y-1">
                     {marks.map((m) => (
                       <div key={m.id} className="flex items-center justify-between text-[12px]">
-                        <span style={{ color: MARK_ACTION_COLORS[m.action] }}>@{m.name}（{MARK_ACTION_LABELS[m.action]}）</span>
+                        <span style={{ color: MARK_ACTION_COLORS[m.action] }}>@{m.name}（{t(`mark.${m.action}`)}）</span>
                         <button onClick={() => removeMark(m.id)} className="text-white/30 hover:text-white/60">×</button>
                       </div>
                     ))}
@@ -906,7 +928,7 @@ export function ImageNodeControlPanel({
               </div>
             )}
           </div>
-          {/* 风格 */}
+          {/* Style */}
           <div className="relative">
             <button
               onClick={() => {
@@ -929,7 +951,7 @@ export function ImageNodeControlPanel({
                 border: selectedStyle ? '1px solid rgba(167,139,250,0.7)' : FLOATING_PANEL_BORDER,
                 opacity: 1,
               }}
-              title="选择整体视觉风格"
+              title={t('style.selectStyle')}
             >
               {selectedStyle ? (
                 <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
@@ -938,19 +960,19 @@ export function ImageNodeControlPanel({
               ) : (
                 <>
                   <Palette className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.7)' }} />
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>风格</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>{t('imageNode.style')}</span>
                 </>
               )}
               {selectedStyle && (
                 <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-xl p-2.5 text-left group-hover/style-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
                   <div className="text-[12px] font-medium text-white/90">{selectedStyle.title}</div>
                   <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.56)' }}>{selectedStyle.description}</div>
-                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(167,139,250,0.86)' }}>点击更换风格 / 移除风格</div>
+                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(167,139,250,0.86)' }}>{t('imageNode.clickToChangeStyle')}</div>
                 </div>
               )}
             </button>
           </div>
-          {/* 引用缩略图 — 支持拖拽排序 */}
+          {/* Reference thumbnails — supports drag sorting */}
           <div className="flex items-center gap-2">
             {orderedRefs.map((ref, idx) => (
               <div
@@ -1002,7 +1024,7 @@ export function ImageNodeControlPanel({
                       }}
                     />
                     <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                      {ref.roleLabel || '未定义用途'}
+                      {ref.roleLabel || t('imageNode.undefinedUsage')}
                     </div>
                   </div>
                 )}
@@ -1038,7 +1060,7 @@ export function ImageNodeControlPanel({
                     }}
                     className="nodrag nowheel absolute right-0 top-0 z-30 hidden items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/ref:flex"
                     style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-                    title="删除引用"
+                    title={t('imageNode.removeReference')}
                   >
                     <X className="h-2.5 w-2.5" />
                   </button>
@@ -1052,7 +1074,7 @@ export function ImageNodeControlPanel({
           onClick={() => setPromptExpanded((value) => !value)}
           className="flex items-center justify-center rounded-md transition-colors hover:bg-white/5"
           style={{ width: 32, height: 32, color: promptExpanded ? '#ffffff' : 'rgba(255,255,255,0.45)' }}
-          title={promptExpanded ? '收起提示词框' : '展开提示词框'}
+          title={promptExpanded ? t('imageNode.collapsePrompt') : t('imageNode.expandPrompt')}
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
@@ -1139,7 +1161,7 @@ export function ImageNodeControlPanel({
                             className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
                             style={{ color: 'rgba(255,255,255,0.58)' }}
                           >
-                            取消
+                            {t('common.cancel')}
                           </button>
                           <button
                             type="button"
@@ -1150,7 +1172,7 @@ export function ImageNodeControlPanel({
                             className="rounded-md px-2 py-1 text-[12px] font-medium transition-colors hover:brightness-110"
                             style={{ background: 'rgba(0,212,255,0.16)', color: '#ffffff', border: '1px solid rgba(0,212,255,0.35)' }}
                           >
-                            保存
+                            {t('common.save')}
                           </button>
                         </div>
                       </>
@@ -1166,7 +1188,7 @@ export function ImageNodeControlPanel({
                         }}
                         className="ml-0.5 hidden h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 group-hover/prompt-ref:flex"
                         style={{ color: 'rgba(255,255,255,0.58)' }}
-                        title="编辑图片引用提示词"
+                        title={t('imageNode.editReferencePrompt')}
                       >
                         <Pencil className="h-2.5 w-2.5" />
                       </button>
@@ -1179,7 +1201,7 @@ export function ImageNodeControlPanel({
                       }}
                       className={`ml-0.5 h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 ${isEditing ? 'hidden' : 'hidden group-hover/prompt-ref:flex'}`}
                       style={{ color: 'rgba(255,255,255,0.58)' }}
-                      title="删除图片引用"
+                      title={t('imageNode.removeReferencePrompt')}
                     >
                       <X className="h-2.5 w-2.5" />
                     </button>
@@ -1213,7 +1235,7 @@ export function ImageNodeControlPanel({
             value={promptText}
             onChange={handlePromptChange}
             onKeyDown={handlePromptKeyDown}
-            placeholder="描述你想要生成的画面内容，按/呼出指令，@引用素材"
+            placeholder={t('imageNode.promptPlaceholder')}
             className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
             style={{ color: 'rgba(255,255,255,0.94)', fontSize: 14, lineHeight: 1.58, minHeight: promptExpanded ? 176 : 104 }}
             rows={promptExpanded ? 7 : 4}
@@ -1236,7 +1258,7 @@ export function ImageNodeControlPanel({
             >
               {(() => {
                 if (slashFilteredPresets.length === 0) {
-                  return <div className="px-3 py-2 text-[13px] text-white/40">无匹配预设</div>;
+                  return <div className="px-3 py-2 text-[13px] text-white/40">{t('imageNode.noMatchingPreset')}</div>;
                 }
                 return slashFilteredPresets.map((preset, index) => (
                   <button
@@ -1245,8 +1267,8 @@ export function ImageNodeControlPanel({
                     onMouseEnter={() => setSlashIndex(index)}
                     className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left transition-colors ${index === slashIndex ? 'bg-white/8' : 'hover:bg-white/5'}`}
                   >
-                    <span className="text-[13px] text-white/90">{preset.name}</span>
-                    <span className="text-[11px] text-white/40">{preset.shortDescription}</span>
+                    <span className="text-[13px] text-white/90">{t(`preset.${preset.id}.name`)}</span>
+                    <span className="text-[11px] text-white/40">{t(`preset.${preset.id}.shortDescription`)}</span>
                   </button>
                 ));
               })()}
@@ -1280,7 +1302,7 @@ export function ImageNodeControlPanel({
                       <Image className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.45)' }} />
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{reference.roleLabel || '未定义用途'}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{reference.roleLabel || t('imageNode.undefinedUsage')}</span>
                 </button>
               ))}
             </div>
@@ -1299,11 +1321,11 @@ export function ImageNodeControlPanel({
               }}
               onWheel={(e) => e.stopPropagation()}
             >
-              <div className="px-3 py-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.58)' }}>选择图片用途</div>
+              <div className="px-3 py-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.58)' }}>{t('imageNode.selectImagePurpose')}</div>
               {usageConflict && (
                 <div className="mx-2 mb-1 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.10)' }}>
                   <div className="text-[12px] leading-5" style={{ color: 'rgba(255,255,255,0.72)' }}>
-                    已有一张「{getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel)}」，该用途同一目标节点最多 1 张。
+                    {t('imageNode.usageConflictTitle', { role: getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel) })}
                   </div>
                   <div className="mt-2 flex gap-1.5">
                     <button
@@ -1312,7 +1334,7 @@ export function ImageNodeControlPanel({
                       className="rounded-md px-2 py-1 text-[12px] font-medium transition-colors hover:bg-white/15"
                       style={{ color: '#ffffff', background: 'rgba(255,255,255,0.10)' }}
                     >
-                      替换
+                      {t('common.replace')}
                     </button>
                     <button
                       type="button"
@@ -1320,7 +1342,7 @@ export function ImageNodeControlPanel({
                       className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
                       style={{ color: 'rgba(255,255,255,0.62)' }}
                     >
-                      取消
+                      {t('common.cancel')}
                     </button>
                     <button
                       type="button"
@@ -1328,7 +1350,7 @@ export function ImageNodeControlPanel({
                       className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
                       style={{ color: 'rgba(255,255,255,0.62)' }}
                     >
-                      改用途
+                      {t('imageNode.changeUsage')}
                     </button>
                   </div>
                 </div>
@@ -1370,7 +1392,7 @@ export function ImageNodeControlPanel({
                         setPendingCustomInput(false);
                       }
                     }}
-                    placeholder="这张图主要参考什么？例如：铺装 / 水景 / 入口 / 栏杆"
+                    placeholder={t('imageNode.customPurposePlaceholder')}
                     {...customUsagePlaceholderProps}
                     className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
                     style={{
@@ -1380,7 +1402,7 @@ export function ImageNodeControlPanel({
                     }}
                   />
                   <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
-                    用于定义具体参考内容，例如铺装、水景、灯光、家具。
+                    {t('reference.customReferenceDesc')}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {customUsageSuggestions.map((label) => (
@@ -1437,7 +1459,7 @@ export function ImageNodeControlPanel({
             {showRatioMenu && (
               <div className="absolute bottom-full left-0 mb-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 16px 34px rgba(0,0,0,0.48)', width: 326, padding: 8 }}>
                 <div className="pb-2">
-                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>分辨率</div>
+                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('imageNode.resolution')}</div>
                   <div className="grid grid-cols-3 gap-2">
                     {RESOLUTION_OPTIONS.map((r) => (
                       <button
@@ -1456,7 +1478,7 @@ export function ImageNodeControlPanel({
                   </div>
                 </div>
                 <div className="pt-1">
-                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>比例</div>
+                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('imageNode.ratio')}</div>
                   <div className="grid grid-cols-5 gap-2">
                     {RATIO_OPTIONS.map((ar) => (
                       <button
@@ -1470,7 +1492,7 @@ export function ImageNodeControlPanel({
                         }}
                       >
                         <div className="border border-current rounded-[2px]" style={{ width: ar.icon === 'portrait' ? 9 : ar.icon === 'landscape' ? 14 : ar.icon === 'ultrawide' ? 17 : 11, height: ar.icon === 'portrait' ? 15 : ar.icon === 'landscape' ? 8 : ar.icon === 'ultrawide' ? 5 : 11, opacity: 0.78 }} />
-                        <span className="text-[13px]">{ar.value}</span>
+                        <span className="text-[13px]">{t(`imageNode.ratioValue.${ar.value}`, { defaultValue: ar.value })}</span>
                       </button>
                     ))}
                   </div>
@@ -1486,13 +1508,13 @@ export function ImageNodeControlPanel({
             className="flex items-center gap-1 transition-colors hover:text-white"
             style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}
           >
-            {modelParams.count}
+            {t(`imageNode.countValue.${modelParams.count}`, { defaultValue: modelParams.count })}
             <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
           </button>
           {showCountMenu && (
             <div className="absolute bottom-full right-10 mb-2 py-1 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', minWidth: 80 }}>
               {COUNT_OPTIONS.map((c) => (
-                <button key={c} onClick={() => { onModelParamsChange({ ...modelParams, count: c }); setShowCountMenu(false); }} className={`w-full px-3 py-2 text-left text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}>{c}</button>
+                <button key={c} onClick={() => { onModelParamsChange({ ...modelParams, count: c }); setShowCountMenu(false); }} className={`w-full px-3 py-2 text-left text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}>{t(`imageNode.countValue.${c}`, { defaultValue: c })}</button>
               ))}
             </div>
           )}
@@ -1500,20 +1522,49 @@ export function ImageNodeControlPanel({
             <Zap className="w-3.5 h-3.5" />
             <span style={{ fontSize: 15 }}>14</span>
           </div>
-          <button
-            onClick={onGenerate}
-            disabled={!canGenerate}
-            className="flex items-center justify-center rounded-lg transition-colors"
-            style={{
-              width: 34,
-              height: 34,
-              background: canGenerate ? '#ffffff' : 'rgba(255,255,255,0.14)',
-              opacity: canGenerate ? 1 : 0.45,
-            }}
-            title="生成"
-          >
-            <ArrowUp className="w-4 h-4 text-black" />
-          </button>
+          {generationTask?.status === 'failed' && generationTask.errorMessage ? (
+            <button
+              onClick={onGenerate}
+              className="flex items-center justify-center gap-1 rounded-lg transition-colors"
+              style={{
+                height: 34,
+                padding: '0 10px',
+                background: 'rgba(239,68,68,0.16)',
+                border: '1px solid rgba(239,68,68,0.35)',
+                color: '#fca5a5',
+                fontSize: 12,
+              }}
+              title={generationTask.errorMessage}
+            >
+              <span className="truncate" style={{ maxWidth: 120 }}>{t('imageNode.generationFailed')}</span>
+              <span className="text-white/60">·</span>
+              <span className="text-white/80 hover:text-white">{t('imageNode.retry')}</span>
+            </button>
+          ) : (
+            <button
+              onClick={onGenerate}
+              disabled={!canGenerate}
+              className="flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                width: 34,
+                height: 34,
+                background: canGenerate ? '#ffffff' : 'rgba(255,255,255,0.14)',
+                opacity: canGenerate ? 1 : 0.45,
+              }}
+              title={isGenerating ? t('imageNode.generating') : t('imageNode.generate')}
+            >
+              {isGenerating ? (
+                <div className="relative flex items-center justify-center">
+                  <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6" stroke="rgba(0,0,0,0.15)" strokeWidth="2" />
+                    <path d="M8 2A6 6 0 0 1 14 8" stroke="#000" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </div>
+              ) : (
+                <ArrowUp className="w-4 h-4 text-black" />
+              )}
+            </button>
+          )}
         </div>
       </div>
       <StylePickerModal

@@ -1,4 +1,5 @@
 import { Building2, Layers, Leaf, Users, Cloud, Pencil, Palette, Sun, CircleHelp } from 'lucide-react';
+import i18n from '@/i18n';
 import type { ImageRole, ImageRoleOption } from '../types/imageNode.types';
 
 export const SYSTEM_USAGE_LABELS = [
@@ -14,64 +15,64 @@ export const SYSTEM_USAGE_LABELS = [
 export const imageRoleOptions: ImageRoleOption[] = [
   {
     value: 'primary_building',
-    label: '主体建筑',
-    description: '参考建筑本体的体块、特征与主要材质',
-    detail: '作为主体建筑参考，AI 将优先参考建筑体块、轮廓比例、立面关系、建筑特征，以及外立面的主要材质与纹理表达。',
-    constraints: ['建筑体块', '轮廓比例', '立面语言', '开窗节奏', '建筑特征', '主要材质纹理'],
+    label: i18n.t('reference.primaryBuilding'),
+    description: i18n.t('reference.primaryBuilding'),
+    detail: i18n.t('reference.primaryBuildingDetail'),
+    constraints: ['buildingMass', 'outlineRatio', 'facadeLanguage', 'windowRhythm', 'buildingFeature', 'mainMaterialTexture'],
     Icon: Building2,
     color: '#3B82F6',
   },
   {
     value: 'atmosphere_reference',
-    label: '氛围参考',
-    description: '参考整体氛围 / 色调 / 真实度',
-    detail: '作为氛围参考，AI 将主要参考整体时间段、天气状态、色调、光影情绪、曝光关系、对比度和真实度，不复制具体建筑内容。',
-    constraints: ['时间段', '天气', '色调', '光影情绪', '曝光', '对比度', '真实度', '整体画面气质'],
+    label: i18n.t('reference.atmosphereReference'),
+    description: i18n.t('reference.atmosphereReference'),
+    detail: i18n.t('reference.atmosphereReferenceDetail'),
+    constraints: ['timeOfDay', 'weather', 'colorTone', 'lightShadowMood', 'exposure', 'contrast', 'realism', 'overallQuality'],
     Icon: Layers,
     color: '#8B5CF6',
   },
   {
     value: 'vegetation_reference',
-    label: '植物参考',
-    description: '参考植物类型与绿化层次',
-    detail: '作为植物参考，AI 将主要参考植物类型、树形、种植密度、景观层次、季节感、地域感和绿化风格，不改变主体建筑。',
-    constraints: ['植物类型', '树形', '种植密度', '草坪', '灌木', '花境', '季节感', '绿化层次'],
+    label: i18n.t('reference.vegetationReference'),
+    description: i18n.t('reference.vegetationReference'),
+    detail: i18n.t('reference.vegetationReferenceDetail'),
+    constraints: ['plantType', 'treeShape', 'plantingDensity', 'lawn', 'shrub', 'flowerBed', 'seasonalSense', 'greeningLevel'],
     Icon: Leaf,
     color: '#22C55E',
   },
   {
     value: 'people_reference',
-    label: '人物参考',
-    description: '参考人物尺度 / 密度 / 活动状态',
-    detail: '作为人物参考，AI 将主要参考人物密度、尺度关系、活动状态、生活方式和场景活力，不参考具体人物长相，不让人物成为视觉中心。',
-    constraints: ['人物数量', '人物密度', '尺度关系', '活动状态', '生活方式', '服装季节', '场景活力'],
+    label: i18n.t('reference.peopleReference'),
+    description: i18n.t('reference.peopleReference'),
+    detail: i18n.t('reference.peopleReferenceDetail'),
+    constraints: ['peopleCount', 'peopleDensity', 'scaleRelation', 'activityState', 'lifestyle', 'clothingSeason', 'sceneVitality'],
     Icon: Users,
     color: '#F97316',
   },
   {
     value: 'sky_reference',
-    label: '天空参考',
-    description: '参考天空 / 云层 / 天气背景',
-    detail: '作为天空参考，AI 将主要参考天空颜色、云层形态、天气状态、日落层次和天空明暗关系，不改变主体建筑和画面构图。',
-    constraints: ['天空颜色', '云层形态', '天气状态', '日落晚霞', '蓝天白云', '阴天天空', '明暗层次'],
+    label: i18n.t('reference.skyReference'),
+    description: i18n.t('reference.skyReference'),
+    detail: i18n.t('reference.skyReferenceDetail'),
+    constraints: ['skyColor', 'cloudShape', 'weatherState', 'sunsetGlow', 'blueSky', 'overcastSky', 'lightDarkLevel'],
     Icon: Cloud,
     color: '#FACC15',
   },
   {
     value: 'custom_reference',
-    label: '自定义用途...',
-    description: '自定义具体局部参考内容',
-    detail: '用于定义具体局部参考内容，例如铺装、水景、入口、栏杆、灯带、室内家具、立面肌理、商业招牌等。',
-    constraints: ['用户输入的具体局部内容'],
+    label: i18n.t('reference.customReference'),
+    description: i18n.t('reference.customReference'),
+    detail: i18n.t('reference.customReferenceDetail'),
+    constraints: ['userDefinedContent'],
     Icon: Pencil,
     color: '#EF4444',
   },
   {
     value: 'undefined_usage',
-    label: '未定义用途',
-    description: '尚未明确控制维度，按中性参考处理',
-    detail: '该图片尚未明确控制哪一类内容，AI 仅按中性的视觉参考处理，不主动覆盖主体、氛围、植物、人物或天空等具体维度。',
-    constraints: ['中性视觉参考'],
+    label: i18n.t('imageNode.undefinedUsage'),
+    description: i18n.t('imageNode.undefinedUsage'),
+    detail: i18n.t('reference.undefinedUsageDetail'),
+    constraints: ['neutralVisualReference'],
     Icon: CircleHelp,
     color: '#9CA3AF',
   },
@@ -99,19 +100,19 @@ export const legacyImageRoleOptions: Partial<Record<ImageRole, ImageRoleOption>>
   plant_reference: imageRoleOptions.find((option) => option.value === 'vegetation_reference'),
   material_reference: {
     value: 'material_reference',
-    label: '材质参考',
-    description: '旧数据兼容：材质参考',
-    detail: '旧数据兼容显示为材质参考。新建用途请使用自定义用途。',
-    constraints: ['材质参考'],
+    label: i18n.t('reference.materialReference'),
+    description: i18n.t('reference.materialReference'),
+    detail: i18n.t('reference.materialReferenceDetail'),
+    constraints: ['materialReference'],
     Icon: Palette,
     color: '#EF4444',
   },
   lighting_reference: {
     value: 'lighting_reference',
-    label: '灯光参考',
-    description: '旧数据兼容：灯光参考',
-    detail: '旧数据兼容显示为灯光参考。新建用途请使用自定义用途。',
-    constraints: ['灯光参考'],
+    label: i18n.t('reference.lightingReference'),
+    description: i18n.t('reference.lightingReference'),
+    detail: i18n.t('reference.lightingReferenceDetail'),
+    constraints: ['lightingReference'],
     Icon: Sun,
     color: '#EF4444',
   },
@@ -129,13 +130,13 @@ export function normalizeCustomReferenceLabel(value: string) {
 
 export function validateCustomReferenceLabel(value: string, existingLabels: string[] = []) {
   const label = normalizeCustomReferenceLabel(value);
-  if (!label) return { ok: false as const, message: '自定义用途不能为空' };
+  if (!label) return { ok: false as const, message: i18n.t('reference.customEmptyError') };
   const normalized = normalizeUsageNameForCompare(label);
   if (SYSTEM_USAGE_LABELS.some((reserved) => normalizeUsageNameForCompare(reserved) === normalized)) {
-    return { ok: false as const, message: '不能使用系统保留用途名称' };
+    return { ok: false as const, message: i18n.t('reference.customReservedError') };
   }
   if (existingLabels.some((existing) => normalizeUsageNameForCompare(existing) === normalized)) {
-    return { ok: false as const, message: '该自定义用途名称已存在' };
+    return { ok: false as const, message: i18n.t('reference.customDuplicateError') };
   }
   return { ok: true as const, label };
 }
@@ -149,7 +150,7 @@ export function getImageRoleOption(role: ImageRole | null | undefined, customLab
 }
 
 export function getImageRoleLabel(role: ImageRole | null | undefined, customLabel?: string) {
-  return getImageRoleOption(role, customLabel)?.label || '未定义用途';
+  return getImageRoleOption(role, customLabel)?.label || i18n.t('imageNode.undefinedUsage');
 }
 
 export function getImageRoleColor(role: ImageRole | null | undefined) {

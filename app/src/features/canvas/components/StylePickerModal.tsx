@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check, Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../constants/canvasConstants';
 import { STYLE_PRESETS, getStylePresetById } from '../constants/presets';
 
@@ -15,6 +16,7 @@ export function StylePickerModal({
   onApply: (styleId: string | null) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [draftStyleId, setDraftStyleId] = useState<string | null>(selectedStyleId);
   const entryStyleIdRef = useRef<string | null>(selectedStyleId);
@@ -38,8 +40,8 @@ export function StylePickerModal({
     if (!normalizedQuery) return STYLE_PRESETS;
     return STYLE_PRESETS.filter(
       (style) =>
-        style.title.toLowerCase().includes(normalizedQuery) ||
-        style.description.toLowerCase().includes(normalizedQuery) ||
+        t(`style.${style.id}.title`).toLowerCase().includes(normalizedQuery) ||
+        t(`style.${style.id}.description`).toLowerCase().includes(normalizedQuery) ||
         style.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery)),
     );
   }, [query]);
@@ -64,8 +66,8 @@ export function StylePickerModal({
       >
         <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
           <div>
-            <div className="text-[16px] font-semibold text-white/92">选择风格</div>
-            <div className="mt-1 text-[12px]" style={{ color: 'rgba(255,255,255,0.48)' }}>风格样图仅用于展示风格，不作为参考图。</div>
+            <div className="text-[16px] font-semibold text-white/92">{t('style.selectStyle')}</div>
+            <div className="mt-1 text-[12px]" style={{ color: 'rgba(255,255,255,0.48)' }}>{t('style.styleSampleNotice')}</div>
           </div>
           <button
             type="button"
@@ -84,7 +86,7 @@ export function StylePickerModal({
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索风格、标签"
+                placeholder={t('style.searchStyle')}
                 className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-white/30"
                 style={{ color: 'rgba(255,255,255,0.86)' }}
               />
@@ -106,7 +108,7 @@ export function StylePickerModal({
                   >
                     <img src={style.thumbnail} alt="" className="h-11 w-11 flex-shrink-0 rounded-md object-cover" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-white/88">{style.title}</span>
+                      <span className="block truncate text-[13px] font-medium text-white/88">{t(`style.${style.id}.title`)}</span>
                       <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.44)' }}>{style.tags.slice(0, 3).join(' / ')}</span>
                     </span>
                     {applied && <Check className="h-4 w-4 flex-shrink-0" style={{ color: '#a78bfa' }} />}
@@ -114,7 +116,7 @@ export function StylePickerModal({
                 );
               })}
               {filteredStyles.length === 0 && (
-                <div className="py-8 text-center text-[13px] text-white/35">无匹配风格</div>
+                <div className="py-8 text-center text-[13px] text-white/35">{t('style.noMatchingStyle')}</div>
               )}
             </div>
           </div>
@@ -123,12 +125,12 @@ export function StylePickerModal({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-[18px] font-semibold text-white/92">{previewStyle.title}</h3>
+                  <h3 className="text-[18px] font-semibold text-white/92">{t(`style.${previewStyle.id}.title`)}</h3>
                   {selectedStyleId === previewStyle.id && (
-                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'rgba(167,139,250,0.18)', color: '#c4b5fd' }}>当前风格</span>
+                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'rgba(167,139,250,0.18)', color: '#c4b5fd' }}>{t('style.currentStyle')}</span>
                   )}
                 </div>
-                <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.58)' }}>{previewStyle.description}</p>
+                <p className="mt-2 max-w-[560px] text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.58)' }}>{t(`style.${previewStyle.id}.description`)}</p>
               </div>
               <button
                 type="button"
@@ -136,7 +138,7 @@ export function StylePickerModal({
                 className="rounded-lg px-3 py-2 text-[13px] font-medium transition-colors hover:brightness-110"
                 style={{ background: '#a78bfa', color: '#111' }}
               >
-                应用风格
+                {t('style.applyStyle')}
               </button>
             </div>
 
@@ -163,7 +165,7 @@ export function StylePickerModal({
                   onClick={() => onApply(previewStyle.id)}
                   className="overflow-hidden rounded-lg border transition-all hover:border-[#a78bfa]"
                   style={{ borderColor: 'rgba(255,255,255,0.08)' }}
-                  title="应用该风格"
+                  title={t('style.applyThisStyle')}
                 >
                   <img src={image} alt="" className="h-16 w-full object-cover" />
                 </button>
@@ -174,22 +176,22 @@ export function StylePickerModal({
 
         <div className="flex items-center justify-between border-t px-5 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
           <div className="flex min-w-0 items-center gap-2">
-            <span className="text-[12px] text-white/40">当前选择：</span>
+            <span className="text-[12px] text-white/40">{t('style.currentSelection')}</span>
             {selectedStyle ? (
               <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px]" style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.24)' }}>
-                {selectedStyle.title}
+                {t(`style.${selectedStyle.id}.title`)}
                 <button type="button" onClick={() => onApply(null)} className="rounded-full hover:bg-white/10">
                   <X className="h-3 w-3" />
                 </button>
               </span>
             ) : (
-              <span className="text-[12px] text-white/32">无风格</span>
+              <span className="text-[12px] text-white/32">{t('style.noStyle')}</span>
             )}
-            <button type="button" onClick={() => onApply(null)} className="text-[12px] transition-colors hover:text-white/70" style={{ color: 'rgba(255,255,255,0.42)' }}>清除风格</button>
+            <button type="button" onClick={() => onApply(null)} className="text-[12px] transition-colors hover:text-white/70" style={{ color: 'rgba(255,255,255,0.42)' }}>{t('style.clearStyle')}</button>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={handleCancel} className="rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/8" style={{ color: 'rgba(255,255,255,0.62)' }}>取消</button>
-            <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-[13px] font-medium" style={{ background: 'rgba(255,255,255,0.9)', color: '#111' }}>确认选择</button>
+            <button type="button" onClick={handleCancel} className="rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/8" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('common.cancel')}</button>
+            <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-[13px] font-medium" style={{ background: 'rgba(255,255,255,0.9)', color: '#111' }}>{t('style.confirmSelection')}</button>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { Image, Plus } from 'lucide-react';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import {
   IMAGE_NODE_PREVIEW_WIDTH,
   IMAGE_NODE_MIN_IMAGE_SIZE,
@@ -9,6 +10,7 @@ import {
 import { UpscaleParamPanel } from '../components/UpscaleParamPanel';
 
 export function UpscaleNode({ data, selected, id }: NodeProps) {
+  const { t } = useTranslation();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
@@ -34,7 +36,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
       <div className="absolute z-20" style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}>
         <div className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
           <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
-          <span className="truncate">{(data.label as string) || '高清'}</span>
+          <span className="truncate">{(data.label as string) || t('canvas.nodeLabels.upscale')}</span>
         </div>
       </div>
 
@@ -51,7 +53,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
           }}
         >
           <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            配置参数生成高清图像
+            {t('imageNode.configParamsToGenerate')}
           </span>
         </div>
 

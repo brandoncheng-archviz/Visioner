@@ -9,6 +9,7 @@ import {
   Headphones,
   X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export interface CanvasSidebarProps {
   activePanel: string | null;
@@ -16,15 +17,17 @@ export interface CanvasSidebarProps {
   onAddNode: (type: string) => void;
 }
 
-const sidebarTools = [
-  { id: 'add', icon: Plus, label: '添加节点' },
-  { id: 'assets', icon: FolderOpen, label: '我的素材' },
-  { id: 'skills', icon: ListTree, label: 'AI工具箱' },
-  { id: 'support', icon: MessageCircle, label: '客服' },
-  { id: 'history', icon: History, label: '历史记录' },
-];
-
 export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: CanvasSidebarProps) {
+  const { t } = useTranslation();
+
+  const sidebarTools = [
+    { id: 'add', icon: Plus, label: t('sidebar.addNode') },
+    { id: 'assets', icon: FolderOpen, label: t('sidebar.myAssets') },
+    { id: 'skills', icon: ListTree, label: t('sidebar.aiToolbox') },
+    { id: 'support', icon: MessageCircle, label: t('sidebar.support') },
+    { id: 'history', icon: History, label: t('sidebar.history') },
+  ];
+
   return (
     <>
       {/* Left Sidebar Pill */}
@@ -94,7 +97,7 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a35]">
             <span className="text-sm font-medium text-white">
-              {sidebarTools.find((t) => t.id === activePanel)?.label}
+              {sidebarTools.find((toolItem) => toolItem.id === activePanel)?.label}
             </span>
             <button
               onClick={() => onSetActivePanel(null)}
@@ -106,10 +109,10 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
           <div className="p-4">
             {activePanel === 'add' && (
               <div className="space-y-2">
-                <p className="text-xs text-[#6a6a7a] mb-2">添加节点</p>
+                <p className="text-xs text-[#6a6a7a] mb-2">{t('sidebar.addNode')}</p>
                 {[
-                  { type: 'image', label: '图片节点', icon: Image, color: '#22d3ee' },
-                  { type: 'upscale', label: '高清放大', icon: Image, color: '#a855f7' },
+                  { type: 'image', label: t('sidebar.imageNode'), icon: Image, color: '#22d3ee' },
+                  { type: 'upscale', label: t('sidebar.upscaleNode'), icon: Image, color: '#a855f7' },
                 ].map((item) =>(
                   <button
                     key={item.type}
@@ -127,14 +130,14 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
             {activePanel === 'skills' && (
               <div className="text-center py-8">
                 <Wand2 className="w-10 h-10 text-[#3a3a4a] mx-auto mb-3" />
-                <p className="text-sm text-[#6a6a7a]">AI工具箱</p>
-                <p className="text-xs text-[#3a3a4a] mt-1">选择节点后查看可用技能</p>
+                <p className="text-sm text-[#6a6a7a]">{t('sidebar.aiToolboxEmpty')}</p>
+                <p className="text-xs text-[#3a3a4a] mt-1">{t('sidebar.aiToolboxHint')}</p>
               </div>
             )}
             {activePanel === 'assets' && (
               <div>
                 <div className="flex gap-2 mb-3">
-                  {['全部', '人物', '场景', '物品', '风格', '音效', '其他'].map((tab) => (
+                  {[t('common.all'), t('sidebar.character'), t('sidebar.scene'), t('sidebar.item'), t('sidebar.style'), t('sidebar.sound'), t('sidebar.other')].map((tab) => (
                     <button key={tab} className="px-2 py-1 rounded text-[10px] text-[#a0a0b0] hover:bg-[#1e1e28] transition-colors">
                       {tab}
                     </button>
@@ -142,16 +145,16 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
                 </div>
                 <div className="text-center py-8">
                   <Image className="w-8 h-8 text-[#3a3a4a] mx-auto mb-2" />
-                  <p className="text-xs text-[#6a6a7a]">暂无素材</p>
+                  <p className="text-xs text-[#6a6a7a]">{t('sidebar.noAssets')}</p>
                 </div>
               </div>
             )}
             {activePanel === 'history' && (
               <div>
                 <div className="flex gap-4 mb-3 text-xs">
-                  <span className="text-white">图片历史(6)</span>
-                  <span className="text-[#6a6a7a]">视频历史(0)</span>
-                  <span className="text-[#6a6a7a]">音频历史(0)</span>
+                  <span className="text-white">{t('sidebar.imageHistory', { count: 6 })}</span>
+                  <span className="text-[#6a6a7a]">{t('sidebar.videoHistory', { count: 0 })}</span>
+                  <span className="text-[#6a6a7a]">{t('sidebar.audioHistory', { count: 0 })}</span>
                 </div>
                 <p className="text-[10px] text-[#6a6a7a] mb-2">2026-04-23</p>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -166,8 +169,8 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
             {activePanel === 'support' && (
               <div className="text-center py-8">
                 <Headphones className="w-10 h-10 text-[#3a3a4a] mx-auto mb-3" />
-                <p className="text-sm text-[#6a6a7a]">联系客服</p>
-                <p className="text-xs text-[#3a3a4a] mt-1">客服在线时间 9:00-21:00</p>
+                <p className="text-sm text-[#6a6a7a]">{t('sidebar.contactSupport')}</p>
+                <p className="text-xs text-[#3a3a4a] mt-1">{t('sidebar.supportHours')}</p>
               </div>
             )}
           </div>

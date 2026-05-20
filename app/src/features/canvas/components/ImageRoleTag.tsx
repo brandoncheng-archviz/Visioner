@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Building2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { imageRoleOptions, getImageRoleOption, validateCustomReferenceLabel } from '../constants/imageUsages';
 import { FLOATING_PANEL_BACKGROUND } from '../constants/canvasConstants';
 import type { ImageRole } from '../types/imageNode.types';
@@ -28,7 +29,7 @@ export function ImageRoleTag({
   const selectedOption = getImageRoleOption(role, customRoleLabel);
   const previewOption = getImageRoleOption(hoveredRole || role, hoveredRole === 'custom_reference' ? customInput : customRoleLabel);
   const DisplayIcon = selectedOption?.Icon || Building2;
-  const customUsageSuggestions = ['\u94fa\u88c5\u53c2\u8003', '\u6c34\u666f\u53c2\u8003', '\u7acb\u9762\u706f\u5149', '\u5ba4\u5185\u5bb6\u5177'];
+  const customUsageSuggestions = [t('imageNode.customSuggestions.paving'), t('imageNode.customSuggestions.waterscape'), t('imageNode.customSuggestions.facadeLight'), t('imageNode.customSuggestions.indoorFurniture')];
 
   useEffect(() => {
     if (!open) {
@@ -103,7 +104,7 @@ export function ImageRoleTag({
           }}
         >
           <DisplayIcon className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
-          <span>{selectedOption?.label || '\u5b9a\u4e49\u7528\u9014'}</span>
+          <span>{selectedOption?.label || t('imageNode.definePurpose')}</span>
           <ChevronDown className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.6)' }} />
         </button>
       </div>
@@ -167,7 +168,7 @@ export function ImageRoleTag({
                     setOpen(false);
                   }
                 }}
-                placeholder={'\u8f93\u5165\u81ea\u5b9a\u4e49\u7528\u9014'}
+                placeholder={t('imageNode.customReferencePlaceholder')}
                 className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
                 style={{
                   background: 'rgba(255,255,255,0.08)',
@@ -176,7 +177,7 @@ export function ImageRoleTag({
                 }}
               />
               <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
-                {'\u7528\u4e8e\u5b9a\u4e49\u5177\u4f53\u53c2\u8003\u5185\u5bb9\uff0c\u4f8b\u5982\u94fa\u88c5\u3001\u6c34\u666f\u3001\u706f\u5149\u3001\u5bb6\u5177\u3002'}
+                {t('imageNode.customReferenceDesc')}
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {customUsageSuggestions.map((label) => (
@@ -205,7 +206,7 @@ export function ImageRoleTag({
                 color: 'rgba(255,255,255,0.54)',
               }}
             >
-              <div>{previewOption?.detail || '\u9009\u62e9\u56fe\u7247\u5728\u5efa\u7b51\u53ef\u89c6\u5316\u6d41\u7a0b\u4e2d\u7684\u53c2\u8003\u89d2\u8272\u3002\u5177\u4f53\u5c40\u90e8\u5185\u5bb9\u53ef\u4f7f\u7528\u81ea\u5b9a\u4e49\u7528\u9014\u3002'}</div>
+              <div>{previewOption?.detail || t('reference.undefinedUsageDetail')}</div>
               {previewOption && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {previewOption.constraints.map((constraint) => (
@@ -218,7 +219,7 @@ export function ImageRoleTag({
                         color: 'rgba(225,245,255,0.76)',
                       }}
                     >
-                      <span style={{ color: previewOption.color }}>*</span> {constraint}
+                      <span style={{ color: previewOption.color }}>*</span> {t(`reference.constraints.${constraint}`, { defaultValue: constraint })}
                     </span>
                   ))}
                 </div>

@@ -1,14 +1,16 @@
 import { Crop, Box, Pencil, Lightbulb, MoreHorizontal, Maximize, Download, Maximize2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export function ImageToolbar({ onFullscreen }: { onFullscreen: () => void }) {
+  const { t } = useTranslation();
   const tools = [
-    { icon: Crop, label: '裁剪' },
-    { icon: Box, label: '视角' },
-    { icon: Pencil, label: '重绘' },
-    { icon: Lightbulb, label: '灯光' },
-    { icon: MoreHorizontal, label: '更多' },
-    { icon: Maximize, label: '扩展' },
-    { icon: Download, label: '下载' },
+    { icon: Crop, label: t('common.crop') },
+    { icon: Box, label: t('common.view') },
+    { icon: Pencil, label: t('common.redraw') },
+    { icon: Lightbulb, label: t('common.lighting') },
+    { icon: MoreHorizontal, label: t('common.more') },
+    { icon: Maximize, label: t('common.expand') },
+    { icon: Download, label: t('common.download') },
   ];
 
   return (
@@ -36,7 +38,7 @@ export function ImageToolbar({ onFullscreen }: { onFullscreen: () => void }) {
         onClick={onFullscreen}
         className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
         style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
-        title="全屏"
+        title={t('imageNode.fullscreen')}
       >
         <Maximize2 className="w-4 h-4" />
       </button>
