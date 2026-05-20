@@ -28,6 +28,7 @@ export function ImageRoleTag({
   const selectedOption = getImageRoleOption(role, customRoleLabel);
   const previewOption = getImageRoleOption(hoveredRole || role, hoveredRole === 'custom_reference' ? customInput : customRoleLabel);
   const DisplayIcon = selectedOption?.Icon || Building2;
+  const customUsageSuggestions = ['\u94fa\u88c5\u53c2\u8003', '\u6c34\u666f\u53c2\u8003', '\u7acb\u9762\u706f\u5149', '\u5ba4\u5185\u5bb6\u5177'];
 
   useEffect(() => {
     if (!open) {
@@ -56,14 +57,28 @@ export function ImageRoleTag({
 
   useEffect(() => {
     if (!open) return;
+
     const closeOnOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as HTMLElement)) {
-        setOpen(false);
+      const target = event.target;
+      if (target instanceof Node && rootRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
     };
-    document.addEventListener('pointerdown', closeOnOutside);
-    return () => document.removeEventListener('pointerdown', closeOnOutside);
-  }, [open]);
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      setShowCustomInput(false);
+    };
+
+    document.addEventListener('pointerdown', closeOnOutside, true);
+    document.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside, true);
+      document.removeEventListener('keydown', closeOnEscape, true);
+    };
+  }, [open, setOpen]);
 
   return (
     <div
@@ -88,7 +103,7 @@ export function ImageRoleTag({
           }}
         >
           <DisplayIcon className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
-          <span>{selectedOption?.label || '定义用途'}</span>
+          <span>{selectedOption?.label || '\u5b9a\u4e49\u7528\u9014'}</span>
           <ChevronDown className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.6)' }} />
         </button>
       </div>
@@ -96,6 +111,7 @@ export function ImageRoleTag({
       {open && (
         <div
           className="absolute left-0 top-[28px] w-[214px] overflow-hidden rounded-[14px] p-1.5"
+          onMouseLeave={() => setHoveredRole(null)}
           style={{
             background: FLOATING_PANEL_BACKGROUND,
             backdropFilter: 'blur(18px)',
@@ -106,12 +122,13 @@ export function ImageRoleTag({
         >
           {imageRoleOptions.map((option) => {
             const active = option.value === role;
+            const hovered = hoveredRole === option.value;
             return (
               <button
                 key={option.value}
                 type="button"
                 onMouseEnter={() => setHoveredRole(option.value)}
-                onMouseLeave={() => setHoveredRole(null)}
+                onFocus={() => setHoveredRole(option.value)}
                 onClick={() => {
                   if (option.value === 'custom_reference') {
                     setShowCustomInput(true);
@@ -123,13 +140,13 @@ export function ImageRoleTag({
                 }}
                 className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors"
                 style={{
-                  background: active ? 'rgba(55, 124, 214, 0.22)' : 'transparent',
-                  color: active ? option.color : 'rgba(255,255,255,0.82)',
+                  background: hovered ? 'rgba(255,255,255,0.09)' : active ? 'rgba(255,255,255,0.045)' : 'transparent',
+                  color: hovered ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.82)',
                 }}
               >
                 <option.Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />
                 <span className="flex-1 font-medium">{option.label}</span>
-                {active && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
+                {active && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
               </button>
             );
           })}
@@ -147,10 +164,10 @@ export function ImageRoleTag({
                   if (event.key === 'Escape') {
                     event.preventDefault();
                     setShowCustomInput(false);
+                    setOpen(false);
                   }
                 }}
-                onBlur={submitCustomRole}
-                placeholder="这张图主要参考什么？例如：铺装 / 水景 / 入口 / 栏杆"
+                placeholder={'\u8f93\u5165\u81ea\u5b9a\u4e49\u7528\u9014'}
                 className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
                 style={{
                   background: 'rgba(255,255,255,0.08)',
@@ -158,34 +175,56 @@ export function ImageRoleTag({
                   color: 'rgba(255,255,255,0.9)',
                 }}
               />
-            </div>
-          )}
-          <div
-            className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[12px] leading-relaxed"
-            style={{
-              borderColor: 'rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.54)',
-            }}
-          >
-            <div>{previewOption?.detail || '选择图片在建筑可视化流程中的参考角色。具体局部内容可使用自定义用途。'}</div>
-            {previewOption && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {previewOption.constraints.map((constraint) => (
-                  <span
-                    key={constraint}
-                    className="rounded-md px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+              <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
+                {'\u7528\u4e8e\u5b9a\u4e49\u5177\u4f53\u53c2\u8003\u5185\u5bb9\uff0c\u4f8b\u5982\u94fa\u88c5\u3001\u6c34\u666f\u3001\u706f\u5149\u3001\u5bb6\u5177\u3002'}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {customUsageSuggestions.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setCustomInput(label)}
+                    className="rounded-md px-1.5 py-0.5 text-[10px] transition-colors hover:bg-white/12"
                     style={{
-                      background: 'rgba(255,255,255,0.07)',
+                      background: 'rgba(255,255,255,0.055)',
                       border: '1px solid rgba(255,255,255,0.08)',
-                      color: 'rgba(225,245,255,0.76)',
+                      color: 'rgba(255,255,255,0.64)',
                     }}
                   >
-                    <span style={{ color: previewOption.color }}>•</span> {constraint}
-                  </span>
+                    {label}
+                  </button>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+          {!showCustomInput && (
+            <div
+              className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[12px] leading-relaxed"
+              style={{
+                borderColor: 'rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.54)',
+              }}
+            >
+              <div>{previewOption?.detail || '\u9009\u62e9\u56fe\u7247\u5728\u5efa\u7b51\u53ef\u89c6\u5316\u6d41\u7a0b\u4e2d\u7684\u53c2\u8003\u89d2\u8272\u3002\u5177\u4f53\u5c40\u90e8\u5185\u5bb9\u53ef\u4f7f\u7528\u81ea\u5b9a\u4e49\u7528\u9014\u3002'}</div>
+              {previewOption && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {previewOption.constraints.map((constraint) => (
+                    <span
+                      key={constraint}
+                      className="rounded-md px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                      style={{
+                        background: 'rgba(255,255,255,0.07)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        color: 'rgba(225,245,255,0.76)',
+                      }}
+                    >
+                      <span style={{ color: previewOption.color }}>*</span> {constraint}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

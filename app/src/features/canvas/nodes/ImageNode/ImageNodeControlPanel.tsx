@@ -125,7 +125,10 @@ export function ImageNodeControlPanel({
   const [slashIndex, setSlashIndex] = useState(0);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const pendingCustomInputRef = useRef<HTMLInputElement>(null);
+  const pendingUsageMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const customUsageSuggestions = ['\u94fa\u88c5\u53c2\u8003', '\u6c34\u666f\u53c2\u8003', '\u7acb\u9762\u706f\u5149', '\u5ba4\u5185\u5bb6\u5177'];
+  const customUsagePlaceholderProps: Record<string, string> = { placeholder: '\u8f93\u5165\u81ea\u5b9a\u4e49\u7528\u9014' };
 
   /* ─── Reference thumbnail drag-and-drop reorder ─── */
   const [orderedRefs, setOrderedRefs] = useState(references);
@@ -396,6 +399,31 @@ export function ImageNodeControlPanel({
     setPendingCustomValue('');
     setUsageConflict(null);
   };
+
+  useEffect(() => {
+    if (!pendingReference) return;
+
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && pendingUsageMenuRef.current?.contains(target)) {
+        return;
+      }
+      closeReferenceMenus();
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeReferenceMenus();
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOnOutside, true);
+    document.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside, true);
+      document.removeEventListener('keydown', closeOnEscape, true);
+    };
+  }, [pendingReference]);
 
   useEffect(() => {
     const referencesById = new Map(references.map((reference) => [reference.nodeId, reference]));
@@ -1259,6 +1287,7 @@ export function ImageNodeControlPanel({
           )}
           {pendingReference && (
             <div
+              ref={pendingUsageMenuRef}
               className="absolute left-0 top-7 z-40 overflow-hidden rounded-xl py-1"
               style={{
                 width: 260,
@@ -1341,8 +1370,8 @@ export function ImageNodeControlPanel({
                         setPendingCustomInput(false);
                       }
                     }}
-                    onBlur={submitPendingCustomRole}
                     placeholder="这张图主要参考什么？例如：铺装 / 水景 / 入口 / 栏杆"
+                    {...customUsagePlaceholderProps}
                     className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
                     style={{
                       background: 'rgba(255,255,255,0.08)',
@@ -1350,6 +1379,26 @@ export function ImageNodeControlPanel({
                       color: 'rgba(255,255,255,0.9)',
                     }}
                   />
+                  <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
+                    用于定义具体参考内容，例如铺装、水景、灯光、家具。
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {customUsageSuggestions.map((label) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setPendingCustomValue(label)}
+                        className="rounded-md px-1.5 py-0.5 text-[10px] transition-colors hover:bg-white/12"
+                        style={{
+                          background: 'rgba(255,255,255,0.055)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          color: 'rgba(255,255,255,0.64)',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
