@@ -199,6 +199,8 @@ Features:
 
 The canvas editor code is organized as a feature module under `src/features/canvas/` with sub-folders for components, nodes, types, constants, hooks, and utils.
 
+> **Architecture & Data Rules:** 详细的 Canvas 模块架构规则、组件放置规范、以及假生成任务流数据规则，见仓库根目录 `CANVAS_RULES.md`。后续所有 Canvas 相关修改必须同时遵守 `AGENTS.md` 和 `CANVAS_RULES.md`。
+
 ### Custom 2D Canvas Node Editor (`src/components/NodeEditor/`)
 
 An independent canvas-based node editor rendered on a raw `<canvas>` element. **Note:** This module is not currently wired into any route; it is a standalone subsystem.

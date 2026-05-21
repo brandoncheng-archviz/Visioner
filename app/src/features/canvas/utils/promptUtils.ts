@@ -1,6 +1,26 @@
-import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StylePreset } from '../types/imageNode.types';
+import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StylePreset, PromptTemplate } from '../types/imageNode.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
+
+function serializePromptTemplate(template: string | PromptTemplate): string {
+  if (typeof template === 'string') return template;
+  const parts = [
+    template.goal,
+    template.style,
+    template.image,
+    template.lighting,
+    template.color,
+    template.background,
+    template.material,
+    template.output,
+  ].filter(Boolean);
+  return parts.join(' ');
+}
+
+function extractConstraints(template: string | PromptTemplate): string | null {
+  if (typeof template === 'string') return null;
+  return template.constraints || null;
+}
 
 export function stripReferencePromptMetadata(promptText: string) {
   const weightLabel = '权重';
@@ -115,24 +135,43 @@ export function buildPromptSubmission(
   const atmosphereRefs = imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围'));
   const undefinedRefs = imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未定义用途');
 
-  const presetPrompts = selectedPresetIds
+  const selectedPresetsList = selectedPresetIds
     .map(getPresetById)
-    .filter((preset): preset is PresetItem => Boolean(preset))
-    .map((preset) => preset.promptTemplate);
+    .filter((preset): preset is PresetItem => Boolean(preset));
 
-  const presets = selectedPresetIds
-    .map(getPresetById)
-    .filter((preset): preset is PresetItem => Boolean(preset))
-    .map((preset) => ({
-      presetKey: preset.id,
-      presetLabel: preset.name,
-      presetPrompt: preset.promptTemplate,
-      presetType: getPresetType(preset),
-    }));
+  const presetPrompts = selectedPresetsList.map((preset) => serializePromptTemplate(preset.promptTemplate));
+
+  const allConstraints: string[] = [];
+  selectedPresetsList.forEach((preset) => {
+    const c = extractConstraints(preset.promptTemplate);
+    if (c) allConstraints.push(c);
+  });
+
+  const presets = selectedPresetsList.map((preset) => ({
+    presetKey: preset.id,
+    presetLabel: preset.name,
+    presetPrompt: serializePromptTemplate(preset.promptTemplate),
+    presetType: getPresetType(preset),
+  }));
 
   const sections: string[] = [];
   if (trimmedUserText) sections.push(`用户明确要求：${trimmedUserText}`);
-  if (presetPrompts.length) sections.push(`预设文本指令：${presetPrompts.join('。')}`);
+  if (presetPrompts.length) {
+    let presetSection = `预设增强：${presetPrompts.join('。')}`;
+    if (allConstraints.length > 0) {
+      const constraintSet = new Set<string>();
+      allConstraints.forEach((c) => {
+        c.split(/[;；]/).forEach((part) => {
+          const trimmed = part.trim();
+          if (trimmed) constraintSet.add(trimmed);
+        });
+      });
+      if (constraintSet.size > 0) {
+        presetSection += `\n约束：${Array.from(constraintSet).join('；')}`;
+      }
+    }
+    sections.push(presetSection);
+  }
   if (primaryBuilding.length) sections.push(`主体建筑约束：${primaryBuilding.map((block) => block.promptText).join('；')}`);
   if (customUsages.length) sections.push(`自定义用途约束：${customUsages.map((block) => block.promptText).join('；')}`);
   if (localRefs.length) sections.push(`局部参考：${localRefs.map((block) => block.promptText).join('；')}`);

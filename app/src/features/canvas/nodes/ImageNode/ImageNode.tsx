@@ -6,7 +6,16 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
 import type { ImageRole, PromptContent, ReferenceInfo } from '../../types/imageNode.types';
 import type { MarkItem, ModelParams } from '../../types/canvas.types';
-import type { GenerationTask } from '../../types/generation.types';
+import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
+import {
+  normalizeGeneratedImages,
+  getCurrentImage,
+  getInputImage,
+  getNodeGenerationTask,
+  getCurrentResultId,
+  getNodeWidth,
+  getNodeHeight,
+} from '../../types/imageNodeData.types';
 import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
 import {
   IMAGE_NODE_PREVIEW_WIDTH,
@@ -34,12 +43,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const inverseScale = 1 / zoom;
   const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
 
-  const img = data.image as string;
+  const inputImage = getInputImage(data);
+  const currentImage = getCurrentImage(data);
   const role = (data.role as ImageRole | null | undefined) ?? null;
   const customRoleLabel = data.customRoleLabel as string | undefined;
   const fileRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || 'Image');
-  const [previewImage, setPreviewImage] = useState(img);
+  const [previewImage, setPreviewImage] = useState(currentImage);
   const [editingName, setEditingName] = useState(false);
   const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -54,8 +65,53 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [selectedPresets, setSelectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
-  const [generatedImages, setGeneratedImages] = useState<string[]>((data.generatedImages as string[]) || []);
-  const [generationTask, setGenerationTask] = useState<GenerationTask | null>((data.generationTask as GenerationTask | undefined) || null);
+  const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
+  const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
+  const [currentResultId, setCurrentResultId] = useState<string | null>(getCurrentResultId(data));
+
+  // Cleanup: abort running generation on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  // Sync local generation state from node.data (for Undo/Redo and external updates)
+  useEffect(() => {
+    const next = getNodeGenerationTask(data);
+    setGenerationTask((prev) => {
+      if (prev === next) return prev;
+      if (
+        prev?.taskId === next?.taskId &&
+        prev?.status === next?.status &&
+        prev?.progress === next?.progress &&
+        prev?.errorMessage === next?.errorMessage &&
+        prev?.result?.taskId === next?.result?.taskId
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [data.generationTask]);
+
+  useEffect(() => {
+    const nextCurrent = getCurrentImage(data);
+    setPreviewImage((prev) => (prev === nextCurrent ? prev : nextCurrent));
+  }, [data.currentImage, data.image, data.inputImage]);
+
+  useEffect(() => {
+    const next = normalizeGeneratedImages(data.generatedImages);
+    setGeneratedImages((prev) => {
+      if (prev.length !== next.length) return next;
+      if (prev.some((item, i) => item.resultId !== next[i]?.resultId)) return next;
+      return prev;
+    });
+  }, [data.generatedImages]);
+
+  useEffect(() => {
+    const next = getCurrentResultId(data);
+    setCurrentResultId((prev) => (prev === next ? prev : next));
+  }, [data.currentResultId]);
 
   /* ─── Reference tracking ─── */
   const allEdges = useStore((state) => state.edges);
@@ -76,9 +132,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       role: referenceRole,
       roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel),
       customRoleLabel: referenceCustomRoleLabel,
-      imageUrl: sourceNode?.data?.image as string,
-      width: (sourceNode?.data?.width as number) || undefined,
-      height: (sourceNode?.data?.height as number) || undefined,
+      imageUrl: getCurrentImage(sourceNode?.data),
+      width: getNodeWidth(sourceNode?.data),
+      height: getNodeHeight(sourceNode?.data),
     };
   });
   const references: ReferenceInfo[] = rawReferences
@@ -136,6 +192,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const handleGenerate = useCallback(async () => {
     const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references);
 
+    // Abort any previous running generation
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const task = createGenerationTask({
       sourceNodeId: id,
       prompt: textPrompt,
@@ -172,9 +233,24 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress, updatedAt: Date.now() } : prev));
           },
         },
+        controller.signal,
       );
 
-      const nextGeneratedImages = [...generatedImages, result.imageUrl];
+      const historyItem: GenerationHistoryItem = {
+        resultId: result.taskId,
+        imageUrl: result.imageUrl,
+        prompt: textPrompt,
+        userPrompt: userPrompt || '',
+        inputRefs: task.inputRefs,
+        presetIds: selectedPresets,
+        styleId: selectedStyleId,
+        modelParams: { ...modelParams },
+        seed: result.seed,
+        width: result.width,
+        height: result.height,
+        createdAt: Date.now(),
+      };
+      const nextGeneratedImages = [...generatedImages, historyItem];
       setPreviewImage(result.imageUrl);
       setGeneratedImages(nextGeneratedImages);
 
@@ -194,6 +270,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 data: {
                   ...n.data,
                   image: result.imageUrl,
+                  currentImage: result.imageUrl,
+                  currentResultId: result.taskId,
                   finalPrompt: textPrompt,
                   textPrompt,
                   imageReferences,
@@ -230,7 +308,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [promptText, promptContent, selectedPresets, selectedStyle, references, generatedImages, id, setNodes, modelParams]);
+  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
@@ -292,6 +370,32 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     // Shared entry point for top thumbnails and the @ reference menu.
   };
 
+  const handleSelectResult = (resultId: string | null) => {
+    if (resultId === null) {
+      setPreviewImage(inputImage);
+      setCurrentResultId(null);
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? { ...n, data: { ...n.data, image: inputImage, currentImage: inputImage, currentResultId: null } }
+            : n,
+        ),
+      );
+      return;
+    }
+    const item = generatedImages.find((g) => g.resultId === resultId);
+    if (!item) return;
+    setPreviewImage(item.imageUrl);
+    setCurrentResultId(resultId);
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id
+          ? { ...n, data: { ...n.data, image: item.imageUrl, currentImage: item.imageUrl, currentResultId: resultId } }
+          : n,
+      ),
+    );
+  };
+
   const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string) => {
     const roleOption = getImageRoleOption(nextRole, nextCustomRoleLabel);
     const roleData = getRoleData(nextRole, nextCustomRoleLabel);
@@ -336,6 +440,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 data: {
                   ...n.data,
                   image: url,
+                  inputImage: url,
+                  currentImage: url,
+                  currentResultId: null,
                   label: name,
                   width: imgEl.width,
                   height: imgEl.height,
@@ -382,9 +489,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     event.stopPropagation();
   };
 
-  const displayImage = previewImage || img;
-  const sourceWidth = imgSize?.width || (data.width as number) || 1;
-  const sourceHeight = imgSize?.height || (data.height as number) || 1;
+  const displayImage = previewImage || currentImage;
+  const sourceWidth = imgSize?.width || getNodeWidth(data) || 1;
+  const sourceHeight = imgSize?.height || getNodeHeight(data) || 1;
   const aspectRatio = sourceWidth / sourceHeight;
   const imageDisplayScale = displayImage
     ? Math.min(
@@ -482,7 +589,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </div>
           {displayImage && showTitleMeta && (
             <span className="flex-shrink-0 ml-2" style={{ fontSize: 11 }}>
-              {imgSize ? `${imgSize.width}×${imgSize.height}` : `${(data.width as number) || 1024}×${(data.height as number) || 1024}`}
+              {imgSize ? `${imgSize.width}×${imgSize.height}` : `${getNodeWidth(data) || 1024}×${getNodeHeight(data) || 1024}`}
             </span>
           )}
         </div>
@@ -540,6 +647,64 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             </div>
           )}
         </div>
+
+        {/* Result history thumbnails — shown at bottom of image when there are generated results */}
+        {displayImage && generatedImages.length > 0 && isOnlySelected && (
+          <div
+            className="absolute z-20 flex items-center gap-1.5 nodrag nowheel"
+            style={{
+              bottom: 8,
+              left: '50%',
+              transform: `translateX(-50%)`,
+              padding: '4px 6px',
+              background: 'rgba(10,10,15,0.72)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.08)',
+              maxWidth: cardWidth - 16,
+              overflowX: 'auto',
+            }}
+          >
+            {/* Original image thumbnail */}
+            <button
+              type="button"
+              onClick={() => handleSelectResult(null)}
+              className="flex-shrink-0 relative rounded overflow-hidden transition-all"
+              style={{
+                width: 28,
+                height: 28,
+                border: currentResultId === null ? '1.5px solid #00d4ff' : '1.5px solid transparent',
+                boxShadow: currentResultId === null ? '0 0 0 1px rgba(0,212,255,0.3)' : 'none',
+              }}
+              title={t('imageNode.originalImage')}
+            >
+              {inputImage ? (
+                <img src={inputImage} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
+              )}
+            </button>
+            {/* Generated result thumbnails */}
+            {generatedImages.map((item, idx) => (
+              <button
+                key={item.resultId}
+                type="button"
+                onClick={() => handleSelectResult(item.resultId)}
+                className="flex-shrink-0 relative rounded overflow-hidden transition-all"
+                style={{
+                  width: 28,
+                  height: 28,
+                  border: currentResultId === item.resultId ? '1.5px solid #00d4ff' : '1.5px solid transparent',
+                  boxShadow: currentResultId === item.resultId ? '0 0 0 1px rgba(0,212,255,0.3)' : 'none',
+                }}
+                title={`#${idx + 1}`}
+              >
+                <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Left visual handle — Input (hidden when image exists) */}
         {!displayImage && (

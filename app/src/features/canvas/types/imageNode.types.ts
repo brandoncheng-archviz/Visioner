@@ -13,6 +13,18 @@ export type ImageRole =
   | 'overall_reference'
   | 'plant_reference';
 
+export interface PromptTemplate {
+  goal: string;
+  style: string;
+  image: string;
+  lighting: string;
+  color: string;
+  background: string;
+  material: string;
+  output: string;
+  constraints: string;
+}
+
 export interface PresetItem {
   id: string;
   name: string;
@@ -22,7 +34,9 @@ export interface PresetItem {
   selectType: 'single' | 'multi';
   presetType?: 'enhancement' | 'modifier';
   shortDescription: string;
-  promptTemplate: string;
+  promptTemplate: string | PromptTemplate;
+  shortHelp?: string;
+  recommendedInCommon?: boolean;
   tags: string[];
   thumbnail: string;
 }

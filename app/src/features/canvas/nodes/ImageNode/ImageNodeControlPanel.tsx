@@ -321,7 +321,14 @@ export function ImageNodeControlPanel({
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const selectedStyle = getStylePresetById(selectedStyleId);
   const visiblePresets = useMemo(
-    () => PRESET_DATA.filter((preset) => preset.category !== 'style' && preset.tabs.includes(activePresetTab)),
+    () =>
+      PRESET_DATA.filter((preset) => {
+        if (preset.category === 'style') return false;
+        if (activePresetTab === '常用') {
+          return preset.tabs.includes('常用') || preset.recommendedInCommon;
+        }
+        return preset.tabs.includes(activePresetTab);
+      }),
     [activePresetTab],
   );
   const slashFilteredPresets = useMemo(() => {

@@ -259,7 +259,7 @@ function FlowCanvas() {
     if (selected.length === 0) return;
     clipboardRef.current = selected.map((n) => ({
       type: n.type!,
-      data: { ...n.data },
+      data: { ...n.data, generationTask: null },
       position: { ...n.position },
     }));
     pasteOffsetRef.current = 0;
@@ -618,6 +618,9 @@ function FlowCanvas() {
                 data: {
                   label: file.name.replace(/\.[^/.]+$/, ''),
                   image: url,
+                  inputImage: url,
+                  currentImage: url,
+                  currentResultId: null,
                   width: imgEl.width,
                   height: imgEl.height,
                   ...getRoleData(null),

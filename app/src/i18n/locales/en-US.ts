@@ -106,6 +106,7 @@ const enUS = {
     generating: "Generating...",
     retry: "Retry",
     generationFailed: "Generation failed",
+    originalImage: "Original",
     model: "Model",
     count: "Count",
     usageConflictTitle: "There is already a 「{{role}}」reference; this purpose allows at most 1 per target node.",
@@ -209,29 +210,37 @@ const enUS = {
     },
     noCustomPresets: "No custom presets yet",
     saveCurrentPresetsHint: "You can save current preset combinations here",
-    photorealistic: {
+    photo_realistic: {
       name: "Photorealistic",
-      shortDescription: "Global realism enhancement",
+      shortDescription: "Real light / Material detail",
     },
-    commercial_render: {
-      name: "Commercial Render",
-      shortDescription: "High-precision commercial quality",
+    natural_exposure: {
+      name: "Natural Exposure",
+      shortDescription: "Balanced ratio / Natural exposure",
     },
-    material_enhance: {
-      name: "Material Enhance",
+    material_enhancement: {
+      name: "Material Enhancement",
       shortDescription: "Glass / Metal / Concrete",
     },
-    glass_reflection: {
-      name: "Glass Reflection",
-      shortDescription: "Optimize glass mirror reflection",
+    realistic_reflection: {
+      name: "Realistic Reflection",
+      shortDescription: "Glass reflection / Water reflection",
     },
     reduce_ai_feel: {
       name: "Reduce AI Feel",
-      shortDescription: "Weaken AI generation traces",
+      shortDescription: "Less generation trace / More real",
     },
-    unify_texture: {
-      name: "Unify Texture",
-      shortDescription: "Unify material expression language",
+    commercial_photography: {
+      name: "Commercial Photography",
+      shortDescription: "Estate quality / Premium output",
+    },
+    realistic_vegetation: {
+      name: "Realistic Vegetation",
+      shortDescription: "Natural plants / Real layers",
+    },
+    clear_details: {
+      name: "Clear Details",
+      shortDescription: "Detail enhancement / Sharp imaging",
     },
     sunset_mood: {
       name: "Sunset Mood",

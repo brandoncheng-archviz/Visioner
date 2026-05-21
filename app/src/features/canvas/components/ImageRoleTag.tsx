@@ -18,6 +18,7 @@ export function ImageRoleTag({
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
@@ -29,7 +30,12 @@ export function ImageRoleTag({
   const selectedOption = getImageRoleOption(role, customRoleLabel);
   const previewOption = getImageRoleOption(hoveredRole || role, hoveredRole === 'custom_reference' ? customInput : customRoleLabel);
   const DisplayIcon = selectedOption?.Icon || Building2;
-  const customUsageSuggestions = [t('imageNode.customSuggestions.paving'), t('imageNode.customSuggestions.waterscape'), t('imageNode.customSuggestions.facadeLight'), t('imageNode.customSuggestions.indoorFurniture')];
+  const customUsageSuggestions = [
+    t('imageNode.customSuggestions.paving', { defaultValue: '铺装参考' }),
+    t('imageNode.customSuggestions.waterscape', { defaultValue: '水景参考' }),
+    t('imageNode.customSuggestions.facadeLight', { defaultValue: '立面灯光' }),
+    t('imageNode.customSuggestions.indoorFurniture', { defaultValue: '室内家具' }),
+  ];
 
   useEffect(() => {
     if (!open) {
@@ -152,7 +158,13 @@ export function ImageRoleTag({
             );
           })}
           {showCustomInput && (
-            <div className="px-2.5 py-2">
+            <div
+              className="mx-1.5 my-1.5 rounded-[10px] p-2"
+              style={{
+                background: 'rgba(255,255,255,0.045)',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
               <input
                 ref={customInputRef}
                 value={customInput}
@@ -168,7 +180,7 @@ export function ImageRoleTag({
                     setOpen(false);
                   }
                 }}
-                placeholder={t('imageNode.customReferencePlaceholder')}
+                placeholder={t('imageNode.customReferencePlaceholder', { defaultValue: '输入用途名称' })}
                 className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
                 style={{
                   background: 'rgba(255,255,255,0.08)',
@@ -176,9 +188,6 @@ export function ImageRoleTag({
                   color: 'rgba(255,255,255,0.9)',
                 }}
               />
-              <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
-                {t('imageNode.customReferenceDesc')}
-              </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {customUsageSuggestions.map((label) => (
                   <button
@@ -195,6 +204,9 @@ export function ImageRoleTag({
                     {label}
                   </button>
                 ))}
+              </div>
+              <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.44)' }}>
+                {t('imageNode.customReferenceDesc', { defaultValue: '用于定义具体局部参考内容。' })}
               </div>
             </div>
           )}

@@ -41,6 +41,7 @@ export function createGenerationTask(input: GenerationInput): GenerationTask {
 export function simulateGeneration(
   input: GenerationInput,
   callbacks?: GenerationCallbacks,
+  signal?: AbortSignal,
 ): Promise<GenerationResult> {
   return new Promise((resolve, reject) => {
     const totalDuration = 2000 + Math.random() * 3000; // 2~5s
@@ -49,14 +50,24 @@ export function simulateGeneration(
 
     let elapsed = 0;
     let progress = 0;
+    let settled = false;
 
     const intervalId = setInterval(() => {
+      if (settled) return;
+
       elapsed += updateInterval;
       progress = Math.min(95, Math.floor((elapsed / totalDuration) * 100));
       callbacks?.onProgress?.(progress);
 
       if (elapsed >= totalDuration) {
+        settled = true;
         clearInterval(intervalId);
+
+        if (signal?.aborted) {
+          reject(new Error('任务已取消'));
+          return;
+        }
+
         const shouldFail = Math.random() < failProbability;
         if (shouldFail) {
           const errorMessages = [
@@ -72,5 +83,19 @@ export function simulateGeneration(
         }
       }
     }, updateInterval);
+
+    if (signal) {
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        clearInterval(intervalId);
+        reject(new Error('任务已取消'));
+      };
+      if (signal.aborted) {
+        onAbort();
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+    }
   });
 }

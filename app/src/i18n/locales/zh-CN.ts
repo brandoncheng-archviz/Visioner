@@ -106,6 +106,7 @@ const zhCN = {
     generating: "生成中...",
     retry: "重试",
     generationFailed: "生成失败",
+    originalImage: "原图",
     model: "模型",
     count: "数量",
     usageConflictTitle: "已有一张「{{role}}」，该用途同一目标节点最多 1 张。",
@@ -209,29 +210,37 @@ const zhCN = {
     },
     noCustomPresets: "暂无自定义预设",
     saveCurrentPresetsHint: "你可以将当前预设组合保存到这里",
-    photorealistic: {
+    photo_realistic: {
       name: "照片般真实",
-      shortDescription: "全局真实度增强",
+      shortDescription: "真实光影 / 材质细节",
     },
-    commercial_render: {
-      name: "商业渲染",
-      shortDescription: "高精度商业级表现",
+    natural_exposure: {
+      name: "自然曝光",
+      shortDescription: "光比平衡 / 曝光自然",
     },
-    material_enhance: {
+    material_enhancement: {
       name: "材质强化",
       shortDescription: "玻璃 / 金属 / 混凝土",
     },
-    glass_reflection: {
-      name: "玻璃反射",
-      shortDescription: "优化玻璃镜面反射",
+    realistic_reflection: {
+      name: "真实反射",
+      shortDescription: "玻璃反光 / 水面反射",
     },
     reduce_ai_feel: {
-      name: "降低AI感",
-      shortDescription: "弱化AI生成痕迹",
+      name: "降低 AI 感",
+      shortDescription: "减少生成痕迹 / 更真实可信",
     },
-    unify_texture: {
-      name: "统一质感",
-      shortDescription: "统一材质表现语言",
+    commercial_photography: {
+      name: "商业摄影感",
+      shortDescription: "地产质感 / 高级成片",
+    },
+    realistic_vegetation: {
+      name: "植被真实化",
+      shortDescription: "自然植物 / 真实层次",
+    },
+    clear_details: {
+      name: "细节清晰",
+      shortDescription: "细部增强 / 清晰成像",
     },
     sunset_mood: {
       name: "黄昏氛围",

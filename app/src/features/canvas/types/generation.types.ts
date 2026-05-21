@@ -1,3 +1,5 @@
+import type { ModelParams } from './canvas.types';
+
 export type GenerationStatus = 'pending' | 'running' | 'success' | 'failed';
 
 export interface GenerationInput {
@@ -42,6 +44,21 @@ export interface GenerationTask {
   errorMessage: string | null;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface GenerationHistoryItem {
+  resultId: string;
+  imageUrl: string;
+  prompt: string;
+  userPrompt: string;
+  inputRefs: GenerationInput['inputRefs'];
+  presetIds: string[];
+  styleId: string | null;
+  modelParams: ModelParams;
+  seed: number;
+  width: number;
+  height: number;
+  createdAt: number;
 }
 
 export interface GenerationCallbacks {

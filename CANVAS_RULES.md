@@ -682,6 +682,102 @@ ImageNodeControlPanel 修改频繁且难维护
 不要因为已经完成 Phase 1 / Phase 2，就继续机械地进入 Phase 3。
 当前更重要的是保持稳定，并继续完善产品功能。
 
+---
+
+## 18. 假生成任务流数据规则（Fake Generation Flow Data Rules）
+
+ImageNode 已接入最小假生成任务流。后续所有与图片生成、生成历史、生成任务相关的修改，必须遵守以下数据规则。
+
+### 18.1 图片字段规则
+
+| 字段 | 含义 | 写入时机 | 是否可被生成覆盖 |
+|---|---|---|---|
+| `inputImage` | 用户最初上传 / 拖入的原始输入图 | 首次上传、拖放、明确替换原图时 | **禁止覆盖** |
+| `currentImage` | 节点当前显示图（原图或最新生成结果） | 上传时写入；生成成功时更新 | 允许更新 |
+| `image` | **旧数据兼容字段**，不再作为唯一图片来源 | 上传时同步写入；生成成功时同步更新 | 允许更新 |
+| `generatedImages` | 生成结果历史数组 | 每次生成成功时 push | 允许追加 |
+
+**核心约束：**
+- 生成成功时只能更新 `currentImage`，不允许覆盖 `inputImage`。
+- 上传 / 拖放新图片时，`inputImage`、`currentImage`、`image` 三个字段可同时写入新 URL。
+- 新逻辑中不得单独依赖 `data.image` 作为图片来源，必须使用读取优先级链。
+
+### 18.2 读取优先级
+
+```ts
+// 当前显示图
+const currentImage = data.currentImage || data.image || data.inputImage;
+
+// 原始输入图
+const inputImage = data.inputImage || data.image;
+```
+
+- `currentImage` 用于节点预览、全屏查看、控制面板缩略图。
+- `inputImage` 用于"对比原图"、"回退到原图"、原图元数据展示。
+- `data.image` 仅作为无 `inputImage`/`currentImage` 时的兜底兼容。
+
+### 18.3 生成历史规则
+
+`generatedImages` 必须使用 `GenerationHistoryItem[]` 结构：
+
+```ts
+interface GenerationHistoryItem {
+  resultId: string;           // 结果唯一 ID
+  imageUrl: string;           // 图片地址
+  prompt: string;             // 最终拼接后的完整 prompt
+  userPrompt: string;         // 用户手写输入（不含预设/引用拼接）
+  inputRefs: InputRef[];      // 引用图快照
+  presetIds: string[];        // 已选预设 ID 列表
+  styleId: string | null;     // 已选风格 ID
+  modelParams: ModelParams;   // 模型参数快照
+  seed: number;               // 随机种子
+  width: number;              // 结果宽
+  height: number;             // 结果高
+  createdAt: number;          // 生成时间戳
+}
+```
+
+**约束：**
+- 不再新增 `string[]` 形式的 `generatedImages`。
+- 每次生成成功必须写入完整快照，禁止只存 `imageUrl`。
+- 旧 `string[]` 数据仅通过 `normalizeGeneratedImages()` 兼容读取，写入时必须转为新结构。
+- 禁止绕过 `normalizeGeneratedImages` 直接假设 `data.generatedImages` 是对象数组。
+
+### 18.4 任务状态规则
+
+`generationTask` 存在于 `node.data` 中，作为持久化来源。
+
+**数据来源层级：**
+```
+node.data.generationTask  ← 持久化来源（Undo/Redo 快照包含此字段）
+    ↓
+ImageNode local state     ← 即时 UI 状态（mount 时从 data 初始化）
+    ↓
+UI 展示（生成中 / 成功 / 失败 / 重试按钮）
+```
+
+**同步约束：**
+- `ImageNode` 本地 state 必须监听 `node.data.generationTask` 变化并同步更新。
+- 本地 state 的修改必须伴随 `setNodes` 写入 `node.data`，不能仅存于本地。
+- Undo / Redo 回退 `node.data` 后，本地 UI 状态不得继续显示旧的生成中 / 失败 / 成功状态。
+
+**生命周期约束：**
+- 开始新生成前必须 `abort` 旧任务（通过 `AbortController`）。
+- 组件卸载时必须 `abort` 当前运行中的任务。
+- `simulateGeneration` 支持 `AbortSignal`，取消后必须清理 `setInterval`。
+
+### 18.5 禁止事项
+
+```text
+- 不要把生成结果覆盖到 inputImage。
+- 不要让 generatedImages 回退为 string[]。
+- 不要绕过 normalizeGeneratedImages 直接读取历史。
+- 不要把 AI prompt、预设、引用图、模型参数只存在本地 state 中而不写入生成快照。
+- 不要在组件卸载后让 simulateGeneration 的 interval 继续运行。
+- 不要为了在生成中显示进度而破坏 node.data 的结构化数据。
+- 不要为了假生成流重构 CanvasPage 大结构。
+```
+
 ````
 
 这版可以作为你现在的**完整长期规则**。  
