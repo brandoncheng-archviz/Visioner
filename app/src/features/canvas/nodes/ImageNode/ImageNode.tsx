@@ -236,8 +236,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         controller.signal,
       );
 
+      const batchId = result.taskId;
       const historyItem: GenerationHistoryItem = {
         resultId: result.taskId,
+        batchId,
+        batchIndex: 1,
         imageUrl: result.imageUrl,
         prompt: textPrompt,
         userPrompt: userPrompt || '',
@@ -666,25 +669,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               overflowX: 'auto',
             }}
           >
-            {/* Original image thumbnail */}
-            <button
-              type="button"
-              onClick={() => handleSelectResult(null)}
-              className="flex-shrink-0 relative rounded overflow-hidden transition-all"
-              style={{
-                width: 28,
-                height: 28,
-                border: currentResultId === null ? '1.5px solid #00d4ff' : '1.5px solid transparent',
-                boxShadow: currentResultId === null ? '0 0 0 1px rgba(0,212,255,0.3)' : 'none',
-              }}
-              title={t('imageNode.originalImage')}
-            >
-              {inputImage ? (
-                <img src={inputImage} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              )}
-            </button>
             {/* Generated result thumbnails */}
             {generatedImages.map((item, idx) => (
               <button
@@ -698,7 +682,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   border: currentResultId === item.resultId ? '1.5px solid #00d4ff' : '1.5px solid transparent',
                   boxShadow: currentResultId === item.resultId ? '0 0 0 1px rgba(0,212,255,0.3)' : 'none',
                 }}
-                title={`#${idx + 1}`}
+                title={`${idx + 1}`}
               >
                 <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
               </button>

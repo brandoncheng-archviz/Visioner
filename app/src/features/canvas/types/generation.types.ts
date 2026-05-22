@@ -48,6 +48,8 @@ export interface GenerationTask {
 
 export interface GenerationHistoryItem {
   resultId: string;
+  batchId: string;
+  batchIndex: number;
   imageUrl: string;
   prompt: string;
   userPrompt: string;

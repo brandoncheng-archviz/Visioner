@@ -40,7 +40,7 @@ export const banners: BannerItem[] = [
     title: 'SKETCH TO RENDER',
     subtitle: '草图一键渲染',
     tag: 'VizMaker Core',
-    image: '/images/banner-workflow.jpg',
+    image: '/assets/examples/home/banner-workflow.jpg',
     textPosition: 'left',
   },
   {
@@ -49,7 +49,7 @@ export const banners: BannerItem[] = [
     subtitle: 'AI 智能填色',
     tag: 'Revit / SketchUp / 3ds Max',
     date: '实时渲染',
-    image: '/images/banner-ai-video.jpg',
+    image: '/assets/examples/home/banner-ai-video.jpg',
     textPosition: 'left',
   },
   {
@@ -57,7 +57,7 @@ export const banners: BannerItem[] = [
     title: 'PRESET LIBRARY',
     subtitle: '千种风格预设',
     tag: '室内 · 建筑 · 景观 · 产品',
-    image: '/images/banner-features.jpg',
+    image: '/assets/examples/home/banner-features.jpg',
     textPosition: 'left',
   },
 ];
@@ -218,7 +218,7 @@ export const recentProjects: ProjectItem[] = [
   {
     id: 'villa-01',
     name: '现代别墅外观表现',
-    thumbnail: '/images/project-thumb.jpg',
+    thumbnail: '/assets/examples/home/project-thumb.jpg',
     date: '2026/04/24',
     canvasNodes: villaProjectNodes,
   },

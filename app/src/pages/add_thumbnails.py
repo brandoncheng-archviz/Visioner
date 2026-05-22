@@ -24,7 +24,7 @@ new_preset_text = preset_text
 thumb_idx = 1
 
 for m in tags_matches:
-    thumbnail = f"    thumbnail: '/images/show-cover-{thumb_idx}.jpg',"
+    thumbnail = f"    thumbnail: '/assets/mock/generation-results/show-cover-{thumb_idx}.jpg',"
     thumb_idx = thumb_idx % 20 + 1
     pos = m.end() + offset
     new_preset_text = new_preset_text[:pos] + '\n' + thumbnail + new_preset_text[pos:]

@@ -1532,6 +1532,7 @@ export function ImageNodeControlPanel({
           {generationTask?.status === 'failed' && generationTask.errorMessage ? (
             <button
               onClick={onGenerate}
+              disabled={isGenerating}
               className="flex items-center justify-center gap-1 rounded-lg transition-colors"
               style={{
                 height: 34,
@@ -1540,6 +1541,8 @@ export function ImageNodeControlPanel({
                 border: '1px solid rgba(239,68,68,0.35)',
                 color: '#fca5a5',
                 fontSize: 12,
+                opacity: isGenerating ? 0.5 : 1,
+                cursor: isGenerating ? 'not-allowed' : 'pointer',
               }}
               title={generationTask.errorMessage}
             >

@@ -45,8 +45,7 @@ export function getCurrentImage(data: unknown): string {
 }
 
 export function getInputImage(data: unknown): string {
-  const d = castRecord(data);
-  return (d.inputImage as string) || (d.image as string) || '';
+  return (castRecord(data).inputImage as string) || '';
 }
 
 export function getCurrentResultId(data: unknown): string | null {
@@ -71,6 +70,8 @@ export function normalizeGeneratedImages(value: unknown): GenerationHistoryItem[
     const baseTime = Date.now();
     return (value as string[]).map((url, index) => ({
       resultId: `legacy-${baseTime}-${index}`,
+      batchId: `legacy-batch-${baseTime}`,
+      batchIndex: index + 1,
       imageUrl: url,
       prompt: '',
       userPrompt: '',

@@ -326,42 +326,7 @@ const zhCN = {
       name: "无人机视角",
       shortDescription: "鸟瞰 / 半鸟瞰",
     },
-    mir_style: {
-      name: "MIR风格",
-      shortDescription: "MIR 建筑表现风格",
-    },
-    binyan_style: {
-      name: "BINYAN风格",
-      shortDescription: "BINYAN 表现风格",
-    },
-    magazine_style: {
-      name: "杂志感",
-      shortDescription: "建筑杂志排版感",
-    },
-    nature_forest: {
-      name: "自然森系",
-      shortDescription: "自然 / 生态 / 有机",
-    },
-    cold_tech: {
-      name: "冷调科技",
-      shortDescription: "冷色调 / 科技感",
-    },
-    low_saturation: {
-      name: "低饱和",
-      shortDescription: "低饱和度 / 克制",
-    },
-    grey_style: {
-      name: "高级灰",
-      shortDescription: "高级灰色调",
-    },
-    warm_estate: {
-      name: "暖调地产",
-      shortDescription: "温暖色调 / 地产感",
-    },
-    low_saturation_realism: {
-      name: "低饱和写实",
-      shortDescription: "低饱和 / 写实",
-    },
+
   },
 
   style: {

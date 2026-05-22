@@ -326,42 +326,7 @@ const enUS = {
       name: "Drone View",
       shortDescription: "Bird's eye / Semi-bird's eye",
     },
-    mir_style: {
-      name: "MIR Style",
-      shortDescription: "MIR architectural visualization style",
-    },
-    binyan_style: {
-      name: "BINYAN Style",
-      shortDescription: "BINYAN visualization style",
-    },
-    magazine_style: {
-      name: "Magazine Style",
-      shortDescription: "Architectural magazine layout feel",
-    },
-    nature_forest: {
-      name: "Nature Forest",
-      shortDescription: "Nature / Ecology / Organic",
-    },
-    cold_tech: {
-      name: "Cold Tech",
-      shortDescription: "Cold tones / Tech feel",
-    },
-    low_saturation: {
-      name: "Low Saturation",
-      shortDescription: "Low saturation / Restrained",
-    },
-    grey_style: {
-      name: "Premium Grey",
-      shortDescription: "Premium grey tones",
-    },
-    warm_estate: {
-      name: "Warm Estate",
-      shortDescription: "Warm tones / Real estate feel",
-    },
-    low_saturation_realism: {
-      name: "Low Sat Realism",
-      shortDescription: "Low saturation / Realistic",
-    },
+
   },
 
   style: {

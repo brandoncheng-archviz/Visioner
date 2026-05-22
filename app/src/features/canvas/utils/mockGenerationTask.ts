@@ -10,7 +10,7 @@ function createMockResult(input: GenerationInput): GenerationResult {
   const coverIndex = Math.floor(Math.random() * 20) + 1;
   return {
     taskId: createTaskId(),
-    imageUrl: `/images/show-cover-${coverIndex}.jpg`,
+    imageUrl: `/assets/mock/generation-results/show-cover-${coverIndex}.jpg`,
     width: 1024,
     height: 1024,
     seed: Math.floor(Math.random() * 1000000),

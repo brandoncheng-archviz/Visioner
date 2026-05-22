@@ -274,7 +274,7 @@ export async function simulateNodeExecution(
       return inputs.text || inputs['input-1'] || `Generated text from ${node.id}`;
     case 'image':
       return {
-        url: node.data?.image || '/images/show-cover-1.jpg',
+        url: node.data?.image || '/assets/mock/generation-results/show-cover-1.jpg',
         prompt: inputs.prompt || node.data?.prompt || '',
         seed: Math.floor(Math.random() * 100000),
       };
