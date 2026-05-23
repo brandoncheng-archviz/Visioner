@@ -1,4 +1,4 @@
-# Visioner — AI Video Creation Platform
+# Visioner — AI Video & Image Creation Platform
 
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
@@ -21,6 +21,7 @@
 | Icons | lucide-react | ^0.562.0 |
 | Forms | react-hook-form + zod | ^7.70.0 / ^4.3.5 |
 | Charts | recharts | ^2.15.4 |
+| i18n | i18next + react-i18next | ^26.2.0 / ^17.0.8 |
 
 Additional notable dependencies:
 
@@ -45,10 +46,14 @@ Dev dependencies:
 ```
 app/
 ├── public/
-│   └── images/              # Static image assets (banners, show covers, project thumbs)
+│   ├── images/              # Static image assets (show covers, project thumbs)
+│   └── assets/
+│       ├── examples/home/   # Home page banner images
+│       ├── mock/generation-results/  # Mock AI generation result images
+│       └── presets/         # Preset thumbnail images
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # shadcn/ui components (50+ primitives: button, dialog, form, etc.)
+│   │   ├── ui/              # shadcn/ui components (53 primitives)
 │   │   ├── NodeEditor/      # Custom 2D canvas node editor (standalone, not wired to routes)
 │   │   ├── AccountPanel.tsx
 │   │   ├── CanvasEdge.tsx
@@ -64,13 +69,18 @@ app/
 │   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus)
 │   │   ├── constants/       # Canvas constants, presets, image usage configs
 │   │   ├── hooks/           # Canvas-specific hooks (useToast, etc.)
-│   │   ├── nodes/           # Node type components (ImageNode, VideoNode, TextNode, etc.)
+│   │   ├── nodes/           # Node type components (ImageNode/, VideoNode, TextNode, etc.)
 │   │   ├── types/           # Canvas-specific TypeScript types
-│   │   └── utils/           # Pure utility functions (prompt utils, reference utils)
+│   │   └── utils/           # Pure utility functions (prompt utils, reference utils, mock generation)
 │   ├── data/
 │   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas nodes/edges
 │   ├── hooks/
 │   │   └── use-mobile.ts    # useIsMobile hook (breakpoint 768px)
+│   ├── i18n/                # Internationalization (zh-CN default, en-US fallback)
+│   │   ├── index.ts
+│   │   └── locales/
+│   │       ├── zh-CN.ts
+│   │       └── en-US.ts
 │   ├── lib/
 │   │   ├── nodeEditor/
 │   │   │   ├── dag.ts       # Cycle detection, topological sort, execution batches, input hashing
@@ -79,11 +89,11 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor page entry (~905 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor page entry (~911 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
-│   ├── App.css              # Minimal root-level styles
+│   ├── App.css              # Minimal root-level styles (mostly unused template CSS)
 │   ├── App.tsx              # Root router with BrowserRouter, Routes for / and /canvas
 │   ├── main.tsx             # React root render with StrictMode
 │   └── index.css            # Global styles, Tailwind directives, ReactFlow custom CSS, CSS variables
@@ -96,6 +106,17 @@ app/
 ├── eslint.config.js         # ESLint flat config: TS + react-hooks + react-refresh
 └── postcss.config.js        # Tailwind + autoprefixer
 ```
+
+**Source file counts:**
+- `src/components/ui/`: 53 shadcn/ui primitive components
+- `src/features/canvas/`: 33 files (components, nodes, types, constants, utils, hooks)
+- `src/` total: ~115 source files
+
+**Key file sizes:**
+- `CanvasPage.tsx`: ~911 lines (page entry + core state container)
+- `ImageNode.tsx`: ~818 lines
+- `ImageNodeControlPanel.tsx`: ~1,588 lines
+- `NodeEditorCanvas.tsx`: ~894 lines
 
 ---
 
@@ -165,10 +186,10 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~905 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~911 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
-- Page entry and React Flow provider wrapper
+- Canvas page entry and React Flow provider wrapper
 - Core `nodes` / `edges` / `tempLine` state management
 - Line drawing logic (custom connection lines from output ports)
 - Copy / paste / duplicate / delete logic
@@ -187,7 +208,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`
 
 **Node components (`src/features/canvas/nodes/`):**
-- `ImageNode/` — Image node with control panel, prompt box, reference image area
+- `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
 - `VideoNode.tsx`
 - `TextNode.tsx`
 - `AudioNode.tsx`
@@ -196,9 +217,9 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `UpscaleNode.tsx`
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `imageNode.types.ts`
+- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`
 - `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
-- `utils/` — `promptUtils.ts`, `referenceUtils.ts`
+- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`
 - `hooks/` — `useToast.ts`
 
 **Canvas architecture rules (from `CANVAS_RULES.md`):**
@@ -208,7 +229,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - Do not actively perform large-scale hook extractions (e.g., `useLineDrawing`, `useCanvasClipboard`) unless explicitly required.
 - Prefer small, low-risk changes that keep the current architecture stable.
 
-Features:
+**Features:**
 - Left sidebar tool panel (add nodes, AI toolbox, assets, history, tutorial, support).
 - Context menu on right-clicking the canvas to add nodes.
 - Node context menu with copy, paste, duplicate, delete, and save-to-library actions.
@@ -218,6 +239,13 @@ Features:
 - Custom connection line drawing from output ports with cycle detection, type validation, and drop-to-create-node support.
 - Keyboard shortcuts: `Ctrl+C` / `Ctrl+V` for copy/paste, `Delete` / `Backspace` to remove selected nodes/edges.
 - Zoom slider, grid snap toggle, fit view reset, and help panel in the bottom toolbar.
+
+**ImageNode generation flow:**
+- `ImageNode` is the most complex node type, supporting AI image generation via a mock task system.
+- Generation state uses `GenerationTask` and `GenerationHistoryItem` types from `generation.types.ts`.
+- The `mockGenerationTask.ts` utility simulates generation with a 2–5 second delay, 10% failure rate, and `AbortSignal` support.
+- Image data fields: `inputImage` (original upload, never overwritten by generation), `currentImage` (latest display image), `image` (legacy compatibility), and `generatedImages` (history array).
+- Nodes support reference images with typed roles (`primary_building`, `atmosphere_reference`, `vegetation_reference`, `people_reference`, `sky_reference`, `custom_reference`, etc.).
 
 ### Custom 2D Canvas Node Editor (`src/components/NodeEditor/`)
 
@@ -238,6 +266,14 @@ Port types and colors:
 - `STRING` — slate `#94a3b8`
 - `BOOLEAN` — red `#ef4444`
 - `ANY` — white `#ffffff`
+
+### Internationalization (`src/i18n/`)
+
+The app uses `react-i18next` with two locale files:
+- `zh-CN.ts` — Default language (简体中文)
+- `en-US.ts` — Fallback language
+
+Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`).
 
 ### Data Layer (`src/data/siteData.ts`)
 
@@ -262,16 +298,6 @@ Mock API service for user account features (profile, credits, usage, billing, de
 There are **no test files** in the project currently. No test runner (Jest, Vitest, Playwright, etc.) is installed.
 
 If you add tests, the conventional location would be alongside source files (e.g., `*.test.tsx`) or in a top-level `tests/` directory inside `app/`.
-
----
-
-## Dependencies of Note
-
-- **@xyflow/react** — React Flow canvas; its CSS must be imported (`@xyflow/react/dist/style.css`). Transitive dependencies include `zustand` (state management used internally by React Flow, not directly by application code).
-- **embla-carousel-react** — Lightweight carousel for the hero banner.
-- **next-themes** — Used by the `sonner` toast component for theme-aware rendering.
-- **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
-- **react-router-dom** — Client-side routing. Note: `react-router` is also listed in `dependencies` but all imports in source use `react-router-dom`.
 
 ---
 

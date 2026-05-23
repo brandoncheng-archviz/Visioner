@@ -29,19 +29,22 @@ export interface PresetItem {
   id: string;
   name: string;
   tabs: string[];
-  category: 'realism' | 'mood' | 'environment' | 'perspective' | 'style';
+  category: 'realism' | 'mood' | 'environment' | 'perspective' | 'style' | 'atmosphere';
   group: string;
   selectType: 'single' | 'multi';
   presetType?: 'enhancement' | 'modifier';
   shortDescription: string;
   promptTemplate: string | PromptTemplate;
   shortHelp?: string;
+  detailDescription?: string;
+  keywords?: string[];
   recommendedInCommon?: boolean;
+  userFavorite?: boolean;
   tags: string[];
   thumbnail: string;
 }
 
-export type PresetTab = '常用' | '变真实' | '换氛围' | '换环境' | '换视角' | '我的';
+export type PresetTab = '常用' | '变真实' | '换氛围' | '我的';
 
 export type StylePreset = {
   id: string;

@@ -203,8 +203,6 @@ const zhCN = {
       common: "常用",
       realism: "变真实",
       mood: "换氛围",
-      environment: "换环境",
-      perspective: "换视角",
       my: "我的",
       style: "风格",
     },
@@ -325,6 +323,70 @@ const zhCN = {
     drone_view: {
       name: "无人机视角",
       shortDescription: "鸟瞰 / 半鸟瞰",
+    },
+    time_early_morning: {
+      name: "清晨",
+      shortDescription: "柔和晨光 / 空气感",
+    },
+    time_morning: {
+      name: "上午",
+      shortDescription: "干净日光 / 自然通透",
+    },
+    time_afternoon: {
+      name: "午后",
+      shortDescription: "温暖日光 / 生活感",
+    },
+    time_dusk: {
+      name: "黄昏",
+      shortDescription: "日落天空 / 归家感",
+    },
+    time_blue_hour: {
+      name: "蓝调",
+      shortDescription: "冷蓝天空 / 室内暖光",
+    },
+    time_night: {
+      name: "夜景",
+      shortDescription: "夜间灯光 / 商业氛围",
+    },
+    weather_sunny: {
+      name: "晴天",
+      shortDescription: "晴朗无云 / 明亮通透",
+    },
+    weather_cloudy: {
+      name: "多云",
+      shortDescription: "云层覆盖 / 柔和光线",
+    },
+    weather_overcast: {
+      name: "阴天",
+      shortDescription: "阴天柔光 / 无硬边",
+    },
+    weather_after_rain: {
+      name: "雨后",
+      shortDescription: "湿润地面 / 清新空气",
+    },
+    weather_heavy_rain: {
+      name: "大雨",
+      shortDescription: "强降雨 / 戏剧性天空",
+    },
+    weather_foggy: {
+      name: "雾天",
+      shortDescription: "浓雾 / 朦胧远景",
+    },
+    season_spring: {
+      name: "春季",
+      shortDescription: "生机 / 绿意",
+    },
+    season_summer: {
+      name: "夏季",
+      shortDescription: "浓绿 / 强烈阳光",
+    },
+    season_autumn: {
+      name: "秋季",
+      shortDescription: "金黄 / 温暖色调",
+    },
+    season_winter: {
+      name: "冬季",
+      shortDescription: "萧瑟 / 冷色调",
     },
 
   },

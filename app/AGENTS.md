@@ -265,3 +265,51 @@ npx shadcn add <component-name>
 ```
 
 The CLI will place it in `src/components/ui/` and follow the existing alias conventions (`@/lib/utils`, `@/components/ui`).
+
+---
+
+## Development Collaboration & Execution Rules
+
+可以使用终端辅助开发，但执行会明显修改项目状态、依赖状态或 Git 状态的操作前，需要先说明目的、影响和预期结果。
+
+### 需要特别谨慎的操作
+
+以下操作执行前**必须先说明目的、影响和预期结果**，涉及 Git 或依赖变更时须等待明确批准：
+
+- `git commit` / `git push` / `git reset` / `git checkout` / `git rebase`
+- `npm install` / `pnpm install` / `yarn add`
+- 修改 `package.json` / `package-lock.json` / `pnpm-lock.yaml` / `yarn.lock`
+- 删除文件、批量移动文件、批量重命名文件
+- 修改环境变量或配置文件（如 `.env`、`vite.config.ts`）
+- 发布、部署、清理缓存等影响较大的命令
+
+### 新增依赖的规则
+
+如确实需要新增依赖或修改 package 文件，请先说明：
+
+- **为什么现有依赖无法满足当前需求**
+- **新依赖的用途和预期收益**
+- **会影响哪些文件**
+- **是否有更轻量的替代方案**（如使用现有工具库、浏览器原生 API、手写实现等）
+
+获得明确批准后，方可执行安装或修改。
+
+### 构建与验证命令
+
+开发过程中可以执行构建和验证类命令辅助开发，例如：
+
+```bash
+cd app && npm run build
+cd app && npm run lint
+cd app && npm run dev
+```
+
+执行前需说明目的。单次任务中，构建/验证类命令**最多执行 3 次**；超过则停止，提供建议命令供手动执行。
+
+### 无关命令禁止
+
+不要执行与当前任务无关的终端命令。
+
+### 命令执行后的说明
+
+修改或验证完成后，说明执行了哪些命令及结果。

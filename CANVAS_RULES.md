@@ -16,6 +16,8 @@
 
 后续所有 AI 代码修改工具，包括 KimiCode 和 Codex，都必须遵守以下规则。
 
+> **职责边界：** 本文件只规定 Canvas 模块的产品规则、交互规则与架构约束。通用开发协作规则，包括终端命令、依赖管理、Git 操作、构建与验证规则等，统一见 `app/AGENTS.md`。
+
 ---
 
 ## 1. 总体原则
@@ -555,18 +557,7 @@ src/features/canvas/hooks/
 
 ---
 
-## 13. 终端命令规则
-
-- 执行任何命令前，**必须说明目的和预期结果**。
-- 安全命令（如 `cd app && npm run build`、`npm run dev`）可以执行，但需先说明。
-- 危险命令（如 `git push`、`npm install` 新依赖、修改 `package.json`）**必须等待明确批准**。
-- 单次任务中，构建/验证类命令最多执行 3 次。超过则停止，提供建议命令供手动执行。
-- 不要执行与当前任务无关的命令。
-- 修改完成后，说明执行了哪些命令及结果。
-
----
-
-## 14. 输出要求
+## 13. 输出要求
 
 每次修改完成后，请说明：
 
@@ -596,7 +587,7 @@ src/features/canvas/hooks/
 
 ---
 
-## 15. 禁止行为
+## 14. 禁止行为
 
 除非我明确要求，否则不要做以下事情：
 
@@ -611,9 +602,6 @@ src/features/canvas/hooks/
 - 不要删除现有功能
 - 不要改变现有 UI 风格
 - 不要改变现有交互逻辑
-- 不要执行与当前任务无关的终端命令
-- 不要修改 package.json / package-lock.json
-- 不要引入新依赖
 - 不要修改路由结构
 - 不要修改与当前任务无关的文件
 - 不要为了代码好看而做无关优化
@@ -622,7 +610,7 @@ src/features/canvas/hooks/
 
 ---
 
-## 16. 如果遇到不确定情况
+## 15. 如果遇到不确定情况
 
 如果存在多种方案，并且修改风险较高，请先说明：
 
@@ -641,7 +629,7 @@ src/features/canvas/hooks/
 
 ---
 
-## 17. 当前开发策略
+## 16. 当前开发策略
 
 当前阶段的核心策略是：
 
@@ -684,11 +672,11 @@ ImageNodeControlPanel 修改频繁且难维护
 
 ---
 
-## 18. 假生成任务流数据规则（Fake Generation Flow Data Rules）
+## 17. 假生成任务流数据规则（Fake Generation Flow Data Rules）
 
 ImageNode 已接入最小假生成任务流。后续所有与图片生成、生成历史、生成任务相关的修改，必须遵守以下数据规则。
 
-### 18.1 图片字段规则
+### 17.1 图片字段规则
 
 | 字段 | 含义 | 写入时机 | 是否可被生成覆盖 |
 |---|---|---|---|
@@ -702,7 +690,7 @@ ImageNode 已接入最小假生成任务流。后续所有与图片生成、生�
 - 上传 / 拖放新图片时，`inputImage`、`currentImage`、`image` 三个字段可同时写入新 URL。
 - 新逻辑中不得单独依赖 `data.image` 作为图片来源，必须使用读取优先级链。
 
-### 18.2 读取优先级
+### 17.2 读取优先级
 
 ```ts
 // 当前显示图
@@ -716,7 +704,7 @@ const inputImage = data.inputImage || data.image;
 - `inputImage` 用于"对比原图"、"回退到原图"、原图元数据展示。
 - `data.image` 仅作为无 `inputImage`/`currentImage` 时的兜底兼容。
 
-### 18.3 生成历史规则
+### 17.3 生成历史规则
 
 `generatedImages` 必须使用 `GenerationHistoryItem[]` 结构：
 
@@ -743,7 +731,7 @@ interface GenerationHistoryItem {
 - 旧 `string[]` 数据仅通过 `normalizeGeneratedImages()` 兼容读取，写入时必须转为新结构。
 - 禁止绕过 `normalizeGeneratedImages` 直接假设 `data.generatedImages` 是对象数组。
 
-### 18.4 任务状态规则
+### 17.4 任务状态规则
 
 `generationTask` 存在于 `node.data` 中，作为持久化来源。
 
@@ -766,7 +754,7 @@ UI 展示（生成中 / 成功 / 失败 / 重试按钮）
 - 组件卸载时必须 `abort` 当前运行中的任务。
 - `simulateGeneration` 支持 `AbortSignal`，取消后必须清理 `setInterval`。
 
-### 18.5 禁止事项
+### 17.5 禁止事项
 
 ```text
 - 不要把生成结果覆盖到 inputImage。

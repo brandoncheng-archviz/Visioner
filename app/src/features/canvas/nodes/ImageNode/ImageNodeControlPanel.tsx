@@ -10,22 +10,13 @@ import {
   Zap,
   ArrowUp,
   Maximize2,
-  Check,
-  Star,
-  Eye,
-  Sun,
-  Mountain,
-  ScanEye,
-  User,
   Pencil,
-  Trash2 as TrashIcon,
 } from 'lucide-react';
 import type {
   PromptContent,
   ImageReferencePromptBlock,
   ReferenceInfo,
   ImageRole,
-  PresetTab,
 } from '../../types/imageNode.types';
 import type { MarkAction, MarkItem, ModelParams } from '../../types/canvas.types';
 import {
@@ -44,14 +35,13 @@ import {
 import { UNIQUE_USAGES, imageRoleOptions, getImageRoleLabel, getImageRoleColor, validateCustomReferenceLabel } from '../../constants/imageUsages';
 import {
   PRESET_DATA,
-  PRESET_TABS,
-  MAX_MULTI_PRESETS_BY_GROUP,
-  getPresetById,
   getStylePresetById,
 } from '../../constants/presets';
 import { createImageReferenceBlock, stripReferencePromptMetadata } from '../../utils/promptUtils';
 import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUtils';
+import { togglePresetSelection } from '../../utils/presetSelection';
 import { StylePickerModal } from '../../components/StylePickerModal';
+import { PresetPickerModal } from '../../components/PresetPickerModal';
 
 export function ImageNodeControlPanel({
   promptText,
@@ -102,9 +92,8 @@ export function ImageNodeControlPanel({
 }) {
   const { t } = useTranslation();
   const [showMarkPanel, setShowMarkPanel] = useState(false);
-  const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [showPresetModal, setShowPresetModal] = useState(false);
   const [showStylePicker, setShowStylePicker] = useState(false);
-  const [activePresetTab, setActivePresetTab] = useState<PresetTab>('常用');
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [showCountMenu, setShowCountMenu] = useState(false);
@@ -320,66 +309,20 @@ export function ImageNodeControlPanel({
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const selectedStyle = getStylePresetById(selectedStyleId);
-  const visiblePresets = useMemo(
-    () =>
-      PRESET_DATA.filter((preset) => {
-        if (preset.category === 'style') return false;
-        if (activePresetTab === '常用') {
-          return preset.tabs.includes('常用') || preset.recommendedInCommon;
-        }
-        return preset.tabs.includes(activePresetTab);
-      }),
-    [activePresetTab],
-  );
   const slashFilteredPresets = useMemo(() => {
     const query = slashQuery.trim().toLowerCase();
-    const presetPool = PRESET_DATA.filter((preset) => preset.category !== 'style');
+    const presetPool = PRESET_DATA.filter((preset) => preset.category !== 'style' && preset.tabs.length > 0);
     if (!query) return presetPool;
 
     return presetPool.filter(
       (preset) =>
-        t(`preset.${preset.id}.name`).toLowerCase().includes(query) ||
+        preset.name.toLowerCase().includes(query) ||
         preset.tags.some((tag) => tag.toLowerCase().includes(query)),
     );
   }, [slashQuery]);
 
   const selectPreset = (presetId: string) => {
-    const preset = getPresetById(presetId);
-    if (!preset || preset.category === 'style') return;
-
-    if (selectedPresets.includes(presetId)) {
-      removePreset(presetId);
-      return;
-    }
-
-    let nextPresets = selectedPresets.filter((id) => {
-      const selectedPreset = getPresetById(id);
-      if (!selectedPreset || selectedPreset.category === 'style') return false;
-      if (selectedPreset.group !== preset.group) return true;
-      return preset.selectType === 'multi';
-    });
-
-    if (preset.id === 'snow_scene') {
-      nextPresets = nextPresets.filter((id) => id !== 'summer');
-    } else if (preset.id === 'summer') {
-      nextPresets = nextPresets.filter((id) => id !== 'snow_scene');
-    }
-
-    const groupLimit = MAX_MULTI_PRESETS_BY_GROUP[preset.group];
-    if (preset.selectType === 'multi' && groupLimit) {
-      const presetsInGroup = nextPresets.filter((id) => getPresetById(id)?.group === preset.group);
-      const overflowCount = presetsInGroup.length - groupLimit + 1;
-      if (overflowCount > 0) {
-        const idsToRemove = new Set(presetsInGroup.slice(0, overflowCount));
-        nextPresets = nextPresets.filter((id) => !idsToRemove.has(id));
-      }
-    }
-
-    onPresetsChange([...nextPresets, presetId]);
-  };
-
-  const removePreset = (presetId: string) => {
-    onPresetsChange(selectedPresets.filter((id) => id !== presetId));
+    onPresetsChange(togglePresetSelection(selectedPresets, presetId));
   };
 
   const addMark = () => {
@@ -773,140 +716,26 @@ export function ImageNodeControlPanel({
           {/* Preset */}
           <div className="relative">
             <button
-              onClick={() => { setShowPresetMenu(!showPresetMenu); setShowMarkPanel(false); setShowStylePicker(false); }}
+              onClick={() => { setShowPresetModal(true); setShowMarkPanel(false); setShowStylePicker(false); }}
               className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
               style={{ width: 54, height: 50, padding: '4px', background: selectedPresets.length > 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
             >
               <Bookmark className="w-4 h-4" style={{ color: selectedPresets.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.7)' }} />
               <span style={{ fontSize: 12, color: selectedPresets.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.72)' }}>{t('imageNode.preset')}</span>
             </button>
-            {showPresetMenu && (
-              <div
-                className="absolute top-full left-0 mt-1 rounded-xl z-30 overflow-hidden flex flex-col"
-                style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 16px 40px rgba(0,0,0,0.48)', width: 420, maxHeight: 520 }}
-                onWheel={(e) => e.stopPropagation()}
-              >
-                {/* Tabs */}
-                <div className="flex items-center gap-1 px-3 pt-3 pb-2 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                  {PRESET_TABS.map((tab) => {
-                    const isActive = activePresetTab === tab;
-                    const tabIcons: Record<PresetTab, typeof Star> = {
-                      '常用': Star,
-                      '变真实': Eye,
-                      '换氛围': Sun,
-                      '换环境': Mountain,
-                      '换视角': ScanEye,
-                      '我的': User,
-                    };
-                    const tabKeys: Record<PresetTab, string> = {
-                      '常用': 'common',
-                      '变真实': 'realism',
-                      '换氛围': 'mood',
-                      '换环境': 'environment',
-                      '换视角': 'perspective',
-                      '我的': 'my',
-                    };
-                    const TabIcon = tabIcons[tab];
-                    return (
-                      <button
-                        key={tab}
-                        onClick={() => setActivePresetTab(tab as PresetTab)}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] transition-colors ${isActive ? 'text-white font-medium' : 'text-white/45 hover:text-white/70 hover:bg-white/5'}`}
-                        style={isActive ? { background: 'rgba(167,139,250,0.18)' } : {}}
-                      >
-                        <TabIcon className="w-3 h-3" />
-                        {t(`preset.tabs.${tabKeys[tab]}`)}
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* Cards */}
-                <div className="p-3 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
-                  {activePresetTab === '我的' ? (
-                    <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <Bookmark className="w-10 h-10 text-white/10 mb-3" />
-                      <div className="text-[13px] text-white/40">{t('preset.noCustomPresets')}</div>
-                      <div className="text-[11px] text-white/25 mt-1">{t('preset.saveCurrentPresetsHint')}</div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {visiblePresets.map((preset) => {
-                        const isSelected = selectedPresets.includes(preset.id);
-                        return (
-                          <button
-                            key={preset.id}
-                            onClick={() => selectPreset(preset.id)}
-                            className={`relative group rounded-xl overflow-hidden text-left transition-all border ${isSelected ? 'border-[#a78bfa]' : 'border-white/[0.06] hover:border-white/15'}`}
-                            style={{ background: 'rgba(30,30,40,0.6)' }}
-                          >
-                            {/* Thumbnail */}
-                            <div className="relative w-full overflow-hidden" style={{ height: 88 }}>
-                              <img
-                                src={preset.thumbnail}
-                                alt={t(`preset.${preset.id}.name`)}
-                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                              />
-                              <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.5) 100%)' }} />
-                              {/* Check indicator */}
-                              {isSelected && (
-                                <div className="absolute top-2 right-2 flex items-center justify-center rounded-full" style={{ width: 18, height: 18, background: '#a78bfa', boxShadow: '0 2px 8px rgba(167,139,250,0.4)' }}>
-                                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                                </div>
-                              )}
-                            </div>
-                            {/* Info */}
-                            <div className="p-2">
-                              <div className="text-[12px] font-medium text-white/90 truncate">{t(`preset.${preset.id}.name`)}</div>
-                              <div className="text-[11px] text-white/40 truncate mt-0.5">{t(`preset.${preset.id}.shortDescription`)}</div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                {/* Selected presets footer */}
-                {selectedPresets.length > 0 && (
-                  <div className="shrink-0 px-3 py-2.5 border-t flex items-center gap-2" style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
-                    <span className="text-[11px] text-white/35 shrink-0">{t('imageNode.selectedPresets')}</span>
-                    <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
-                      {selectedPresets.map((presetId) => {
-                        const preset = getPresetById(presetId);
-                        if (!preset) return null;
-                        return (
-                          <span
-                            key={presetId}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px]"
-                            style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.22)' }}
-                          >
-                            {t(`preset.${preset.id}.name`)}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); removePreset(presetId); }}
-                              className="hover:text-white transition-colors"
-                              style={{ color: 'rgba(196,181,253,0.7)' }}
-                            >
-                              <X className="w-2.5 h-2.5" />
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <button
-                      onClick={() => onPresetsChange([])}
-                      className="flex items-center gap-1 text-[11px] text-white/35 hover:text-white/60 transition-colors shrink-0"
-                    >
-                      <TrashIcon className="w-3 h-3" />
-                      {t('common.clear')}
-                    </button>
-                  </div>
-                )}
-              </div>
+            {showPresetModal && (
+              <PresetPickerModal
+                open={showPresetModal}
+                selectedPresetIds={selectedPresets}
+                onApply={onPresetsChange}
+                onClose={() => setShowPresetModal(false)}
+              />
             )}
           </div>
           {/* Mark */}
           <div className="relative">
             <button
-              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowPresetMenu(false); setShowStylePicker(false); }}
+              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowStylePicker(false); }}
               className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
               style={{ width: 54, height: 50, padding: '4px', background: marks.length > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
             >
@@ -940,13 +769,11 @@ export function ImageNodeControlPanel({
             <button
               onClick={() => {
                 setShowStylePicker(true);
-                setShowPresetMenu(false);
                 setShowMarkPanel(false);
               }}
               onPointerDown={(e) => {
                 e.stopPropagation();
                 setShowStylePicker(true);
-                setShowPresetMenu(false);
                 setShowMarkPanel(false);
               }}
               className="group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"

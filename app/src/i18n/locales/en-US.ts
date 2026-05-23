@@ -203,8 +203,6 @@ const enUS = {
       common: "Common",
       realism: "Realism",
       mood: "Mood",
-      environment: "Environment",
-      perspective: "Perspective",
       my: "My",
       style: "Style",
     },
@@ -325,6 +323,70 @@ const enUS = {
     drone_view: {
       name: "Drone View",
       shortDescription: "Bird's eye / Semi-bird's eye",
+    },
+    time_early_morning: {
+      name: "Early Morning",
+      shortDescription: "Soft dawn light / Airy calm",
+    },
+    time_morning: {
+      name: "Morning",
+      shortDescription: "Clean daylight / Clear facade",
+    },
+    time_afternoon: {
+      name: "Afternoon",
+      shortDescription: "Warm daylight / Lived-in feel",
+    },
+    time_dusk: {
+      name: "Dusk",
+      shortDescription: "Sunset sky / Homeward warmth",
+    },
+    time_blue_hour: {
+      name: "Blue Hour",
+      shortDescription: "Blue sky / Warm interior light",
+    },
+    time_night: {
+      name: "Night Scene",
+      shortDescription: "Night lighting / Commercial mood",
+    },
+    weather_sunny: {
+      name: "Sunny",
+      shortDescription: "Clear and cloudless / Bright",
+    },
+    weather_cloudy: {
+      name: "Cloudy",
+      shortDescription: "Cloud cover / Soft light",
+    },
+    weather_overcast: {
+      name: "Overcast",
+      shortDescription: "Overcast soft light / No hard edges",
+    },
+    weather_after_rain: {
+      name: "After Rain",
+      shortDescription: "Wet ground / Fresh air",
+    },
+    weather_heavy_rain: {
+      name: "Heavy Rain",
+      shortDescription: "Heavy rain / Dramatic sky",
+    },
+    weather_foggy: {
+      name: "Foggy",
+      shortDescription: "Thick fog / Hazy distance",
+    },
+    season_spring: {
+      name: "Spring",
+      shortDescription: "Vitality / Greenery",
+    },
+    season_summer: {
+      name: "Summer",
+      shortDescription: "Deep green / Strong sunlight",
+    },
+    season_autumn: {
+      name: "Autumn",
+      shortDescription: "Golden / Warm tones",
+    },
+    season_winter: {
+      name: "Winter",
+      shortDescription: "Desolate / Cold tones",
     },
 
   },
