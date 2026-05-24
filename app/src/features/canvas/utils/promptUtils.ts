@@ -8,10 +8,15 @@ function serializePromptTemplate(template: string | PromptTemplate): string {
     template.goal,
     template.style,
     template.image,
+    template.atmosphere,
+    template.sky,
     template.lighting,
     template.color,
     template.background,
+    template.environment,
+    template.vegetation,
     template.material,
+    template.materialImpact,
     template.output,
   ].filter(Boolean);
   return parts.join(' ');
@@ -139,7 +144,10 @@ export function buildPromptSubmission(
     .map(getPresetById)
     .filter((preset): preset is PresetItem => Boolean(preset));
 
-  const presetPrompts = selectedPresetsList.map((preset) => serializePromptTemplate(preset.promptTemplate));
+  const presetPrompts = selectedPresetsList.map((preset) => {
+    const prompt = serializePromptTemplate(preset.promptTemplate);
+    return preset.owner === 'user' ? `${preset.name}：${prompt}` : prompt;
+  });
 
   const allConstraints: string[] = [];
   selectedPresetsList.forEach((preset) => {

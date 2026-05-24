@@ -15,12 +15,17 @@ export type ImageRole =
 
 export interface PromptTemplate {
   goal: string;
-  style: string;
-  image: string;
-  lighting: string;
-  color: string;
-  background: string;
-  material: string;
+  style?: string;
+  image?: string;
+  atmosphere?: string;
+  sky?: string;
+  lighting?: string;
+  color?: string;
+  background?: string;
+  environment?: string;
+  vegetation?: string;
+  material?: string;
+  materialImpact?: string;
   output: string;
   constraints: string;
 }
@@ -28,12 +33,17 @@ export interface PromptTemplate {
 export interface PresetItem {
   id: string;
   name: string;
+  title?: string;
   tabs: string[];
-  category: 'realism' | 'mood' | 'environment' | 'perspective' | 'style' | 'atmosphere';
+  category: 'realism' | 'mood' | 'environment' | 'perspective' | 'style' | 'atmosphere' | 'mine';
   group: string;
   selectType: 'single' | 'multi';
+  selectionMode?: 'single' | 'multi';
+  exclusiveGroup?: string;
+  owner?: 'system' | 'user';
   presetType?: 'enhancement' | 'modifier';
   shortDescription: string;
+  description?: string;
   promptTemplate: string | PromptTemplate;
   shortHelp?: string;
   detailDescription?: string;
@@ -44,7 +54,7 @@ export interface PresetItem {
   thumbnail: string;
 }
 
-export type PresetTab = '常用' | '变真实' | '换氛围' | '我的';
+export type PresetTab = '我的常用' | '变真实' | '换氛围';
 
 export type StylePreset = {
   id: string;

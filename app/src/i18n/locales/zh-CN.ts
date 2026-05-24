@@ -200,10 +200,10 @@ const zhCN = {
 
   preset: {
     tabs: {
-      common: "常用",
+      common: "我的常用",
       realism: "变真实",
       mood: "换氛围",
-      my: "我的",
+      my: "我的常用",
       style: "风格",
     },
     noCustomPresets: "暂无自定义预设",
@@ -212,33 +212,13 @@ const zhCN = {
       name: "照片般真实",
       shortDescription: "真实光影 / 材质细节",
     },
-    natural_exposure: {
-      name: "自然曝光",
-      shortDescription: "光比平衡 / 曝光自然",
+    artistic_realism: {
+      name: "艺术化处理",
+      shortDescription: "克制艺术感 / 高级表达",
     },
-    material_enhancement: {
-      name: "材质强化",
-      shortDescription: "玻璃 / 金属 / 混凝土",
-    },
-    realistic_reflection: {
-      name: "真实反射",
-      shortDescription: "玻璃反光 / 水面反射",
-    },
-    reduce_ai_feel: {
-      name: "降低 AI 感",
-      shortDescription: "减少生成痕迹 / 更真实可信",
-    },
-    commercial_photography: {
-      name: "商业摄影感",
-      shortDescription: "地产质感 / 高级成片",
-    },
-    realistic_vegetation: {
-      name: "植被真实化",
-      shortDescription: "自然植物 / 真实层次",
-    },
-    clear_details: {
-      name: "细节清晰",
-      shortDescription: "细部增强 / 清晰成像",
+    cinematic_narrative: {
+      name: "电影感叙事",
+      shortDescription: "电影光影 / 情绪叙事",
     },
     sunset_mood: {
       name: "黄昏氛围",
@@ -350,43 +330,43 @@ const zhCN = {
     },
     weather_sunny: {
       name: "晴天",
-      shortDescription: "晴朗无云 / 明亮通透",
+      shortDescription: "明亮日光 / 干净蓝天",
     },
     weather_cloudy: {
       name: "多云",
-      shortDescription: "云层覆盖 / 柔和光线",
+      shortDescription: "层次云影 / 柔和日光",
     },
     weather_overcast: {
       name: "阴天",
-      shortDescription: "阴天柔光 / 无硬边",
+      shortDescription: "灰云漫射 / 安静克制",
     },
     weather_after_rain: {
       name: "雨后",
-      shortDescription: "湿润地面 / 清新空气",
-    },
-    weather_heavy_rain: {
-      name: "大雨",
-      shortDescription: "强降雨 / 戏剧性天空",
+      shortDescription: "湿润反光 / 雨后恢复感",
     },
     weather_foggy: {
       name: "雾天",
-      shortDescription: "浓雾 / 朦胧远景",
+      shortDescription: "朦胧雾气 / 诗意安静",
+    },
+    weather_snow: {
+      name: "雪景",
+      shortDescription: "积雪氛围 / 冷空气感",
     },
     season_spring: {
       name: "春季",
-      shortDescription: "生机 / 绿意",
+      shortDescription: "嫩叶新绿 / 清新生机",
     },
     season_summer: {
       name: "夏季",
-      shortDescription: "浓绿 / 强烈阳光",
+      shortDescription: "繁茂绿意 / 明亮饱满",
     },
     season_autumn: {
       name: "秋季",
-      shortDescription: "金黄 / 温暖色调",
+      shortDescription: "金黄橙叶 / 温暖层次",
     },
     season_winter: {
       name: "冬季",
-      shortDescription: "萧瑟 / 冷色调",
+      shortDescription: "裸枝霜感 / 清冷安静",
     },
 
   },

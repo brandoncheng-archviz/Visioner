@@ -200,45 +200,25 @@ const enUS = {
 
   preset: {
     tabs: {
-      common: "Common",
+      common: "My Favorites",
       realism: "Realism",
       mood: "Mood",
-      my: "My",
+      my: "My Favorites",
       style: "Style",
     },
     noCustomPresets: "No custom presets yet",
     saveCurrentPresetsHint: "You can save current preset combinations here",
     photo_realistic: {
-      name: "Photorealistic",
-      shortDescription: "Real light / Material detail",
+      name: "Photo Realistic",
+      shortDescription: "Real lighting / Material details",
     },
-    natural_exposure: {
-      name: "Natural Exposure",
-      shortDescription: "Balanced ratio / Natural exposure",
+    artistic_realism: {
+      name: "Artistic Realism",
+      shortDescription: "Refined artistic mood / Elevated expression",
     },
-    material_enhancement: {
-      name: "Material Enhancement",
-      shortDescription: "Glass / Metal / Concrete",
-    },
-    realistic_reflection: {
-      name: "Realistic Reflection",
-      shortDescription: "Glass reflection / Water reflection",
-    },
-    reduce_ai_feel: {
-      name: "Reduce AI Feel",
-      shortDescription: "Less generation trace / More real",
-    },
-    commercial_photography: {
-      name: "Commercial Photography",
-      shortDescription: "Estate quality / Premium output",
-    },
-    realistic_vegetation: {
-      name: "Realistic Vegetation",
-      shortDescription: "Natural plants / Real layers",
-    },
-    clear_details: {
-      name: "Clear Details",
-      shortDescription: "Detail enhancement / Sharp imaging",
+    cinematic_narrative: {
+      name: "Cinematic Narrative",
+      shortDescription: "Cinematic lighting / Spatial storytelling",
     },
     sunset_mood: {
       name: "Sunset Mood",
@@ -350,43 +330,43 @@ const enUS = {
     },
     weather_sunny: {
       name: "Sunny",
-      shortDescription: "Clear and cloudless / Bright",
+      shortDescription: "Bright daylight / Clean blue sky",
     },
     weather_cloudy: {
       name: "Cloudy",
-      shortDescription: "Cloud cover / Soft light",
+      shortDescription: "Layered clouds / Soft daylight",
     },
     weather_overcast: {
       name: "Overcast",
-      shortDescription: "Overcast soft light / No hard edges",
+      shortDescription: "Gray diffusion / Calm restraint",
     },
     weather_after_rain: {
       name: "After Rain",
-      shortDescription: "Wet ground / Fresh air",
-    },
-    weather_heavy_rain: {
-      name: "Heavy Rain",
-      shortDescription: "Heavy rain / Dramatic sky",
+      shortDescription: "Wet reflections / Refreshed mood",
     },
     weather_foggy: {
       name: "Foggy",
-      shortDescription: "Thick fog / Hazy distance",
+      shortDescription: "Soft haze / Quiet mood",
+    },
+    weather_snow: {
+      name: "Snow Scene",
+      shortDescription: "Snow cover / Cold air",
     },
     season_spring: {
       name: "Spring",
-      shortDescription: "Vitality / Greenery",
+      shortDescription: "Fresh leaves / New vitality",
     },
     season_summer: {
       name: "Summer",
-      shortDescription: "Deep green / Strong sunlight",
+      shortDescription: "Lush greenery / Bright fullness",
     },
     season_autumn: {
       name: "Autumn",
-      shortDescription: "Golden / Warm tones",
+      shortDescription: "Golden-orange leaves / Warm layers",
     },
     season_winter: {
       name: "Winter",
-      shortDescription: "Desolate / Cold tones",
+      shortDescription: "Bare branches / Quiet frost",
     },
 
   },

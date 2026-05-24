@@ -23,6 +23,9 @@ export function togglePresetSelection(currentPresetIds: string[], presetId: stri
   let nextPresetIds = normalizedPresetIds.filter((id) => {
     const selectedPreset = getPresetById(id);
     if (!selectedPreset) return false;
+    if (preset.exclusiveGroup && selectedPreset.exclusiveGroup === preset.exclusiveGroup) {
+      return false;
+    }
     if (selectedPreset.group !== preset.group) return true;
     return preset.selectType === 'multi';
   });
