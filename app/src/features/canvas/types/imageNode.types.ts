@@ -51,7 +51,8 @@ export interface PresetItem {
   recommendedInCommon?: boolean;
   userFavorite?: boolean;
   tags: string[];
-  thumbnail: string;
+  thumbnail?: string;
+  sourcePresetThumbnail?: string;
 }
 
 export type PresetTab = '我的常用' | '变真实' | '换氛围';

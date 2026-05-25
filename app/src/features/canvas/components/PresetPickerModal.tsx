@@ -1,13 +1,13 @@
 import { useState, useMemo, useCallback, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Star, Bookmark, Plus } from 'lucide-react';
+import { X, Check, Star, Bookmark, Plus, Pencil } from 'lucide-react';
 
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../constants/canvasConstants';
 import { PRESET_DATA, PRESET_TABS, getPresetById } from '../constants/presets';
+import { CustomPresetFallbackCover } from './CustomPresetFallbackCover';
 import type { PresetItem, PresetTab } from '../types/imageNode.types';
 import { normalizePresetSelection, togglePresetSelection } from '../utils/presetSelection';
 import {
-  DEFAULT_USER_PRESET_THUMBNAIL,
   deleteUserPreset,
   loadUserPresets,
   setUserPresetFavorite,
@@ -43,7 +43,7 @@ function getPresetName(preset: PresetItem): string {
 }
 
 function getPresetShortDesc(preset: PresetItem): string {
-  return preset.description || preset.shortDescription;
+  return preset.description || preset.shortDescription || (preset.owner === 'user' ? '用户自定义' : '');
 }
 
 function buildAtmosphereComboDescription(presets: PresetItem[]): { title: string; description: string; keywords: string[] } {
@@ -104,7 +104,7 @@ export function PresetPickerModal({
   const [showPresetEditor, setShowPresetEditor] = useState(false);
   const [presetTitle, setPresetTitle] = useState('');
   const [presetPrompt, setPresetPrompt] = useState('');
-  const [presetThumbnail, setPresetThumbnail] = useState(DEFAULT_USER_PRESET_THUMBNAIL);
+  const [presetThumbnail, setPresetThumbnail] = useState('');
 
   const allPresets = useMemo(() => [...PRESET_DATA, ...userPresets], [userPresets]);
 
@@ -126,7 +126,7 @@ export function PresetPickerModal({
     setEditingPreset(null);
     setPresetTitle('');
     setPresetPrompt('');
-    setPresetThumbnail(DEFAULT_USER_PRESET_THUMBNAIL);
+    setPresetThumbnail('');
     setShowPresetEditor(true);
   }, []);
 
@@ -134,7 +134,7 @@ export function PresetPickerModal({
     setEditingPreset(preset);
     setPresetTitle(preset.name);
     setPresetPrompt(typeof preset.promptTemplate === 'string' ? preset.promptTemplate : preset.detailDescription || '');
-    setPresetThumbnail(preset.thumbnail || DEFAULT_USER_PRESET_THUMBNAIL);
+    setPresetThumbnail(preset.thumbnail || '');
     setShowPresetEditor(true);
   }, []);
 
@@ -143,7 +143,7 @@ export function PresetPickerModal({
     setEditingPreset(null);
     setPresetTitle('');
     setPresetPrompt('');
-    setPresetThumbnail(DEFAULT_USER_PRESET_THUMBNAIL);
+    setPresetThumbnail('');
   }, []);
 
   const handleSaveUserPreset = useCallback(() => {
@@ -310,6 +310,11 @@ export function PresetPickerModal({
   const renderPresetCard = useCallback((preset: PresetItem) => {
     const selected = isDraftSelected(preset.id);
     const favorite = isFavorite(preset);
+    const presetName = getPresetName(preset);
+    const thumbnail = preset.thumbnail?.trim();
+    const sourcePresetThumbnail = preset.sourcePresetThumbnail?.trim();
+    const showSourceThumbnail = preset.owner === 'user' && !thumbnail && Boolean(sourcePresetThumbnail);
+    const shouldShowFallbackCover = preset.owner === 'user' && !thumbnail && !sourcePresetThumbnail;
     return (
       <button
         key={preset.id}
@@ -325,11 +330,30 @@ export function PresetPickerModal({
       >
         {/* Thumbnail */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-white/[0.03]">
-          <img
-            src={preset.thumbnail}
-            alt={getPresetName(preset)}
-            className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-          />
+          {thumbnail ? (
+            <img
+              src={thumbnail}
+              alt={presetName}
+              className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            />
+          ) : showSourceThumbnail ? (
+            <>
+              <img
+                src={sourcePresetThumbnail}
+                alt={presetName}
+                className="block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+              <span
+                className="absolute left-2 bottom-2 flex h-6 w-6 items-center justify-center rounded-full"
+                style={{ background: 'rgba(0,0,0,0.42)', color: 'rgba(255,255,255,0.82)', border: '1px solid rgba(255,255,255,0.16)' }}
+                title="自定义编辑"
+              >
+                <Pencil className="h-3 w-3" />
+              </span>
+            </>
+          ) : shouldShowFallbackCover ? (
+            <CustomPresetFallbackCover title={presetName} />
+          ) : null}
           <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.35) 100%)' }} />
           {/* Star icon */}
           <span
@@ -352,7 +376,7 @@ export function PresetPickerModal({
         </div>
         {/* Info */}
         <div className="px-3 py-2">
-          <div className="truncate text-[13px] font-medium text-white/88">{getPresetName(preset)}</div>
+          <div className="truncate text-[13px] font-medium text-white/88">{presetName}</div>
           <div className="mt-0.5 truncate text-[11px] text-white/40">{getPresetShortDesc(preset)}</div>
         </div>
       </button>
@@ -635,7 +659,11 @@ export function PresetPickerModal({
                 <div className="text-[12px] text-white/52">缩略图</div>
                 <div className="mt-2 flex items-center gap-3">
                   <div className="h-16 w-24 overflow-hidden rounded-lg border bg-white/[0.03]" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                    <img src={presetThumbnail} alt="" className="h-full w-full object-cover" />
+                    {presetThumbnail ? (
+                      <img src={presetThumbnail} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <CustomPresetFallbackCover title={presetTitle} />
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="inline-flex cursor-pointer items-center rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/8" style={{ color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.10)' }}>
@@ -644,7 +672,7 @@ export function PresetPickerModal({
                     </label>
                     <button
                       type="button"
-                      onClick={() => setPresetThumbnail(DEFAULT_USER_PRESET_THUMBNAIL)}
+                      onClick={() => setPresetThumbnail('')}
                       className="text-left text-[12px] transition-colors hover:text-white/70"
                       style={{ color: 'rgba(255,255,255,0.38)' }}
                     >

@@ -32,7 +32,7 @@ function createUserPreset(draft: UserPresetDraft): PresetItem {
     recommendedInCommon: false,
     userFavorite: draft.userFavorite ?? true,
     tags: ['自定义预设'],
-    thumbnail: draft.thumbnail || DEFAULT_USER_PRESET_THUMBNAIL,
+    thumbnail: draft.thumbnail?.trim() || undefined,
     promptTemplate: prompt,
   };
 }
@@ -59,7 +59,7 @@ export function loadUserPresets(): PresetItem[] {
         detailDescription: preset.detailDescription || String(preset.promptTemplate),
         keywords: preset.keywords || [],
         tags: preset.tags?.length ? preset.tags : ['自定义预设'],
-        thumbnail: preset.thumbnail || DEFAULT_USER_PRESET_THUMBNAIL,
+        thumbnail: preset.thumbnail === DEFAULT_USER_PRESET_THUMBNAIL ? undefined : preset.thumbnail,
       }));
   } catch {
     return [];
