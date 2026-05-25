@@ -74,7 +74,7 @@ const zhCN = {
     undefinedUsage: "未定义用途",
     generateImage: "生成图片",
     fullscreen: "全屏",
-    clickToChangeStyle: "点击更换风格 / 移除风格",
+    clickToChangeStyle: "点击更换风格",
     noPrompt: "暂无提示词",
     info: "信息",
     size: "尺寸",
@@ -373,7 +373,8 @@ const zhCN = {
 
   style: {
     selectStyle: "选择风格",
-    styleSampleNotice: "风格样图仅用于展示风格，不作为参考图。",
+    selectVisualPreference: "选择视觉偏好",
+    styleSampleNotice: "视觉偏好用于控制整体画面语言，不作为单张参考图。",
     searchStyle: "搜索风格、标签",
     noMatchingStyle: "无匹配风格",
     currentStyle: "当前风格",
@@ -381,40 +382,20 @@ const zhCN = {
     applyThisStyle: "应用该风格",
     currentSelection: "当前选择：",
     noStyle: "无风格",
-    clearStyle: "清除风格",
+    clearStyle: "清除偏好",
     confirmSelection: "确认选择",
-    clickToChange: "点击更换风格 / 移除风格",
-    mir_atmosphere: {
+    clickToChange: "点击更换风格",
+    mir: {
       title: "MIR 氛围感",
-      description: "低饱和、叙事性、强氛围的建筑可视化表达，适合竞赛表现、文化建筑、景观氛围和概念方案。",
+      description: "低饱和 / 诗意氛围 / 柔和自然光",
     },
-    binyan_estate: {
-      title: "Binyan 商业地产感",
-      description: "明亮、高端、地产写实的商业建筑表现，强调清晰材质、空间品质和销售展示感。",
-    },
-    luxigon_drama: {
+    luxigon: {
       title: "Luxigon 戏剧感",
-      description: "高对比、情绪化、强光影的建筑视觉表达，适合概念方案和有冲击力的展示图。",
+      description: "强对比 / 概念叙事 / 戏剧化冲击",
     },
-    real_estate_photo: {
-      title: "写实地产效果图",
-      description: "干净、商业、摄影感的地产效果图表达，强调真实材质、清晰光线和稳定构图。",
-    },
-    soft_grey: {
-      title: "低饱和高级灰",
-      description: "克制、高级、低对比的灰调建筑表达，适合现代住宅、办公与精品商业方案。",
-    },
-    japanese_minimal: {
-      title: "日系极简",
-      description: "自然、留白、柔和的极简建筑表达，强调材料安静质感和自然光。",
-    },
-    cinematic_arch_photo: {
-      title: "电影感建筑摄影",
-      description: "叙事、光影、真实的建筑摄影语言，强调镜头感、情绪层次和自然画面。",
-    },
-    fresh_natural_residential: {
-      title: "清新自然住宅感",
-      description: "柔和、景观、自然光的住宅表现，强调生活气息、绿化融合和亲和力。",
+    binyan: {
+      title: "Binyan 高级感",
+      description: "超真实 / 精致质感 / 温暖叙事",
     },
   },
 

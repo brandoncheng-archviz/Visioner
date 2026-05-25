@@ -74,7 +74,7 @@ const enUS = {
     undefinedUsage: "Undefined Purpose",
     generateImage: "Generate Image",
     fullscreen: "Fullscreen",
-    clickToChangeStyle: "Click to change / remove style",
+    clickToChangeStyle: "Click to change style",
     noPrompt: "No prompt yet",
     info: "Info",
     size: "Size",
@@ -373,7 +373,8 @@ const enUS = {
 
   style: {
     selectStyle: "Select Style",
-    styleSampleNotice: "Style samples are for display only, not used as reference images.",
+    selectVisualPreference: "Select Visual Preference",
+    styleSampleNotice: "Visual preference controls the overall image language and is not used as a single reference image.",
     searchStyle: "Search styles, tags",
     noMatchingStyle: "No matching styles",
     currentStyle: "Current Style",
@@ -381,40 +382,20 @@ const enUS = {
     applyThisStyle: "Apply this style",
     currentSelection: "Current Selection:",
     noStyle: "No Style",
-    clearStyle: "Clear Style",
+    clearStyle: "Clear Preference",
     confirmSelection: "Confirm Selection",
-    clickToChange: "Click to change / remove style",
-    mir_atmosphere: {
+    clickToChange: "Click to change style",
+    mir: {
       title: "MIR Atmosphere",
-      description: "Low saturation, narrative, strong atmosphere architectural visualization, suitable for competition presentations, cultural buildings, landscape atmosphere and concept proposals.",
+      description: "Low saturation / poetic atmosphere / soft natural light",
     },
-    binyan_estate: {
-      title: "Binyan Commercial Estate",
-      description: "Bright, high-end, real-estate realistic commercial architectural visualization, emphasizing clear materials, spatial quality and sales presentation feel.",
-    },
-    luxigon_drama: {
+    luxigon: {
       title: "Luxigon Drama",
-      description: "High contrast, emotional, strong light/shadow architectural visual expression, suitable for concept proposals and impactful presentation images.",
+      description: "High contrast / conceptual narrative / dramatic impact",
     },
-    real_estate_photo: {
-      title: "Real Estate Photo",
-      description: "Clean, commercial, photographic real estate rendering expression, emphasizing real materials, clear lighting and stable composition.",
-    },
-    soft_grey: {
-      title: "Soft Grey Premium",
-      description: "Restrained, premium, low-contrast grey-tone architectural expression, suitable for modern residential, office and boutique commercial proposals.",
-    },
-    japanese_minimal: {
-      title: "Japanese Minimal",
-      description: "Natural, white-space, soft minimal architectural expression, emphasizing quiet material texture and natural light.",
-    },
-    cinematic_arch_photo: {
-      title: "Cinematic Arch Photo",
-      description: "Narrative, light/shadow, real architectural photography language, emphasizing lens feel, emotional layers and natural images.",
-    },
-    fresh_natural_residential: {
-      title: "Fresh Natural Residential",
-      description: "Soft, landscape, natural light residential expression, emphasizing living atmosphere, greenery integration and approachability.",
+    binyan: {
+      title: "Binyan Premium",
+      description: "Photoreal / refined material / warm narrative",
     },
   },
 

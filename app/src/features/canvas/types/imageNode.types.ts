@@ -55,20 +55,28 @@ export interface PresetItem {
   sourcePresetThumbnail?: string;
 }
 
-export type PresetTab = '我的常用' | '变真实' | '换氛围';
+export type PresetTab = '我的常用' | '变真实' | '变时段' | '变天气' | '变季节';
 
-export type StylePreset = {
+export type StylePromptTemplate = {
+  styleCore: string;
+  color: string;
+  lighting: string;
+  atmosphere: string;
+  architectureEnvironment: string;
+  composition: string;
+  material: string;
+  entourage: string;
+  avoid: string;
+};
+
+export type StyleDefinition = {
   id: string;
-  type: 'style';
   title: string;
-  description: string;
-  thumbnail: string;
-  heroImage?: string;
-  sampleImages: string[];
+  shortDescription: string;
+  coverImage: string;
+  detailedDescription: string;
   tags: string[];
-  prompt: string;
-  selectionMode: 'single';
-  strength: 'high';
+  promptTemplate: StylePromptTemplate;
 };
 
 export type PromptContent =

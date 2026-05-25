@@ -1,7 +1,7 @@
-import type { PresetItem, StylePreset } from '../types/imageNode.types';
+import type { PresetItem, StyleDefinition } from '../types/imageNode.types';
 import { getUserPresetById } from '../utils/userPresets';
 
-export const PRESET_TABS = ['我的常用', '变真实', '换氛围'] as const;
+export const PRESET_TABS = ['我的常用', '变真实', '变时段', '变天气', '变季节'] as const;
 
 export const MAX_MULTI_PRESETS_BY_GROUP: Partial<Record<PresetItem['group'], number>> = {
   accent_style: 2,
@@ -110,12 +110,12 @@ export const PRESET_DATA: PresetItem[] = [
     thumbnail: '/assets/presets/realism/cinematic-narrative.jpg',
   },
 
-  // ── 换氛围：时间段 ──
+  // ── 变时段 ──
   {
     id: 'time_early_morning',
     name: '清晨',
     title: '清晨',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变时段'],
     category: 'atmosphere',
     group: 'time',
     selectType: 'single',
@@ -145,7 +145,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'time_morning',
     name: '上午',
     title: '上午',
-    tabs: ['换氛围'],
+    tabs: ['变时段'],
     category: 'atmosphere',
     group: 'time',
     selectType: 'single',
@@ -175,7 +175,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'time_afternoon',
     name: '午后',
     title: '午后',
-    tabs: ['换氛围'],
+    tabs: ['变时段'],
     category: 'atmosphere',
     group: 'time',
     selectType: 'single',
@@ -205,7 +205,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'time_dusk',
     name: '黄昏',
     title: '黄昏',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变时段'],
     category: 'atmosphere',
     group: 'time',
     selectType: 'single',
@@ -235,7 +235,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'time_blue_hour',
     name: '蓝调',
     title: '蓝调',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变时段'],
     category: 'atmosphere',
     group: 'time',
     selectType: 'single',
@@ -265,7 +265,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'time_night',
     name: '夜景',
     title: '夜景',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变时段'],
     category: 'atmosphere',
     group: 'time',
     selectType: 'single',
@@ -292,12 +292,12 @@ export const PRESET_DATA: PresetItem[] = [
     thumbnail: '/assets/presets/time/time-night.jpg',
   },
 
-  // ── 换氛围：天气 ──
+  // ── 变天气 ──
   {
     id: 'weather_sunny',
     name: '晴天',
     title: '晴天',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变天气'],
     category: 'atmosphere',
     group: 'weather',
     selectType: 'single',
@@ -327,7 +327,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'weather_cloudy',
     name: '多云',
     title: '多云',
-    tabs: ['换氛围'],
+    tabs: ['变天气'],
     category: 'atmosphere',
     group: 'weather',
     selectType: 'single',
@@ -357,7 +357,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'weather_overcast',
     name: '阴天',
     title: '阴天',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变天气'],
     category: 'atmosphere',
     group: 'weather',
     selectType: 'single',
@@ -387,7 +387,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'weather_after_rain',
     name: '雨后',
     title: '雨后',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变天气'],
     category: 'atmosphere',
     group: 'weather',
     selectType: 'single',
@@ -417,7 +417,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'weather_foggy',
     name: '雾天',
     title: '雾天',
-    tabs: ['换氛围'],
+    tabs: ['变天气'],
     category: 'atmosphere',
     group: 'weather',
     selectType: 'single',
@@ -447,7 +447,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'weather_snow',
     name: '雪景',
     title: '雪景',
-    tabs: ['换氛围'],
+    tabs: ['变天气'],
     category: 'atmosphere',
     group: 'weather',
     selectType: 'single',
@@ -474,12 +474,12 @@ export const PRESET_DATA: PresetItem[] = [
     thumbnail: '/assets/presets/weather/weather-snow.jpg',
   },
 
-  // ── 换氛围：季节 ──
+  // ── 变季节 ──
   {
     id: 'season_spring',
     name: '春季',
     title: '春季',
-    tabs: ['换氛围'],
+    tabs: ['变季节'],
     category: 'atmosphere',
     group: 'season',
     selectType: 'single',
@@ -510,7 +510,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'season_summer',
     name: '夏季',
     title: '夏季',
-    tabs: ['换氛围'],
+    tabs: ['变季节'],
     category: 'atmosphere',
     group: 'season',
     selectType: 'single',
@@ -541,7 +541,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'season_autumn',
     name: '秋季',
     title: '秋季',
-    tabs: ['常用', '换氛围'],
+    tabs: ['变季节'],
     category: 'atmosphere',
     group: 'season',
     selectType: 'single',
@@ -572,7 +572,7 @@ export const PRESET_DATA: PresetItem[] = [
     id: 'season_winter',
     name: '冬季',
     title: '冬季',
-    tabs: ['换氛围'],
+    tabs: ['变季节'],
     category: 'atmosphere',
     group: 'season',
     selectType: 'single',
@@ -861,115 +861,81 @@ export function getPresetById(id: string) {
   return PRESET_BY_ID.get(id) || getUserPresetById(id);
 }
 
-export const STYLE_PRESETS: StylePreset[] = [
-  {
-    id: 'mir_atmosphere',
-    type: 'style',
-    title: 'MIR 氛围感',
-    description: '低饱和、叙事性、强氛围的建筑可视化表达，适合竞赛表现、文化建筑、景观氛围和概念方案。',
-    thumbnail: '/images/show-cover-8.jpg',
-    heroImage: '/images/show-cover-8.jpg',
-    sampleImages: ['/images/show-cover-8.jpg', '/images/show-cover-13.jpg', '/images/show-cover-12.jpg', '/images/show-cover-16.jpg'],
-    tags: ['低饱和', '叙事性', '强氛围', '空气感'],
-    prompt: '全局风格采用 MIR 氛围感表达：低饱和、叙事性、强氛围和空气感，但不得覆盖用户硬约束、主体建筑、自定义用途和具体参考图用途。',
-    selectionMode: 'single',
-    strength: 'high',
+export const mirStyle: StyleDefinition = {
+  id: 'mir',
+  title: 'MIR 氛围感',
+  shortDescription: '低饱和 / 诗意氛围 / 柔和自然光',
+  coverImage: '/assets/styles/mir/cover.jpg',
+  detailedDescription:
+    'MIR 氛围感强调低饱和、冷灰调、柔和自然光和强烈的环境氛围。画面不追求商业效果图式的高清锐利，而是营造一种诗意、冷静、内敛、略带忧郁的建筑图像气质。\n\n建筑应与地形、植物、天空、雾气、雨雪、水体等自然环境深度融合，而不是像单独摆放在场景中的物体。画面通常采用阴天、薄雾、漫射光、侧光、逆光或冬季感光线，避免强烈直射阳光、纯净蓝天和过高饱和度。\n\n整体质感偏向绘画感与自然主义，更接近高级建筑摄影与数字手绘合成之间的状态。材质表现应真实但克制，不夸张、不塑料感、不强 HDR。人物和活动元素应尽量少且处理克制，重点仍然是建筑在环境中的存在感与时间感。',
+  tags: ['低饱和', '冷灰调', '阴天漫射光', '薄雾空气感', '绘画感', '建筑融于环境', '冷静叙事', '北欧气质'],
+  promptTemplate: {
+    styleCore: '高度氛围化的建筑可视化表达，强调北欧自然主义气质、诗意叙事感和柔和绘画感，不追求硬质商业CG效果。',
+    color: '使用低饱和、冷灰调、克制的自然色彩关系，避免鲜艳、高饱和和地产广告式配色。',
+    lighting: '采用柔和自然光、阴天漫射光、侧光、逆光或雾中光感，避免强烈直射阳光和生硬阴影。',
+    atmosphere: '营造安静、冷静、略带忧郁的环境氛围，允许轻微薄雾、空气透视和柔和颗粒感。',
+    architectureEnvironment: '强调建筑与自然环境、景观、地形、植物、天空、水体的深度融合，让建筑像已经在场地中存在很久。',
+    composition: '保持克制、冷静、电影化的构图，强调空间层次、环境包裹感和建筑摄影式视角。',
+    material: '材质真实但柔和，不要过度锐化、过度反光、过强CG塑料感。',
+    entourage: '人物和配景元素应克制，数量少，避免喧宾夺主，重点服务建筑与场景氛围。',
+    avoid: '避免纯蓝天大晴天、过高饱和、商业地产广告感、塑料CG感、夸张HDR、过强锐化、人物过多、舞台式强打光。',
   },
-  {
-    id: 'binyan_estate',
-    type: 'style',
-    title: 'Binyan 商业地产感',
-    description: '明亮、高端、地产写实的商业建筑表现，强调清晰材质、空间品质和销售展示感。',
-    thumbnail: '/images/show-cover-9.jpg',
-    heroImage: '/images/show-cover-9.jpg',
-    sampleImages: ['/images/show-cover-9.jpg', '/images/show-cover-1.jpg', '/images/show-cover-2.jpg', '/images/show-cover-14.jpg'],
-    tags: ['明亮', '高端', '地产写实', '商业'],
-    prompt: '全局风格采用 Binyan 商业地产感表达：明亮、高端、干净、商业写实，但不得覆盖用户硬约束和具体参考图控制。',
-    selectionMode: 'single',
-    strength: 'high',
-  },
-  {
-    id: 'luxigon_drama',
-    type: 'style',
-    title: 'Luxigon 戏剧感',
-    description: '高对比、情绪化、强光影的建筑视觉表达，适合概念方案和有冲击力的展示图。',
-    thumbnail: '/images/show-cover-10.jpg',
-    heroImage: '/images/show-cover-10.jpg',
-    sampleImages: ['/images/show-cover-10.jpg', '/images/show-cover-7.jpg', '/images/show-cover-11.jpg', '/images/show-cover-15.jpg'],
-    tags: ['高对比', '情绪化', '强光影', '戏剧'],
-    prompt: '全局风格采用 Luxigon 戏剧感表达：高对比、情绪化、强光影和视觉冲击，但不得覆盖更高优先级的参考图用途。',
-    selectionMode: 'single',
-    strength: 'high',
-  },
-  {
-    id: 'real_estate_photo',
-    type: 'style',
-    title: '写实地产效果图',
-    description: '干净、商业、摄影感的地产效果图表达，强调真实材质、清晰光线和稳定构图。',
-    thumbnail: '/images/show-cover-1.jpg',
-    heroImage: '/images/show-cover-1.jpg',
-    sampleImages: ['/images/show-cover-1.jpg', '/images/show-cover-2.jpg', '/images/show-cover-3.jpg', '/images/show-cover-4.jpg'],
-    tags: ['干净', '商业', '摄影感', '写实'],
-    prompt: '全局风格采用写实地产效果图表达：干净、商业、摄影感和真实材质表现，但服从用户硬约束和参考图用途。',
-    selectionMode: 'single',
-    strength: 'high',
-  },
-  {
-    id: 'soft_grey',
-    type: 'style',
-    title: '低饱和高级灰',
-    description: '克制、高级、低对比的灰调建筑表达，适合现代住宅、办公与精品商业方案。',
-    thumbnail: '/images/show-cover-14.jpg',
-    heroImage: '/images/show-cover-14.jpg',
-    sampleImages: ['/images/show-cover-14.jpg', '/images/show-cover-12.jpg', '/images/show-cover-13.jpg', '/images/show-cover-16.jpg'],
-    tags: ['克制', '高级', '低对比', '灰调'],
-    prompt: '全局风格采用低饱和高级灰表达：克制、高级、低对比和细腻灰调，但不得覆盖具体参考图控制。',
-    selectionMode: 'single',
-    strength: 'high',
-  },
-  {
-    id: 'japanese_minimal',
-    type: 'style',
-    title: '日系极简',
-    description: '自然、留白、柔和的极简建筑表达，强调材料安静质感和自然光。',
-    thumbnail: '/images/show-cover-11.jpg',
-    heroImage: '/images/show-cover-11.jpg',
-    sampleImages: ['/images/show-cover-11.jpg', '/images/show-cover-20.jpg', '/images/show-cover-3.jpg', '/images/show-cover-6.jpg'],
-    tags: ['自然', '留白', '柔和', '极简'],
-    prompt: '全局风格采用日系极简表达：自然、留白、柔和和安静材质，但服从用户硬约束、主体建筑和局部参考。',
-    selectionMode: 'single',
-    strength: 'high',
-  },
-  {
-    id: 'cinematic_arch_photo',
-    type: 'style',
-    title: '电影感建筑摄影',
-    description: '叙事、光影、真实的建筑摄影语言，强调镜头感、情绪层次和自然画面。',
-    thumbnail: '/images/show-cover-7.jpg',
-    heroImage: '/images/show-cover-7.jpg',
-    sampleImages: ['/images/show-cover-7.jpg', '/images/show-cover-10.jpg', '/images/show-cover-15.jpg', '/images/show-cover-19.jpg'],
-    tags: ['叙事', '光影', '真实', '镜头感'],
-    prompt: '全局风格采用电影感建筑摄影表达：叙事、光影、真实和镜头感，但不得推翻具体参考图与预设目标。',
-    selectionMode: 'single',
-    strength: 'high',
-  },
-  {
-    id: 'fresh_natural_residential',
-    type: 'style',
-    title: '清新自然住宅感',
-    description: '柔和、景观、自然光的住宅表现，强调生活气息、绿化融合和亲和力。',
-    thumbnail: '/images/show-cover-20.jpg',
-    heroImage: '/images/show-cover-20.jpg',
-    sampleImages: ['/images/show-cover-20.jpg', '/images/show-cover-1.jpg', '/images/show-cover-5.jpg', '/images/show-cover-11.jpg'],
-    tags: ['柔和', '景观', '自然光', '住宅'],
-    prompt: '全局风格采用清新自然住宅感表达：柔和、景观、自然光和生活亲和力，但不能覆盖人物、植物、天空等具体参考用途。',
-    selectionMode: 'single',
-    strength: 'high',
-  },
-];
+};
 
-const STYLE_PRESET_BY_ID = new Map(STYLE_PRESETS.map((style) => [style.id, style]));
+export const luxigonStyle: StyleDefinition = {
+  id: 'luxigon',
+  title: 'Luxigon 戏剧感',
+  shortDescription: '强对比 / 概念叙事 / 戏剧化冲击',
+  coverImage: '/assets/styles/luxigon/cover.jpg',
+  detailedDescription:
+    'Luxigon 戏剧感强调强烈的视觉冲击力、概念叙事和电影化光影。画面不只是展示建筑外观，而是将建筑放入一个具有情绪、事件和故事张力的场景中，让建筑成为画面中的视觉主角和叙事核心。\n\n与 MIR 的冷静、低饱和、自然主义氛围不同，Luxigon 更偏向大胆、外放、艺术化和戏剧化的表达。画面可以使用更强烈的明暗反差、更鲜明的冷暖对比、更有表现力的天空、云层、烟雾、逆光、城市活动或超现实氛围，用来放大设计概念和空间情绪。\n\n这种风格适合让建筑图像更有传播性、记忆点和概念冲击力。人物、车辆、灯光、天气和城市配景可以更积极地参与画面叙事，但必须服务于建筑主体，不能让画面变得混乱或把建筑淹没。最终效果应接近一张高质量的建筑电影海报：有张力、有故事、有视觉中心，同时仍然保持建筑可视化的空间可信度和设计表达清晰度。',
+  tags: ['戏剧光影', '强对比', '概念叙事', '电影感', '视觉冲击', '大胆色彩', '城市事件', '海报感'],
+  promptTemplate: {
+    styleCore: '戏剧化、概念叙事导向的建筑可视化表达，强调强烈视觉冲击、电影化场景、情绪张力和设计概念的视觉放大。建筑必须保持清晰主体地位，而不是被环境元素淹没。',
+    color: '使用更大胆、更有表现力的色彩关系，允许强烈冷暖对比、深蓝阴影、橙红天空、霓虹色点缀、浓郁黄昏或夜景色调。色彩可以鲜明但必须高级、受控，避免廉价过饱和和杂乱配色。',
+    lighting: '采用强烈戏剧化光影，例如强侧光、逆光、轮廓光、局部聚焦光、夜景灯光、体积光、穿透云层的光束或高反差环境光。光线应强化建筑体量、边缘轮廓、空间深度和画面张力。',
+    atmosphere: '营造充满能量、事件感和故事性的画面氛围。可以加入戏剧化天空、厚重云层、烟雾、雨雪、湿润地面、反射、光束、城市活动或轻微超现实元素，让画面具有记忆点和传播感。',
+    architectureEnvironment: '建筑应作为视觉故事的核心角色，与城市环境、人群活动、交通、天气、景观、灯光和场地事件形成完整叙事。环境元素可以丰富，但必须围绕建筑展开，不能遮挡或削弱建筑主体。',
+    composition: '使用电影化、海报化、具有强视觉中心的构图。允许大胆透视、前景遮挡、强剪影、动态人群、低机位、广角张力和富有冲击力的画面布局，但仍需保持建筑形体、比例和空间关系清晰。',
+    material: '材质表现应保持可信，同时可以通过更强的高光、反射、湿润地面、夜景灯光、金属与玻璃反射、局部明暗对比来增强表现力。避免塑料感、廉价CG质感和无细节的大面积假材质。',
+    entourage: '人物、车辆、活动、城市配景和环境细节可以比克制风格更积极地出现，用来制造事件感和画面故事。但数量、位置和明暗关系必须受控，不能造成杂乱，也不能抢走建筑主体的注意力。',
+    avoid: '避免平淡光照、低对比、灰暗无重点、普通地产效果图感、没有故事的空场景、过度干净的CG感、廉价过饱和、杂乱配景、人物失控、主体建筑被遮挡、过度游戏概念图感、过度插画化、建筑细节丢失。',
+  },
+};
+
+export const binyanStyle: StyleDefinition = {
+  id: 'binyan',
+  title: 'Binyan 高级感',
+  shortDescription: '超真实 / 精致质感 / 温暖叙事',
+  coverImage: '/assets/styles/binyan/cover.jpg',
+  detailedDescription:
+    'Binyan 高级感强调高度真实、精致材质和具有生活温度的建筑可视化表达。它不像 MIR 那样偏向冷静、诗意和自然主义氛围，也不像 Luxigon 那样追求戏剧冲击和概念张力，而是更关注高端项目本身的商业完成度、空间品质、材料可信度和生活方式吸引力。\n\n画面应呈现明亮、通透、干净、成熟且昂贵的视觉气质。建筑主体需要被清晰、优雅地展示，体块关系、立面材质、入口界面、景观层次、室内外过渡和公共空间都应具有明确秩序。光线通常自然、柔和、受控，可以是清晨柔光、黄昏暖光、晴朗但不过曝的日光，或精致的室内外灯光，整体应让空间显得真实可信、舒适且有吸引力。\n\n人物、车辆、家具、绿化、水景、灯光和生活配景可以适度出现，用来增强尺度感、生活感和归属感，但不应喧宾夺主。整体效果应接近高端住宅、酒店、商业综合体或品牌地产项目的正式宣传图：画面精修、材质高级、氛围温暖、细节完整，让观者产生对空间品质和生活方式的信任与向往。',
+  tags: ['超真实', '精致质感', '温暖叙事', '高端商业', '生活方式', '明亮通透', '高级材质', '可信真实'],
+  promptTemplate: {
+    styleCore: '高端商业建筑与地产营销导向的建筑可视化表达，强调真实可信、精致完成度、温暖生活方式和成熟高级的项目气质。建筑主体必须清晰、优雅、有吸引力。',
+    color: '使用自然、干净、平衡且具有高级感的色彩关系。可采用暖灰、米色、香槟色、自然木色、柔和天空色、低饱和绿植色和精致金属色点缀。整体色彩应温和、通透、现代，避免脏灰、过冷、廉价高饱和或过度滤镜感。',
+    lighting: '采用真实、受控且讨好的高端建筑摄影光线，例如清晨柔光、黄昏暖光、晴朗但柔和的日光、精致室内灯光、立面灯光和景观灯光。光线应强化空间品质、材料质感和舒适氛围，避免过度阴郁、强烈戏剧冲突或廉价爆亮效果。',
+    atmosphere: '营造成熟、温暖、舒适、可信赖且具有向往感的空间氛围。画面应具有高端生活方式吸引力和商业传播价值，但不能显得浮夸、廉价、过度广告化或虚假。',
+    architectureEnvironment: '建筑应与高品质环境自然结合，包括景观、入口界面、街道、泳池、会所、露台、阳台、室内外过渡空间和公共活动区域。环境应服务项目价值表达，让空间看起来真实可达、成熟完整、具有场所感。',
+    composition: '使用稳定、清晰、优雅且商业完成度高的构图。突出建筑体量、立面秩序、入口仪式感、景观界面和空间价值。构图应接近高端地产摄影、酒店宣传图或开发商正式发布图，避免过分实验性、过度倾斜透视或主体不明确。',
+    material: '强调高品质材料细节和可信质感，例如玻璃、石材、金属、木饰面、幕墙、软装、干净铺装、水面、绿植和精致景观材质。材质应真实、干净、细腻、精修，避免塑料感、粗糙未完成感、过度锐化和廉价反光。',
+    entourage: '人物、车辆、家具、灯光、绿化和生活配景可以适度使用，用来传达尺度、活力、服务感和高端生活方式。人物应自然、体面、数量适中，动作和服装应符合高端项目气质，不能遮挡建筑主体或造成杂乱。',
+    avoid: '避免过度阴郁、过度概念化、强戏剧冲突、脏乱环境、廉价饱和色、过度HDR、过强锐化、塑料CG感、空洞无生活感、人物过多、建筑主体不清晰、过度浮夸的奢华感、销售图缺乏可信度。',
+  },
+};
+
+export const styleDefinitions: StyleDefinition[] = [mirStyle, luxigonStyle, binyanStyle];
+
+export const STYLE_PRESETS = styleDefinitions;
+
+const STYLE_PRESET_BY_ID = new Map(styleDefinitions.map((style) => [style.id, style]));
+const LEGACY_STYLE_ID_MAP: Record<string, string> = {
+  mir_atmosphere: 'mir',
+  luxigon_drama: 'luxigon',
+  binyan_estate: 'binyan',
+};
 
 export function getStylePresetById(id: string | null | undefined) {
-  return id ? STYLE_PRESET_BY_ID.get(id) || null : null;
+  if (!id) return null;
+  return STYLE_PRESET_BY_ID.get(id) || STYLE_PRESET_BY_ID.get(LEGACY_STYLE_ID_MAP[id]) || null;
 }

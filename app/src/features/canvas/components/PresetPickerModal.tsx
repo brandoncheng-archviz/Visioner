@@ -30,13 +30,21 @@ function saveUserFavorites(favorites: Set<string>) {
   } catch { /* ignore */ }
 }
 
-const ATMOSPHERE_GROUP_LABELS: Record<string, string> = {
-  time: '时间段',
-  weather: '天气',
-  season: '季节',
+const PRESET_TAB_HINTS: Record<PresetTab, string> = {
+  我的常用: '显示你收藏或常用的预设，选择规则沿用其原始分类。',
+  变真实: '提升画面真实度、材质、曝光和成片质量。',
+  变时段: '选择一天中的时间段，控制光线方向、色温和整体时间氛围。同一时间最多选择一项。',
+  变天气: '选择天气与空气状态，控制天空、地面湿润感、能见度和整体空气氛围。同一时间最多选择一项。',
+  变季节: '选择季节气质，控制植物状态、色彩倾向和环境季节感。同一时间最多选择一项。',
 };
 
-const ATMOSPHERE_GROUP_ORDER = ['time', 'weather', 'season'];
+const SELECTED_PRESET_GROUP_ORDER: Record<string, number> = {
+  realism_mode: 0,
+  time: 1,
+  weather: 2,
+  season: 3,
+  user_custom: 4,
+};
 
 function getPresetName(preset: PresetItem): string {
   return preset.title || preset.name;
@@ -44,44 +52,6 @@ function getPresetName(preset: PresetItem): string {
 
 function getPresetShortDesc(preset: PresetItem): string {
   return preset.description || preset.shortDescription || (preset.owner === 'user' ? '用户自定义' : '');
-}
-
-function buildAtmosphereComboDescription(presets: PresetItem[]): { title: string; description: string; keywords: string[] } {
-  const time = presets.find((p) => p.group === 'time');
-  const weather = presets.find((p) => p.group === 'weather');
-  const season = presets.find((p) => p.group === 'season');
-
-  const parts: string[] = [];
-  if (time) parts.push(time.name);
-  if (weather) parts.push(weather.name);
-  if (season) parts.push(season.name);
-
-  const title = parts.join(' · ') || '';
-
-  if (parts.length === 0) {
-    return { title: '', description: '', keywords: [] };
-  }
-
-  // Build natural language description based on combination
-  let description = '';
-  if (parts.length === 1) {
-    const single = time || weather || season;
-    description = single?.detailDescription || `画面会调整${single?.name}氛围，同时保持建筑主体、构图和主要设计特征不变。`;
-  } else {
-    const atmosParts: string[] = [];
-    if (time) atmosParts.push(`${time.name}光线`);
-    if (weather) atmosParts.push(`${weather.name}天空`);
-    if (season) atmosParts.push(`${season.name}色调`);
-    description = `画面会转向${parts.join('、')}的组合氛围，${atmosParts.join('、')}相互融合。系统会增强对应的自然光影、色调氛围和空气感，同时保持建筑主体、构图和主要设计特征不变。`;
-  }
-
-  const keywords: string[] = [];
-  presets.forEach((p) => {
-    if (p.keywords) keywords.push(...p.keywords);
-  });
-  const uniqueKeywords = Array.from(new Set(keywords));
-
-  return { title, description, keywords: uniqueKeywords };
 }
 
 export function PresetPickerModal({
@@ -120,6 +90,11 @@ export function PresetPickerModal({
   const handleClear = useCallback(() => {
     setDraftPresetIds([]);
     setFocusedPresetId(null);
+  }, []);
+
+  const handleRemoveDraftPreset = useCallback((presetId: string) => {
+    setDraftPresetIds((ids) => ids.filter((id) => id !== presetId));
+    setFocusedPresetId((id) => (id === presetId ? null : id));
   }, []);
 
   const openCreateEditor = useCallback(() => {
@@ -243,61 +218,26 @@ export function PresetPickerModal({
     });
   }, [activeTab, allPresets, userFavorites]);
 
-  const atmospherePresets = useMemo(() => {
-    if (activeTab !== '换氛围') return null;
-    const byGroup: Record<string, PresetItem[]> = {};
-    ATMOSPHERE_GROUP_ORDER.forEach((g) => { byGroup[g] = []; });
-    PRESET_DATA.filter((p) => p.category === 'atmosphere' && p.tabs.includes('换氛围')).forEach((p) => {
-      if (p.group && byGroup[p.group]) {
-        byGroup[p.group].push(p);
-      }
-    });
-    return byGroup;
-  }, [activeTab]);
-
-  const detailSection = useMemo(() => {
-    if (activeTab === '换氛围') {
-      const selectedAtmosphere = draftPresetIds
-        .map(getPresetById)
-        .filter((p): p is PresetItem => p !== undefined && p.category === 'atmosphere');
-      if (selectedAtmosphere.length === 0) {
-        return {
-          title: '',
-          description: '选择时间段、天气和季节来组合画面氛围。每个维度最多选择一项。',
-          keywords: [] as string[],
-        };
-      }
-      return buildAtmosphereComboDescription(selectedAtmosphere);
-    }
-
-    const focused = focusedPresetId ? allPresets.find((preset) => preset.id === focusedPresetId) || getPresetById(focusedPresetId) : null;
-    if (focused) {
-      return {
-        title: getPresetName(focused),
-        description: focused.detailDescription || focused.shortHelp || '',
-        keywords: focused.keywords || [],
-      };
-    }
-
-    const selected = draftPresetIds
-      .map((id) => allPresets.find((preset) => preset.id === id) || getPresetById(id))
-      .filter((p): p is PresetItem => Boolean(p));
-    if (selected.length === 1) {
-      const p = selected[0];
-      return {
-        title: getPresetName(p),
-        description: p.detailDescription || p.shortHelp || '',
-        keywords: p.keywords || [],
-      };
-    }
-
-    return { title: '', description: '', keywords: [] as string[] };
-  }, [activeTab, allPresets, draftPresetIds, focusedPresetId]);
-
   const detailPreset = useMemo(() => {
     if (!focusedPresetId) return null;
     return allPresets.find((preset) => preset.id === focusedPresetId) || getPresetById(focusedPresetId) || null;
   }, [allPresets, focusedPresetId]);
+
+  const selectedPresetPills = useMemo(() => {
+    return draftPresetIds
+      .map((id, index) => ({
+        id,
+        index,
+        preset: allPresets.find((preset) => preset.id === id) || getPresetById(id),
+      }))
+      .filter((item): item is { id: string; index: number; preset: PresetItem } => Boolean(item.preset))
+      .sort((a, b) => {
+        const aOrder = SELECTED_PRESET_GROUP_ORDER[a.preset.group] ?? 99;
+        const bOrder = SELECTED_PRESET_GROUP_ORDER[b.preset.group] ?? 99;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return a.index - b.index;
+      });
+  }, [allPresets, draftPresetIds]);
 
   const handleCardClick = useCallback((presetId: string) => {
     selectPreset(presetId);
@@ -453,18 +393,47 @@ export function PresetPickerModal({
 
           {/* Right content */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <div className="flex shrink-0 items-start justify-between gap-4 px-5 pb-2 pt-4">
+              <div className="min-w-0">
+                <div className="text-[15px] font-semibold text-white/88">{activeTab}</div>
+                <div className="mt-1 truncate text-[12px]" style={{ color: 'rgba(255,255,255,0.42)' }}>
+                  {PRESET_TAB_HINTS[activeTab]}
+                </div>
+              </div>
+              {detailPreset?.owner === 'user' && (
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openEditEditor(detailPreset)}
+                    className="rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/8"
+                    style={{ color: 'rgba(255,255,255,0.68)', border: '1px solid rgba(255,255,255,0.10)' }}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteUserPreset(detailPreset.id)}
+                    className="rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/8"
+                    style={{ color: 'rgba(248,113,113,0.84)', border: '1px solid rgba(248,113,113,0.18)' }}
+                  >
+                    删除
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Cards area */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
               {activeTab === '我的常用' ? (
                 visiblePresets.length === 0 ? (
-                  <div className="flex h-full flex-col items-center justify-center py-10 text-center">
+                  <div className="flex min-h-[360px] flex-col items-center justify-center text-center">
                     <Bookmark className="mb-3 h-10 w-10 text-white/10" />
-                    <div className="text-[13px] text-white/40">还没有常用预设</div>
-                    <div className="mt-1 text-[11px] text-white/25">点击预设右上角的星标，或添加自己的预设。</div>
+                    <div className="text-[13px] font-medium text-white/42">还没有常用预设</div>
+                    <div className="mt-1 text-[11px] text-white/28">点击预设右上角的星标，或添加自己的预设。</div>
                     <button
                       type="button"
                       onClick={openCreateEditor}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium"
+                      className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium"
                       style={{ background: 'rgba(167,139,250,0.86)', color: '#111' }}
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -486,107 +455,49 @@ export function PresetPickerModal({
                     </button>
                   </div>
                 )
-              ) : activeTab === '换氛围' && atmospherePresets ? (
-                <div className="space-y-5">
-                  {ATMOSPHERE_GROUP_ORDER.map((groupKey) => {
-                    const groupPresets = atmospherePresets[groupKey];
-                    if (!groupPresets || groupPresets.length === 0) return null;
-                    return (
-                      <div key={groupKey}>
-                        <div className="mb-2 text-[13px] font-medium text-white/70">{ATMOSPHERE_GROUP_LABELS[groupKey]}</div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {groupPresets.map((preset) => renderPresetCard(preset))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
               ) : (
                 <div className="grid grid-cols-3 gap-3">
                   {visiblePresets.map((preset) => renderPresetCard(preset))}
                 </div>
               )}
             </div>
-
-            {/* Detail section */}
-            <div className="h-[190px] shrink-0 overflow-y-auto border-t px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.028)' }}>
-              {detailSection.title ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[18px] font-semibold text-white/92">{detailSection.title}</span>
-                  </div>
-                  {detailSection.description && (
-                    <p className="mt-3 text-[13px] leading-7" style={{ color: 'rgba(255,255,255,0.64)' }}>
-                      {detailSection.description}
-                    </p>
-                  )}
-                  {detailSection.keywords.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-1.5">
-                      {detailSection.keywords.map((kw) => (
-                        <span
-                          key={kw}
-                          className="rounded-md px-2 py-1 text-[11px]"
-                          style={{ background: 'rgba(167,139,250,0.12)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.2)' }}
-                        >
-                          {kw}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {detailPreset?.owner === 'user' && (
-                    <div className="mt-4 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditEditor(detailPreset)}
-                        className="rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/8"
-                        style={{ color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.10)' }}
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteUserPreset(detailPreset.id)}
-                        className="rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/8"
-                        style={{ color: 'rgba(248,113,113,0.88)', border: '1px solid rgba(248,113,113,0.20)' }}
-                      >
-                        删除
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : activeTab === '换氛围' ? (
-                <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.40)' }}>
-                  选择时间段、天气和季节来组合画面氛围。每个维度最多选择一项。
-                </p>
-              ) : (
-                <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.40)' }}>
-                  点击卡片选择预设，悬停查看详细说明。
-                </p>
-              )}
-            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 items-center justify-between border-t px-5 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          <div className="flex items-center gap-2">
-            {draftPresetIds.length > 0 ? (
+        <div className="flex h-20 shrink-0 items-center justify-between border-t px-5" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="flex min-w-0 flex-1 items-center gap-2 pr-4">
+            <span className="shrink-0 text-[12px] text-white/40">当前选择：</span>
+            {selectedPresetPills.length > 0 ? (
               <>
-                <span className="text-[12px] text-white/35">已选 {draftPresetIds.length} 项</span>
+                <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-contain">
+                  {selectedPresetPills.map(({ id, preset }) => (
+                    <span
+                      key={id}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px]"
+                      style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.24)' }}
+                    >
+                      {getPresetName(preset)}
+                      <button type="button" onClick={() => handleRemoveDraftPreset(id)} className="rounded-full hover:bg-white/10" aria-label={`移除${getPresetName(preset)}`}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="text-[12px] transition-colors hover:text-white/70"
+                  className="shrink-0 text-[12px] transition-colors hover:text-white/70"
                   style={{ color: 'rgba(255,255,255,0.42)' }}
                 >
-                  清除已选
+                  清除选择
                 </button>
               </>
             ) : (
               <span className="text-[12px] text-white/25">未选择预设</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={handleCancel}

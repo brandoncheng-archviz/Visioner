@@ -2,7 +2,7 @@
 
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
-**Important:** All application source code, configuration, and build assets live inside the `app/` subdirectory. The repository root only contains `.git/`, `package-lock.json`, `CANVAS_RULES.md`, and the `app/` folder. Every command below should be run from `app/` unless noted otherwise.
+**Important:** All application source code, configuration, and build assets live inside the `app/` subdirectory. The repository root only contains `.git/`, `package-lock.json`, `CANVAS_RULES.md`, and the `app/` folder. Every command below should be run from `app/` unless noted otherwise. The `src/` directory at the repository root is effectively empty (contains only `.DS_Store` files) and is not part of the build.
 
 ---
 
@@ -38,6 +38,7 @@ Dev dependencies:
 
 - **kimi-plugin-inspect-react** — Dev-only Vite plugin for React component inspection.
 - **typescript-eslint + eslint-plugin-react-hooks + eslint-plugin-react-refresh** — Linting stack.
+- **tailwindcss-animate + tw-animate-css** — Tailwind animation utilities.
 
 ---
 
@@ -107,16 +108,18 @@ app/
 └── postcss.config.js        # Tailwind + autoprefixer
 ```
 
-**Source file counts:**
+**Source file counts (actual):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 33 files (components, nodes, types, constants, utils, hooks)
-- `src/` total: ~115 source files
+- `src/features/canvas/`: 38 files (components, nodes, types, constants, utils, hooks)
+- `src/` total: 116 source files (`.ts` + `.tsx`)
 
-**Key file sizes:**
+**Key file sizes (approximate):**
 - `CanvasPage.tsx`: ~911 lines (page entry + core state container)
 - `ImageNode.tsx`: ~818 lines
-- `ImageNodeControlPanel.tsx`: ~1,588 lines
+- `ImageNodeControlPanel.tsx`: ~1,415 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
+- `PresetPickerModal.tsx`: ~711 lines
+- `presets.ts`: ~975 lines
 
 ---
 
@@ -177,8 +180,13 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
   - `--primary: 195 100% 50%`
   - `--radius: 0.5rem`
 - **Component patterns**: shadcn/ui components use `class-variance-authority` (cva) for variants and the `cn()` utility from `@/lib/utils` for conditional class merging.
-- **TypeScript**: Strict mode is enabled. `noUnusedLocals` and `noUnusedParameters` are active; unused variables will fail the build. `verbatimModuleSyntax` is also enabled, so type-only imports must use the `type` keyword (e.g., `import type { Foo } from '...'` or `import { type Foo } from '...'`).
-- **ESLint**: The project disables `@typescript-eslint/no-explicit-any` in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
+- **TypeScript**: Strict mode is enabled with the following notable flags:
+  - `noUnusedLocals: true` — unused variables will fail the build.
+  - `noUnusedParameters: true` — unused parameters will fail the build.
+  - `verbatimModuleSyntax: true` — type-only imports must use the `type` keyword (e.g., `import type { Foo } from '...'` or `import { type Foo } from '...'`).
+  - `erasableSyntaxOnly: true` — only TypeScript syntax that can be erased during compilation is allowed.
+  - `noUncheckedSideEffectImports: true` — side-effect imports must be valid.
+- **ESLint**: Flat config using `eslint/config` (`defineConfig`, `globalIgnores`). The project disables `@typescript-eslint/no-explicit-any` in `src/lib/nodeSystem.ts` for React Flow node data definitions. Prefer avoiding `any` in new code.
 
 ---
 
@@ -205,7 +213,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
 - `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
 - `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
-- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`
 
 **Node components (`src/features/canvas/nodes/`):**
 - `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
@@ -219,7 +227,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 **Supporting modules:**
 - `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`
 - `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
-- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`
+- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `presetSelection.ts`, `userPresets.ts`
 - `hooks/` — `useToast.ts`
 
 **Canvas architecture rules (from `CANVAS_RULES.md`):**

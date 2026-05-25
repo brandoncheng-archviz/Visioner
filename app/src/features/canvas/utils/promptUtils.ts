@@ -1,4 +1,4 @@
-import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StylePreset, PromptTemplate } from '../types/imageNode.types';
+import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition, PromptTemplate } from '../types/imageNode.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
 
@@ -25,6 +25,21 @@ function serializePromptTemplate(template: string | PromptTemplate): string {
 function extractConstraints(template: string | PromptTemplate): string | null {
   if (typeof template === 'string') return null;
   return template.constraints || null;
+}
+
+function serializeStylePrompt(style: StyleDefinition): string {
+  const template = style.promptTemplate;
+  return [
+    `风格核心：${template.styleCore}`,
+    `色彩：${template.color}`,
+    `光线：${template.lighting}`,
+    `氛围：${template.atmosphere}`,
+    `建筑与环境：${template.architectureEnvironment}`,
+    `构图：${template.composition}`,
+    `材质：${template.material}`,
+    `人物与配景：${template.entourage}`,
+    `避免：${template.avoid}`,
+  ].join('\n');
 }
 
 export function stripReferencePromptMetadata(promptText: string) {
@@ -111,7 +126,7 @@ export function buildPromptSubmission(
   userText: string,
   promptContent: PromptContent[],
   selectedPresetIds: string[],
-  selectedStyle: StylePreset | null,
+  selectedStyle: StyleDefinition | null,
   nodeReferences: ReferenceInfo[] = [],
 ) {
   const trimmedUserText = userText.trim();
@@ -186,7 +201,7 @@ export function buildPromptSubmission(
   if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((block) => block.promptText).join('；')}`);
   if (undefinedRefs.length) sections.push(`未定义参考：${undefinedRefs.map((block) => block.promptText).join('；')}`);
   if (selectedStyle) {
-    sections.push(`最终全局 Look / LUT / 视觉语言：${selectedStyle.prompt}`);
+    sections.push(`最终全局 Look / LUT / 视觉语言：${serializeStylePrompt(selectedStyle)}`);
   }
   if (nodeReferences.length) {
     sections.push('维度控制约束：参考图按各自定义用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
@@ -213,7 +228,7 @@ export function buildPromptSubmission(
       ? {
           styleKey: selectedStyle.id,
           styleLabel: selectedStyle.title,
-          stylePrompt: selectedStyle.prompt,
+          stylePrompt: serializeStylePrompt(selectedStyle),
           styleRole: 'global-look' as const,
         }
       : null,
