@@ -235,6 +235,24 @@ function FlowCanvas() {
     setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === targetNodeId)));
   }, []);
 
+  const swapCompareInputs = useCallback((targetNodeId: string, leftSourceNodeId: string, rightSourceNodeId: string) => {
+    setEdges((eds) => {
+      const leftEdge = eds.find((edge) => edge.target === targetNodeId && edge.source === leftSourceNodeId);
+      const rightEdge = eds.find((edge) => edge.target === targetNodeId && edge.source === rightSourceNodeId);
+      if (!leftEdge || !rightEdge) return eds;
+
+      return eds.map((edge) => {
+        if (edge.id === leftEdge.id) {
+          return { ...edge, source: rightEdge.source, sourceHandle: rightEdge.sourceHandle };
+        }
+        if (edge.id === rightEdge.id) {
+          return { ...edge, source: leftEdge.source, sourceHandle: leftEdge.sourceHandle };
+        }
+        return edge;
+      });
+    });
+  }, []);
+
   const assignReferenceEdgeRole = useCallback((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string) => {
     const roleData = getRoleData(role, customRoleLabel);
     setEdges((eds) =>
@@ -254,10 +272,11 @@ function FlowCanvas() {
         ...n.data,
         onStartLineDraw: startLineDraw,
         onRemoveReferenceEdge: removeReferenceEdge,
+        onSwapCompareInputs: swapCompareInputs,
         onAssignReferenceEdgeRole: assignReferenceEdgeRole,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, assignReferenceEdgeRole]);
+  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole]);
 
   // ─── Copy / Paste / Delete ───
   const clipboardRef = useRef<{ type: string; data: Record<string, unknown>; position: { x: number; y: number } }[]>([]);

@@ -20,6 +20,11 @@ interface CompareImageAreaProps {
   onSliderChange: (value: number) => void;
 }
 
+function stopNodeControlEvent(event: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 function CompareImageArea({
   leftImage,
   rightImage,
@@ -185,6 +190,10 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   const singleImage = leftImage || rightImage;
   const hasBothImages = Boolean(leftImage && rightImage);
   const nodeTitle = (data.label as string) || t('canvas.nodeLabels.compare');
+  const removeReferenceEdge = data.onRemoveReferenceEdge as ((targetNodeId: string, sourceNodeId: string) => void) | undefined;
+  const swapCompareInputs = data.onSwapCompareInputs as
+    | ((targetNodeId: string, leftSourceNodeId: string, rightSourceNodeId: string) => void)
+    | undefined;
 
   useEffect(() => {
     setNodes((nodes) =>
@@ -196,6 +205,10 @@ export function CompareNode({ id, data, selected }: NodeProps) {
 
   const handleSwap = useCallback(() => {
     if (!leftImage || !rightImage) return;
+    if (swapCompareInputs) {
+      swapCompareInputs(id, leftImage.nodeId, rightImage.nodeId);
+      return;
+    }
     const leftEdge = inputEdges[0];
     const rightEdge = inputEdges[1];
     if (!leftEdge || !rightEdge) return;
@@ -206,7 +219,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
         return edge;
       }),
     );
-  }, [inputEdges, leftImage, rightImage, setEdges]);
+  }, [id, inputEdges, leftImage, rightImage, setEdges, swapCompareInputs]);
 
   const handleReset = useCallback(() => {
     setSliderPosition(50);
@@ -214,13 +227,21 @@ export function CompareNode({ id, data, selected }: NodeProps) {
 
   const handleClearLeft = useCallback(() => {
     if (!leftImage) return;
+    if (removeReferenceEdge) {
+      removeReferenceEdge(id, leftImage.nodeId);
+      return;
+    }
     setEdges((edges) => edges.filter((edge) => !(edge.target === id && edge.source === leftImage.nodeId)));
-  }, [id, leftImage, setEdges]);
+  }, [id, leftImage, removeReferenceEdge, setEdges]);
 
   const handleClearRight = useCallback(() => {
     if (!rightImage) return;
+    if (removeReferenceEdge) {
+      removeReferenceEdge(id, rightImage.nodeId);
+      return;
+    }
     setEdges((edges) => edges.filter((edge) => !(edge.target === id && edge.source === rightImage.nodeId)));
-  }, [id, rightImage, setEdges]);
+  }, [id, removeReferenceEdge, rightImage, setEdges]);
 
   const renderEmptyState = (compact = false) => (
     <div className="grid h-full w-full grid-cols-2 gap-2 p-3">
@@ -273,9 +294,13 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   ) => (
     <button
       type="button"
-      onClick={onClick}
+      onPointerDown={stopNodeControlEvent}
+      onClick={(event) => {
+        stopNodeControlEvent(event);
+        onClick(event);
+      }}
       disabled={disabled}
-      className="flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] transition disabled:cursor-not-allowed disabled:opacity-30"
+      className="nodrag nowheel flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] transition disabled:cursor-not-allowed disabled:opacity-30"
       style={{
         color: 'rgba(255,255,255,0.62)',
         background: 'rgba(255,255,255,0.035)',
@@ -345,8 +370,12 @@ export function CompareNode({ id, data, selected }: NodeProps) {
                 {leftImage && (
                   <button
                     type="button"
-                    onClick={(event) => { event.stopPropagation(); handleClearLeft(); }}
-                    className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
+                    onPointerDown={stopNodeControlEvent}
+                    onClick={(event) => {
+                      stopNodeControlEvent(event);
+                      handleClearLeft();
+                    }}
+                    className="nodrag nowheel flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
                     style={{ color: 'rgba(255,255,255,0.34)' }}
                     title={t('common.remove')}
                   >
@@ -361,8 +390,12 @@ export function CompareNode({ id, data, selected }: NodeProps) {
                 {rightImage && (
                   <button
                     type="button"
-                    onClick={(event) => { event.stopPropagation(); handleClearRight(); }}
-                    className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
+                    onPointerDown={stopNodeControlEvent}
+                    onClick={(event) => {
+                      stopNodeControlEvent(event);
+                      handleClearRight();
+                    }}
+                    className="nodrag nowheel flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
                     style={{ color: 'rgba(255,255,255,0.34)' }}
                     title={t('common.remove')}
                   >
@@ -373,12 +406,10 @@ export function CompareNode({ id, data, selected }: NodeProps) {
             </div>
 
             <div className="mt-2 flex items-center justify-center gap-2">
-              {nodeActionButton(<ArrowLeftRight className="h-4 w-4" />, t('compare.swap'), (event) => {
-                  event.stopPropagation();
+              {nodeActionButton(<ArrowLeftRight className="h-4 w-4" />, t('compare.swap'), () => {
                   handleSwap();
                 }, !hasBothImages)}
-              {nodeActionButton(<RotateCcw className="h-4 w-4" />, t('compare.reset'), (event) => {
-                  event.stopPropagation();
+              {nodeActionButton(<RotateCcw className="h-4 w-4" />, t('compare.reset'), () => {
                   handleReset();
                 })}
             </div>
