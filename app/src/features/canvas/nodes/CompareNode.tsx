@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useStore, useReactFlow, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
 import { ArrowLeftRight, GitCompare, RotateCcw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +7,8 @@ interface ConnectedImage {
   nodeId: string;
   imageUrl: string;
   label: string;
+  width?: number;
+  height?: number;
 }
 
 interface CompareImageAreaProps {
@@ -23,6 +25,79 @@ interface CompareImageAreaProps {
 function stopNodeControlEvent(event: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>) {
   event.preventDefault();
   event.stopPropagation();
+}
+
+const DEFAULT_COMPARE_RATIO = 16 / 9;
+const CLOSE_RATIO_THRESHOLD = 0.15;
+const CARD_PADDING_X = 24;
+const MIN_IMAGE_WIDTH = 300;
+const MAX_IMAGE_WIDTH = 620;
+const MIN_IMAGE_HEIGHT = 220;
+const MAX_IMAGE_HEIGHT = 420;
+const MIN_NODE_WIDTH = 340;
+const MAX_NODE_WIDTH = 680;
+const EMPTY_IMAGE_WIDTH = 500;
+const SQUARE_IMAGE_SIZE = 420;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getImageRatio(image: ConnectedImage | null) {
+  if (!image?.width || !image.height || image.width <= 0 || image.height <= 0) return null;
+  return image.width / image.height;
+}
+
+function getCompareAspectRatio(leftImage: ConnectedImage | null, rightImage: ConnectedImage | null) {
+  const leftRatio = getImageRatio(leftImage);
+  const rightRatio = getImageRatio(rightImage);
+
+  if (leftRatio && rightRatio) {
+    return Math.abs(leftRatio - rightRatio) < CLOSE_RATIO_THRESHOLD
+      ? (leftRatio + rightRatio) / 2
+      : leftRatio;
+  }
+
+  return leftRatio || rightRatio || DEFAULT_COMPARE_RATIO;
+}
+
+function getCompareSize(aspectRatio: number) {
+  let imageWidth: number;
+  let imageHeight: number;
+
+  if (aspectRatio >= 0.9 && aspectRatio <= 1.1) {
+    imageWidth = SQUARE_IMAGE_SIZE;
+    imageHeight = SQUARE_IMAGE_SIZE;
+  } else if (aspectRatio >= 1) {
+    imageWidth = MAX_IMAGE_WIDTH;
+    imageHeight = imageWidth / aspectRatio;
+
+    if (imageHeight < MIN_IMAGE_HEIGHT) {
+      imageHeight = MIN_IMAGE_HEIGHT;
+      imageWidth = imageHeight * aspectRatio;
+    }
+  } else {
+    imageHeight = MAX_IMAGE_HEIGHT;
+    imageWidth = imageHeight * aspectRatio;
+
+    if (imageWidth < MIN_IMAGE_WIDTH) {
+      imageWidth = MIN_IMAGE_WIDTH;
+      imageHeight = imageWidth / aspectRatio;
+    }
+  }
+
+  imageWidth = Math.round(clamp(imageWidth, MIN_IMAGE_WIDTH, MAX_IMAGE_WIDTH));
+  imageHeight = Math.round(clamp(imageHeight, MIN_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT));
+
+  const nodeWidth = Math.round(clamp(imageWidth + CARD_PADDING_X, MIN_NODE_WIDTH, MAX_NODE_WIDTH));
+  const imageAreaWidth = nodeWidth - CARD_PADDING_X;
+  const imageAreaHeight = Math.round(clamp(imageAreaWidth / aspectRatio, MIN_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT));
+
+  return {
+    imageAreaWidth,
+    imageAreaHeight,
+    nodeWidth,
+  };
 }
 
 function CompareImageArea({
@@ -162,6 +237,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   const allEdges = useStore((state) => state.edges);
   const allNodes = useStore((state) => state.nodes);
   const { setNodes, setEdges } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const [sliderPosition, setSliderPosition] = useState<number>((data.sliderPosition as number) ?? 50);
 
@@ -169,7 +245,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   const connectedImages: ConnectedImage[] = useMemo(
     () =>
       inputEdges
-        .map((edge) => {
+        .map((edge): ConnectedImage | null => {
           const sourceNode = allNodes.find((node) => node.id === edge.source);
           if (!sourceNode) return null;
           const imageUrl = (sourceNode.data?.currentImage || sourceNode.data?.image || sourceNode.data?.inputImage) as string | undefined;
@@ -178,6 +254,8 @@ export function CompareNode({ id, data, selected }: NodeProps) {
             nodeId: sourceNode.id,
             imageUrl,
             label: (sourceNode.data?.label as string) || sourceNode.id,
+            width: sourceNode.data?.width as number | undefined,
+            height: sourceNode.data?.height as number | undefined,
           };
         })
         .filter((item): item is ConnectedImage => item !== null)
@@ -190,10 +268,27 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   const singleImage = leftImage || rightImage;
   const hasBothImages = Boolean(leftImage && rightImage);
   const nodeTitle = (data.label as string) || t('canvas.nodeLabels.compare');
+  const compareSize = useMemo(() => {
+    if (!leftImage && !rightImage) {
+      return {
+        imageAreaWidth: EMPTY_IMAGE_WIDTH,
+        imageAreaHeight: Math.round(EMPTY_IMAGE_WIDTH / DEFAULT_COMPARE_RATIO),
+        nodeWidth: EMPTY_IMAGE_WIDTH + CARD_PADDING_X,
+      };
+    }
+
+    const aspectRatio = getCompareAspectRatio(leftImage, rightImage);
+    return getCompareSize(aspectRatio);
+  }, [leftImage, rightImage]);
+  const { imageAreaWidth, imageAreaHeight, nodeWidth } = compareSize;
   const removeReferenceEdge = data.onRemoveReferenceEdge as ((targetNodeId: string, sourceNodeId: string) => void) | undefined;
   const swapCompareInputs = data.onSwapCompareInputs as
     | ((targetNodeId: string, leftSourceNodeId: string, rightSourceNodeId: string) => void)
     | undefined;
+
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, imageAreaHeight, nodeWidth, updateNodeInternals]);
 
   useEffect(() => {
     setNodes((nodes) =>
@@ -265,23 +360,26 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   );
 
   const renderSingleState = () => (
-    <div className="grid h-full w-full grid-cols-2 gap-2 p-3">
-      <div className="relative overflow-hidden rounded-xl" style={{ background: 'rgba(0,0,0,0.28)' }}>
-        {singleImage && (
-          <img
-            src={singleImage.imageUrl}
-            alt=""
-            className="h-full w-full object-contain"
-            draggable={false}
-          />
-        )}
-      </div>
+    <div className="relative h-full w-full">
+      {singleImage && (
+        <img
+          src={singleImage.imageUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-contain"
+          draggable={false}
+        />
+      )}
       <div
-        className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed"
-        style={{ borderColor: 'rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.42)' }}
+        className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-lg px-3 py-2 text-center text-xs"
+        style={{
+          background: 'rgba(20,20,26,0.78)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: 'rgba(255,255,255,0.56)',
+          boxShadow: '0 8px 18px rgba(0,0,0,0.25)',
+        }}
       >
-        <GitCompare className="h-5 w-5" />
-        <span className="px-4 text-center text-xs leading-5">{t('compare.connectSecondImage')}</span>
+        <GitCompare className="h-4 w-4 flex-shrink-0" />
+        <span className="whitespace-nowrap">{t('compare.connectSecondImage')}</span>
       </div>
     </div>
   );
@@ -314,18 +412,14 @@ export function CompareNode({ id, data, selected }: NodeProps) {
     </button>
   );
 
-  const containerWidth = 560;
-  const imageWidth = 536;
-  const containerHeight = 326;
-
   return (
-    <div className="relative group/compare" style={{ zIndex: selected ? 100 : 1, width: containerWidth, cursor: 'default' }}>
+    <div className="relative group/compare" style={{ zIndex: selected ? 100 : 1, width: nodeWidth, cursor: 'default' }}>
       <div
         className="absolute z-20"
         style={{
           top: -20 / zoom,
           left: 0,
-          width: containerWidth * zoom,
+          width: nodeWidth * zoom,
           transform: `scale(${inverseScale})`,
           transformOrigin: 'top left',
         }}
@@ -336,24 +430,30 @@ export function CompareNode({ id, data, selected }: NodeProps) {
         </div>
       </div>
 
-      <div className="relative" style={{ width: containerWidth }}>
+      <div className="relative" style={{ width: nodeWidth }}>
         <div
           className="node-preview-card w-full overflow-hidden rounded-[16px] transition-all"
           style={{
-            width: containerWidth,
+            width: nodeWidth,
             background: '#1a1a1a',
             border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
             boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
           }}
         >
           <div className="px-3 pt-3">
-            <div className="overflow-hidden rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.04)' }}>
+            <div
+              className="mx-auto overflow-hidden rounded-xl"
+              style={{
+                width: imageAreaWidth,
+                border: '1px solid rgba(255,255,255,0.04)',
+              }}
+            >
               <CompareImageArea
                 leftImage={leftImage}
                 rightImage={rightImage}
                 sliderPosition={sliderPosition}
-                width={imageWidth}
-                height={containerHeight}
+                width={imageAreaWidth}
+                height={imageAreaHeight}
                 emptyContent={renderEmptyState(true)}
                 singleContent={renderSingleState()}
                 onSliderChange={setSliderPosition}
