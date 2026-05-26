@@ -319,7 +319,6 @@ export function ImageNodeControlPanel({
     [selectedPresets],
   );
   const selectedPresetCount = selectedPresetItems.length;
-  const selectedPresetBadge = selectedPresetCount > 9 ? '9+' : String(selectedPresetCount);
 
   const removeSelectedPreset = useCallback((presetId: string) => {
     onPresetsChange(selectedPresets.filter((id) => id !== presetId));
@@ -712,8 +711,20 @@ export function ImageNodeControlPanel({
     }
   };
 
+  const stopControlContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const openStylePicker = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+                    openStylePicker(event);
+  };
+
   return (
     <div
+      onContextMenu={stopControlContextMenu}
       className="nodrag nowheel"
       style={{
         width: IMAGE_NODE_CONTROL_WIDTH,
@@ -733,19 +744,18 @@ export function ImageNodeControlPanel({
           <div className="relative">
             <button
               onClick={() => { setShowPresetModal(true); setShowMarkPanel(false); setShowStylePicker(false); }}
-              className="relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
-              style={{ width: 54, height: 50, padding: '4px', background: selectedPresetCount > 0 ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
+              className="relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/[0.07]"
+              style={{
+                width: 54,
+                height: 50,
+                padding: '4px',
+                background: selectedPresetCount > 0 ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.04)',
+                border: selectedPresetCount > 0 ? '1px solid rgba(255,255,255,0.34)' : '1px solid rgba(255,255,255,0.10)',
+                boxShadow: selectedPresetCount > 0 ? 'inset 0 0 0 1px rgba(255,255,255,0.08)' : 'none',
+              }}
             >
-              <Bookmark className="w-4 h-4" style={{ color: selectedPresetCount > 0 ? '#a78bfa' : 'rgba(255,255,255,0.7)' }} />
-              <span style={{ fontSize: 12, color: selectedPresetCount > 0 ? '#a78bfa' : 'rgba(255,255,255,0.72)' }}>{t('imageNode.preset')}</span>
-              {selectedPresetCount > 0 && (
-                <span
-                  className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none text-white"
-                  style={{ background: '#a78bfa', boxShadow: '0 0 0 1px rgba(20,20,26,0.95)' }}
-                >
-                  {selectedPresetBadge}
-                </span>
-              )}
+              <Bookmark className="w-4 h-4" style={{ color: selectedPresetCount > 0 ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.50)' }} />
+              <span style={{ fontSize: 12, color: selectedPresetCount > 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.56)' }}>{t('imageNode.preset')}</span>
             </button>
             {showPresetModal && (
               <PresetPickerModal
@@ -796,17 +806,19 @@ export function ImageNodeControlPanel({
                 setShowMarkPanel(false);
               }}
               onPointerDown={(e) => {
+                if (e.button !== 0) return;
                 e.stopPropagation();
                 setShowStylePicker(true);
                 setShowMarkPanel(false);
               }}
-              className="group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
+              className="group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/[0.07]"
               style={{
                 width: 54,
                 height: 50,
                 padding: selectedStyle ? 0 : '4px',
-                background: selectedStyle ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.025)',
-                border: selectedStyle ? '1px solid rgba(167,139,250,0.7)' : FLOATING_PANEL_BORDER,
+                background: selectedStyle ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.04)',
+                border: selectedStyle ? '1px solid rgba(255,255,255,0.34)' : '1px solid rgba(255,255,255,0.10)',
+                boxShadow: selectedStyle ? 'inset 0 0 0 1px rgba(255,255,255,0.08)' : 'none',
                 opacity: 1,
               }}
               title={t('style.selectStyle')}
@@ -817,15 +829,15 @@ export function ImageNodeControlPanel({
                 </span>
               ) : (
                 <>
-                  <Palette className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.7)' }} />
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>{t('imageNode.style')}</span>
+                  <Palette className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.50)' }} />
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.56)' }}>{t('imageNode.style')}</span>
                 </>
               )}
               {selectedStyle && (
                 <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-xl p-2.5 text-left group-hover/style-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
                   <div className="text-[12px] font-medium text-white/90">{selectedStyle.title}</div>
                   <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.56)' }}>{selectedStyle.shortDescription}</div>
-                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(167,139,250,0.86)' }}>{t('imageNode.clickToChangeStyle')}</div>
+                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.72)' }}>{t('imageNode.clickToChangeStyle')}</div>
                 </div>
               )}
             </button>
@@ -888,7 +900,10 @@ export function ImageNodeControlPanel({
                 )}
                 <div
                   className="relative h-full w-full overflow-hidden rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${getImageRoleColor(ref.role)}` }}
+                  style={{
+              background: ref.role === 'undefined_usage' ? 'rgba(156,163,175,0.08)' : 'rgba(255,255,255,0.04)',
+              border: ref.role === 'undefined_usage' ? '1px solid rgba(156,163,175,0.20)' : `1px solid ${getImageRoleColor(ref.role)}`,
+            }}
                 >
                   {ref.imageUrl ? (
                     <img src={ref.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
@@ -942,14 +957,13 @@ export function ImageNodeControlPanel({
         <div className="px-3.5 pb-1">
           <div
             className="flex min-w-0 items-center gap-1.5 overflow-x-auto overscroll-contain rounded-lg px-2 py-1.5"
-            style={{ background: 'rgba(167,139,250,0.055)', border: '1px solid rgba(167,139,250,0.12)' }}
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)' }}
           >
             <span className="shrink-0 text-[12px]" style={{ color: 'rgba(255,255,255,0.42)' }}>已选预设：</span>
             {selectedPresetItems.map((preset) => (
               <span
                 key={preset.id}
-                className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px]"
-                style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.24)' }}
+                className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.06] px-2 text-[12px] text-white/[0.72] transition-colors hover:border-white/[0.22] hover:bg-white/[0.09] hover:text-white/[0.86]"
               >
                 {preset.title || preset.name}
                 <button
@@ -958,8 +972,7 @@ export function ImageNodeControlPanel({
                     event.stopPropagation();
                     removeSelectedPreset(preset.id);
                   }}
-                  className="flex h-4 w-4 items-center justify-center rounded-full transition-colors hover:bg-white/10"
-                  style={{ color: 'rgba(255,255,255,0.62)' }}
+                  className="flex h-4 w-4 items-center justify-center rounded-full text-white/[0.45] transition-colors hover:bg-white/10 hover:text-white/[0.70]"
                   title={`移除${preset.title || preset.name}`}
                 >
                   <X className="h-2.5 w-2.5" />

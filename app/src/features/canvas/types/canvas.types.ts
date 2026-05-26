@@ -22,3 +22,15 @@ export type UpscaleSliderProps = {
   max: number;
   onChange: (value: number) => void;
 };
+
+export interface CompareImageRef {
+  nodeId: string;
+  imageUrl: string;
+  label?: string;
+}
+
+export interface CompareNodeData {
+  leftImage?: CompareImageRef;
+  rightImage?: CompareImageRef;
+  sliderPosition: number;
+}

@@ -63,6 +63,10 @@ export const NODE_PORT_CONFIG: Record<string, NodePortConfig> = {
     inputs: [{ id: 'input-1', type: 'IMAGE', label: '视频' }],
     outputs: [{ id: 'output-1', type: 'IMAGE', label: '合成视频' }],
   },
+  compare: {
+    inputs: [{ id: 'input-1', type: 'IMAGE', label: '图片' }],
+    outputs: [],
+  },
 };
 
 /** Infer port type from node type + handle position. */

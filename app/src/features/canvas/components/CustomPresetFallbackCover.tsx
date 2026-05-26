@@ -21,7 +21,7 @@ const variantStyles = {
 
 export function CustomPresetFallbackCover({
   icon,
-  variant = 'purple',
+  variant = 'gray',
 }: {
   title: string;
   icon?: ReactNode;
@@ -50,7 +50,7 @@ export function CustomPresetFallbackCover({
       />
       <div
         className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
-        style={{ background: 'rgba(167,139,250,0.08)', color: style.icon, border: '1px solid rgba(255,255,255,0.07)' }}
+        style={{ background: 'rgba(255,255,255,0.08)', color: style.icon, border: '1px solid rgba(255,255,255,0.07)' }}
       >
         {icon || <WandSparkles className="h-4 w-4" />}
       </div>

@@ -56,6 +56,7 @@ const zhCN = {
       text: "文本节点",
       image: "图片生成",
       upscale: "高清放大",
+      compare: "对比节点",
       video: "视频生成",
       audio: "音频节点",
       script: "脚本节点",
@@ -63,6 +64,19 @@ const zhCN = {
     },
     createMenuImageNode: "图片节点",
     createMenuUpscaleNode: "高清放大",
+    addCompareNode: "对比节点",
+    createMenuCompareNode: "对比节点",
+  },
+
+  compare: {
+    connectTwoImages: "请连接两张图片以开始对比",
+    connectSecondImage: "请再连接一张图片以开始对比",
+    swap: "交换左右",
+    reset: "重置滑杆",
+    clearLeft: "清空左图",
+    clearRight: "清空右图",
+    left: "左图",
+    right: "右图",
   },
 
   imageNode: {
@@ -485,6 +499,7 @@ const zhCN = {
     portTypeMismatch: "只能连接相同类型的端口",
     cycleDetected: "连接会形成环路",
     alreadyConnected: "两个节点之间已存在连接",
+    compareMaxTwoImages: "对比节点最多只能接入两张图",
   },
 
   sidebar: {
@@ -495,6 +510,7 @@ const zhCN = {
     history: "历史记录",
     imageNode: "图片节点",
     upscaleNode: "高清放大",
+    compareNode: "对比节点",
     aiToolboxEmpty: "AI工具箱",
     aiToolboxHint: "选择节点后查看可用技能",
     all: "全部",

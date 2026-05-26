@@ -46,12 +46,12 @@ Dev dependencies:
 ```
 app/
 ├── public/
-│   ├── assets/              # Static assets (examples, home banners)
-│   └── images/              # Static image assets (banners, show covers, project thumbs)
+│   ├── assets/              # Static assets (banner images, preset thumbnails, mock generation results)
+│   └── images/              # Static image assets (show covers, project thumbs)
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # shadcn/ui components (50+ primitives: button, dialog, form, etc.)
-│   │   ├── NodeEditor/      # Custom 2D canvas node editor (standalone, not wired to routes)
+│   │   ├── ui/              # shadcn/ui components (53 primitives: button, dialog, form, etc.)
+│   │   ├── NodeEditor/      # Custom 2D canvas node editor (standalone subsystem, not wired to routes)
 │   │   │   ├── NodeEditorCanvas.tsx
 │   │   │   └── NodeRegistry.ts
 │   │   ├── AccountPanel.tsx
@@ -64,59 +64,23 @@ app/
 │   │   ├── TeamModal.tsx
 │   │   ├── TVShow.tsx       # Video gallery with category filter and search
 │   │   └── UpgradePanel.tsx
-│   ├── features/canvas/     # Canvas editor feature module (refactored from CanvasPage.tsx)
-│   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus)
-│   │   │   ├── CanvasContextMenus.tsx
-│   │   │   ├── CanvasSidebar.tsx
-│   │   │   ├── CanvasStage.tsx
-│   │   │   ├── CanvasToolbar.tsx
-│   │   │   ├── GlobalDropForwarder.tsx
-│   │   │   ├── ImagePreviewModal.tsx
-│   │   │   ├── ImageRoleTag.tsx
-│   │   │   ├── ImageToolbar.tsx
-│   │   │   ├── NodeShell.tsx
-│   │   │   ├── PresetPickerModal.tsx
-│   │   │   ├── ShortcutRow.tsx
-│   │   │   ├── StylePickerModal.tsx
-│   │   │   ├── TempConnectionLine.tsx
-│   │   │   └── UpscaleParamPanel.tsx
-│   │   ├── constants/       # Canvas constants, presets, image usage configs
-│   │   │   ├── canvasConstants.ts
-│   │   │   ├── imageUsages.ts
-│   │   │   └── presets.ts
-│   │   ├── hooks/           # Canvas-specific hooks
-│   │   │   └── useToast.ts
-│   │   ├── nodes/           # Node type components
-│   │   │   ├── ImageNode/
-│   │   │   │   ├── ImageNode.tsx
-│   │   │   │   ├── ImageNodeControlPanel.tsx
-│   │   │   │   └── index.ts
-│   │   │   ├── AudioNode.tsx
-│   │   │   ├── ScriptNode.tsx
-│   │   │   ├── TextNode.tsx
-│   │   │   ├── UpscaleNode.tsx
-│   │   │   ├── VideoMergeNode.tsx
-│   │   │   └── VideoNode.tsx
-│   │   ├── types/           # Canvas-specific TypeScript types
-│   │   │   ├── canvas.types.ts
-│   │   │   ├── generation.types.ts
-│   │   │   ├── imageNode.types.ts
-│   │   │   └── imageNodeData.types.ts
-│   │   └── utils/           # Pure utility functions
-│   │       ├── mockGenerationTask.ts
-│   │       ├── presetSelection.ts
-│   │       ├── promptUtils.ts
-│   │       ├── referenceUtils.ts
-│   │       └── userPresets.ts
+│   ├── features/
+│   │   └── canvas/          # Canvas editor feature module (React Flow based)
+│   │       ├── components/  # Canvas UI components (stage, sidebar, toolbars, menus, modals)
+│   │       ├── constants/   # Canvas constants, presets, image usage configs
+│   │       ├── hooks/       # Canvas-specific hooks (useToast)
+│   │       ├── nodes/       # Node type components (ImageNode, VideoNode, TextNode, etc.)
+│   │       ├── types/       # Canvas-specific TypeScript types
+│   │       └── utils/       # Pure utility functions (prompt utils, reference utils, mock generation)
 │   ├── data/
 │   │   └── siteData.ts      # Static mock data: banners, projects, gallery, canvas nodes/edges
 │   ├── hooks/
 │   │   └── use-mobile.ts    # useIsMobile hook (breakpoint 768px)
-│   ├── i18n/                # Internationalization (react-i18next)
-│   │   ├── index.ts         # i18n init with zh-CN default, en-US fallback
+│   ├── i18n/
+│   │   ├── index.ts         # i18next initialization (default lang: zh-CN)
 │   │   └── locales/
-│   │       ├── zh-CN.ts     # Full Chinese translation (~850 lines)
-│   │       └── en-US.ts     # English translation
+│   │       ├── zh-CN.ts
+│   │       └── en-US.ts
 │   ├── lib/
 │   │   ├── nodeEditor/
 │   │   │   ├── dag.ts       # Cycle detection, topological sort, execution batches, input hashing
@@ -125,7 +89,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor page entry (~911 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~911 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -142,6 +106,8 @@ app/
 ├── eslint.config.js         # ESLint flat config: TS + react-hooks + react-refresh
 └── postcss.config.js        # Tailwind + autoprefixer
 ```
+
+**Source file count:** 116 TypeScript / TSX files total. 53 shadcn/ui components in `src/components/ui/`.
 
 ---
 
@@ -230,18 +196,10 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
 - `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
 - `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
-- `PresetPickerModal.tsx` — Preset selection modal for image generation
-- `StylePickerModal.tsx` — Style selection modal
-- `ImagePreviewModal.tsx` — Fullscreen image preview
-- `ImageRoleTag.tsx` — Reference image role tag component
-- `ImageToolbar.tsx` — Floating toolbar for selected image nodes
-- `UpscaleParamPanel.tsx` — Upscale parameter configuration panel
-- `TempConnectionLine.tsx` — Custom temporary connection line
-- `NodeShell.tsx` — Common node wrapper shell
-- `ShortcutRow.tsx` — Keyboard shortcut help row
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`
 
 **Node components (`src/features/canvas/nodes/`):**
-- `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, preset/style pickers
+- `ImageNode/` — Image node with control panel, prompt box, reference image area, mock generation task flow
 - `VideoNode.tsx`
 - `TextNode.tsx`
 - `AudioNode.tsx`
@@ -250,7 +208,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `UpscaleNode.tsx`
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `imageNode.types.ts`, `generation.types.ts`, `imageNodeData.types.ts`
+- `types/` — `canvas.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `generation.types.ts`
 - `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
 - `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `presetSelection.ts`, `userPresets.ts`
 - `hooks/` — `useToast.ts`
@@ -272,14 +230,13 @@ Features:
 - Custom connection line drawing from output ports with cycle detection, type validation, and drop-to-create-node support.
 - Keyboard shortcuts: `Ctrl+C` / `Ctrl+V` for copy/paste, `Delete` / `Backspace` to remove selected nodes/edges.
 - Zoom slider, grid snap toggle, fit view reset, and help panel in the bottom toolbar.
-- Typed port system (IMAGE, PROMPT, LATENT, MODEL, NUMBER) with colored handles and connection validation.
-- Fake/mock generation flow with task states (running, success, error), history tracking, and abort support.
+- ImageNode supports a mock generation task flow with progress tracking, history, and abort support.
 
 ### Custom 2D Canvas Node Editor (`src/components/NodeEditor/`)
 
 An independent canvas-based node editor rendered on a raw `<canvas>` element. **Note:** This module is not currently imported or wired into any route; it is a standalone subsystem.
 
-- `NodeEditorCanvas.tsx` — Main component handling pan, zoom, selection, connection dragging, and rendering.
+- `NodeEditorCanvas.tsx` — Main component handling pan, zoom, selection, connection dragging, and rendering (~894 lines).
 - `NodeRegistry.ts` — Node templates (`PromptInput`, `LoadModel`, `TextEncode`, `EmptyLatent`, `KSampler`, `VAEDecode`, `PreviewImage`) with typed ports.
 - `src/lib/nodeEditor/types.ts` — Core types (`EditorNode`, `EditorEdge`, `PortType`, `Camera`, `ConnectionPreview`) and connection validation (`canConnect`).
 - `src/lib/nodeEditor/dag.ts` — Cycle detection (DFS), topological sort (Kahn), execution batching, input hashing, and node input building.
@@ -313,13 +270,10 @@ Mock API service for user account features (profile, credits, usage, billing, de
 
 ### Internationalization (`src/i18n/`)
 
-The app uses `react-i18next` with `i18next`. Default language is `zh-CN` (Chinese Simplified) with `en-US` as fallback.
-
-- `src/i18n/index.ts` — Initializes i18n with resources and interpolation settings.
-- `src/i18n/locales/zh-CN.ts` — Comprehensive Chinese translations covering all UI sections (canvas, image node, presets, styles, toolbar, modals, account, etc.).
-- `src/i18n/locales/en-US.ts` — English translations.
-
-All user-facing text should be added to both locale files and accessed via the `useTranslation()` hook or the `t` function.
+- Default language: `zh-CN` (Chinese Simplified).
+- Fallback language: `zh-CN`.
+- Supported languages: `zh-CN`, `en-US`.
+- Translation files are plain TypeScript objects exported from `src/i18n/locales/`.
 
 ---
 
@@ -349,51 +303,3 @@ npx shadcn add <component-name>
 ```
 
 The CLI will place it in `src/components/ui/` and follow the existing alias conventions (`@/lib/utils`, `@/components/ui`).
-
----
-
-## Development Collaboration & Execution Rules
-
-可以使用终端辅助开发，但执行会明显修改项目状态、依赖状态或 Git 状态的操作前，需要先说明目的、影响和预期结果。
-
-### 需要特别谨慎的操作
-
-以下操作执行前**必须先说明目的、影响和预期结果**，涉及 Git 或依赖变更时须等待明确批准：
-
-- `git commit` / `git push` / `git reset` / `git checkout` / `git rebase`
-- `npm install` / `pnpm install` / `yarn add`
-- 修改 `package.json` / `package-lock.json` / `pnpm-lock.yaml` / `yarn.lock`
-- 删除文件、批量移动文件、批量重命名文件
-- 修改环境变量或配置文件（如 `.env`、`vite.config.ts`）
-- 发布、部署、清理缓存等影响较大的命令
-
-### 新增依赖的规则
-
-如确实需要新增依赖或修改 package 文件，请先说明：
-
-- **为什么现有依赖无法满足当前需求**
-- **新依赖的用途和预期收益**
-- **会影响哪些文件**
-- **是否有更轻量的替代方案**（如使用现有工具库、浏览器原生 API、手写实现等）
-
-获得明确批准后，方可执行安装或修改。
-
-### 构建与验证命令
-
-开发过程中可以执行构建和验证类命令辅助开发，例如：
-
-```bash
-cd app && npm run build
-cd app && npm run lint
-cd app && npm run dev
-```
-
-执行前需说明目的。单次任务中，构建/验证类命令**最多执行 3 次**；超过则停止，提供建议命令供手动执行。
-
-### 无关命令禁止
-
-不要执行与当前任务无关的终端命令。
-
-### 命令执行后的说明
-
-修改或验证完成后，说明执行了哪些命令及结果。

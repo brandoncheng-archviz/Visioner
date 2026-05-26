@@ -20,12 +20,14 @@ import { ScriptNode } from '../nodes/ScriptNode';
 import { VideoMergeNode } from '../nodes/VideoMergeNode';
 import { UpscaleNode } from '../nodes/UpscaleNode';
 import { ImageNode } from '../nodes/ImageNode';
+import { CompareNode } from '../nodes/CompareNode';
 import { TempConnectionLine } from './TempConnectionLine';
 
 const nodeTypes = {
   text: TextNode,
   image: ImageNode,
   upscale: UpscaleNode,
+  compare: CompareNode,
   video: VideoNode,
   audio: AudioNode,
   script: ScriptNode,

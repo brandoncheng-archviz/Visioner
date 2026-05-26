@@ -113,6 +113,7 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
                 {[
                   { type: 'image', label: t('sidebar.imageNode'), icon: Image, color: '#22d3ee' },
                   { type: 'upscale', label: t('sidebar.upscaleNode'), icon: Image, color: '#a855f7' },
+                  { type: 'compare', label: t('sidebar.compareNode'), icon: Image, color: '#94a3b8' },
                 ].map((item) =>(
                   <button
                     key={item.type}

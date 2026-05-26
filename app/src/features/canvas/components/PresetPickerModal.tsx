@@ -261,11 +261,10 @@ export function PresetPickerModal({
         type="button"
         onClick={() => handleCardClick(preset.id)}
         onMouseEnter={() => handleCardMouseEnter(preset.id)}
-        className="group relative overflow-hidden rounded-lg border text-left transition-all"
+        className={`group relative overflow-hidden rounded-lg border text-left transition-all ${selected ? 'border-white/[0.42]' : 'border-white/[0.12] hover:border-white/[0.24]'}`}
         style={{
-          background: selected ? 'rgba(167,139,250,0.10)' : 'rgba(255,255,255,0.025)',
-          borderColor: selected ? 'rgba(167,139,250,0.82)' : 'rgba(255,255,255,0.08)',
-          boxShadow: selected ? '0 0 0 1px rgba(167,139,250,0.28), 0 10px 26px rgba(0,0,0,0.28)' : 'none',
+          background: selected ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.025)',
+          boxShadow: selected ? '0 0 0 1px rgba(255,255,255,0.10), 0 10px 26px rgba(0,0,0,0.28)' : 'none',
         }}
       >
         {/* Thumbnail */}
@@ -309,7 +308,7 @@ export function PresetPickerModal({
           </span>
           {/* Check indicator */}
           {selected && (
-            <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: '#a78bfa', color: '#111' }}>
+            <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'rgba(255,255,255,0.88)', color: '#111' }}>
               <Check className="h-3.5 w-3.5" />
             </span>
           )}
@@ -383,7 +382,7 @@ export function PresetPickerModal({
                   type="button"
                   onClick={() => setActiveTab(tab)}
                   className={`mx-2 mb-1 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors ${isActive ? 'font-medium text-white' : 'text-white/50 hover:bg-white/5 hover:text-white/75'}`}
-                  style={isActive ? { background: 'rgba(167,139,250,0.16)' } : {}}
+                  style={isActive ? { background: 'rgba(255,255,255,0.09)' } : {}}
                 >
                   {tab}
                 </button>
@@ -434,7 +433,7 @@ export function PresetPickerModal({
                       type="button"
                       onClick={openCreateEditor}
                       className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium"
-                      style={{ background: 'rgba(167,139,250,0.86)', color: '#111' }}
+                      style={{ background: 'rgba(255,255,255,0.82)', color: '#111' }}
                     >
                       <Plus className="h-3.5 w-3.5" />
                       添加预设
@@ -475,7 +474,7 @@ export function PresetPickerModal({
                     <span
                       key={id}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px]"
-                      style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.24)' }}
+                      style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.14)' }}
                     >
                       {getPresetName(preset)}
                       <button type="button" onClick={() => handleRemoveDraftPreset(id)} className="rounded-full hover:bg-white/10" aria-label={`移除${getPresetName(preset)}`}>
@@ -608,7 +607,7 @@ export function PresetPickerModal({
                 onClick={handleSaveUserPreset}
                 disabled={!presetTitle.trim() || !presetPrompt.trim()}
                 className="rounded-lg px-3 py-2 text-[13px] font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-45"
-                style={{ background: 'rgba(167,139,250,0.92)', color: '#111' }}
+                style={{ background: 'rgba(255,255,255,0.82)', color: '#111' }}
               >
                 保存预设
               </button>

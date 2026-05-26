@@ -56,6 +56,7 @@ const enUS = {
       text: "Text Node",
       image: "Image Generation",
       upscale: "Upscale",
+      compare: "Compare",
       video: "Video Generation",
       audio: "Audio Node",
       script: "Script Node",
@@ -63,6 +64,19 @@ const enUS = {
     },
     createMenuImageNode: "Image Node",
     createMenuUpscaleNode: "Upscale",
+    addCompareNode: "Compare",
+    createMenuCompareNode: "Compare",
+  },
+
+  compare: {
+    connectTwoImages: "Connect two images to start comparison",
+    connectSecondImage: "Connect another image to start comparison",
+    swap: "Swap sides",
+    reset: "Reset slider",
+    clearLeft: "Clear left",
+    clearRight: "Clear right",
+    left: "Left",
+    right: "Right",
   },
 
   imageNode: {
@@ -485,6 +499,7 @@ const enUS = {
     portTypeMismatch: "Can only connect ports of the same type",
     cycleDetected: "Connection would form a cycle",
     alreadyConnected: "A connection already exists between the two nodes",
+    compareMaxTwoImages: "Compare node can only accept two images",
   },
 
   sidebar: {
@@ -495,6 +510,7 @@ const enUS = {
     history: "History",
     imageNode: "Image Node",
     upscaleNode: "Upscale",
+    compareNode: "Compare",
     aiToolboxEmpty: "AI Toolbox",
     aiToolboxHint: "Select a node to see available skills",
     all: "All",

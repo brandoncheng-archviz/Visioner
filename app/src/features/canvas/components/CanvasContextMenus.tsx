@@ -23,6 +23,7 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
   const items = [
     { type: 'image', label: t('canvas.addImageNode'), icon: Image, color: '#22d3ee' },
     { type: 'upscale', label: t('canvas.addUpscaleNode'), icon: Image, color: '#a855f7' },
+    { type: 'compare', label: t('canvas.addCompareNode'), icon: Image, color: '#94a3b8' },
   ];
 
   return (
@@ -103,6 +104,12 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
           <Image className="w-4 h-4" style={{ color: '#a855f7' }} /> {t('canvas.createMenuUpscaleNode')}
+        </button>
+        <button
+          onClick={() => onCreateAndConnect('compare')}
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+        >
+          <Image className="w-4 h-4" style={{ color: '#94a3b8' }} /> {t('canvas.createMenuCompareNode')}
         </button>
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />

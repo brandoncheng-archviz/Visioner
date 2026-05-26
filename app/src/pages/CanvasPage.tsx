@@ -111,6 +111,15 @@ function FlowCanvas() {
       const alreadyConnected = edges.some((e) => e.source === nodeId && e.target === targetId);
       if (alreadyConnected) return t('error.alreadyConnected');
 
+      // Compare node max 2 images
+      const targetNode = nodes.find((n) => n.id === targetId);
+      if (targetNode?.type === 'compare') {
+        const targetInputEdges = edges.filter((e) => e.target === targetId);
+        if (targetInputEdges.length >= 2) {
+          return t('error.compareMaxTwoImages');
+        }
+      }
+
       // 唯一用途检查
       const sourceNode = nodes.find((n) => n.id === nodeId);
       const sourceRole = sourceNode?.data?.role as ImageRole | null;
@@ -358,6 +367,11 @@ function FlowCanvas() {
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
+    const target = event.target as HTMLElement;
+    if (!target.closest('.node-preview-card')) {
+      setNodeContextMenu(null);
+      return;
+    }
     setContextMenu(null);
     setNodeContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
   }, []);
@@ -577,6 +591,7 @@ function FlowCanvas() {
         text: t('canvas.nodeLabels.text'),
         image: t('canvas.nodeLabels.image'),
         upscale: t('canvas.nodeLabels.upscale'),
+        compare: t('canvas.nodeLabels.compare'),
         video: t('canvas.nodeLabels.video'),
         audio: t('canvas.nodeLabels.audio'),
         script: t('canvas.nodeLabels.script'),

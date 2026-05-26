@@ -90,11 +90,10 @@ export function StylePickerModal({
                   key={style.id}
                   type="button"
                   onClick={() => setDraftStyleId(style.id)}
-                  className="group relative overflow-hidden rounded-lg border text-left transition-all"
+                  className={`group relative overflow-hidden rounded-lg border text-left transition-all ${previewing ? 'border-white/[0.42]' : 'border-white/[0.12] hover:border-white/[0.24]'}`}
                   style={{
-                    background: previewing ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.025)',
-                    borderColor: previewing ? 'rgba(167,139,250,0.82)' : 'rgba(255,255,255,0.08)',
-                    boxShadow: previewing ? '0 0 0 1px rgba(167,139,250,0.28), 0 10px 26px rgba(0,0,0,0.28)' : 'none',
+                    background: previewing ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.025)',
+                    boxShadow: previewing ? '0 0 0 1px rgba(255,255,255,0.10), 0 10px 26px rgba(0,0,0,0.28)' : 'none',
                   }}
                 >
                   <img src={style.coverImage} alt="" className="aspect-[4/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
@@ -102,7 +101,7 @@ export function StylePickerModal({
                     <div className="truncate text-[13px] font-medium text-white/88">{style.title}</div>
                   </div>
                   {previewing && (
-                    <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: '#a78bfa', color: '#111' }}>
+                    <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'rgba(255,255,255,0.88)', color: '#111' }}>
                       <Check className="h-3.5 w-3.5" />
                     </span>
                   )}
@@ -117,7 +116,7 @@ export function StylePickerModal({
                 <div className="flex items-center gap-2">
                   <h3 className="text-[18px] font-semibold text-white/92">{previewStyle.title}</h3>
                   {selectedStyleId === previewStyle.id && (
-                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'rgba(167,139,250,0.18)', color: '#c4b5fd' }}>{t('style.currentStyle')}</span>
+                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.72)' }}>{t('style.currentStyle')}</span>
                   )}
                 </div>
                 <p className="mt-3 text-[13px] leading-7" style={{ color: 'rgba(255,255,255,0.64)' }}>
@@ -125,7 +124,7 @@ export function StylePickerModal({
                 </p>
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   {previewStyle.tags.map((tag) => (
-                    <span key={tag} className="rounded-md px-2 py-1 text-[11px]" style={{ background: 'rgba(167,139,250,0.12)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.2)' }}>{tag}</span>
+                    <span key={tag} className="rounded-md px-2 py-1 text-[11px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.14)' }}>{tag}</span>
                   ))}
                 </div>
               </>
@@ -144,7 +143,7 @@ export function StylePickerModal({
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-[12px] text-white/40">{t('style.currentSelection')}</span>
             {draftStyle ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px]" style={{ background: 'rgba(167,139,250,0.14)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.24)' }}>
+              <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px]" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 {draftStyle.title}
                 <button type="button" onClick={handleClear} className="rounded-full hover:bg-white/10">
                   <X className="h-3 w-3" />
