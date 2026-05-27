@@ -5,7 +5,7 @@ export interface SunSkyNodePreviewProps {
   height?: number;
 }
 
-export function SunSkyNodePreview({ imagePath, height = 360 }: SunSkyNodePreviewProps) {
+export function SunSkyNodePreview({ imagePath, height = 210 }: SunSkyNodePreviewProps) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -28,14 +28,11 @@ export function SunSkyNodePreview({ imagePath, height = 360 }: SunSkyNodePreview
     <div className="relative overflow-hidden rounded-xl bg-[#0f1219]" style={{ height }}>
       <img
         src={imagePath}
-        alt="Sun & Sky Preview"
+        alt="Light & Shadow Preview"
         className="h-full w-full object-cover"
         onError={() => setError(true)}
         draggable={false}
       />
-      <div className="absolute right-2.5 top-2.5 rounded-md bg-[#0d1017]/75 px-2 py-0.5 text-[11px] font-medium text-white/70 backdrop-blur">
-        矩阵预览
-      </div>
     </div>
   );
 }

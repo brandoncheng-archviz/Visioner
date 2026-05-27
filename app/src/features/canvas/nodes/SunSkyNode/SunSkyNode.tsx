@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ChevronDown, Link2, MoreVertical, RotateCcw, Sun } from 'lucide-react';
+import { ChevronDown, Link2, MoreVertical, Plus, RotateCcw, Sun } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import type { SunSkyNodeData } from './sunSkyNode.types';
@@ -9,7 +9,7 @@ import { SunSkyNodeControls } from './SunSkyNodeControls';
 import { SunSkyNodeInfo } from './SunSkyNodeInfo';
 import { clamp, clampDisplayAzimuth, sameStringList, snapToStep } from './sunSkyNode.utils';
 
-const NODE_WIDTH = 760;
+const NODE_WIDTH = 500;
 
 function stopControlEvent(event: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>) {
   event.stopPropagation();
@@ -189,14 +189,14 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between gap-3 px-5 py-4">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full" style={{ background: 'rgba(245,158,11,0.15)' }}>
-                <Sun className="h-7 w-7" style={{ color: '#f59e0b' }} />
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                <Sun className="h-5 w-5" style={{ color: '#f59e0b' }} />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-[24px] font-semibold leading-none text-white/90">太阳天空 / Sun & Sky</div>
-                <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[12px] text-white/42">
+                <div className="truncate text-[17px] font-semibold leading-none text-white/90">光影 / Light & Shadow</div>
+                <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] text-white/42">
                   <span className="truncate">{derived.timeLabel}</span>
                   <span className="h-1 w-1 rounded-full bg-white/20" />
                   <span className="truncate">{derived.directionLabel}</span>
@@ -207,7 +207,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
               <button
                 type="button"
                 className="nodrag nowheel flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-white/[0.07] hover:text-white/78"
-                title="重置太阳天空"
+                title="重置光影"
                 onPointerDown={stopControlEvent}
                 onClick={(event) => {
                   stopControlEvent(event);
@@ -226,7 +226,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
           </div>
 
           {/* Content */}
-          <div className="flex flex-col gap-5 px-4 pb-4">
+          <div className="flex flex-col gap-3.5 px-3.5 pb-3.5">
             {/* Preview */}
             <SunSkyNodePreview imagePath={derived.previewImagePath} />
 
@@ -242,25 +242,10 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
             <SunSkyNodeInfo elevation={elevation} azimuth={azimuth} derived={derived} />
 
             {/* Linked images */}
-            <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3">
-              <div className="flex items-center gap-2 text-[15px] text-[#60a5fa]">
+            <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+              <div className="flex items-center gap-2 text-[13px] text-white/55">
                 <Link2 className="h-4 w-4" />
-                <span>已连接 {linkedImageNodeIds.length} 张图</span>
-              </div>
-              <div className="flex items-center gap-3 text-[13px] text-white/45">
-                <span className="rounded-lg border border-white/[0.07] bg-[#111722]/80 px-3 py-1.5">矩阵预览 12×8</span>
-                <div className="grid h-8 w-16 overflow-hidden rounded-md border border-white/[0.08]" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                  {Array.from({ length: 8 }).map((_, index) => (
-                    <span
-                      key={index}
-                      style={{
-                        background: index % 2 === 0
-                          ? 'linear-gradient(180deg, #88a9c9 0%, #d7c4a7 55%, #55504b 56%, #26282d 100%)'
-                          : 'linear-gradient(180deg, #607d9c 0%, #cda36f 55%, #47433f 56%, #20242b 100%)',
-                      }}
-                    />
-                  ))}
-                </div>
+                <span>{linkedImageNodeIds.length > 0 ? `已连接 ${linkedImageNodeIds.length} 张图` : '未连接图片'}</span>
               </div>
             </div>
           </div>
@@ -289,7 +274,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
             zIndex: 10,
           }}
         >
-          <span style={{ width: 14, height: 14, color: 'white', fontSize: 16, lineHeight: 1 }}>+</span>
+          <Plus style={{ width: 14, height: 14, color: 'white', display: 'block' }} />
         </div>
 
         {/* Right visual handle — Output */}
@@ -324,7 +309,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
             zIndex: 10,
           }}
         >
-          <span style={{ width: 14, height: 14, color: 'white', fontSize: 16, lineHeight: 1 }}>+</span>
+          <Plus style={{ width: 14, height: 14, color: 'white', display: 'block' }} />
         </div>
 
         {/* React Flow handles */}
