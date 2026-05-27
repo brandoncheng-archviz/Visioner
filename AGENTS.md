@@ -40,6 +40,8 @@ Dev dependencies:
 - **typescript-eslint + eslint-plugin-react-hooks + eslint-plugin-react-refresh** — Linting stack.
 - **tailwindcss-animate + tw-animate-css** — Tailwind animation utilities.
 
+Runtime requirement: **Node.js 20**.
+
 ---
 
 ## Project Structure
@@ -56,6 +58,8 @@ app/
 │   ├── components/
 │   │   ├── ui/              # shadcn/ui components (53 primitives)
 │   │   ├── NodeEditor/      # Custom 2D canvas node editor (standalone, not wired to routes)
+│   │   │   ├── NodeEditorCanvas.tsx
+│   │   │   └── NodeRegistry.ts
 │   │   ├── AccountPanel.tsx
 │   │   ├── CanvasEdge.tsx
 │   │   ├── CustomConnectionLine.tsx
@@ -67,10 +71,11 @@ app/
 │   │   ├── TVShow.tsx       # Video gallery with category filter and search
 │   │   └── UpgradePanel.tsx
 │   ├── features/canvas/     # Canvas editor feature module (refactored from CanvasPage.tsx)
-│   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus)
+│   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus, modals)
 │   │   ├── constants/       # Canvas constants, presets, image usage configs
-│   │   ├── hooks/           # Canvas-specific hooks (useToast, etc.)
+│   │   ├── hooks/           # Canvas-specific hooks (useToast)
 │   │   ├── nodes/           # Node type components (ImageNode/, VideoNode, TextNode, etc.)
+│   │   ├── sunSky/          # SunSky lighting analysis subsystem (types, utils, UI components)
 │   │   ├── types/           # Canvas-specific TypeScript types
 │   │   └── utils/           # Pure utility functions (prompt utils, reference utils, mock generation)
 │   ├── data/
@@ -86,11 +91,11 @@ app/
 │   │   ├── nodeEditor/
 │   │   │   ├── dag.ts       # Cycle detection, topological sort, execution batches, input hashing
 │   │   │   └── types.ts     # Port types, EditorNode, EditorEdge, Camera, connection validation
-│   │   ├── nodeSystem.ts    # Node port config & DAG execution engine for React Flow canvas
+│   │   ├── nodeSystem.ts    # Node port config & DAG execution engine for React Flow canvas (~319 lines)
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor page entry (~911 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~946 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -110,16 +115,18 @@ app/
 
 **Source file counts (actual):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 38 files (components, nodes, types, constants, utils, hooks)
-- `src/` total: 116 source files (`.ts` + `.tsx`)
+- `src/features/canvas/`: 63 files (components, nodes, sunSky, types, constants, utils, hooks)
+- `src/` total: 144 source files (`.ts` + `.tsx`)
 
 **Key file sizes (approximate):**
-- `CanvasPage.tsx`: ~911 lines (page entry + core state container)
+- `CanvasPage.tsx`: ~946 lines (page entry + core state container)
 - `ImageNode.tsx`: ~818 lines
-- `ImageNodeControlPanel.tsx`: ~1,415 lines
+- `ImageNodeControlPanel.tsx`: ~1,484 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
-- `PresetPickerModal.tsx`: ~711 lines
-- `presets.ts`: ~975 lines
+- `PresetPickerModal.tsx`: ~621 lines
+- `presets.ts`: ~941 lines
+- `CompareNode.tsx`: ~564 lines
+- `nodeSystem.ts`: ~319 lines
 
 ---
 
@@ -194,18 +201,19 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~911 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~946 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper
 - Core `nodes` / `edges` / `tempLine` state management
 - Line drawing logic (custom connection lines from output ports)
 - Copy / paste / duplicate / delete logic
-- Keyboard shortcuts (`Ctrl+C` / `Ctrl+V`, `Delete` / `Backspace`)
+- Keyboard shortcuts (`Ctrl+C` / `Ctrl+V`, `Delete` / `Backspace`, `Ctrl+Z` / `Ctrl+Shift+Z`, `Ctrl+A`, `Esc`, arrows, `+`/`-`, `0`/`f`/`1`)
 - Drag-and-drop upload handling
 - Box-selection pre-highlight logic
 - Context menu state
 - Node registration and menu/drag/shortcut entry wiring
+- Undo/Redo history (max 50 states, JSON snapshot based)
 
 **Extracted UI components (`src/features/canvas/components/`):**
 - `CanvasStage.tsx` — React Flow container, Background, MiniMap, drop overlay, temp connection line, reject tooltip, upload toast
@@ -223,6 +231,15 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `ScriptNode.tsx`
 - `VideoMergeNode.tsx`
 - `UpscaleNode.tsx`
+- `CompareNode.tsx` — Side-by-side image comparison with draggable slider
+- `SunSkyNode/` — SunSky lighting analysis node (preview, controls, derived info)
+
+**SunSky subsystem (`src/features/canvas/sunSky/`):**
+A dedicated feature module for solar and sky lighting analysis, consumed by `SunSkyNode`. It includes:
+- `components/` — `SunSkyPanel.tsx`, `SunSkyPreview.tsx`, `SunSkyControls.tsx`, `SunDomeController.tsx`, `SunSkyDerivedInfo.tsx`, `SunSkyPresetList.tsx`, `SunSkySnapshotStrip.tsx`
+- `utils/` — `resolveSunSkyState.ts`, `resolveSimpleSunSkyState.ts`, `sunSkyMath.ts`, `sunSkyPrompt.ts`
+- `data/` — `sunSkyPresets.ts`
+- `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`
 
 **Supporting modules:**
 - `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`
@@ -230,7 +247,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `presetSelection.ts`, `userPresets.ts`
 - `hooks/` — `useToast.ts`
 
-**Canvas architecture rules (from `CANVAS_RULES.md`):**
+**Canvas architecture rules (from `CANVAS_RULES.md` at repo root):**
 - Do **not** put new node UI, new panel UI, new toolbar UI, or new business logic back into `CanvasPage.tsx`.
 - New canvas features should be placed in the appropriate `src/features/canvas/` subfolder.
 - `CanvasPage.tsx` should only receive minimal wiring (node registration, menu entry, shortcut entry, state bridging).
@@ -244,8 +261,8 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - Floating toolbar appears when any node is selected (panorama, lighting, crop, etc.).
 - MiniMap and Controls are visible.
 - Edges are cyan (`#00d4ff`) smooth-step curves when selected, gray (`#555`) otherwise.
-- Custom connection line drawing from output ports with cycle detection, type validation, and drop-to-create-node support.
-- Keyboard shortcuts: `Ctrl+C` / `Ctrl+V` for copy/paste, `Delete` / `Backspace` to remove selected nodes/edges.
+- Custom connection line drawing from output ports with cycle detection, type validation, unique role usage conflict detection, and drop-to-create-node support.
+- Keyboard shortcuts: `Ctrl+C` / `Ctrl+V` for copy/paste, `Delete` / `Backspace` to remove selected nodes/edges, `Ctrl+Z` / `Ctrl+Shift+Z` for undo/redo, `Ctrl+A` to select all, `Esc` to deselect/close help, arrow keys to pan, `+`/`-` to zoom, `0`/`f`/`1` to fit view.
 - Zoom slider, grid snap toggle, fit view reset, and help panel in the bottom toolbar.
 
 **ImageNode generation flow:**
@@ -259,7 +276,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 
 An independent canvas-based node editor rendered on a raw `<canvas>` element. **Note:** This module is not currently imported or wired into any route; it is a standalone subsystem.
 
-- `NodeEditorCanvas.tsx` — Main component handling pan, zoom, selection, connection dragging, and rendering.
+- `NodeEditorCanvas.tsx` — Main component handling pan, zoom, selection, connection dragging, and rendering (~894 lines).
 - `NodeRegistry.ts` — Node templates (`PromptInput`, `LoadModel`, `TextEncode`, `EmptyLatent`, `KSampler`, `VAEDecode`, `PreviewImage`) with typed ports.
 - `src/lib/nodeEditor/types.ts` — Core types (`EditorNode`, `EditorEdge`, `PortType`, `Camera`, `ConnectionPreview`) and connection validation (`canConnect`).
 - `src/lib/nodeEditor/dag.ts` — Cycle detection (DFS), topological sort (Kahn), execution batching, input hashing, and node input building.
@@ -281,7 +298,7 @@ The app uses `react-i18next` with two locale files:
 - `zh-CN.ts` — Default language (简体中文)
 - `en-US.ts` — Fallback language
 
-Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`).
+Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`, `sunSky`).
 
 ### Data Layer (`src/data/siteData.ts`)
 

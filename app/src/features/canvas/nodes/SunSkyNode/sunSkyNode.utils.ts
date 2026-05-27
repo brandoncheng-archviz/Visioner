@@ -11,6 +11,14 @@ export function normalizeAzimuth(value: number): number {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+export function normalizeAzimuthForMath(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+export function clampDisplayAzimuth(value: number): number {
+  return clamp(value, 0, 360);
+}
+
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }

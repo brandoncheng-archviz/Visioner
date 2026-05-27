@@ -1,5 +1,5 @@
 import type { SunSkyNodeDerived } from './sunSkyNode.types';
-import { clamp, snapToStep, normalizeAzimuth, lerp, round, interpolateColor } from './sunSkyNode.utils';
+import { clamp, snapToStep, normalizeAzimuthForMath, lerp, round, interpolateColor } from './sunSkyNode.utils';
 import { getSunSkyPreviewImage } from './getSunSkyPreviewImage';
 
 interface ElevationKeyframe {
@@ -16,18 +16,6 @@ interface ElevationKeyframe {
 }
 
 const KEYFRAMES: ElevationKeyframe[] = [
-  {
-    elevation: 0,
-    timeLabel: '日出/日落边缘',
-    skyTopColor: '#6F7F91',
-    skyHorizonColor: '#E59B6A',
-    sunColor: '#FFB35C',
-    colorTemp: 2800,
-    sunIntensity: 0.95,
-    shadowLengthScale: 1.0,
-    shadowBlur: 18,
-    shadowOpacity: 0.42,
-  },
   {
     elevation: 3,
     timeLabel: '日出/日落边缘',
@@ -206,8 +194,8 @@ function interpolateElevation(elevation: number): ElevationKeyframe {
 }
 
 function getDirectionLabel(azimuth: number): string {
-  const sector = Math.round(normalizeAzimuth(azimuth) / 45) % 8;
-  const labels = ['正前方光', '右前方光', '右侧光', '右后方光', '正后方逆光', '左后方光', '左侧光', '左前方光'];
+  const sector = Math.round(normalizeAzimuthForMath(azimuth) / 45) % 8;
+  const labels = ['右侧光', '右后方光', '正后方光 / 逆光', '左后方光', '左侧光', '左前方光', '正前方光', '右前方光'];
   return labels[sector];
 }
 
@@ -249,53 +237,52 @@ function buildSummary(params: {
 
 function buildPromptText(params: {
   directionLabel: string;
-  timeLabel: string;
   elevation: number;
   skyLabel: string;
   shadowLengthLabel: string;
   shadowBlurLabel: string;
-  colorTemp: number;
 }): string {
-  const parts: string[] = [];
-  parts.push('architectural visualization sun and sky lighting');
-
-  if (params.elevation <= 12) {
-    parts.push('low golden hour sunlight');
-  } else if (params.elevation <= 30) {
-    parts.push('afternoon sunlight');
-  } else if (params.elevation <= 60) {
-    parts.push('standard daylight');
-  } else {
-    parts.push('high noon sunlight');
-  }
-
-  const dirMap: Record<string, string> = {
-    '正前方光': 'front lighting',
-    '右前方光': 'right-front side light',
-    '右侧光': 'right side light',
-    '右后方光': 'right-rear side light',
-    '正后方逆光': 'strong backlight',
-    '左后方光': 'left-rear side light',
-    '左侧光': 'left side light',
-    '左前方光': 'left-front side light',
+  const directionMap: Record<string, string> = {
+    '右侧光': 'right side sunlight',
+    '右后方光': 'right-back side sunlight',
+    '正后方光 / 逆光': 'backlight from behind',
+    '左后方光': 'left-back side sunlight',
+    '左侧光': 'left side sunlight',
+    '左前方光': 'left-front side sunlight',
+    '正前方光': 'front sunlight',
+    '右前方光': 'right-front side sunlight',
   };
-  parts.push(dirMap[params.directionLabel] || 'natural lighting');
-  parts.push(`${params.colorTemp}K sunlight`);
+  const directionText = directionMap[params.directionLabel] || 'natural sunlight';
+
+  const shadowLengthText = params.shadowLengthLabel === '超长阴影'
+    ? 'very long'
+    : params.shadowLengthLabel === '很长阴影'
+      ? 'long'
+      : params.shadowLengthLabel === '长阴影'
+        ? 'long'
+        : params.shadowLengthLabel === '中等阴影'
+          ? 'medium'
+          : params.shadowLengthLabel === '短阴影'
+            ? 'short'
+            : 'very short';
+  const shadowBlurText = params.shadowBlurLabel === '清晰'
+    ? 'crisp'
+    : params.shadowBlurLabel === '标准'
+      ? 'natural'
+      : params.shadowBlurLabel === '稍柔'
+        ? 'slightly soft'
+        : 'soft';
 
   if (params.elevation <= 12) {
-    parts.push('warm horizon glow');
-    parts.push('cool upper sky');
-  } else if (params.elevation <= 30) {
-    parts.push('natural blue sky');
-    parts.push('warm pale horizon');
-  } else {
-    parts.push('clean blue sky');
+    return `low golden hour ${directionText}, warm horizon glow, cool upper sky, ${shadowLengthText} ${shadowBlurText} shadows, realistic architectural sun and sky lighting`;
   }
-
-  parts.push(params.shadowLengthLabel.replace('阴影', 'shadows'));
-  parts.push(params.shadowBlurLabel === '清晰' ? 'crisp shadow edges' : params.shadowBlurLabel === '标准' ? 'natural shadow edges' : `${params.shadowBlurLabel} shadow edges`);
-
-  return parts.join(', ');
+  if (params.elevation <= 30) {
+    return `afternoon ${directionText}, natural blue sky, pale warm horizon, ${shadowLengthText} ${shadowBlurText} architectural shadows, realistic sun and sky lighting`;
+  }
+  if (params.elevation <= 60) {
+    return `standard daylight, ${directionText}, natural blue sky, neutral white sunlight, ${shadowLengthText} ${shadowBlurText} architectural shadows, realistic sun and sky lighting`;
+  }
+  return `high noon sunlight, clean blue sky, white overhead sun, ${shadowLengthText} ${shadowBlurText} shadows, realistic architectural daylight`;
 }
 
 export interface ResolveSunSkyInput {
@@ -305,16 +292,17 @@ export interface ResolveSunSkyInput {
 }
 
 export function resolveSunSkyDerived(input?: ResolveSunSkyInput): SunSkyNodeDerived {
-  const elevation = snapToStep(clamp(input?.elevation ?? 12, 0, 90), 3);
-  const azimuth = snapToStep(normalizeAzimuth(input?.azimuth ?? 55), 5);
+  const elevation = snapToStep(clamp(input?.elevation ?? 12, 3, 90), 3);
+  const azimuth = snapToStep(clamp(input?.azimuth ?? 55, 0, 360), 5);
+  const mathAzimuth = normalizeAzimuthForMath(azimuth);
 
   const frame = interpolateElevation(elevation);
-  const directionLabel = getDirectionLabel(azimuth);
+  const directionLabel = getDirectionLabel(mathAzimuth);
   const skyLabel = getSkyLabel(elevation);
   const shadowLengthLabel = getShadowLengthLabel(frame.shadowLengthScale);
   const shadowBlurLabel = getShadowBlurLabel(frame.shadowBlur);
-  const shadowDirection = normalizeAzimuth(azimuth + 180);
-  const previewImagePath = getSunSkyPreviewImage(elevation, azimuth);
+  const shadowDirection = normalizeAzimuthForMath(mathAzimuth + 180);
+  const previewImagePath = getSunSkyPreviewImage({ elevation, azimuth });
 
   const summary = buildSummary({
     directionLabel,
@@ -327,12 +315,10 @@ export function resolveSunSkyDerived(input?: ResolveSunSkyInput): SunSkyNodeDeri
 
   const promptText = buildPromptText({
     directionLabel,
-    timeLabel: frame.timeLabel,
     elevation,
     skyLabel,
     shadowLengthLabel,
     shadowBlurLabel,
-    colorTemp: frame.colorTemp,
   });
 
   return {

@@ -779,11 +779,17 @@ function FlowCanvas() {
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
     const newNodeId = `${type}-${Date.now()}`;
+    const labels: Record<string, string> = {
+      image: t('canvas.nodeLabels.image'),
+      upscale: t('canvas.nodeLabels.upscale'),
+      compare: t('canvas.nodeLabels.compare'),
+      sunSky: t('canvas.nodeLabels.sunSky'),
+    };
     const newNode: Node = {
       id: newNodeId,
       type,
       position: createMenu.flowPos,
-      data: { label: type === 'image' ? t('canvas.nodeLabels.image') : t('canvas.nodeLabels.upscale'), ...(type === 'image' ? getRoleData(null) : {}) },
+      data: { label: labels[type] || type, ...(type === 'image' ? getRoleData(null) : {}) },
     };
     setNodes((nds) => [...nds, newNode]);
     setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId }]);

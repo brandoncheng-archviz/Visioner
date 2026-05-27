@@ -1,4 +1,4 @@
-import { Sun, Compass } from 'lucide-react';
+import { Compass, Sun } from 'lucide-react';
 
 export interface SunSkyNodeControlsProps {
   elevation: number;
@@ -16,15 +16,15 @@ export function SunSkyNodeControls({
   onAzimuthChange,
 }: SunSkyNodeControlsProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <SunSlider
         icon={<Sun className="h-3.5 w-3.5" />}
         label="太阳高度"
         value={elevation}
-        min={0}
+        min={3}
         max={90}
         step={3}
-        minLabel="0°"
+        minLabel="3°"
         midLabel="45°"
         maxLabel="90°"
         onChange={onElevationChange}
@@ -75,11 +75,11 @@ function SunSlider({
   const percent = ((value - min) / (max - min)) * 100;
 
   return (
-    <div className="nodrag nowheel grid items-center gap-3" style={{ gridTemplateColumns: '88px minmax(0, 1fr) 58px' }}>
+    <div className="nodrag nowheel grid items-center gap-5" style={{ gridTemplateColumns: '132px minmax(0, 1fr) 86px' }}>
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-xs font-semibold text-white/82">
-          <span className="text-white/48">{icon}</span>
-          <span>{label}</span>
+        <div className="flex items-center gap-3 text-[15px] font-semibold text-white/82">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+          <span className="truncate">{label}</span>
         </div>
       </div>
       <div>
@@ -90,22 +90,22 @@ function SunSlider({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="h-1.5 w-full cursor-pointer appearance-none rounded-full"
+          className="h-2 w-full cursor-pointer appearance-none rounded-full"
           style={{
             background: `linear-gradient(to right, #208cff 0%, #208cff ${percent}%, rgba(255,255,255,0.12) ${percent}%, rgba(255,255,255,0.12) 100%)`,
           }}
         />
-        <div className="mt-2 grid grid-cols-3 text-[11px] text-white/35">
+        <div className="mt-2 grid grid-cols-3 text-[13px] text-white/38">
           <span>{minLabel}</span>
           <span className="text-center">{midLabel}</span>
           <span className="text-right">{maxLabel}</span>
         </div>
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <span className="rounded-md border border-white/[0.08] bg-[#111722] px-2 py-1 text-right text-xs text-white/82">
+        <span className="min-w-[78px] rounded-lg border border-white/[0.08] bg-[#111722] px-3 py-2 text-center text-[15px] font-medium text-white/82">
           {value}°
         </span>
-        {extraValue && <span className="text-[11px] text-white/45">{extraValue}</span>}
+        {extraValue && <span className="max-w-[86px] truncate rounded-md border border-white/[0.06] bg-white/[0.025] px-2 py-0.5 text-[12px] text-white/48">{extraValue}</span>}
       </div>
     </div>
   );

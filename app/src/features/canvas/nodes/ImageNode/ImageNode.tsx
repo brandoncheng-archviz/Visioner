@@ -118,24 +118,27 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const allNodes = useStore((state) => state.nodes);
   const inputEdges = allEdges.filter((e) => e.target === id);
   const referenceOrder = (data.referenceOrder as string[]) || [];
-  const rawReferences = inputEdges.map((edge) => {
+  const rawReferences = inputEdges.flatMap((edge) => {
     const sourceNode = allNodes.find((n) => n.id === edge.source);
+    if (sourceNode?.type === 'sunSky') return [];
     const edgeRole = edge.data?.role as ImageRole | null | undefined;
     const edgeCustomRoleLabel = edge.data?.customRoleLabel as string | undefined;
     const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
     const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
     const referenceRole = edgeRole ?? sourceRole;
     const referenceCustomRoleLabel = edgeCustomRoleLabel ?? sourceCustomRoleLabel;
-    return {
+    const imageUrl = getCurrentImage(sourceNode?.data);
+    if (!imageUrl) return [];
+    return [{
       nodeId: edge.source,
       index: 0,
       role: referenceRole,
       roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel),
       customRoleLabel: referenceCustomRoleLabel,
-      imageUrl: getCurrentImage(sourceNode?.data),
+      imageUrl,
       width: getNodeWidth(sourceNode?.data),
       height: getNodeHeight(sourceNode?.data),
-    };
+    }];
   });
   const references: ReferenceInfo[] = rawReferences
     .sort((a, b) => {

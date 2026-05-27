@@ -1,17 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface SunSkyNodePreviewProps {
   imagePath: string;
+  height?: number;
 }
 
-export function SunSkyNodePreview({ imagePath }: SunSkyNodePreviewProps) {
+export function SunSkyNodePreview({ imagePath, height = 360 }: SunSkyNodePreviewProps) {
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setError(false);
+  }, [imagePath]);
 
   if (error) {
     return (
       <div
         className="flex flex-col items-center justify-center rounded-lg"
-        style={{ height: 220, background: '#1a1d24' }}
+        style={{ height, background: '#1a1d24' }}
       >
         <span className="text-xs text-[#6a6a7a]">预览图占位</span>
         <span className="mt-1 text-[10px] text-[#4a4a5a]">{imagePath.split('/').pop()}</span>
@@ -20,7 +25,7 @@ export function SunSkyNodePreview({ imagePath }: SunSkyNodePreviewProps) {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-lg" style={{ height: 220 }}>
+    <div className="relative overflow-hidden rounded-xl bg-[#0f1219]" style={{ height }}>
       <img
         src={imagePath}
         alt="Sun & Sky Preview"
@@ -29,7 +34,7 @@ export function SunSkyNodePreview({ imagePath }: SunSkyNodePreviewProps) {
         draggable={false}
       />
       <div className="absolute right-2.5 top-2.5 rounded-md bg-[#0d1017]/75 px-2 py-0.5 text-[11px] font-medium text-white/70 backdrop-blur">
-        实时预览
+        矩阵预览
       </div>
     </div>
   );
