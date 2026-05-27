@@ -27,6 +27,11 @@ function stopNodeControlEvent(event: React.PointerEvent<HTMLElement> | React.Mou
   event.stopPropagation();
 }
 
+function preventNodeContextMenu(event: React.MouseEvent<HTMLElement>) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 const DEFAULT_COMPARE_RATIO = 16 / 9;
 const CLOSE_RATIO_THRESHOLD = 0.15;
 const CARD_PADDING_X = 24;
@@ -125,7 +130,7 @@ function CompareImageArea({
     [onSliderChange],
   );
 
-  const handlePointerDown = useCallback(
+  const handleSliderPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (!hasBothImages || event.button !== 0) return;
       event.preventDefault();
@@ -137,7 +142,7 @@ function CompareImageArea({
     [hasBothImages, updateSlider],
   );
 
-  const handlePointerMove = useCallback(
+  const handleSliderPointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (!isDragging) return;
       event.preventDefault();
@@ -147,7 +152,7 @@ function CompareImageArea({
     [isDragging, updateSlider],
   );
 
-  const handlePointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+  const handleSliderPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     event.preventDefault();
     event.stopPropagation();
@@ -162,13 +167,9 @@ function CompareImageArea({
       style={{
         width,
         height,
-        cursor: hasBothImages ? (isDragging ? 'col-resize' : 'ew-resize') : 'default',
+        cursor: 'default',
         background: 'linear-gradient(135deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012))',
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
     >
       {!leftImage && !rightImage && emptyContent}
 
@@ -204,14 +205,25 @@ function CompareImageArea({
             }}
           />
           <div
-            className="pointer-events-none absolute top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
+            className="nodrag nowheel absolute top-0 bottom-0 z-10 w-8 -translate-x-1/2"
             style={{
               left: `${sliderPosition}%`,
-              background: 'rgba(255,255,255,0.92)',
-              boxShadow: '0 6px 18px rgba(0,0,0,0.34)',
+              cursor: isDragging ? 'col-resize' : 'ew-resize',
             }}
+            onPointerDown={handleSliderPointerDown}
+            onPointerMove={handleSliderPointerMove}
+            onPointerUp={handleSliderPointerEnd}
+            onPointerCancel={handleSliderPointerEnd}
           >
-            <ArrowLeftRight className="h-4 w-4" style={{ color: '#111' }} />
+            <div
+              className="pointer-events-none absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
+              style={{
+                background: 'rgba(255,255,255,0.92)',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.34)',
+              }}
+            >
+              <ArrowLeftRight className="h-4 w-4" style={{ color: '#111' }} />
+            </div>
           </div>
           <div
             className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-lg px-2.5 py-1 text-[12px]"
@@ -413,7 +425,11 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   );
 
   return (
-    <div className="relative group/compare" style={{ zIndex: selected ? 100 : 1, width: nodeWidth, cursor: 'default' }}>
+    <div
+      className="relative group/compare"
+      style={{ zIndex: selected ? 100 : 1, width: nodeWidth, cursor: 'default' }}
+      onContextMenu={preventNodeContextMenu}
+    >
       <div
         className="absolute z-20"
         style={{

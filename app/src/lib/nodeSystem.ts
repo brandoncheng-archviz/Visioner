@@ -67,6 +67,10 @@ export const NODE_PORT_CONFIG: Record<string, NodePortConfig> = {
     inputs: [{ id: 'input-1', type: 'IMAGE', label: '图片' }],
     outputs: [],
   },
+  sunSky: {
+    inputs: [{ id: 'input-1', type: 'IMAGE', label: '图片' }],
+    outputs: [{ id: 'output-1', type: 'IMAGE', label: '光照结果' }],
+  },
 };
 
 /** Infer port type from node type + handle position. */

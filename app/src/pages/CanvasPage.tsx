@@ -615,6 +615,7 @@ function FlowCanvas() {
         audio: t('canvas.nodeLabels.audio'),
         script: t('canvas.nodeLabels.script'),
         'video-merge': t('canvas.nodeLabels.video-merge'),
+        sunSky: t('canvas.nodeLabels.sunSky'),
       };
       const newNode: Node = {
         id: `${type}-${Date.now()}`,

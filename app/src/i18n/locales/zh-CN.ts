@@ -61,11 +61,14 @@ const zhCN = {
       audio: "音频节点",
       script: "脚本节点",
       "video-merge": "视频合成",
+      sunSky: "太阳天空",
     },
     createMenuImageNode: "图片节点",
     createMenuUpscaleNode: "高清放大",
     addCompareNode: "对比节点",
     createMenuCompareNode: "对比节点",
+    addSunSkyNode: "太阳天空",
+    createMenuSunSkyNode: "太阳天空",
   },
 
   compare: {
@@ -511,6 +514,7 @@ const zhCN = {
     imageNode: "图片节点",
     upscaleNode: "高清放大",
     compareNode: "对比节点",
+    sunSkyNode: "太阳天空",
     aiToolboxEmpty: "AI工具箱",
     aiToolboxHint: "选择节点后查看可用技能",
     all: "全部",

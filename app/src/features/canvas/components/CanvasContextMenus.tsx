@@ -1,4 +1,4 @@
-import { Image, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
+import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /* ─── Canvas Context Menu (right-click on empty canvas) ─── */
@@ -24,6 +24,7 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
     { type: 'image', label: t('canvas.addImageNode'), icon: Image, color: '#22d3ee' },
     { type: 'upscale', label: t('canvas.addUpscaleNode'), icon: Image, color: '#a855f7' },
     { type: 'compare', label: t('canvas.addCompareNode'), icon: Image, color: '#94a3b8' },
+    { type: 'sunSky', label: t('canvas.addSunSkyNode'), icon: Sun, color: '#f59e0b' },
   ];
 
   return (
@@ -110,6 +111,12 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
           <Image className="w-4 h-4" style={{ color: '#94a3b8' }} /> {t('canvas.createMenuCompareNode')}
+        </button>
+        <button
+          onClick={() => onCreateAndConnect('sunSky')}
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+        >
+          <Sun className="w-4 h-4" style={{ color: '#f59e0b' }} /> {t('canvas.createMenuSunSkyNode')}
         </button>
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />

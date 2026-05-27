@@ -61,11 +61,14 @@ const enUS = {
       audio: "Audio Node",
       script: "Script Node",
       "video-merge": "Video Merge",
+      sunSky: "Sun & Sky",
     },
     createMenuImageNode: "Image Node",
     createMenuUpscaleNode: "Upscale",
     addCompareNode: "Compare",
     createMenuCompareNode: "Compare",
+    addSunSkyNode: "Sun & Sky",
+    createMenuSunSkyNode: "Sun & Sky",
   },
 
   compare: {
@@ -511,6 +514,7 @@ const enUS = {
     imageNode: "Image Node",
     upscaleNode: "Upscale",
     compareNode: "Compare",
+    sunSkyNode: "Sun & Sky",
     aiToolboxEmpty: "AI Toolbox",
     aiToolboxHint: "Select a node to see available skills",
     all: "All",
