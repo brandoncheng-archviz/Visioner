@@ -343,6 +343,148 @@ function FlowCanvas() {
     }, 50);
   }, [nodes, setNodes, setEdges, fitView, getViewport, t]);
 
+  const createSunSkyNode = useCallback((sourceNodeId: string, inputImage: string, width: number, height: number) => {
+    const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+    if (!sourceNode) return;
+
+    const newNodeId = `sunSky-${Date.now()}`;
+    const label = t('canvas.nodeLabels.sunSky');
+    const spacing = 80;
+    const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
+
+    const newNode: Node = {
+      id: newNodeId,
+      type: 'sunSky',
+      position: {
+        x: sourceNode.position.x + estimatedWidth + spacing,
+        y: sourceNode.position.y,
+      },
+      data: {
+        label,
+        inputImage,
+        image: inputImage,
+        width,
+        height,
+      },
+      selected: true,
+    };
+
+    setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
+    setEdges((eds) => [
+      ...eds,
+      {
+        id: `e-${Date.now()}`,
+        source: sourceNodeId,
+        target: newNodeId,
+        sourceHandle: 'right-source',
+        targetHandle: 'left-target',
+        style: { stroke: '#555', strokeWidth: 1 },
+      },
+    ]);
+
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: newNodeId }],
+        duration: 300,
+        padding: 0.15,
+        maxZoom: Math.min(getViewport().zoom, 1.2),
+      });
+    }, 50);
+  }, [nodes, setNodes, setEdges, fitView, getViewport, t]);
+
+  const createCompareNode = useCallback((sourceNodeId: string, _inputImage: string, _width: number, _height: number) => {
+    const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+    if (!sourceNode) return;
+
+    // ── Strategy: reuse the most-recent pending CompareNode (exactly 1 input edge) ──
+    const compareNodes = nodes.filter((n) => n.type === 'compare');
+    const pendingList = compareNodes
+      .map((node) => {
+        const inputEdges = edges.filter((e) => e.target === node.id);
+        return { node, inputEdges, inputCount: inputEdges.length };
+      })
+      .filter(({ inputCount, inputEdges }) => {
+        // Only nodes with exactly one image connected
+        if (inputCount !== 1) return false;
+        // Avoid re-connecting the same source node
+        const alreadyConnected = inputEdges.some((e) => e.source === sourceNodeId);
+        if (alreadyConnected) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        // Most recently created first (compare-${timestamp})
+        const aTime = parseInt(a.node.id.replace('compare-', ''), 10) || 0;
+        const bTime = parseInt(b.node.id.replace('compare-', ''), 10) || 0;
+        return bTime - aTime;
+      });
+
+    if (pendingList.length > 0) {
+      const targetCompare = pendingList[0].node;
+      setEdges((eds) => [
+        ...eds,
+        {
+          id: `e-${Date.now()}`,
+          source: sourceNodeId,
+          target: targetCompare.id,
+          sourceHandle: 'right-source',
+          targetHandle: 'left-target',
+          style: { stroke: '#555', strokeWidth: 1 },
+        },
+      ]);
+      setTimeout(() => {
+        fitView({
+          nodes: [{ id: targetCompare.id }],
+          duration: 300,
+          padding: 0.15,
+          maxZoom: Math.min(getViewport().zoom, 1.2),
+        });
+      }, 50);
+      return;
+    }
+
+    // ── Fallback: create a brand-new CompareNode ──
+    const newNodeId = `compare-${Date.now()}`;
+    const label = t('canvas.nodeLabels.compare');
+    const spacing = 80;
+    const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
+
+    const newNode: Node = {
+      id: newNodeId,
+      type: 'compare',
+      position: {
+        x: sourceNode.position.x + estimatedWidth + spacing,
+        y: sourceNode.position.y,
+      },
+      data: {
+        label,
+        sliderPosition: 50,
+      },
+      selected: true,
+    };
+
+    setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
+    setEdges((eds) => [
+      ...eds,
+      {
+        id: `e-${Date.now()}`,
+        source: sourceNodeId,
+        target: newNodeId,
+        sourceHandle: 'right-source',
+        targetHandle: 'left-target',
+        style: { stroke: '#555', strokeWidth: 1 },
+      },
+    ]);
+
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: newNodeId }],
+        duration: 300,
+        padding: 0.15,
+        maxZoom: Math.min(getViewport().zoom, 1.2),
+      });
+    }, 50);
+  }, [nodes, edges, setNodes, setEdges, fitView, getViewport, t]);
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
       ...n,
@@ -352,10 +494,12 @@ function FlowCanvas() {
         onRemoveReferenceEdge: removeReferenceEdge,
         onSwapCompareInputs: swapCompareInputs,
         onAssignReferenceEdgeRole: assignReferenceEdgeRole,
-        onCreateUpscaleNode: n.type === 'image' ? createUpscaleNode : undefined,
+        onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' ? createUpscaleNode : undefined,
+        onCreateSunSkyNode: n.type === 'image' ? createSunSkyNode : undefined,
+        onCreateCompareNode: n.type === 'image' ? createCompareNode : undefined,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode]);
+  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode]);
 
   // ─── Copy / Paste / Delete ───
   const clipboardRef = useRef<{ type: string; data: Record<string, unknown>; position: { x: number; y: number } }[]>([]);

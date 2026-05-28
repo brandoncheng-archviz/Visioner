@@ -1,25 +1,49 @@
-import { Crop, Box, Pencil, Lightbulb, MoreHorizontal, Maximize, Download, Maximize2, ZoomIn } from 'lucide-react';
+import type { MouseEvent, PointerEvent } from 'react';
+import { Sun, ZoomIn, GitCompare, Maximize2, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+interface ToolbarAction {
+  icon: typeof Sun;
+  label: string;
+  action: () => void;
+  disabled?: boolean;
+}
+
 export function ImageToolbar({
-  onFullscreen,
+  onSunSky,
   onUpscale,
+  onCompare,
+  onPreview,
+  onDownload,
   hasImage,
 }: {
-  onFullscreen: () => void;
+  onSunSky: () => void;
   onUpscale: () => void;
+  onCompare: () => void;
+  onPreview: () => void;
+  onDownload: () => void;
   hasImage: boolean;
 }) {
   const { t } = useTranslation();
-  const tools = [
-    { icon: Crop, label: t('common.crop') },
-    { icon: Box, label: t('common.view') },
-    { icon: Pencil, label: t('common.redraw') },
-    { icon: Lightbulb, label: t('common.lighting') },
-    { icon: MoreHorizontal, label: t('common.more') },
-    { icon: Maximize, label: t('common.expand') },
-    { icon: Download, label: t('common.download') },
+
+  const tools: ToolbarAction[] = [
+    { icon: Sun, label: t('imageNode.sunSky'), action: onSunSky, disabled: !hasImage },
+    { icon: ZoomIn, label: t('imageNode.upscale'), action: onUpscale, disabled: !hasImage },
+    { icon: GitCompare, label: t('imageNode.compare'), action: onCompare, disabled: !hasImage },
+    { icon: Maximize2, label: t('imageNode.preview'), action: onPreview, disabled: !hasImage },
+    { icon: Download, label: t('common.download'), action: onDownload, disabled: !hasImage },
   ];
+
+  const stopToolbarEvent = (event: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleAction = (event: MouseEvent<HTMLButtonElement>, tool: ToolbarAction) => {
+    stopToolbarEvent(event);
+    if (tool.disabled) return;
+    tool.action();
+  };
 
   return (
     <div
@@ -35,30 +59,18 @@ export function ImageToolbar({
       {tools.map((tool) => (
         <button
           key={tool.label}
-          className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
+          type="button"
+          onPointerDown={stopToolbarEvent}
+          onClick={(event) => handleAction(event, tool)}
+          disabled={tool.disabled}
+          className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15 disabled:opacity-30 disabled:cursor-not-allowed"
           style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
           title={tool.label}
+          aria-label={tool.label}
         >
           <tool.icon className="w-4 h-4" />
         </button>
       ))}
-      <button
-        onClick={onUpscale}
-        disabled={!hasImage}
-        className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15 disabled:opacity-30 disabled:cursor-not-allowed"
-        style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
-        title={t('imageNode.upscale')}
-      >
-        <ZoomIn className="w-4 h-4" />
-      </button>
-      <button
-        onClick={onFullscreen}
-        className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
-        style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
-        title={t('imageNode.fullscreen')}
-      >
-        <Maximize2 className="w-4 h-4" />
-      </button>
     </div>
   );
 }

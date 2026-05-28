@@ -31,6 +31,7 @@ import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor
 import { getStylePresetById, getPresetById } from '../../constants/presets';
 import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
+import { resolveNodeImage } from '../../utils/resolveNodeImage';
 import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
@@ -517,39 +518,59 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const isOnlySelected = selected && selectedNodeCount === 1;
 
   const handleUpscale = useCallback(() => {
-    let imageUrl = '';
-    let imgWidth = sourceWidth;
-    let imgHeight = sourceHeight;
-
-    if (currentResultId) {
-      const result = generatedImages.find((g) => g.resultId === currentResultId);
-      if (result?.imageUrl) {
-        imageUrl = result.imageUrl;
-        imgWidth = result.width || sourceWidth;
-        imgHeight = result.height || sourceHeight;
-      }
-    }
-
-    if (!imageUrl && generatedImages.length > 0) {
-      const latest = generatedImages[generatedImages.length - 1];
-      imageUrl = latest.imageUrl;
-      imgWidth = latest.width || sourceWidth;
-      imgHeight = latest.height || sourceHeight;
-    }
-
-    if (!imageUrl) {
-      imageUrl = previewImage || currentImage || inputImage || '';
-    }
-
-    if (!imageUrl) {
+    const resolved = resolveNodeImage(data);
+    if (!resolved) {
       showToast(t('imageNode.noImageForUpscale'));
       return;
     }
 
     const onCreateUpscaleNode = data.onCreateUpscaleNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
     if (!onCreateUpscaleNode) return;
-    onCreateUpscaleNode(id, imageUrl, imgWidth, imgHeight);
-  }, [currentResultId, generatedImages, previewImage, currentImage, inputImage, sourceWidth, sourceHeight, id, data, showToast, t]);
+    onCreateUpscaleNode(id, resolved.imageUrl, resolved.width, resolved.height);
+  }, [data, id, showToast, t]);
+
+  const handleSunSky = useCallback(() => {
+    const resolved = resolveNodeImage(data);
+    if (!resolved) {
+      showToast(t('imageNode.noImageForSunSky'));
+      return;
+    }
+
+    const onCreateSunSkyNode = data.onCreateSunSkyNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
+    if (!onCreateSunSkyNode) return;
+    onCreateSunSkyNode(id, resolved.imageUrl, resolved.width, resolved.height);
+  }, [data, id, showToast, t]);
+
+  const handleCompare = useCallback(() => {
+    const resolved = resolveNodeImage(data);
+    if (!resolved) {
+      showToast(t('imageNode.noImageForCompare'));
+      return;
+    }
+
+    const onCreateCompareNode = data.onCreateCompareNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
+    if (!onCreateCompareNode) return;
+    onCreateCompareNode(id, resolved.imageUrl, resolved.width, resolved.height);
+  }, [data, id, showToast, t]);
+
+  const handlePreview = useCallback(() => {
+    const resolved = resolveNodeImage(data);
+    if (!resolved) return;
+    setPreviewImage(resolved.imageUrl);
+    setImgSize({ width: resolved.width, height: resolved.height });
+    setShowPreview(true);
+  }, [data]);
+
+  const handleDownload = useCallback(() => {
+    const resolved = resolveNodeImage(data);
+    if (!resolved) return;
+    const link = document.createElement('a');
+    link.href = resolved.imageUrl;
+    link.download = `image-node-${id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [data, id]);
 
   // Global Ctrl+G / Cmd+G shortcut for generation
   useEffect(() => {
@@ -571,7 +592,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {/* Toolbar — shown above title when image exists and node is selected */}
       {displayImage && isOnlySelected && (
         <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
-          <ImageToolbar onFullscreen={() => setShowPreview(true)} onUpscale={handleUpscale} hasImage={!!displayImage} />
+          <ImageToolbar
+            onSunSky={handleSunSky}
+            onUpscale={handleUpscale}
+            onCompare={handleCompare}
+            onPreview={handlePreview}
+            onDownload={handleDownload}
+            hasImage={!!displayImage}
+          />
         </div>
       )}
 
@@ -675,7 +703,16 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           }}
         >
           {displayImage ? (
-            <img src={displayImage} alt="" className="w-full h-full object-contain" />
+            <img
+              src={displayImage}
+              alt=""
+              className="w-full h-full object-contain"
+              draggable={false}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                handlePreview();
+              }}
+            />
           ) : (
             <div className="flex items-center justify-center">
               {/* Clean placeholder icon */}
@@ -845,8 +882,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {showPreview && displayImage && createPortal(
         <ImagePreviewModal
           imageUrl={displayImage}
-          nodeName={nodeName}
-          imgSize={imgSize}
           onClose={() => setShowPreview(false)}
         />,
         document.body,

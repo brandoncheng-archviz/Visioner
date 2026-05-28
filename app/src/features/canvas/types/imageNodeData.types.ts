@@ -33,6 +33,9 @@ export interface ImageNodeData {
   onStartLineDraw?: (nodeId: string, x: number, y: number) => void;
   onRemoveReferenceEdge?: (targetNodeId: string, sourceNodeId: string) => void;
   onAssignReferenceEdgeRole?: (targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string) => void;
+  onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
+  onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
+  onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
 }
 
 function castRecord(data: unknown): Record<string, unknown> {

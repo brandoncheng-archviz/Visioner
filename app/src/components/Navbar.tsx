@@ -72,13 +72,13 @@ export default function Navbar({ variant = 'home', projectName = '' }: NavbarPro
 
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 md:px-6"
+      className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center justify-between px-4 md:px-6 pointer-events-none"
       style={{
         background: 'transparent',
       }}
     >
       {/* Left */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 pointer-events-auto">
         <button
           onClick={() => navigate('/')}
           className="text-white font-bold text-lg tracking-tight hover:opacity-80 transition-opacity"
@@ -96,7 +96,7 @@ export default function Navbar({ variant = 'home', projectName = '' }: NavbarPro
       </div>
 
       {/* Right */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pointer-events-auto">
         {!isCanvas && (
           <>
             <button className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#a0a0b0] border border-[#2a2a35] hover:bg-[#1e1e28] hover:border-[#3a3a4a] transition-all">

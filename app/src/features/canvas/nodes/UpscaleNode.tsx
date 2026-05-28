@@ -549,8 +549,6 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
       {showPreview && displayImage && createPortal(
         <ImagePreviewModal
           imageUrl={displayImage}
-          nodeName={(data.label as string) || t('canvas.nodeLabels.upscale')}
-          imgSize={{ width: nodeData.width, height: nodeData.height }}
           onClose={() => setShowPreview(false)}
         />,
         document.body,
