@@ -1,10 +1,12 @@
 import type { MarkAction, ModelParams } from '../types/canvas.types';
 
-export const IMAGE_NODE_PREVIEW_WIDTH = 410;
-export const IMAGE_NODE_EMPTY_HEIGHT = 230;
-export const IMAGE_NODE_MIN_IMAGE_SIZE = 180;
-export const IMAGE_NODE_MAX_IMAGE_WIDTH = 520;
-export const IMAGE_NODE_MAX_IMAGE_HEIGHT = 360;
+export const IMAGE_NODE_PREVIEW_WIDTH = 440;
+export const IMAGE_NODE_EMPTY_HEIGHT = 260;
+export const IMAGE_NODE_MIN_IMAGE_SIZE = 180; // Kept for backward compatibility
+export const IMAGE_NODE_MIN_IMAGE_WIDTH = 220;
+export const IMAGE_NODE_MIN_IMAGE_HEIGHT = 160;
+export const IMAGE_NODE_MAX_IMAGE_WIDTH = 600;
+export const IMAGE_NODE_MAX_IMAGE_HEIGHT = 440;
 export const IMAGE_NODE_CONTROL_WIDTH = 640;
 export const IMAGE_NODE_CONTROL_HEIGHT = 252;
 export const IMAGE_NODE_CONTROL_EXPANDED_HEIGHT = 344;

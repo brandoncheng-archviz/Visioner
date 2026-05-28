@@ -18,11 +18,6 @@ import {
 } from '../../types/imageNodeData.types';
 import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
 import {
-  IMAGE_NODE_PREVIEW_WIDTH,
-  IMAGE_NODE_EMPTY_HEIGHT,
-  IMAGE_NODE_MIN_IMAGE_SIZE,
-  IMAGE_NODE_MAX_IMAGE_WIDTH,
-  IMAGE_NODE_MAX_IMAGE_HEIGHT,
   IMAGE_NODE_CONTROL_WIDTH,
   IMAGE_NODE_CONTROL_HEIGHT,
   DEFAULT_MODEL_PARAMS,
@@ -32,6 +27,7 @@ import { getStylePresetById, getPresetById } from '../../constants/presets';
 import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
+import { resolveImageNodeSize } from '../../utils/imageNodeSizing';
 import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
@@ -499,18 +495,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const displayImage = previewImage || currentImage;
   const sourceWidth = imgSize?.width || getNodeWidth(data) || 1;
   const sourceHeight = imgSize?.height || getNodeHeight(data) || 1;
-  const aspectRatio = sourceWidth / sourceHeight;
-  const imageDisplayScale = displayImage
-    ? Math.min(
-        IMAGE_NODE_MAX_IMAGE_WIDTH / sourceWidth,
-        IMAGE_NODE_MAX_IMAGE_HEIGHT / sourceHeight,
-        Math.max(IMAGE_NODE_MIN_IMAGE_SIZE / sourceWidth, IMAGE_NODE_MIN_IMAGE_SIZE / sourceHeight),
-      )
-    : 1;
-  const cardWidth = displayImage ? Math.round(sourceWidth * imageDisplayScale) : IMAGE_NODE_PREVIEW_WIDTH;
-  const cardHeight = displayImage
-    ? Math.max(120, Math.min(Math.round(cardWidth / aspectRatio), 320))
-    : IMAGE_NODE_EMPTY_HEIGHT;
+  const { cardWidth, cardHeight, imageDisplayScale } = resolveImageNodeSize({
+    hasImage: Boolean(displayImage),
+    sourceWidth,
+    sourceHeight,
+  });
   const showTitleMeta = zoom >= 0.35;
   const roleOption = getImageRoleOption(role, customRoleLabel);
   const RoleIconForTitle = roleOption?.Icon;

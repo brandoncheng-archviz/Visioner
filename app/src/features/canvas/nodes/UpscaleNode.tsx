@@ -4,16 +4,13 @@ import { Image, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import {
-  IMAGE_NODE_PREVIEW_WIDTH,
-  IMAGE_NODE_MIN_IMAGE_SIZE,
-  IMAGE_NODE_MAX_IMAGE_WIDTH,
-  IMAGE_NODE_MAX_IMAGE_HEIGHT,
   IMAGE_NODE_EMPTY_HEIGHT,
 } from '../constants/canvasConstants';
 import { UpscaleParamPanel } from '../components/UpscaleParamPanel';
 import { UpscaleResultToolbar } from '../components/UpscaleResultToolbar';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { createUpscaleTask, simulateUpscale } from '../utils/mockUpscaleTask';
+import { resolveImageNodeSize } from '../utils/imageNodeSizing';
 import type { UpscaleNodeData, UpscaleHistoryItem } from '../types/upscaleNode.types';
 import { getCurrentImage, getNodeHeight, getNodeWidth } from '../types/imageNodeData.types';
 
@@ -170,23 +167,13 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
   const displayImage = nodeData.outputImage || nodeData.inputImage;
   const sourceWidth = nodeData.width || 1;
   const sourceHeight = nodeData.height || 1;
-  const aspectRatio = sourceWidth / sourceHeight;
-
-  const cardWidth = displayImage
-    ? Math.round(
-        sourceWidth *
-          Math.min(
-            IMAGE_NODE_MAX_IMAGE_WIDTH / sourceWidth,
-            IMAGE_NODE_MAX_IMAGE_HEIGHT / sourceHeight,
-            Math.max(IMAGE_NODE_MIN_IMAGE_SIZE / sourceWidth, IMAGE_NODE_MIN_IMAGE_SIZE / sourceHeight),
-          ),
-      )
-    : IMAGE_NODE_PREVIEW_WIDTH;
-
-  // Result state: dynamic height like ImageNode; Processing state: fixed 240
-  const cardHeight = isSuccess
-    ? Math.max(120, Math.min(Math.round(cardWidth / aspectRatio), 320))
-    : IMAGE_NODE_EMPTY_HEIGHT;
+  const imageSize = resolveImageNodeSize({
+    hasImage: Boolean(displayImage),
+    sourceWidth,
+    sourceHeight,
+  });
+  const cardWidth = imageSize.cardWidth;
+  const cardHeight = isSuccess ? imageSize.cardHeight : IMAGE_NODE_EMPTY_HEIGHT;
 
   const handleParamChange = useCallback(
     (patch: Record<string, unknown>) => {

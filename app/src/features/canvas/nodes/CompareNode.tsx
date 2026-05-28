@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, useStore, useReactFlow, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
 import { ArrowLeftRight, GitCompare, RotateCcw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { resolveNodeImage } from '../utils/resolveNodeImage';
 
 interface ConnectedImage {
   nodeId: string;
@@ -41,7 +42,7 @@ const MIN_IMAGE_HEIGHT = 220;
 const MAX_IMAGE_HEIGHT = 420;
 const MIN_NODE_WIDTH = 340;
 const MAX_NODE_WIDTH = 680;
-const EMPTY_IMAGE_WIDTH = 500;
+const EMPTY_IMAGE_WIDTH = 420;
 const SQUARE_IMAGE_SIZE = 420;
 
 function clamp(value: number, min: number, max: number) {
@@ -260,14 +261,14 @@ export function CompareNode({ id, data, selected }: NodeProps) {
         .map((edge): ConnectedImage | null => {
           const sourceNode = allNodes.find((node) => node.id === edge.source);
           if (!sourceNode) return null;
-          const imageUrl = (sourceNode.data?.currentImage || sourceNode.data?.image || sourceNode.data?.inputImage) as string | undefined;
-          if (!imageUrl) return null;
+          const resolvedImage = resolveNodeImage(sourceNode.data);
+          if (!resolvedImage) return null;
           return {
             nodeId: sourceNode.id,
-            imageUrl,
+            imageUrl: resolvedImage.imageUrl,
             label: (sourceNode.data?.label as string) || sourceNode.id,
-            width: sourceNode.data?.width as number | undefined,
-            height: sourceNode.data?.height as number | undefined,
+            width: resolvedImage.width,
+            height: resolvedImage.height,
           };
         })
         .filter((item): item is ConnectedImage => item !== null)
