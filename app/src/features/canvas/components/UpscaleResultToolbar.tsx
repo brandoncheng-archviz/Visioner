@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { Maximize2, Download, Trash2, ZoomIn } from 'lucide-react';
+import { Maximize2, Download, Trash2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export function UpscaleResultToolbar({
@@ -36,7 +36,8 @@ export function UpscaleResultToolbar({
         onClick={(event) => handleAction(event, onPreview)}
         className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
         style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
-        title={t('common.expand')}
+        title={t('imageNode.preview')}
+        aria-label={t('imageNode.preview')}
       >
         <Maximize2 className="w-4 h-4" />
       </button>
@@ -46,6 +47,7 @@ export function UpscaleResultToolbar({
         className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
         style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
         title={t('common.download')}
+        aria-label={t('common.download')}
       >
         <Download className="w-4 h-4" />
       </button>
@@ -55,8 +57,9 @@ export function UpscaleResultToolbar({
         className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
         style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
         title={t('imageNode.upscale')}
+        aria-label={t('imageNode.upscale')}
       >
-        <ZoomIn className="w-4 h-4" />
+        <Sparkles className="w-4 h-4" />
       </button>
       <button
         type="button"
@@ -64,6 +67,7 @@ export function UpscaleResultToolbar({
         className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"
         style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
         title={t('common.delete')}
+        aria-label={t('common.delete')}
       >
         <Trash2 className="w-4 h-4" />
       </button>

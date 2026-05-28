@@ -25,7 +25,8 @@
 
 Additional notable dependencies:
 
-- **@radix-ui/* ** — Headless UI primitives used by shadcn/ui components (accordion, dialog, dropdown-menu, slider, tabs, tooltip, and many more).
+- **@radix-ui/*** — Headless UI primitives used by shadcn/ui components (accordion, dialog, dropdown-menu, slider, tabs, tooltip, and many more).
+- **@hookform/resolvers** — Zod resolver bridge for react-hook-form.
 - **class-variance-authority + clsx + tailwind-merge** — Utility stack for component variants and conditional class merging.
 - **sonner + next-themes** — Toast notifications with theme-aware rendering.
 - **react-resizable-panels** — Resizable panel layouts.
@@ -74,7 +75,7 @@ app/
 │   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus, modals)
 │   │   ├── constants/       # Canvas constants, presets, image usage configs
 │   │   ├── hooks/           # Canvas-specific hooks (useToast)
-│   │   ├── nodes/           # Node type components (ImageNode, VideoNode, TextNode, etc.)
+│   │   ├── nodes/           # Node type components (ImageNode/, VideoNode, TextNode, etc.)
 │   │   ├── sunSky/          # SunSky lighting analysis subsystem (types, utils, UI components)
 │   │   ├── types/           # Canvas-specific TypeScript types
 │   │   └── utils/           # Pure utility functions (prompt utils, reference utils, mock generation)
@@ -95,7 +96,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~952 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,183 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -115,17 +116,19 @@ app/
 
 **Source file counts (actual):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 62 files (components, nodes, sunSky, types, constants, utils, hooks)
-- `src/` total: 141 TypeScript / TSX source files; 144 total files under `src/`
+- `src/features/canvas/`: 68 files (components, nodes, sunSky, types, constants, utils, hooks)
+- `src/` total: 146 TypeScript / TSX source files; 152 total files under `src/`
 
 **Key file sizes (approximate):**
-- `CanvasPage.tsx`: ~952 lines (page entry + core state container)
-- `ImageNode.tsx`: ~821 lines
+- `CanvasPage.tsx`: ~1,183 lines (page entry + core state container)
+- `ImageNode.tsx`: ~880 lines
 - `ImageNodeControlPanel.tsx`: ~1,484 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
 - `PresetPickerModal.tsx`: ~621 lines
 - `presets.ts`: ~941 lines
-- `CompareNode.tsx`: ~564 lines
+- `CompareNode.tsx`: ~565 lines
+- `UpscaleNode.tsx`: ~545 lines
+- `UpscaleParamPanel.tsx`: ~308 lines
 - `nodeSystem.ts`: ~319 lines
 
 ---
@@ -201,7 +204,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~952 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,183 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper
@@ -221,7 +224,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
 - `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
 - `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
-- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`
 
 **Node components (`src/features/canvas/nodes/`):**
 - `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
@@ -242,9 +245,9 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`
+- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`
 - `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
-- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `presetSelection.ts`, `userPresets.ts`
+- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`
 - `hooks/` — `useToast.ts`
 
 **Canvas architecture rules (from `CANVAS_RULES.md` at repo root):**

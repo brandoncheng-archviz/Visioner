@@ -100,6 +100,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
       {/* Title */}
       <div className="px-4 pt-3 pb-2">
         <div className="text-sm font-medium text-white">{t('upscale.title')}</div>
+        <div className="mt-1 text-[11px] text-[#7a7a88]">{t('upscale.subtitle')}</div>
       </div>
 
       <div className="px-4 pb-3 space-y-2.5">
@@ -286,7 +287,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
         {isRunning && (
           <div className="flex items-center gap-1.5 mr-1">
             <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: '#00d4ff' }} />
-            <span className="text-xs text-[#a0a0b0]">{progress}%</span>
+            <span className="text-xs text-[#a0a0b0]">{t('upscale.enhancing')} {progress}%</span>
           </div>
         )}
         <button

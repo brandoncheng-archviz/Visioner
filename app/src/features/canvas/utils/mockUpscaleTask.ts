@@ -101,7 +101,7 @@ export async function simulateUpscale(
 
   // 10% failure rate
   if (Math.random() < 0.1) {
-    throw new Error('Upscale failed: model inference error');
+    throw new Error('Detail enhancement failed: model inference error');
   }
 
   const imageUrl = pickRandom(MOCK_IMAGES);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, useStore, useReactFlow, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
-import { ArrowLeftRight, GitCompare, RotateCcw, X } from 'lucide-react';
+import { ArrowLeftRight, Columns2, RotateCcw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { resolveNodeImage } from '../utils/resolveNodeImage';
 
@@ -359,7 +359,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
           className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed"
           style={{ borderColor: 'rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.42)' }}
         >
-          <GitCompare className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+          <Columns2 className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
           <span className="text-xs">{label}</span>
         </div>
       ))}
@@ -391,7 +391,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
           boxShadow: '0 8px 18px rgba(0,0,0,0.25)',
         }}
       >
-        <GitCompare className="h-4 w-4 flex-shrink-0" />
+        <Columns2 className="h-4 w-4 flex-shrink-0" />
         <span className="whitespace-nowrap">{t('compare.connectSecondImage')}</span>
       </div>
     </div>
@@ -442,7 +442,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
         }}
       >
         <div className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
-          <GitCompare className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
+          <Columns2 className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
           <span className="truncate">{nodeTitle}</span>
         </div>
       </div>
@@ -555,7 +555,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
             zIndex: 10,
           }}
         >
-          <GitCompare style={{ width: 14, height: 14, color: 'white' }} />
+          <Columns2 style={{ width: 14, height: 14, color: 'white' }} />
         </div>
 
         <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%' }} />

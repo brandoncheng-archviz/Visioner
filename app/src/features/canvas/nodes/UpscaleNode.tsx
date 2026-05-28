@@ -1,10 +1,15 @@
 import { useRef, useCallback, useMemo, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Image, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { Sparkles, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import {
   IMAGE_NODE_EMPTY_HEIGHT,
+  IMAGE_NODE_MAX_IMAGE_HEIGHT,
+  IMAGE_NODE_MAX_IMAGE_WIDTH,
+  IMAGE_NODE_MIN_IMAGE_HEIGHT,
+  IMAGE_NODE_MIN_IMAGE_WIDTH,
+  IMAGE_NODE_PREVIEW_WIDTH,
 } from '../constants/canvasConstants';
 import { UpscaleParamPanel } from '../components/UpscaleParamPanel';
 import { UpscaleResultToolbar } from '../components/UpscaleResultToolbar';
@@ -53,6 +58,42 @@ function dataEngineToUi(engine: UpscaleNodeData['engine']): string {
   return 'topazlabs';
 }
 
+function resolveResultImageSize(sourceWidth: number, sourceHeight: number) {
+  const safeWidth = Math.max(1, sourceWidth || IMAGE_NODE_PREVIEW_WIDTH);
+  const safeHeight = Math.max(1, sourceHeight || IMAGE_NODE_PREVIEW_WIDTH);
+  let displayWidth = IMAGE_NODE_MAX_IMAGE_WIDTH;
+  let displayHeight = displayWidth * safeHeight / safeWidth;
+
+  if (displayHeight > IMAGE_NODE_MAX_IMAGE_HEIGHT) {
+    const scale = IMAGE_NODE_MAX_IMAGE_HEIGHT / displayHeight;
+    displayWidth *= scale;
+    displayHeight = IMAGE_NODE_MAX_IMAGE_HEIGHT;
+  }
+
+  if (displayHeight < IMAGE_NODE_MIN_IMAGE_HEIGHT) {
+    const scale = IMAGE_NODE_MIN_IMAGE_HEIGHT / displayHeight;
+    const nextWidth = displayWidth * scale;
+    if (nextWidth <= IMAGE_NODE_MAX_IMAGE_WIDTH) {
+      displayWidth = nextWidth;
+      displayHeight = IMAGE_NODE_MIN_IMAGE_HEIGHT;
+    }
+  }
+
+  if (displayWidth < IMAGE_NODE_MIN_IMAGE_WIDTH) {
+    const scale = IMAGE_NODE_MIN_IMAGE_WIDTH / displayWidth;
+    const nextHeight = displayHeight * scale;
+    if (nextHeight <= IMAGE_NODE_MAX_IMAGE_HEIGHT) {
+      displayWidth = IMAGE_NODE_MIN_IMAGE_WIDTH;
+      displayHeight = nextHeight;
+    }
+  }
+
+  return {
+    width: Math.round(displayWidth),
+    height: Math.round(displayHeight),
+  };
+}
+
 export function UpscaleNode({ data, selected, id }: NodeProps) {
   const { t } = useTranslation();
   const zoom = useStore((state) => state.transform[2]);
@@ -72,6 +113,11 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
   const { setNodes } = useReactFlow();
   const abortControllerRef = useRef<AbortController | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [resultNaturalSize, setResultNaturalSize] = useState<{
+    imageUrl: string;
+    width: number;
+    height: number;
+  } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -161,19 +207,25 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
     );
   }, [connectedInput, id, setNodes]);
 
-  const isSuccess = nodeData.status === 'success' && !!nodeData.outputImage;
-  const isProcessing = !isSuccess;
+  const isResultMode = nodeData.status === 'success' && !!nodeData.outputImage;
+  const isProcessing = !isResultMode;
 
   const displayImage = nodeData.outputImage || nodeData.inputImage;
-  const sourceWidth = nodeData.width || 1;
-  const sourceHeight = nodeData.height || 1;
-  const imageSize = resolveImageNodeSize({
+  const loadedResultSize = resultNaturalSize?.imageUrl === nodeData.outputImage ? resultNaturalSize : null;
+  const sourceWidth = isResultMode ? loadedResultSize?.width || nodeData.width || 1 : nodeData.width || 1;
+  const sourceHeight = isResultMode ? loadedResultSize?.height || nodeData.height || 1 : nodeData.height || 1;
+  const processingSize = resolveImageNodeSize({
     hasImage: Boolean(displayImage),
     sourceWidth,
     sourceHeight,
   });
-  const cardWidth = imageSize.cardWidth;
-  const cardHeight = isSuccess ? imageSize.cardHeight : IMAGE_NODE_EMPTY_HEIGHT;
+  const resultSize = resolveResultImageSize(sourceWidth, sourceHeight);
+  const cardWidth = isResultMode ? resultSize.width : processingSize.cardWidth;
+  const cardHeight = isResultMode
+    ? resultSize.height
+    : displayImage
+      ? processingSize.cardHeight
+      : IMAGE_NODE_EMPTY_HEIGHT;
 
   const handleParamChange = useCallback(
     (patch: Record<string, unknown>) => {
@@ -296,7 +348,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
       );
     } catch (err) {
       if (controller.signal.aborted) return;
-      const errorMessage = err instanceof Error ? err.message : 'Upscale failed';
+      const errorMessage = err instanceof Error ? err.message : 'Detail enhancement failed';
       setNodes((nds) =>
         nds.map((n) =>
           n.id === id
@@ -359,7 +411,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
   return (
     <div className="relative group/upscale" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
       {/* Result toolbar — shown above title when success and node is selected */}
-      {isSuccess && isOnlySelected && (
+      {isResultMode && isOnlySelected && (
         <div
           className="absolute z-20 flex justify-center"
           style={{
@@ -381,65 +433,110 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
       {/* Title label */}
       <div className="absolute z-20" style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}>
         <div className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
-          <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
+          <Sparkles className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
           <span className="truncate">{(data.label as string) || t('canvas.nodeLabels.upscale')}</span>
         </div>
       </div>
 
       {/* Main card */}
       <div className="relative" style={{ width: cardWidth }}>
-        <div
-          className="node-preview-card w-full rounded-[16px] flex items-center justify-center transition-all overflow-hidden"
-          style={{
-            width: cardWidth,
-            height: cardHeight,
-            background: '#1a1a1a',
-            border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
-            boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
-          }}
-        >
-          {displayImage ? (
-            <div className="relative w-full h-full">
-              <img
-                src={displayImage}
-                alt=""
-                className="w-full h-full object-contain"
-                draggable={false}
-                onDoubleClick={(event) => {
-                  event.stopPropagation();
-                  if (isSuccess) setShowPreview(true);
-                }}
-              />
-              {isProcessing && nodeData.status === 'idle' && (
-                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
-                  <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                    {t('upscale.waiting')}
-                  </span>
-                </div>
-              )}
-              {nodeData.status === 'running' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'rgba(0,0,0,0.5)' }}>
-                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#00d4ff' }} />
-                  <span className="text-sm font-medium" style={{ color: '#00d4ff' }}>
-                    {nodeData.progress}%
-                  </span>
-                </div>
-              )}
-              {nodeData.status === 'failed' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5" style={{ background: 'rgba(0,0,0,0.55)' }}>
-                  <AlertCircle className="w-5 h-5" style={{ color: '#ef4444' }} />
-                  <span className="text-xs font-medium px-3 text-center" style={{ color: '#ef4444' }}>
-                    {nodeData.error || t('upscale.failed')}
-                  </span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              {t('imageNode.configParamsToGenerate')}
-            </span>
-          )}
-        </div>
+        {isResultMode ? (
+          <div
+            className="node-preview-card w-full rounded-xl transition-all overflow-hidden"
+            style={{
+              width: cardWidth,
+              height: cardHeight,
+              background: 'transparent',
+              outline: selected ? '1.5px solid #00d4ff' : '1.5px solid transparent',
+              outlineOffset: 0,
+              boxShadow: selected
+                ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)'
+                : 'none',
+            }}
+          >
+            <img
+              src={nodeData.outputImage}
+              alt=""
+              className="block h-full w-full"
+              style={{ objectFit: 'fill' }}
+              draggable={false}
+              onLoad={(event) => {
+                const { naturalWidth, naturalHeight } = event.currentTarget;
+                if (naturalWidth <= 0 || naturalHeight <= 0) return;
+                setResultNaturalSize((current) => {
+                  if (
+                    current?.imageUrl === nodeData.outputImage &&
+                    current.width === naturalWidth &&
+                    current.height === naturalHeight
+                  ) {
+                    return current;
+                  }
+                  return {
+                    imageUrl: nodeData.outputImage,
+                    width: naturalWidth,
+                    height: naturalHeight,
+                  };
+                });
+              }}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                setShowPreview(true);
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            className="node-preview-card w-full rounded-[16px] flex items-center justify-center transition-all overflow-hidden"
+            style={{
+              width: cardWidth,
+              height: cardHeight,
+              background: '#1a1a1a',
+              border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
+              boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+            }}
+          >
+            {displayImage ? (
+              <div className="relative w-full h-full">
+                <img
+                  src={displayImage}
+                  alt=""
+                  className="w-full h-full object-contain"
+                  draggable={false}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                />
+                {isProcessing && nodeData.status === 'idle' && (
+                  <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+                    <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                      {t('upscale.waiting')}
+                    </span>
+                  </div>
+                )}
+                {nodeData.status === 'running' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                    <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#00d4ff' }} />
+                    <span className="text-sm font-medium" style={{ color: '#00d4ff' }}>
+                      {nodeData.progress}%
+                    </span>
+                  </div>
+                )}
+                {nodeData.status === 'failed' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                    <AlertCircle className="w-5 h-5" style={{ color: '#ef4444' }} />
+                    <span className="text-xs font-medium px-3 text-center" style={{ color: '#ef4444' }}>
+                      {nodeData.error || t('upscale.failed')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                {t('imageNode.configParamsToGenerate')}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Left visual handle — Input */}
         <div

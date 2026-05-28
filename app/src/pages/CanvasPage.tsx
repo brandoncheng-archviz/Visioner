@@ -14,7 +14,7 @@ import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
-import { IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
@@ -785,14 +785,14 @@ function FlowCanvas() {
       if (e.key === '+' || e.key === '=') {
         e.preventDefault();
         const current = getViewport();
-        setViewport({ ...current, zoom: Math.min(current.zoom * 1.15, 4) }, { duration: 0 });
+        setViewport({ ...current, zoom: Math.min(current.zoom * 1.15, CANVAS_MAX_ZOOM) }, { duration: 0 });
         return;
       }
 
       if (e.key === '-') {
         e.preventDefault();
         const current = getViewport();
-        setViewport({ ...current, zoom: Math.max(current.zoom / 1.15, 0.2) }, { duration: 0 });
+        setViewport({ ...current, zoom: Math.max(current.zoom / 1.15, CANVAS_MIN_ZOOM) }, { duration: 0 });
         return;
       }
 
@@ -1034,7 +1034,8 @@ function FlowCanvas() {
   // ─── Toolbar Handlers ───
   const handleZoomChange = useCallback((value: number) => {
     const current = getViewport();
-    setViewport({ x: current.x, y: current.y, zoom: value }, { duration: 0 });
+    const nextZoom = Math.min(Math.max(value, CANVAS_MIN_ZOOM), CANVAS_MAX_ZOOM);
+    setViewport({ x: current.x, y: current.y, zoom: nextZoom }, { duration: 0 });
   }, [getViewport, setViewport]);
 
   return (

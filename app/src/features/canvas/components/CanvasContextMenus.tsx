@@ -1,4 +1,4 @@
-import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun } from 'lucide-react';
+import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /* ─── Canvas Context Menu (right-click on empty canvas) ─── */
@@ -17,13 +17,13 @@ export interface CanvasContextMenuProps {
 }
 
 export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: CanvasContextMenuProps) {
-  if (!menu) return null;
   const { t } = useTranslation();
+  if (!menu) return null;
 
   const items = [
     { type: 'image', label: t('canvas.addImageNode'), icon: Image, color: '#22d3ee' },
-    { type: 'upscale', label: t('canvas.addUpscaleNode'), icon: Image, color: '#a855f7' },
-    { type: 'compare', label: t('canvas.addCompareNode'), icon: Image, color: '#94a3b8' },
+    { type: 'upscale', label: t('canvas.addUpscaleNode'), icon: Sparkles, color: '#a855f7' },
+    { type: 'compare', label: t('canvas.addCompareNode'), icon: Columns2, color: '#94a3b8' },
     { type: 'sunSky', label: t('canvas.addSunSkyNode'), icon: Sun, color: '#f59e0b' },
   ];
 
@@ -77,8 +77,8 @@ export interface CreateNodeMenuProps {
 }
 
 export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNodeMenuProps) {
-  if (!menu) return null;
   const { t } = useTranslation();
+  if (!menu) return null;
 
   return (
     <>
@@ -104,13 +104,13 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
           onClick={() => onCreateAndConnect('upscale')}
           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Image className="w-4 h-4" style={{ color: '#a855f7' }} /> {t('canvas.createMenuUpscaleNode')}
+          <Sparkles className="w-4 h-4" style={{ color: '#a855f7' }} /> {t('canvas.createMenuUpscaleNode')}
         </button>
         <button
           onClick={() => onCreateAndConnect('compare')}
           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
-          <Image className="w-4 h-4" style={{ color: '#94a3b8' }} /> {t('canvas.createMenuCompareNode')}
+          <Columns2 className="w-4 h-4" style={{ color: '#94a3b8' }} /> {t('canvas.createMenuCompareNode')}
         </button>
         <button
           onClick={() => onCreateAndConnect('sunSky')}
@@ -151,8 +151,8 @@ export function NodeContextMenu({
   onDelete,
   onCopy,
 }: NodeContextMenuProps) {
-  if (!menu) return null;
   const { t } = useTranslation();
+  if (!menu) return null;
 
   return (
     <>

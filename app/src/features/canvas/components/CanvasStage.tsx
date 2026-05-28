@@ -23,6 +23,7 @@ import { ImageNode } from '../nodes/ImageNode';
 import { CompareNode } from '../nodes/CompareNode';
 import { SunSkyNode } from '../nodes/SunSkyNode';
 import { TempConnectionLine } from './TempConnectionLine';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from '../constants/canvasConstants';
 
 const nodeTypes = {
   text: TextNode,
@@ -101,7 +102,7 @@ export function CanvasStage({
       if (ctrlKey || metaKey) {
         // Zoom centered on mouse pointer
         const factor = deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.min(Math.max(current.zoom * factor, 0.2), 4);
+        const newZoom = Math.min(Math.max(current.zoom * factor, CANVAS_MIN_ZOOM), CANVAS_MAX_ZOOM);
         const zoomRatio = newZoom / current.zoom;
         const newX = clientX - (clientX - current.x) * zoomRatio;
         const newY = clientY - (clientY - current.y) * zoomRatio;
@@ -188,8 +189,8 @@ export function CanvasStage({
         onWheel={handleWheel}
         fitView
         fitViewOptions={{ maxZoom: 1 }}
-        minZoom={0.2}
-        maxZoom={4}
+        minZoom={CANVAS_MIN_ZOOM}
+        maxZoom={CANVAS_MAX_ZOOM}
         attributionPosition="bottom-right"
         multiSelectionKeyCode={['Shift']}
       >

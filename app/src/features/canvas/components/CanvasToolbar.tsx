@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ShortcutRow } from './ShortcutRow';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from '../constants/canvasConstants';
 
 export interface CanvasToolbarProps {
   showMinimap: boolean;
@@ -81,8 +82,8 @@ export function CanvasToolbar({
           <Minus className="w-3 h-3 text-[#e0e0e0]" />
           <input
             type="range"
-            min={0.4}
-            max={4}
+            min={CANVAS_MIN_ZOOM}
+            max={CANVAS_MAX_ZOOM}
             step={0.05}
             value={zoom}
             onChange={(e) => onZoomChange(parseFloat(e.target.value))}
