@@ -1,7 +1,15 @@
-import { Crop, Box, Pencil, Lightbulb, MoreHorizontal, Maximize, Download, Maximize2 } from 'lucide-react';
+import { Crop, Box, Pencil, Lightbulb, MoreHorizontal, Maximize, Download, Maximize2, ZoomIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export function ImageToolbar({ onFullscreen }: { onFullscreen: () => void }) {
+export function ImageToolbar({
+  onFullscreen,
+  onUpscale,
+  hasImage,
+}: {
+  onFullscreen: () => void;
+  onUpscale: () => void;
+  hasImage: boolean;
+}) {
   const { t } = useTranslation();
   const tools = [
     { icon: Crop, label: t('common.crop') },
@@ -34,6 +42,15 @@ export function ImageToolbar({ onFullscreen }: { onFullscreen: () => void }) {
           <tool.icon className="w-4 h-4" />
         </button>
       ))}
+      <button
+        onClick={onUpscale}
+        disabled={!hasImage}
+        className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15 disabled:opacity-30 disabled:cursor-not-allowed"
+        style={{ width: 32, height: 32, color: 'rgba(255,255,255,0.85)' }}
+        title={t('imageNode.upscale')}
+      >
+        <ZoomIn className="w-4 h-4" />
+      </button>
       <button
         onClick={onFullscreen}
         className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15"

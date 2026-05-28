@@ -14,12 +14,40 @@ import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
+import { IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
 import { CanvasContextMenus } from '../features/canvas/components/CanvasContextMenus';
 import { CanvasToolbar } from '../features/canvas/components/CanvasToolbar';
+
+const UPSCALE_NODE_DEFAULTS: Record<string, unknown> = {
+  engine: 'magnific_precision_v2',
+  scale: 2,
+  mode: 'preserve',
+  fidelity: 0,
+  sharpness: 7,
+  denoise: 0,
+  detail: 30,
+  materialDetail: 7,
+  compressionRepair: 0,
+  status: 'idle',
+  progress: 0,
+  history: [],
+  tlModel: 'general',
+  tlScale: 4,
+  mcUpscale: '2x',
+  mcOptimized: 'standard',
+  mcCreativity: 0,
+  mcDetail: 0,
+  mcSimilarity: 0,
+  mcPromptStr: 0,
+  mpUpscale: '2x',
+  mpSharpen: 7,
+  mpGrain: 7,
+  mpUltra: 30,
+};
 
 /* ─── Flow Inner ─── */
 
@@ -265,6 +293,56 @@ function FlowCanvas() {
     setNodes((nds) => nds.map((node) => (node.id === sourceNodeId ? { ...node, data: { ...node.data, ...roleData } } : node)));
   }, []);
 
+  const createUpscaleNode = useCallback((sourceNodeId: string, inputImage: string, width: number, height: number) => {
+    const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+    if (!sourceNode) return;
+
+    const newNodeId = `upscale-${Date.now()}`;
+    const label = t('canvas.nodeLabels.upscale');
+    const spacing = 80;
+    const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
+
+    const newNode: Node = {
+      id: newNodeId,
+      type: 'upscale',
+      position: {
+        x: sourceNode.position.x + estimatedWidth + spacing,
+        y: sourceNode.position.y,
+      },
+      data: {
+        label,
+        inputImage,
+        image: inputImage,
+        width,
+        height,
+        ...UPSCALE_NODE_DEFAULTS,
+      },
+      selected: true,
+    };
+
+    setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
+    setEdges((eds) => [
+      ...eds,
+      {
+        id: `e-${Date.now()}`,
+        source: sourceNodeId,
+        target: newNodeId,
+        sourceHandle: 'right-source',
+        targetHandle: 'left-target',
+        style: { stroke: '#555', strokeWidth: 1 },
+      },
+    ]);
+
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: newNodeId }],
+        duration: 300,
+        padding: 0.15,
+        maxZoom: Math.min(getViewport().zoom, 1.2),
+      });
+    }, 50);
+  }, [nodes, setNodes, setEdges, fitView, getViewport, t]);
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
       ...n,
@@ -274,9 +352,10 @@ function FlowCanvas() {
         onRemoveReferenceEdge: removeReferenceEdge,
         onSwapCompareInputs: swapCompareInputs,
         onAssignReferenceEdgeRole: assignReferenceEdgeRole,
+        onCreateUpscaleNode: n.type === 'image' ? createUpscaleNode : undefined,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole]);
+  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode]);
 
   // ─── Copy / Paste / Delete ───
   const clipboardRef = useRef<{ type: string; data: Record<string, unknown>; position: { x: number; y: number } }[]>([]);
@@ -621,7 +700,11 @@ function FlowCanvas() {
         id: `${type}-${Date.now()}`,
         type,
         position,
-        data: { label: customLabel || labels[type] || type, ...(type === 'image' ? getRoleData(null) : {}) },
+        data: {
+          label: customLabel || labels[type] || type,
+          ...(type === 'image' ? getRoleData(null) : {}),
+          ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
+        },
       };
       setNodes((nds) => [...nds, newNode]);
       setContextMenu(null);
@@ -789,7 +872,11 @@ function FlowCanvas() {
       id: newNodeId,
       type,
       position: createMenu.flowPos,
-      data: { label: labels[type] || type, ...(type === 'image' ? getRoleData(null) : {}) },
+      data: {
+        label: labels[type] || type,
+        ...(type === 'image' ? getRoleData(null) : {}),
+        ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
+      },
     };
     setNodes((nds) => [...nds, newNode]);
     setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId }]);

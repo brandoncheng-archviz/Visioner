@@ -21,10 +21,10 @@ export function SunSkyNodeControls({
         icon={<Sun className="h-3.5 w-3.5" />}
         label="太阳高度"
         value={elevation}
-        min={3}
+        min={0}
         max={90}
         step={3}
-        minLabel="3°"
+        minLabel="0°"
         midLabel="45°"
         maxLabel="90°"
         onChange={onElevationChange}

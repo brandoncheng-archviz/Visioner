@@ -40,6 +40,8 @@ Dev dependencies:
 - **typescript-eslint + eslint-plugin-react-hooks + eslint-plugin-react-refresh** — Linting stack.
 - **tailwindcss-animate + tw-animate-css** — Tailwind animation utilities.
 
+Runtime requirement: **Node.js 20**.
+
 ---
 
 ## Project Structure
@@ -73,6 +75,7 @@ app/
 │   │   ├── constants/       # Canvas constants, presets, image usage configs
 │   │   ├── hooks/           # Canvas-specific hooks (useToast)
 │   │   ├── nodes/           # Node type components (ImageNode, VideoNode, TextNode, etc.)
+│   │   ├── sunSky/          # SunSky lighting analysis subsystem (types, utils, UI components)
 │   │   ├── types/           # Canvas-specific TypeScript types
 │   │   └── utils/           # Pure utility functions (prompt utils, reference utils, mock generation)
 │   ├── data/
@@ -88,11 +91,11 @@ app/
 │   │   ├── nodeEditor/
 │   │   │   ├── dag.ts       # Cycle detection, topological sort, execution batches, input hashing
 │   │   │   └── types.ts     # Port types, EditorNode, EditorEdge, Camera, connection validation
-│   │   ├── nodeSystem.ts    # Node port config & DAG execution engine for React Flow canvas (~315 lines)
+│   │   ├── nodeSystem.ts    # Node port config & DAG execution engine for React Flow canvas (~319 lines)
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~945 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~952 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -112,17 +115,18 @@ app/
 
 **Source file counts (actual):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 38 files (components, nodes, types, constants, utils, hooks)
-- `src/` total: 117 source files (`.ts` + `.tsx`)
+- `src/features/canvas/`: 62 files (components, nodes, sunSky, types, constants, utils, hooks)
+- `src/` total: 141 TypeScript / TSX source files; 144 total files under `src/`
 
 **Key file sizes (approximate):**
-- `CanvasPage.tsx`: ~945 lines (page entry + core state container)
-- `ImageNode.tsx`: ~818 lines
+- `CanvasPage.tsx`: ~952 lines (page entry + core state container)
+- `ImageNode.tsx`: ~821 lines
 - `ImageNodeControlPanel.tsx`: ~1,484 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
 - `PresetPickerModal.tsx`: ~621 lines
 - `presets.ts`: ~941 lines
-- `CompareNode.tsx`: ~548 lines
+- `CompareNode.tsx`: ~564 lines
+- `nodeSystem.ts`: ~319 lines
 
 ---
 
@@ -197,7 +201,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~945 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~952 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper
@@ -227,7 +231,15 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `ScriptNode.tsx`
 - `VideoMergeNode.tsx`
 - `UpscaleNode.tsx`
-- `CompareNode.tsx`
+- `CompareNode.tsx` — Side-by-side image comparison with draggable slider
+- `SunSkyNode/` — SunSky lighting analysis node (preview, controls, derived info)
+
+**SunSky subsystem (`src/features/canvas/sunSky/`):**
+A dedicated feature module for solar and sky lighting analysis, consumed by `SunSkyNode`. It includes:
+- `components/` — `SunSkyPanel.tsx`, `SunSkyPreview.tsx`, `SunSkyControls.tsx`, `SunDomeController.tsx`, `SunSkyDerivedInfo.tsx`, `SunSkyPresetList.tsx`, `SunSkySnapshotStrip.tsx`
+- `utils/` — `resolveSunSkyState.ts`, `resolveSimpleSunSkyState.ts`, `sunSkyMath.ts`, `sunSkyPrompt.ts`
+- `data/` — `sunSkyPresets.ts`
+- `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`
 
 **Supporting modules:**
 - `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`
@@ -286,7 +298,7 @@ The app uses `react-i18next` with two locale files:
 - `zh-CN.ts` — Default language (简体中文)
 - `en-US.ts` — Fallback language
 
-Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`).
+Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`).
 
 ### Data Layer (`src/data/siteData.ts`)
 

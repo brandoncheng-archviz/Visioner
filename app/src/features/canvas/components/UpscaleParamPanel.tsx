@@ -1,6 +1,6 @@
 import { memo, useState, useCallback, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, ArrowUp } from 'lucide-react';
+import { Zap, ArrowUp, Loader2 } from 'lucide-react';
 import type { UpscaleSliderProps } from '../types/canvas.types';
 
 const UpscaleSlider = memo(function UpscaleSlider({ value, min, max, onChange }: UpscaleSliderProps) {
@@ -43,31 +43,39 @@ const UpscaleSlider = memo(function UpscaleSlider({ value, min, max, onChange }:
   );
 });
 
-export function UpscaleParamPanel() {
+export interface UpscalePanelParams {
+  engine: string;
+  tlModel: string;
+  tlScale: number;
+  mcUpscale: string;
+  mcOptimized: string;
+  mcCreativity: number;
+  mcDetail: number;
+  mcSimilarity: number;
+  mcPromptStr: number;
+  mpUpscale: string;
+  mpSharpen: number;
+  mpGrain: number;
+  mpUltra: number;
+}
+
+export interface UpscaleParamPanelProps {
+  params: UpscalePanelParams;
+  onChange: (patch: Partial<UpscalePanelParams>) => void;
+  onGenerate: () => void;
+  status: string;
+  progress: number;
+  canGenerate: boolean;
+}
+
+export function UpscaleParamPanel({ params, onChange, onGenerate, status, progress, canGenerate }: UpscaleParamPanelProps) {
   const { t } = useTranslation();
-  const [engine, setEngine] = useState<'topazlabs' | 'magnific-creative' | 'magnific-precision'>('magnific-precision');
+  const isRunning = status === 'running';
+
   const [showEngineMenu, setShowEngineMenu] = useState(false);
-
-  // Topazlabs params
-  const [tlModel, setTlModel] = useState('general');
-  const [tlScale, setTlScale] = useState<2 | 4 | 6>(4);
   const [showTlModelMenu, setShowTlModelMenu] = useState(false);
-
-  // Magnific Creative params
-  const [mcUpscale, setMcUpscale] = useState<'2x' | '4x'>('2x');
-  const [mcOptimized, setMcOptimized] = useState('standard');
-  const [mcCreativity, setMcCreativity] = useState(0);
-  const [mcDetail, setMcDetail] = useState(0);
-  const [mcSimilarity, setMcSimilarity] = useState(0);
-  const [mcPromptStr, setMcPromptStr] = useState(0);
   const [showMcUpscaleMenu, setShowMcUpscaleMenu] = useState(false);
   const [showMcOptimizedMenu, setShowMcOptimizedMenu] = useState(false);
-
-  // Magnific Precision params
-  const [mpUpscale, setMpUpscale] = useState<'2x' | '4x'>('2x');
-  const [mpSharpen, setMpSharpen] = useState(7);
-  const [mpGrain, setMpGrain] = useState(7);
-  const [mpUltra, setMpUltra] = useState(30);
   const [showMpUpscaleMenu, setShowMpUpscaleMenu] = useState(false);
 
   const engineOptions = [
@@ -100,17 +108,18 @@ export function UpscaleParamPanel() {
           <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.engine')}</div>
           <button
             onClick={() => { closeAllMenus(); setShowEngineMenu(!showEngineMenu); }}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
+            disabled={isRunning}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5 disabled:opacity-40"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <span className="text-xs">▲</span>
-            {engineOptions.find((o) => o.key === engine)?.label}
+            {engineOptions.find((o) => o.key === params.engine)?.label}
             <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
           </button>
           {showEngineMenu && (
             <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
               {engineOptions.map((o) => (
-                <button key={o.key} onClick={() => { setEngine(o.key); setShowEngineMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors ${engine === o.key ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
+                <button key={o.key} onClick={() => { onChange({ engine: o.key }); setShowEngineMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors ${params.engine === o.key ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                   {o.label}
                 </button>
               ))}
@@ -119,22 +128,23 @@ export function UpscaleParamPanel() {
         </div>
 
         {/* ── Topazlabs params ── */}
-        {engine === 'topazlabs' && (
+        {params.engine === 'topazlabs' && (
           <>
             <div className="relative">
               <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.model')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowTlModelMenu(!showTlModelMenu); }}
-                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
+                disabled={isRunning}
+                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5 disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                {t(`upscale.tlModels.${tlModel}`)}
+                {t(`upscale.tlModels.${params.tlModel}`)}
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showTlModelMenu && (
                 <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
                   {tlModels.map((m) => (
-                    <button key={m} onClick={() => { setTlModel(m); setShowTlModelMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors ${tlModel === m ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
+                    <button key={m} onClick={() => { onChange({ tlModel: m }); setShowTlModelMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors ${params.tlModel === m ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                       {t(`upscale.tlModels.${m}`)}
                     </button>
                   ))}
@@ -147,9 +157,10 @@ export function UpscaleParamPanel() {
                 {[2, 4, 6].map((s) => (
                   <button
                     key={s}
-                    onClick={() => setTlScale(s as 2 | 4 | 6)}
-                    className={`flex-1 py-1.5 rounded-lg text-sm transition-colors ${tlScale === s ? 'text-white border border-white/30' : 'text-[#a0a0b0] border border-transparent hover:bg-white/5'}`}
-                    style={{ background: tlScale === s ? 'rgba(255,255,255,0.08)' : 'transparent' }}
+                    onClick={() => onChange({ tlScale: s })}
+                    disabled={isRunning}
+                    className={`flex-1 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-40 ${params.tlScale === s ? 'text-white border border-white/30' : 'text-[#a0a0b0] border border-transparent hover:bg-white/5'}`}
+                    style={{ background: params.tlScale === s ? 'rgba(255,255,255,0.08)' : 'transparent' }}
                   >
                     {s}
                   </button>
@@ -160,23 +171,24 @@ export function UpscaleParamPanel() {
         )}
 
         {/* ── Magnific Creative params ── */}
-        {engine === 'magnific-creative' && (
+        {params.engine === 'magnific-creative' && (
           <>
             <div className="relative">
               <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.upscaleFactor')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowMcUpscaleMenu(!showMcUpscaleMenu); }}
-                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
+                disabled={isRunning}
+                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5 disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                {mcUpscale}
+                {params.mcUpscale}
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showMcUpscaleMenu && (
                 <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
                   {(['2x', '4x'] as const).map((s) => (
-                    <button key={s} onClick={() => { setMcUpscale(s); setShowMcUpscaleMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${mcUpscale === s ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
-                      {mcUpscale === s && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
+                    <button key={s} onClick={() => { onChange({ mcUpscale: s }); setShowMcUpscaleMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${params.mcUpscale === s ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
+                      {params.mcUpscale === s && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
                       {s}
                     </button>
                   ))}
@@ -187,17 +199,18 @@ export function UpscaleParamPanel() {
               <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.optimizeScene')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowMcOptimizedMenu(!showMcOptimizedMenu); }}
-                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
+                disabled={isRunning}
+                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5 disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                {t(`upscale.mcOptimized.${mcOptimized}`)}
+                {t(`upscale.mcOptimized.${params.mcOptimized}`)}
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showMcOptimizedMenu && (
                 <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', maxHeight: 200, overflowY: 'auto' }}>
                   {mcOptimizedOptions.map((o) => (
-                    <button key={o} onClick={() => { setMcOptimized(o); setShowMcOptimizedMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${mcOptimized === o ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
-                      {mcOptimized === o && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
+                    <button key={o} onClick={() => { onChange({ mcOptimized: o }); setShowMcOptimizedMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${params.mcOptimized === o ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
+                      {params.mcOptimized === o && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
                       {t(`upscale.mcOptimized.${o}`)}
                     </button>
                   ))}
@@ -206,41 +219,42 @@ export function UpscaleParamPanel() {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.creativity')}</span>
-              <UpscaleSlider value={mcCreativity} min={0} max={100} onChange={setMcCreativity} />
+              <UpscaleSlider value={params.mcCreativity} min={0} max={100} onChange={(v) => onChange({ mcCreativity: v })} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.detailStrength')}</span>
-              <UpscaleSlider value={mcDetail} min={0} max={100} onChange={setMcDetail} />
+              <UpscaleSlider value={params.mcDetail} min={0} max={100} onChange={(v) => onChange({ mcDetail: v })} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.similarity')}</span>
-              <UpscaleSlider value={mcSimilarity} min={0} max={100} onChange={setMcSimilarity} />
+              <UpscaleSlider value={params.mcSimilarity} min={0} max={100} onChange={(v) => onChange({ mcSimilarity: v })} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.promptStrength')}</span>
-              <UpscaleSlider value={mcPromptStr} min={0} max={100} onChange={setMcPromptStr} />
+              <UpscaleSlider value={params.mcPromptStr} min={0} max={100} onChange={(v) => onChange({ mcPromptStr: v })} />
             </div>
           </>
         )}
 
         {/* ── Magnific Precision v2 params ── */}
-        {engine === 'magnific-precision' && (
+        {params.engine === 'magnific-precision' && (
           <>
             <div className="relative">
               <div className="text-[11px] text-[#6a6a7a] mb-1">{t('upscale.upscaleFactor')}</div>
               <button
                 onClick={() => { closeAllMenus(); setShowMpUpscaleMenu(!showMpUpscaleMenu); }}
-                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5"
+                disabled={isRunning}
+                className="w-full flex items-center px-3 py-2 rounded-lg text-left text-sm text-white transition-colors hover:bg-white/5 disabled:opacity-40"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
               >
-                {mpUpscale}
+                {params.mpUpscale}
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showMpUpscaleMenu && (
                 <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
                   {(['2x', '4x'] as const).map((s) => (
-                    <button key={s} onClick={() => { setMpUpscale(s); setShowMpUpscaleMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${mpUpscale === s ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
-                      {mpUpscale === s && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
+                    <button key={s} onClick={() => { onChange({ mpUpscale: s }); setShowMpUpscaleMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${params.mpUpscale === s ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
+                      {params.mpUpscale === s && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
                       {s}
                     </button>
                   ))}
@@ -249,15 +263,15 @@ export function UpscaleParamPanel() {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.sharpen')}</span>
-              <UpscaleSlider value={mpSharpen} min={0} max={100} onChange={setMpSharpen} />
+              <UpscaleSlider value={params.mpSharpen} min={0} max={100} onChange={(v) => onChange({ mpSharpen: v })} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.smartGrain')}</span>
-              <UpscaleSlider value={mpGrain} min={0} max={100} onChange={setMpGrain} />
+              <UpscaleSlider value={params.mpGrain} min={0} max={100} onChange={(v) => onChange({ mpGrain: v })} />
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-[#a0a0b0] w-20 flex-shrink-0">{t('upscale.ultraDetail')}</span>
-              <UpscaleSlider value={mpUltra} min={0} max={100} onChange={setMpUltra} />
+              <UpscaleSlider value={params.mpUltra} min={0} max={100} onChange={(v) => onChange({ mpUltra: v })} />
             </div>
           </>
         )}
@@ -269,12 +283,24 @@ export function UpscaleParamPanel() {
           <Zap className="w-3 h-3" />
           <span className="text-xs">8</span>
         </div>
+        {isRunning && (
+          <div className="flex items-center gap-1.5 mr-1">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: '#00d4ff' }} />
+            <span className="text-xs text-[#a0a0b0]">{progress}%</span>
+          </div>
+        )}
         <button
-          className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/20"
+          onClick={onGenerate}
+          disabled={!canGenerate || isRunning}
+          className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.9)' }}
-          title={t('common.generate')}
+          title={canGenerate ? t('upscale.generate') : t('upscale.connectImageFirst')}
         >
-          <ArrowUp className="w-4 h-4 text-black" />
+          {isRunning ? (
+            <Loader2 className="w-4 h-4 text-black animate-spin" />
+          ) : (
+            <ArrowUp className="w-4 h-4 text-black" />
+          )}
         </button>
       </div>
     </div>

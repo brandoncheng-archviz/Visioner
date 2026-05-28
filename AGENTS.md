@@ -95,7 +95,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~946 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~952 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -115,12 +115,12 @@ app/
 
 **Source file counts (actual):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 63 files (components, nodes, sunSky, types, constants, utils, hooks)
-- `src/` total: 144 source files (`.ts` + `.tsx`)
+- `src/features/canvas/`: 62 files (components, nodes, sunSky, types, constants, utils, hooks)
+- `src/` total: 141 TypeScript / TSX source files; 144 total files under `src/`
 
 **Key file sizes (approximate):**
-- `CanvasPage.tsx`: ~946 lines (page entry + core state container)
-- `ImageNode.tsx`: ~818 lines
+- `CanvasPage.tsx`: ~952 lines (page entry + core state container)
+- `ImageNode.tsx`: ~821 lines
 - `ImageNodeControlPanel.tsx`: ~1,484 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
 - `PresetPickerModal.tsx`: ~621 lines
@@ -201,7 +201,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~946 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~952 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper
@@ -298,7 +298,7 @@ The app uses `react-i18next` with two locale files:
 - `zh-CN.ts` — Default language (简体中文)
 - `en-US.ts` — Fallback language
 
-Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`, `sunSky`).
+Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`).
 
 ### Data Layer (`src/data/siteData.ts`)
 

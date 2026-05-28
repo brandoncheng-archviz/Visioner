@@ -516,6 +516,41 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
   const isOnlySelected = selected && selectedNodeCount === 1;
 
+  const handleUpscale = useCallback(() => {
+    let imageUrl = '';
+    let imgWidth = sourceWidth;
+    let imgHeight = sourceHeight;
+
+    if (currentResultId) {
+      const result = generatedImages.find((g) => g.resultId === currentResultId);
+      if (result?.imageUrl) {
+        imageUrl = result.imageUrl;
+        imgWidth = result.width || sourceWidth;
+        imgHeight = result.height || sourceHeight;
+      }
+    }
+
+    if (!imageUrl && generatedImages.length > 0) {
+      const latest = generatedImages[generatedImages.length - 1];
+      imageUrl = latest.imageUrl;
+      imgWidth = latest.width || sourceWidth;
+      imgHeight = latest.height || sourceHeight;
+    }
+
+    if (!imageUrl) {
+      imageUrl = previewImage || currentImage || inputImage || '';
+    }
+
+    if (!imageUrl) {
+      showToast(t('imageNode.noImageForUpscale'));
+      return;
+    }
+
+    const onCreateUpscaleNode = data.onCreateUpscaleNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
+    if (!onCreateUpscaleNode) return;
+    onCreateUpscaleNode(id, imageUrl, imgWidth, imgHeight);
+  }, [currentResultId, generatedImages, previewImage, currentImage, inputImage, sourceWidth, sourceHeight, id, data, showToast, t]);
+
   // Global Ctrl+G / Cmd+G shortcut for generation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -536,7 +571,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {/* Toolbar — shown above title when image exists and node is selected */}
       {displayImage && isOnlySelected && (
         <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
-          <ImageToolbar onFullscreen={() => setShowPreview(true)} />
+          <ImageToolbar onFullscreen={() => setShowPreview(true)} onUpscale={handleUpscale} hasImage={!!displayImage} />
         </div>
       )}
 

@@ -27,7 +27,7 @@ function createDefaultSunSkyData(): SunSkyNodeData {
 
 function normalizeSun(sun: Partial<SunSkyNodeData['sun']>): SunSkyNodeData['sun'] {
   return {
-    elevation: snapToStep(clamp(sun.elevation ?? 12, 3, 90), 3),
+    elevation: snapToStep(clamp(sun.elevation ?? 12, 0, 90), 3),
     azimuth: snapToStep(clampDisplayAzimuth(sun.azimuth ?? 55), 5),
   };
 }
@@ -195,7 +195,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
                 <Sun className="h-5 w-5" style={{ color: '#f59e0b' }} />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-[17px] font-semibold leading-none text-white/90">光影 / Light & Shadow</div>
+                <div className="truncate text-[17px] font-semibold leading-none text-white/90">光影预览 / Light Preview</div>
                 <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] text-white/42">
                   <span className="truncate">{derived.timeLabel}</span>
                   <span className="h-1 w-1 rounded-full bg-white/20" />
@@ -207,7 +207,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
               <button
                 type="button"
                 className="nodrag nowheel flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-white/[0.07] hover:text-white/78"
-                title="重置光影"
+                title="重置光影预览"
                 onPointerDown={stopControlEvent}
                 onClick={(event) => {
                   stopControlEvent(event);
@@ -228,7 +228,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
           {/* Content */}
           <div className="flex flex-col gap-3.5 px-3.5 pb-3.5">
             {/* Preview */}
-            <SunSkyNodePreview imagePath={derived.previewImagePath} />
+            <SunSkyNodePreview imagePath={derived.previewImagePath} elevation={elevation} azimuth={azimuth} />
 
             {/* Controls */}
             <SunSkyNodeControls

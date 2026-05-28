@@ -1,16 +1,23 @@
 import { useEffect, useState } from 'react';
+import { preloadNearbySunSkyImages } from './getSunSkyPreviewImage';
 
 export interface SunSkyNodePreviewProps {
   imagePath: string;
+  elevation: number;
+  azimuth: number;
   height?: number;
 }
 
-export function SunSkyNodePreview({ imagePath, height = 210 }: SunSkyNodePreviewProps) {
+export function SunSkyNodePreview({ imagePath, elevation, azimuth, height = 210 }: SunSkyNodePreviewProps) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
     setError(false);
   }, [imagePath]);
+
+  useEffect(() => {
+    preloadNearbySunSkyImages({ elevation, azimuth });
+  }, [elevation, azimuth]);
 
   if (error) {
     return (

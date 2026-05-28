@@ -17,6 +17,18 @@ interface ElevationKeyframe {
 
 const KEYFRAMES: ElevationKeyframe[] = [
   {
+    elevation: 0,
+    timeLabel: '日出/日落边缘',
+    skyTopColor: '#5E738A',
+    skyHorizonColor: '#F09B52',
+    sunColor: '#FFB35A',
+    colorTemp: 2700,
+    sunIntensity: 0.92,
+    shadowLengthScale: 1,
+    shadowBlur: 18,
+    shadowOpacity: 0.46,
+  },
+  {
     elevation: 3,
     timeLabel: '日出/日落边缘',
     skyTopColor: '#74879A',
@@ -292,7 +304,7 @@ export interface ResolveSunSkyInput {
 }
 
 export function resolveSunSkyDerived(input?: ResolveSunSkyInput): SunSkyNodeDerived {
-  const elevation = snapToStep(clamp(input?.elevation ?? 12, 3, 90), 3);
+  const elevation = snapToStep(clamp(input?.elevation ?? 12, 0, 90), 3);
   const azimuth = snapToStep(clamp(input?.azimuth ?? 55, 0, 360), 5);
   const mathAzimuth = normalizeAzimuthForMath(azimuth);
 
