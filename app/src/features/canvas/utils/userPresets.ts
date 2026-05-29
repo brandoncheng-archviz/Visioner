@@ -20,7 +20,7 @@ function createUserPreset(draft: UserPresetDraft): PresetItem {
   return {
     id: draft.id || `user_preset_${Date.now()}`,
     name: draft.name.trim(),
-    tabs: ['我的常用'],
+    tabs: ['我的收藏'],
     category: 'mine',
     owner: 'user',
     group: 'user_custom',
@@ -50,7 +50,7 @@ export function loadUserPresets(): PresetItem[] {
       .filter((preset) => preset && preset.owner === 'user' && typeof preset.promptTemplate === 'string')
       .map((preset) => ({
         ...preset,
-        tabs: ['我的常用'],
+        tabs: ['我的收藏'],
         category: 'mine',
         owner: 'user',
         group: 'user_custom',

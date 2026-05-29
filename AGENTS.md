@@ -34,6 +34,7 @@ Additional notable dependencies:
 - **date-fns + react-day-picker** — Date handling and calendar UI.
 - **vaul** — Drawer component primitives.
 - **input-otp** — OTP input component.
+- **react-router** — Also listed in dependencies (used alongside react-router-dom).
 
 Dev dependencies:
 
@@ -54,7 +55,9 @@ app/
 │   └── assets/
 │       ├── examples/home/   # Home page banner images
 │       ├── mock/generation-results/  # Mock AI generation result images
-│       └── presets/         # Preset thumbnail images
+│       ├── presets/         # Preset thumbnail images (realism, season, time, weather)
+│       ├── styles/          # Style cover images (binyan, luxigon, mir)
+│       └── sun-sky/matrix-preview/  # SunSky lighting preview matrix (136 images)
 ├── src/
 │   ├── components/
 │   │   ├── ui/              # shadcn/ui components (53 primitives)
@@ -96,7 +99,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,183 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,184 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -111,7 +114,9 @@ app/
 ├── tsconfig.app.json        # Strict TypeScript: noUnusedLocals, noUnusedParameters, verbatimModuleSyntax
 ├── tsconfig.node.json       # Node-side config for Vite
 ├── eslint.config.js         # ESLint flat config: TS + react-hooks + react-refresh
-└── postcss.config.js        # Tailwind + autoprefixer
+├── postcss.config.js        # Tailwind + autoprefixer
+├── info.md                  # Setup notes (Tailwind + shadcn component list)
+└── index.html               # App entry HTML (title: "Visioner")
 ```
 
 **Source file counts (actual):**
@@ -120,15 +125,15 @@ app/
 - `src/` total: 146 TypeScript / TSX source files; 152 total files under `src/`
 
 **Key file sizes (approximate):**
-- `CanvasPage.tsx`: ~1,183 lines (page entry + core state container)
+- `CanvasPage.tsx`: ~1,184 lines (page entry + core state container)
 - `ImageNode.tsx`: ~880 lines
 - `ImageNodeControlPanel.tsx`: ~1,484 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
-- `PresetPickerModal.tsx`: ~621 lines
-- `presets.ts`: ~941 lines
+- `PresetPickerModal.tsx`: ~630 lines
+- `presets.ts`: ~1,267 lines
 - `CompareNode.tsx`: ~565 lines
-- `UpscaleNode.tsx`: ~545 lines
-- `UpscaleParamPanel.tsx`: ~308 lines
+- `UpscaleNode.tsx`: ~642 lines
+- `UpscaleParamPanel.tsx`: ~309 lines
 - `nodeSystem.ts`: ~319 lines
 
 ---
@@ -204,7 +209,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,183 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,184 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper
@@ -228,6 +233,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 
 **Node components (`src/features/canvas/nodes/`):**
 - `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
+  - `ImageNode.tsx`, `ImageNodeControlPanel.tsx`, `index.ts`
 - `VideoNode.tsx`
 - `TextNode.tsx`
 - `AudioNode.tsx`
@@ -236,6 +242,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `UpscaleNode.tsx`
 - `CompareNode.tsx` — Side-by-side image comparison with draggable slider
 - `SunSkyNode/` — SunSky lighting analysis node (preview, controls, derived info)
+  - `SunSkyNode.tsx`, `SunSkyNodeControls.tsx`, `SunSkyNodeInfo.tsx`, `SunSkyNodePreview.tsx`, `getSunSkyPreviewImage.ts`, `index.ts`, `resolveSunSkyDerived.ts`, `sunSkyNode.types.ts`, `sunSkyNode.utils.ts`
 
 **SunSky subsystem (`src/features/canvas/sunSky/`):**
 A dedicated feature module for solar and sky lighting analysis, consumed by `SunSkyNode`. It includes:

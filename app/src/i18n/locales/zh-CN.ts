@@ -226,10 +226,10 @@ const zhCN = {
 
   preset: {
     tabs: {
-      common: "我的常用",
+      common: "我的收藏",
       realism: "变真实",
       mood: "换氛围",
-      my: "我的常用",
+      my: "我的收藏",
       style: "风格",
     },
     noCustomPresets: "暂无自定义预设",

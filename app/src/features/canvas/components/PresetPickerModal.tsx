@@ -15,6 +15,7 @@ import {
 } from '../utils/userPresets';
 
 const FAVORITES_STORAGE_KEY = 'visioner_preset_favorites';
+const HIDDEN_COMMON_STORAGE_KEY = 'visioner_hidden_common_presets';
 type PresetTab = (typeof PRESET_TABS)[number];
 
 function loadUserFavorites(): Set<string> {
@@ -31,14 +32,27 @@ function saveUserFavorites(favorites: Set<string>) {
   } catch { /* ignore */ }
 }
 
+function loadHiddenCommonPresets(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_COMMON_STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+function saveHiddenCommonPresets(hiddenPresets: Set<string>) {
+  try {
+    localStorage.setItem(HIDDEN_COMMON_STORAGE_KEY, JSON.stringify(Array.from(hiddenPresets)));
+  } catch { /* ignore */ }
+}
+
 const PRESET_TAB_HINTS: Record<PresetTab, string> = {
-  我的常用: '显示你收藏或常用的预设，选择规则沿用其原始分类。',
+  我的收藏: '显示系统推荐、你收藏的系统预设，以及你添加的自定义预设。',
   真实增强: '提升画面真实度、材质、曝光和成片质量，适合从草图、白模或初稿进入高质量表达。',
   光照氛围: '调整时间、天气、季节、亮度和空气感，控制画面的光影关系与情绪基调。',
   镜头视角: '切换观察角度或镜头距离，用于强调体块、细节、活动、配景或总图关系。',
   建筑表达: '转换表达方式，例如展板、轴测、蓝图、草图、Logo 或样机化呈现。',
   场景配景: '添加或优化人物、车辆、植物、鸟类等配景元素，增强尺度感和场景完整度。',
-  风格状态: '改变画面状态或项目语境，例如清理画面、废弃感、未完成状态等。',
 };
 
 const SELECTED_PRESET_GROUP_ORDER: Record<string, number> = {
@@ -75,8 +89,9 @@ export function PresetPickerModal({
   onClose: () => void;
 }) {
   const [draftPresetIds, setDraftPresetIds] = useState<string[]>(selectedPresetIds);
-  const [activeTab, setActiveTab] = useState<PresetTab>('我的常用');
+  const [activeTab, setActiveTab] = useState<PresetTab>('我的收藏');
   const [userFavorites, setUserFavorites] = useState<Set<string>>(() => loadUserFavorites());
+  const [hiddenCommonPresets, setHiddenCommonPresets] = useState<Set<string>>(() => loadHiddenCommonPresets());
   const [userPresets, setUserPresets] = useState<PresetItem[]>(() => loadUserPresets());
   const [focusedPresetId, setFocusedPresetId] = useState<string | null>(null);
   const [editingPreset, setEditingPreset] = useState<PresetItem | null>(null);
@@ -176,6 +191,15 @@ export function PresetPickerModal({
     event.target.value = '';
   }, []);
 
+  const isDraftSelected = useCallback((presetId: string) => draftPresetIds.includes(presetId), [draftPresetIds]);
+  const isFavorite = useCallback(
+    (preset: PresetItem) =>
+      userFavorites.has(preset.id) ||
+      Boolean(preset.userFavorite) ||
+      (Boolean(preset.recommendedInCommon) && !hiddenCommonPresets.has(preset.id)),
+    [hiddenCommonPresets, userFavorites],
+  );
+
   const toggleFavorite = useCallback((presetId: string) => {
     const userPreset = userPresets.find((preset) => preset.id === presetId);
     if (userPreset) {
@@ -195,6 +219,30 @@ export function PresetPickerModal({
       return;
     }
 
+    const preset = allPresets.find((item) => item.id === presetId);
+    if (preset?.recommendedInCommon) {
+      const currentlyFavorite = isFavorite(preset);
+      setHiddenCommonPresets((prev) => {
+        const next = new Set(prev);
+        if (currentlyFavorite) {
+          next.add(presetId);
+        } else {
+          next.delete(presetId);
+        }
+        saveHiddenCommonPresets(next);
+        return next;
+      });
+      if (userFavorites.has(presetId)) {
+        setUserFavorites((prev) => {
+          const next = new Set(prev);
+          next.delete(presetId);
+          saveUserFavorites(next);
+          return next;
+        });
+      }
+      return;
+    }
+
     setUserFavorites((prev) => {
       const next = new Set(prev);
       if (next.has(presetId)) {
@@ -205,10 +253,7 @@ export function PresetPickerModal({
       saveUserFavorites(next);
       return next;
     });
-  }, [userPresets]);
-
-  const isDraftSelected = useCallback((presetId: string) => draftPresetIds.includes(presetId), [draftPresetIds]);
-  const isFavorite = useCallback((preset: PresetItem) => userFavorites.has(preset.id) || Boolean(preset.userFavorite), [userFavorites]);
+  }, [allPresets, isFavorite, userFavorites, userPresets]);
 
   const selectPreset = useCallback((presetId: string) => {
     setDraftPresetIds((prev) => togglePresetSelection(prev, presetId));
@@ -216,8 +261,12 @@ export function PresetPickerModal({
   }, []);
 
   const visiblePresets = useMemo(() => {
-    if (activeTab === '我的常用') {
-      return allPresets.filter((preset) => preset.owner === 'user' || userFavorites.has(preset.id) || Boolean(preset.userFavorite));
+    if (activeTab === '我的收藏') {
+      return allPresets.filter(
+        (preset) =>
+          preset.owner === 'user' ||
+          isFavorite(preset),
+      );
     }
 
     return allPresets.filter((preset) => {
@@ -225,7 +274,7 @@ export function PresetPickerModal({
       if (preset.category === 'style') return false;
       return preset.tabs.includes(activeTab);
     });
-  }, [activeTab, allPresets, userFavorites]);
+  }, [activeTab, allPresets, isFavorite]);
 
   const detailPreset = useMemo(() => {
     if (!focusedPresetId) return null;
@@ -310,7 +359,7 @@ export function PresetPickerModal({
               background: favorite ? 'rgba(245,158,11,0.85)' : 'rgba(0,0,0,0.35)',
               color: favorite ? '#fff' : 'rgba(255,255,255,0.7)',
             }}
-            title={favorite ? '点击移出常用' : '点击加入常用'}
+            title={favorite ? '点击取消收藏' : '点击加入收藏'}
             onClick={(e) => { e.stopPropagation(); toggleFavorite(preset.id); }}
           >
             <Star className="h-3 w-3" fill={favorite ? 'currentColor' : 'none'} />
@@ -366,7 +415,7 @@ export function PresetPickerModal({
           <div>
             <div className="text-[16px] font-semibold text-white/92">选择预设</div>
             <div className="mt-1 text-[12px]" style={{ color: 'rgba(255,255,255,0.48)' }}>
-              预设会在生成时转化为提示词增强规则，帮助你快速获得理想效果。
+              选择快捷预设，自动补充生成指令，快速调整画面效果。
             </div>
           </div>
           <button
@@ -432,11 +481,11 @@ export function PresetPickerModal({
 
             {/* Cards area */}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
-              {activeTab === '我的常用' ? (
+              {activeTab === '我的收藏' ? (
                 visiblePresets.length === 0 ? (
                   <div className="flex min-h-[360px] flex-col items-center justify-center text-center">
                     <Bookmark className="mb-3 h-10 w-10 text-white/10" />
-                    <div className="text-[13px] font-medium text-white/42">还没有常用预设</div>
+                    <div className="text-[13px] font-medium text-white/42">还没有收藏预设</div>
                     <div className="mt-1 text-[11px] text-white/28">点击预设右上角的星标，或添加自己的预设。</div>
                     <button
                       type="button"
@@ -459,7 +508,7 @@ export function PresetPickerModal({
                     >
                       <Plus className="mb-2 h-5 w-5" />
                       <span className="text-[13px] font-medium">添加预设</span>
-                      <span className="mt-1 text-[11px] text-white/30">保存常用提示词模板</span>
+                      <span className="mt-1 text-[11px] text-white/30">保存收藏提示词模板</span>
                     </button>
                   </div>
                 )
@@ -539,7 +588,7 @@ export function PresetPickerModal({
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-[16px] font-semibold text-white/92">{editingPreset ? '编辑预设' : '添加预设'}</div>
-                <div className="mt-1 text-[12px] text-white/42">保存一个常用提示词增强模板。</div>
+                <div className="mt-1 text-[12px] text-white/42">保存一个收藏提示词增强模板。</div>
               </div>
               <button
                 type="button"

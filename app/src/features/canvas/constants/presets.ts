@@ -2,13 +2,12 @@ import type { PresetItem, StyleDefinition } from '../types/imageNode.types';
 import { getUserPresetById } from '../utils/userPresets';
 
 export const PRESET_TABS = [
-  '我的常用',
+  '我的收藏',
   '真实增强',
   '光照氛围',
   '镜头视角',
   '建筑表达',
   '场景配景',
-  '风格状态',
 ] as const;
 
 export const MAX_MULTI_PRESETS_BY_GROUP: Partial<Record<PresetItem['group'], number>> = {
@@ -55,7 +54,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ['照片', '真实', '写实'],
-    thumbnail: '/assets/presets/realism/photo-realistic.jpg',
+    thumbnail: '/assets/presets/prompt/photo-realistic.webp',
   },
   {
     id: 'artistic_realism',
@@ -88,7 +87,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ['艺术化', '高级表达', '空间情绪'],
-    thumbnail: '/assets/presets/realism/artistic-realism.jpg',
+    thumbnail: '/assets/presets/prompt/artistic-realism.webp',
   },
   {
     id: 'cinematic_narrative',
@@ -121,7 +120,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ['电影感', '叙事', '光影'],
-    thumbnail: '/assets/presets/realism/cinematic-narrative.jpg',
+    thumbnail: '/assets/presets/prompt/cinematic-narrative.webp',
   },
 
   // ── 新增：真实增强 ──
@@ -152,6 +151,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["渲染", "白模", "视口"],
+    thumbnail: '/assets/presets/prompt/view-to-render.webp',
   },
 
   {
@@ -182,6 +182,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["真实", "光影", "材质"],
+    thumbnail: '/assets/presets/prompt/add-realism.webp',
   },
 
   {
@@ -211,6 +212,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["夜景", "灯光", "月光"],
+    thumbnail: '/assets/presets/prompt/night.webp',
   },
 
   {
@@ -241,6 +243,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["雨天", "湿地", "反射"],
+    thumbnail: '/assets/presets/prompt/rain.webp',
   },
 
   {
@@ -270,6 +273,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["微距", "材质", "细节"],
+    thumbnail: '/assets/presets/prompt/macro-closeup.webp',
   },
 
   {
@@ -299,6 +303,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["活动", "人物", "近景"],
+    thumbnail: '/assets/presets/prompt/activity-closeup.webp',
   },
 
   {
@@ -328,6 +333,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["物体", "家具", "细节"],
+    thumbnail: '/assets/presets/prompt/object-closeup.webp',
   },
 
   {
@@ -356,6 +362,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["动物", "自然", "近景"],
+    thumbnail: '/assets/presets/prompt/animal-closeup.webp',
   },
 
   {
@@ -385,6 +392,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["情绪板", "材料", "色彩"],
+    thumbnail: '/assets/presets/prompt/moodboard.webp',
   },
 
   {
@@ -414,6 +422,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["设计板", "汇报", "作品集"],
+    thumbnail: '/assets/presets/prompt/design-board.webp',
   },
 
   {
@@ -442,6 +451,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["蓝图", "图纸", "线稿"],
+    thumbnail: '/assets/presets/prompt/blueprints.webp',
   },
 
   {
@@ -471,6 +481,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["轴测", "剖切", "空间"],
+    thumbnail: '/assets/presets/prompt/axonometry.webp',
   },
 
   {
@@ -498,35 +509,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["清理", "修复", "干净"],
-  },
-
-  {
-    id: "abandoned",
-    name: "废弃氛围",
-    title: "废弃氛围",
-    tabs: ["风格状态"],
-    category: "mood",
-    group: "style_state",
-    selectType: "multi",
-    selectionMode: "multi",
-    owner: "system",
-    presetType: "modifier",
-    shortDescription: "旧化 / 破败 / 荒废",
-    description: "将场景转换为废弃、老化、破败建筑氛围。",
-    shortHelp: "适合表达时间痕迹、破败叙事和特殊概念氛围。",
-    promptTemplate: {
-      goal: "在保留原始结构和构图的前提下，为场景加入真实的老化、破败和废弃氛围。",
-      image: "保留建筑主体、空间布局、体块关系和相机角度，让破败效果附着在原设计上。",
-      material: "增加污垢堆积、污渍、裂缝、剥落表面、磨损边缘、材料损坏、褪色、灰尘和风化痕迹。",
-      vegetation: "可加入少量荒草、藤蔓或自然侵入的植物，但不要完全遮挡建筑。",
-      color: "色彩偏低饱和、灰暗、旧化，可带有潮湿、褪色或自然风化的色调。",
-      atmosphere: "营造被忽视、荒废、时间流逝和轻微衰败的建筑叙事氛围。",
-      output: "输出为真实可信的废弃建筑可视化图像。",
-      constraints: "不要摧毁建筑主体，不要让空间布局不可读，不要变成灾难场景，不要加入过度恐怖或奇幻元素。",
-    },
-    recommendedInCommon: false,
-    userFavorite: false,
-    tags: ["废弃", "旧化", "破败"],
+    thumbnail: '/assets/presets/prompt/clean-up.webp',
   },
 
   {
@@ -554,6 +537,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["航拍", "鸟瞰", "场地"],
+    thumbnail: '/assets/presets/prompt/drone-view.webp',
   },
 
   {
@@ -583,6 +567,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["施工", "毛坯", "未完成"],
+    thumbnail: '/assets/presets/prompt/unfinished.webp',
   },
 
   {
@@ -612,6 +597,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["照明", "灯光", "LED"],
+    thumbnail: '/assets/presets/prompt/artificial-light.webp',
   },
 
   {
@@ -641,6 +627,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["白天", "日光", "转换"],
+    thumbnail: '/assets/presets/prompt/night-to-day.webp',
   },
 
   {
@@ -670,6 +657,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["黄金时刻", "黄昏", "暖光"],
+    thumbnail: '/assets/presets/prompt/golden-hour.webp',
   },
 
   {
@@ -698,6 +686,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["提亮", "曝光", "清晰"],
+    thumbnail: '/assets/presets/prompt/make-brighter.webp',
   },
 
   {
@@ -726,6 +715,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["人物", "尺度", "生活感"],
+    thumbnail: '/assets/presets/prompt/add-people.webp',
   },
 
   {
@@ -754,6 +744,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["人物", "模糊", "动态"],
+    thumbnail: '/assets/presets/prompt/blurred-people.webp',
   },
 
   {
@@ -782,6 +773,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["车辆", "尺度", "街景"],
+    thumbnail: '/assets/presets/prompt/add-cars.webp',
   },
 
   {
@@ -810,6 +802,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["车辆", "模糊", "动态"],
+    thumbnail: '/assets/presets/prompt/blurred-cars.webp',
   },
 
   {
@@ -840,6 +833,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["秋季", "落叶", "暖棕"],
+    thumbnail: '/assets/presets/prompt/autumn.webp',
   },
 
   {
@@ -871,6 +865,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["冬季", "雪", "冷色"],
+    thumbnail: '/assets/presets/prompt/winter.webp',
   },
 
   {
@@ -900,6 +895,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["雾气", "空气感", "层次"],
+    thumbnail: '/assets/presets/prompt/fog.webp',
   },
 
   {
@@ -928,6 +924,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["体积光", "光束", "空气"],
+    thumbnail: '/assets/presets/prompt/volumetric.webp',
   },
 
   {
@@ -955,6 +952,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["飞鸟", "天空", "自然"],
+    thumbnail: '/assets/presets/prompt/add-birds.webp',
   },
 
   {
@@ -983,6 +981,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["花卉", "花境", "景观"],
+    thumbnail: '/assets/presets/prompt/add-flowers.webp',
   },
 
   {
@@ -1011,6 +1010,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["草地", "地被", "景观"],
+    thumbnail: '/assets/presets/prompt/add-grass.webp',
   },
 
   {
@@ -1040,6 +1040,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: true,
     userFavorite: false,
     tags: ["树木", "绿化", "景观"],
+    thumbnail: '/assets/presets/prompt/add-trees.webp',
   },
 
   {
@@ -1067,6 +1068,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["标志", "品牌", "图形"],
+    thumbnail: '/assets/presets/prompt/logo.webp',
   },
 
   {
@@ -1096,6 +1098,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["模型", "mockup", "展示"],
+    thumbnail: '/assets/presets/prompt/mockup.webp',
   },
 
   {
@@ -1124,6 +1127,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["草图", "线稿", "手绘"],
+    thumbnail: '/assets/presets/prompt/make-sketch.webp',
   },
 
   {
@@ -1151,6 +1155,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["侧视", "视角", "立面"],
+    thumbnail: '/assets/presets/prompt/side-view.webp',
   },
 
   {
@@ -1178,6 +1183,7 @@ export const PRESET_DATA: PresetItem[] = [
     recommendedInCommon: false,
     userFavorite: false,
     tags: ["顶视", "俯视", "总平"],
+    thumbnail: '/assets/presets/prompt/top-view.webp',
   },
 ];
 

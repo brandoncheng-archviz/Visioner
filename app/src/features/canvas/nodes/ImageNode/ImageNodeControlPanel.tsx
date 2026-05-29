@@ -123,6 +123,7 @@ export function ImageNodeControlPanel({
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const pendingCustomInputRef = useRef<HTMLInputElement>(null);
   const pendingUsageMenuRef = useRef<HTMLDivElement>(null);
+  const slashMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const customUsageSuggestions = ['\u94fa\u88c5\u53c2\u8003', '\u6c34\u666f\u53c2\u8003', '\u7acb\u9762\u706f\u5149', '\u5ba4\u5185\u5bb6\u5177'];
   const customUsagePlaceholderProps: Record<string, string> = { placeholder: '\u8f93\u5165\u81ea\u5b9a\u4e49\u7528\u9014' };
@@ -319,6 +320,14 @@ export function ImageNodeControlPanel({
     [selectedPresets],
   );
   const selectedPresetCount = selectedPresetItems.length;
+
+  const getSlashPresetName = (preset: PresetItem) =>
+    t(`preset.${preset.id}.name`, { defaultValue: preset.title || preset.name });
+
+  const getSlashPresetDescription = (preset: PresetItem) =>
+    t(`preset.${preset.id}.shortDescription`, {
+      defaultValue: preset.shortDescription || preset.description || '',
+    });
 
   const removeSelectedPreset = useCallback((presetId: string) => {
     onPresetsChange(selectedPresets.filter((id) => id !== presetId));
@@ -656,6 +665,24 @@ export function ImageNodeControlPanel({
     setSlashQuery('');
     setSlashIndex(0);
   };
+
+  useEffect(() => {
+    if (!showSlashMenu) return;
+
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (slashMenuRef.current?.contains(target)) {
+        return;
+      }
+      closeSlashMenu();
+    };
+
+    document.addEventListener('pointerdown', closeOnOutside, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside, true);
+    };
+  }, [showSlashMenu]);
 
   const insertSlashPreset = (presetId: string) => {
     selectPreset(presetId);
@@ -1147,6 +1174,7 @@ export function ImageNodeControlPanel({
           {/* Slash menu */}
           {showSlashMenu && (
             <div
+              ref={slashMenuRef}
               className="absolute left-0 z-40 overflow-hidden rounded-xl py-1"
               style={{
                 top: 0,
@@ -1170,8 +1198,8 @@ export function ImageNodeControlPanel({
                     onMouseEnter={() => setSlashIndex(index)}
                     className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left transition-colors ${index === slashIndex ? 'bg-white/8' : 'hover:bg-white/5'}`}
                   >
-                    <span className="text-[13px] text-white/90">{t(`preset.${preset.id}.name`)}</span>
-                    <span className="text-[11px] text-white/40">{t(`preset.${preset.id}.shortDescription`)}</span>
+                    <span className="text-[13px] text-white/90">{getSlashPresetName(preset)}</span>
+                    <span className="text-[11px] text-white/40">{getSlashPresetDescription(preset)}</span>
                   </button>
                 ));
               })()}
