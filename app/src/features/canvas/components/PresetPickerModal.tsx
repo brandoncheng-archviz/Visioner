@@ -5,7 +5,7 @@ import { X, Check, Star, Bookmark, Plus, Pencil } from 'lucide-react';
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../constants/canvasConstants';
 import { PRESET_DATA, PRESET_TABS, getPresetById } from '../constants/presets';
 import { CustomPresetFallbackCover } from './CustomPresetFallbackCover';
-import type { PresetItem, PresetTab } from '../types/imageNode.types';
+import type { PresetItem } from '../types/imageNode.types';
 import { normalizePresetSelection, togglePresetSelection } from '../utils/presetSelection';
 import {
   deleteUserPreset,
@@ -15,6 +15,7 @@ import {
 } from '../utils/userPresets';
 
 const FAVORITES_STORAGE_KEY = 'visioner_preset_favorites';
+type PresetTab = (typeof PRESET_TABS)[number];
 
 function loadUserFavorites(): Set<string> {
   try {
@@ -32,18 +33,26 @@ function saveUserFavorites(favorites: Set<string>) {
 
 const PRESET_TAB_HINTS: Record<PresetTab, string> = {
   我的常用: '显示你收藏或常用的预设，选择规则沿用其原始分类。',
-  变真实: '提升画面真实度、材质、曝光和成片质量。',
-  变时段: '选择一天中的时间段，控制光线方向、色温和整体时间氛围。同一时间最多选择一项。',
-  变天气: '选择天气与空气状态，控制天空、地面湿润感、能见度和整体空气氛围。同一时间最多选择一项。',
-  变季节: '选择季节气质，控制植物状态、色彩倾向和环境季节感。同一时间最多选择一项。',
+  真实增强: '提升画面真实度、材质、曝光和成片质量，适合从草图、白模或初稿进入高质量表达。',
+  光照氛围: '调整时间、天气、季节、亮度和空气感，控制画面的光影关系与情绪基调。',
+  镜头视角: '切换观察角度或镜头距离，用于强调体块、细节、活动、配景或总图关系。',
+  建筑表达: '转换表达方式，例如展板、轴测、蓝图、草图、Logo 或样机化呈现。',
+  场景配景: '添加或优化人物、车辆、植物、鸟类等配景元素，增强尺度感和场景完整度。',
+  风格状态: '改变画面状态或项目语境，例如清理画面、废弃感、未完成状态等。',
 };
 
 const SELECTED_PRESET_GROUP_ORDER: Record<string, number> = {
   realism_mode: 0,
-  time: 1,
-  weather: 2,
-  season: 3,
-  user_custom: 4,
+  enhancement: 1,
+  lighting_atmosphere: 2,
+  camera_view: 3,
+  architectural_representation: 4,
+  style_state: 5,
+  entourage_elements: 6,
+  time: 7,
+  weather: 8,
+  season: 9,
+  user_custom: 10,
 };
 
 function getPresetName(preset: PresetItem): string {
@@ -254,7 +263,7 @@ export function PresetPickerModal({
     const thumbnail = preset.thumbnail?.trim();
     const sourcePresetThumbnail = preset.sourcePresetThumbnail?.trim();
     const showSourceThumbnail = preset.owner === 'user' && !thumbnail && Boolean(sourcePresetThumbnail);
-    const shouldShowFallbackCover = preset.owner === 'user' && !thumbnail && !sourcePresetThumbnail;
+    const shouldShowFallbackCover = !thumbnail && !sourcePresetThumbnail;
     return (
       <button
         key={preset.id}

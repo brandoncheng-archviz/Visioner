@@ -55,8 +55,6 @@ export interface PresetItem {
   sourcePresetThumbnail?: string;
 }
 
-export type PresetTab = '我的常用' | '变真实' | '变时段' | '变天气' | '变季节';
-
 export type StylePromptTemplate = {
   styleCore: string;
   color: string;

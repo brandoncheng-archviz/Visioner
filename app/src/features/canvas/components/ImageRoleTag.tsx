@@ -23,6 +23,7 @@ export function ImageRoleTag({
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
+  const [isTagHovered, setIsTagHovered] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const customInputRef = useRef<HTMLInputElement>(null);
@@ -91,7 +92,7 @@ export function ImageRoleTag({
     <div
       ref={rootRef}
       className="absolute z-30 nodrag nowheel"
-      style={{ top: 8, left: 8 }}
+      style={{ top: 9, left: 9 }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
@@ -99,19 +100,21 @@ export function ImageRoleTag({
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="image-role-tag-button flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors"
+          onMouseEnter={() => setIsTagHovered(true)}
+          onMouseLeave={() => setIsTagHovered(false)}
+          className="image-role-tag-button flex h-6 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium transition-all"
           style={{
-            background: selectedOption ? 'rgba(27, 36, 52, 0.82)' : 'rgba(20, 22, 28, 0.78)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: `1px solid ${selectedOption ? selectedOption.color : 'rgba(255,255,255,0.2)'}`,
-            color: selectedOption ? '#eaf7ff' : 'rgba(255,255,255,0.8)',
-            boxShadow: selectedOption ? '0 0 0 1px rgba(0,212,255,0.08), 0 10px 24px rgba(0,0,0,0.34)' : '0 8px 18px rgba(0,0,0,0.28)',
+            background: isTagHovered ? 'rgba(30, 41, 59, 0.86)' : 'rgba(15, 23, 42, 0.72)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            border: `1px solid ${isTagHovered ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.12)'}`,
+            color: 'rgba(255,255,255,0.88)',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
           }}
         >
-          <DisplayIcon className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
+          <DisplayIcon className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.74)' }} />
           <span>{selectedOption?.label || t('imageNode.definePurpose')}</span>
-          <ChevronDown className="h-2.5 w-2.5" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.6)' }} />
+          <ChevronDown className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
         </button>
       </div>
 

@@ -5,22 +5,16 @@ export function isSelectablePresetId(presetId: string): boolean {
   return Boolean(preset && preset.category !== 'style' && preset.tabs.length > 0);
 }
 
-export function normalizePresetSelection(presetIds: string[]): string[] {
-  return presetIds.filter(isSelectablePresetId);
-}
-
-export function togglePresetSelection(currentPresetIds: string[], presetId: string): string[] {
+function addPresetSelection(currentPresetIds: string[], presetId: string): string[] {
   const preset = getPresetById(presetId);
   if (!preset || preset.category === 'style' || preset.tabs.length === 0) {
-    return normalizePresetSelection(currentPresetIds);
+    return currentPresetIds;
+  }
+  if (currentPresetIds.includes(presetId)) {
+    return currentPresetIds;
   }
 
-  const normalizedPresetIds = normalizePresetSelection(currentPresetIds);
-  if (normalizedPresetIds.includes(presetId)) {
-    return normalizedPresetIds.filter((id) => id !== presetId);
-  }
-
-  let nextPresetIds = normalizedPresetIds.filter((id) => {
+  let nextPresetIds = currentPresetIds.filter((id) => {
     const selectedPreset = getPresetById(id);
     if (!selectedPreset) return false;
     if (preset.exclusiveGroup && selectedPreset.exclusiveGroup === preset.exclusiveGroup) {
@@ -41,4 +35,22 @@ export function togglePresetSelection(currentPresetIds: string[], presetId: stri
   }
 
   return [...nextPresetIds, presetId];
+}
+
+export function normalizePresetSelection(presetIds: string[]): string[] {
+  return presetIds.reduce<string[]>((normalizedIds, presetId) => addPresetSelection(normalizedIds, presetId), []);
+}
+
+export function togglePresetSelection(currentPresetIds: string[], presetId: string): string[] {
+  const preset = getPresetById(presetId);
+  if (!preset || preset.category === 'style' || preset.tabs.length === 0) {
+    return normalizePresetSelection(currentPresetIds);
+  }
+
+  const normalizedPresetIds = normalizePresetSelection(currentPresetIds);
+  if (normalizedPresetIds.includes(presetId)) {
+    return normalizedPresetIds.filter((id) => id !== presetId);
+  }
+
+  return addPresetSelection(normalizedPresetIds, presetId);
 }
