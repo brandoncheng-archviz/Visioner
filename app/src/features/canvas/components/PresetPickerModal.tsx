@@ -15,7 +15,6 @@ import {
 } from '../utils/userPresets';
 
 const FAVORITES_STORAGE_KEY = 'visioner_preset_favorites';
-const HIDDEN_COMMON_STORAGE_KEY = 'visioner_hidden_common_presets';
 type PresetTab = (typeof PRESET_TABS)[number];
 
 function loadUserFavorites(): Set<string> {
@@ -32,27 +31,13 @@ function saveUserFavorites(favorites: Set<string>) {
   } catch { /* ignore */ }
 }
 
-function loadHiddenCommonPresets(): Set<string> {
-  try {
-    const raw = localStorage.getItem(HIDDEN_COMMON_STORAGE_KEY);
-    if (raw) return new Set(JSON.parse(raw) as string[]);
-  } catch { /* ignore */ }
-  return new Set();
-}
-
-function saveHiddenCommonPresets(hiddenPresets: Set<string>) {
-  try {
-    localStorage.setItem(HIDDEN_COMMON_STORAGE_KEY, JSON.stringify(Array.from(hiddenPresets)));
-  } catch { /* ignore */ }
-}
-
 const PRESET_TAB_HINTS: Record<PresetTab, string> = {
-  我的收藏: '显示系统推荐、你收藏的系统预设，以及你添加的自定义预设。',
   真实增强: '提升画面真实度、材质、曝光和成片质量，适合从草图、白模或初稿进入高质量表达。',
   光照氛围: '调整时间、天气、季节、亮度和空气感，控制画面的光影关系与情绪基调。',
   镜头视角: '切换观察角度或镜头距离，用于强调体块、细节、活动、配景或总图关系。',
   建筑表达: '转换表达方式，例如展板、轴测、蓝图、草图、Logo 或样机化呈现。',
   场景配景: '添加或优化人物、车辆、植物、鸟类等配景元素，增强尺度感和场景完整度。',
+  我的收藏: '显示你收藏的系统预设，以及你添加的自定义预设。',
 };
 
 const SELECTED_PRESET_GROUP_ORDER: Record<string, number> = {
@@ -89,9 +74,8 @@ export function PresetPickerModal({
   onClose: () => void;
 }) {
   const [draftPresetIds, setDraftPresetIds] = useState<string[]>(selectedPresetIds);
-  const [activeTab, setActiveTab] = useState<PresetTab>('我的收藏');
+  const [activeTab, setActiveTab] = useState<PresetTab>('真实增强');
   const [userFavorites, setUserFavorites] = useState<Set<string>>(() => loadUserFavorites());
-  const [hiddenCommonPresets, setHiddenCommonPresets] = useState<Set<string>>(() => loadHiddenCommonPresets());
   const [userPresets, setUserPresets] = useState<PresetItem[]>(() => loadUserPresets());
   const [focusedPresetId, setFocusedPresetId] = useState<string | null>(null);
   const [editingPreset, setEditingPreset] = useState<PresetItem | null>(null);
@@ -192,13 +176,7 @@ export function PresetPickerModal({
   }, []);
 
   const isDraftSelected = useCallback((presetId: string) => draftPresetIds.includes(presetId), [draftPresetIds]);
-  const isFavorite = useCallback(
-    (preset: PresetItem) =>
-      userFavorites.has(preset.id) ||
-      Boolean(preset.userFavorite) ||
-      (Boolean(preset.recommendedInCommon) && !hiddenCommonPresets.has(preset.id)),
-    [hiddenCommonPresets, userFavorites],
-  );
+  const isFavorite = useCallback((preset: PresetItem) => userFavorites.has(preset.id) || Boolean(preset.userFavorite), [userFavorites]);
 
   const toggleFavorite = useCallback((presetId: string) => {
     const userPreset = userPresets.find((preset) => preset.id === presetId);
@@ -219,30 +197,6 @@ export function PresetPickerModal({
       return;
     }
 
-    const preset = allPresets.find((item) => item.id === presetId);
-    if (preset?.recommendedInCommon) {
-      const currentlyFavorite = isFavorite(preset);
-      setHiddenCommonPresets((prev) => {
-        const next = new Set(prev);
-        if (currentlyFavorite) {
-          next.add(presetId);
-        } else {
-          next.delete(presetId);
-        }
-        saveHiddenCommonPresets(next);
-        return next;
-      });
-      if (userFavorites.has(presetId)) {
-        setUserFavorites((prev) => {
-          const next = new Set(prev);
-          next.delete(presetId);
-          saveUserFavorites(next);
-          return next;
-        });
-      }
-      return;
-    }
-
     setUserFavorites((prev) => {
       const next = new Set(prev);
       if (next.has(presetId)) {
@@ -253,7 +207,7 @@ export function PresetPickerModal({
       saveUserFavorites(next);
       return next;
     });
-  }, [allPresets, isFavorite, userFavorites, userPresets]);
+  }, [userPresets]);
 
   const selectPreset = useCallback((presetId: string) => {
     setDraftPresetIds((prev) => togglePresetSelection(prev, presetId));

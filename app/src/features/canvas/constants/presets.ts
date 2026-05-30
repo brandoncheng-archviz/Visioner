@@ -2,12 +2,12 @@ import type { PresetItem, StyleDefinition } from '../types/imageNode.types';
 import { getUserPresetById } from '../utils/userPresets';
 
 export const PRESET_TABS = [
-  '我的收藏',
   '真实增强',
   '光照氛围',
   '镜头视角',
   '建筑表达',
   '场景配景',
+  '我的收藏',
 ] as const;
 
 export const MAX_MULTI_PRESETS_BY_GROUP: Partial<Record<PresetItem['group'], number>> = {

@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
@@ -36,6 +37,7 @@ import {
 import { UNIQUE_USAGES, imageRoleOptions, getImageRoleLabel, getImageRoleColor, validateCustomReferenceLabel } from '../../constants/imageUsages';
 import {
   PRESET_DATA,
+  PRESET_TABS,
   getPresetById,
   getStylePresetById,
 } from '../../constants/presets';
@@ -120,6 +122,13 @@ export function ImageNodeControlPanel({
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashIndex, setSlashIndex] = useState(0);
+  const [slashActiveTab, setSlashActiveTab] = useState<(typeof PRESET_TABS)[number]>('真实增强');
+  const [slashMenuStyle, setSlashMenuStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const pendingCustomInputRef = useRef<HTMLInputElement>(null);
   const pendingUsageMenuRef = useRef<HTMLDivElement>(null);
@@ -335,15 +344,46 @@ export function ImageNodeControlPanel({
 
   const slashFilteredPresets = useMemo(() => {
     const query = slashQuery.trim().toLowerCase();
-    const presetPool = PRESET_DATA.filter((preset) => preset.category !== 'style' && preset.tabs.length > 0);
+    const presetPool = PRESET_DATA.filter((preset) => {
+      if (preset.category === 'style' || preset.tabs.length === 0) return false;
+      if (slashActiveTab === '我的收藏') return false;
+      return preset.tabs.includes(slashActiveTab);
+    });
     if (!query) return presetPool;
 
     return presetPool.filter(
       (preset) =>
         preset.name.toLowerCase().includes(query) ||
-        preset.tags.some((tag) => tag.toLowerCase().includes(query)),
+        preset.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+        (preset.shortDescription || '').toLowerCase().includes(query),
     );
-  }, [slashQuery]);
+  }, [slashActiveTab, slashQuery]);
+
+  const handleSlashTabChange = (tab: (typeof PRESET_TABS)[number]) => {
+    setSlashActiveTab(tab);
+    setSlashIndex(0);
+  };
+
+  const updateSlashMenuPosition = useCallback(() => {
+    const input = promptInputRef.current;
+    if (!input) return;
+
+    const rect = input.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 16;
+    const gap = 8;
+    const width = Math.min(720, Math.max(520, Math.min(viewportWidth - margin * 2, rect.width)));
+    const left = Math.min(Math.max(margin, rect.left), Math.max(margin, viewportWidth - width - margin));
+    const spaceBelow = viewportHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const openAbove = spaceBelow < 360 && spaceAbove > spaceBelow;
+    const availableHeight = openAbove ? spaceAbove - gap : spaceBelow - gap;
+    const maxHeight = Math.min(480, Math.max(240, availableHeight));
+    const top = openAbove ? Math.max(margin, rect.top - maxHeight - gap) : Math.min(rect.bottom + gap, viewportHeight - maxHeight - margin);
+
+    setSlashMenuStyle({ top, left, width, maxHeight });
+  }, []);
 
   const selectPreset = (presetId: string) => {
     onPresetsChange(togglePresetSelection(selectedPresets, presetId));
@@ -669,6 +709,8 @@ export function ImageNodeControlPanel({
   useEffect(() => {
     if (!showSlashMenu) return;
 
+    updateSlashMenuPosition();
+
     const closeOnOutside = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
@@ -677,12 +719,22 @@ export function ImageNodeControlPanel({
       }
       closeSlashMenu();
     };
+    const updatePosition = () => updateSlashMenuPosition();
 
     document.addEventListener('pointerdown', closeOnOutside, true);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
     return () => {
       document.removeEventListener('pointerdown', closeOnOutside, true);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [showSlashMenu]);
+  }, [showSlashMenu, updateSlashMenuPosition]);
+
+  useLayoutEffect(() => {
+    if (!showSlashMenu) return;
+    updateSlashMenuPosition();
+  }, [showSlashMenu, slashActiveTab, slashQuery, updateSlashMenuPosition]);
 
   const insertSlashPreset = (presetId: string) => {
     selectPreset(presetId);
@@ -748,6 +800,82 @@ export function ImageNodeControlPanel({
     event.stopPropagation();
                     openStylePicker(event);
   };
+
+  const slashMenuPortal = showSlashMenu && slashMenuStyle
+    ? createPortal(
+      <div
+        ref={slashMenuRef}
+        className="nodrag nopan nowheel fixed overflow-hidden rounded-xl"
+        style={{
+          top: slashMenuStyle.top,
+          left: slashMenuStyle.left,
+          width: slashMenuStyle.width,
+          maxHeight: slashMenuStyle.maxHeight,
+          zIndex: 2000,
+          background: FLOATING_PANEL_BACKGROUND,
+          border: FLOATING_PANEL_BORDER,
+          boxShadow: '0 20px 48px rgba(0,0,0,0.58)',
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerMove={(event) => event.stopPropagation()}
+        onWheel={(event) => event.stopPropagation()}
+        onWheelCapture={(event) => event.stopPropagation()}
+      >
+        <div className="border-b px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="text-[12px] font-medium text-white/72">快捷指令</div>
+          <div className="mt-2 flex gap-1 overflow-x-auto overscroll-contain pb-1">
+            {PRESET_TABS.map((tab) => {
+              const active = tab === slashActiveTab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => handleSlashTabChange(tab)}
+                  className="shrink-0 rounded-md px-2.5 py-1 text-[11px] transition-colors"
+                  style={{
+                    background: active ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)',
+                    color: active ? 'rgba(255,255,255,0.94)' : 'rgba(255,255,255,0.52)',
+                  }}
+                >
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="overflow-y-auto py-1" style={{ maxHeight: Math.max(160, slashMenuStyle.maxHeight - 74) }}>
+          {slashFilteredPresets.length === 0 ? (
+            <div className="px-3 py-3 text-[13px] text-white/40">{t('imageNode.noMatchingPreset')}</div>
+          ) : (
+            slashFilteredPresets.map((preset, index) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => insertSlashPreset(preset.id)}
+                onMouseEnter={() => setSlashIndex(index)}
+                className={`nodrag nopan nowheel flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${index === slashIndex ? 'bg-white/8' : 'hover:bg-white/5'}`}
+              >
+                <span className="flex h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/[0.10] bg-white/[0.04]">
+                  {preset.thumbnail ? (
+                    <img src={preset.thumbnail} alt="" className="h-full w-full object-cover" draggable={false} />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center">
+                      <Bookmark className="h-4 w-4 text-white/30" />
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] text-white/90">{getSlashPresetName(preset)}</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-white/40">{getSlashPresetDescription(preset)}</span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>,
+      document.body,
+    )
+    : null;
 
   return (
     <div
@@ -983,22 +1111,27 @@ export function ImageNodeControlPanel({
       {selectedPresetItems.length > 0 && (
         <div className="px-3.5 pb-1">
           <div
-            className="flex min-w-0 items-center gap-1.5 overflow-x-auto overscroll-contain rounded-lg px-2 py-1.5"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)' }}
+            className="nodrag nowheel flex min-w-0 flex-wrap items-start gap-2 overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg px-2 py-1.5"
+            style={{ maxHeight: 88, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)' }}
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerMove={(event) => event.stopPropagation()}
+            onWheel={(event) => event.stopPropagation()}
+            onWheelCapture={(event) => event.stopPropagation()}
           >
             <span className="shrink-0 text-[12px]" style={{ color: 'rgba(255,255,255,0.42)' }}>已选预设：</span>
             {selectedPresetItems.map((preset) => (
               <span
                 key={preset.id}
-                className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.06] px-2 text-[12px] text-white/[0.72] transition-colors hover:border-white/[0.22] hover:bg-white/[0.09] hover:text-white/[0.86]"
+                className="inline-flex h-6 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.06] px-2 text-[12px] text-white/[0.72] transition-colors hover:border-white/[0.22] hover:bg-white/[0.09] hover:text-white/[0.86]"
               >
-                {preset.title || preset.name}
+                <span className="min-w-0 truncate">{preset.title || preset.name}</span>
                 <button
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
                     removeSelectedPreset(preset.id);
                   }}
+                  onPointerDown={(event) => event.stopPropagation()}
                   className="flex h-4 w-4 items-center justify-center rounded-full text-white/[0.45] transition-colors hover:bg-white/10 hover:text-white/[0.70]"
                   title={`移除${preset.title || preset.name}`}
                 >
@@ -1171,40 +1304,6 @@ export function ImageNodeControlPanel({
             rows={promptExpanded ? 7 : 4}
             onPointerDown={(e) => e.stopPropagation()}
           />
-          {/* Slash menu */}
-          {showSlashMenu && (
-            <div
-              ref={slashMenuRef}
-              className="absolute left-0 z-40 overflow-hidden rounded-xl py-1"
-              style={{
-                top: 0,
-                width: 260,
-                maxHeight: 240,
-                overflowY: 'auto',
-                background: FLOATING_PANEL_BACKGROUND,
-                border: FLOATING_PANEL_BORDER,
-                boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
-              }}
-              onWheel={(e) => e.stopPropagation()}
-            >
-              {(() => {
-                if (slashFilteredPresets.length === 0) {
-                  return <div className="px-3 py-2 text-[13px] text-white/40">{t('imageNode.noMatchingPreset')}</div>;
-                }
-                return slashFilteredPresets.map((preset, index) => (
-                  <button
-                    key={preset.id}
-                    onClick={() => insertSlashPreset(preset.id)}
-                    onMouseEnter={() => setSlashIndex(index)}
-                    className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left transition-colors ${index === slashIndex ? 'bg-white/8' : 'hover:bg-white/5'}`}
-                  >
-                    <span className="text-[13px] text-white/90">{getSlashPresetName(preset)}</span>
-                    <span className="text-[11px] text-white/40">{getSlashPresetDescription(preset)}</span>
-                  </button>
-                ));
-              })()}
-            </div>
-          )}
           {showReferenceMenu && references.length > 0 && (
             <div
               className="absolute left-0 top-7 z-40 overflow-hidden rounded-xl py-1"
@@ -1507,6 +1606,7 @@ export function ImageNodeControlPanel({
         onApply={onStyleChange}
         onClose={() => setShowStylePicker(false)}
       />
+      {slashMenuPortal}
     </div>
   );
 }
