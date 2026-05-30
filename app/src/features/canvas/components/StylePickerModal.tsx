@@ -17,13 +17,13 @@ export function StylePickerModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [draftStyleId, setDraftStyleId] = useState<string | null>(selectedStyleId);
+  const [draftStyleId, setDraftStyleId] = useState<string | null>(() => getStylePresetById(selectedStyleId)?.id || null);
   const previewStyle = getStylePresetById(draftStyleId);
   const draftStyle = getStylePresetById(draftStyleId);
 
   useEffect(() => {
     if (!open) return;
-    setDraftStyleId(selectedStyleId);
+    setDraftStyleId(getStylePresetById(selectedStyleId)?.id || null);
   }, [open, selectedStyleId]);
 
   const handleCancel = () => {
@@ -96,7 +96,7 @@ export function StylePickerModal({
                     boxShadow: previewing ? '0 0 0 1px rgba(255,255,255,0.10), 0 10px 26px rgba(0,0,0,0.28)' : 'none',
                   }}
                 >
-                  <img src={style.coverImage} alt="" className="aspect-[4/3] w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                  <img src={style.coverImage} alt="" className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                   <div className="px-3 py-2">
                     <div className="truncate text-[13px] font-medium text-white/88">{style.title}</div>
                   </div>
@@ -113,12 +113,7 @@ export function StylePickerModal({
           <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.028)' }}>
             {previewStyle ? (
               <>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-[18px] font-semibold text-white/92">{previewStyle.title}</h3>
-                  {selectedStyleId === previewStyle.id && (
-                    <span className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.72)' }}>{t('style.currentStyle')}</span>
-                  )}
-                </div>
+                <h3 className="text-[18px] font-semibold text-white/92">{previewStyle.title}</h3>
                 <p className="mt-3 text-[13px] leading-7" style={{ color: 'rgba(255,255,255,0.64)' }}>
                   {previewStyle.detailedDescription}
                 </p>

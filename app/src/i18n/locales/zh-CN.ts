@@ -411,17 +411,21 @@ const zhCN = {
     clearStyle: "清除偏好",
     confirmSelection: "确认选择",
     clickToChange: "点击更换风格",
-    mir: {
-      title: "MIR 氛围感",
+    nordic_atmosphere: {
+      title: "北欧氛围感",
       description: "低饱和 / 诗意氛围 / 柔和自然光",
     },
-    luxigon: {
-      title: "Luxigon 戏剧感",
+    conceptual_drama: {
+      title: "概念戏剧感",
       description: "强对比 / 概念叙事 / 戏剧化冲击",
     },
-    binyan: {
-      title: "Binyan 高级感",
+    premium_real_estate: {
+      title: "高端地产感",
       description: "超真实 / 精致质感 / 温暖叙事",
+    },
+    painterly_expression: {
+      title: "绘画感表现",
+      description: "绘画质感 / 艺术表达 / 诗意优雅",
     },
   },
 

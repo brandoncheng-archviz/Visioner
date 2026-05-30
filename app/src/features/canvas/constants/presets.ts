@@ -1193,13 +1193,13 @@ export function getPresetById(id: string) {
   return PRESET_BY_ID.get(id) || getUserPresetById(id);
 }
 
-export const mirStyle: StyleDefinition = {
-  id: 'mir',
-  title: 'MIR 氛围感',
+export const nordicAtmosphereStyle: StyleDefinition = {
+  id: 'nordic_atmosphere',
+  title: '北欧氛围感',
   shortDescription: '低饱和 / 诗意氛围 / 柔和自然光',
-  coverImage: '/assets/styles/mir/cover.jpg',
+  coverImage: '/assets/styles/nordic_atmosphere/cover.webp',
   detailedDescription:
-    'MIR 氛围感强调低饱和、冷灰调、柔和自然光和强烈的环境氛围。画面不追求商业效果图式的高清锐利，而是营造一种诗意、冷静、内敛、略带忧郁的建筑图像气质。\n\n建筑应与地形、植物、天空、雾气、雨雪、水体等自然环境深度融合，而不是像单独摆放在场景中的物体。画面通常采用阴天、薄雾、漫射光、侧光、逆光或冬季感光线，避免强烈直射阳光、纯净蓝天和过高饱和度。\n\n整体质感偏向绘画感与自然主义，更接近高级建筑摄影与数字手绘合成之间的状态。材质表现应真实但克制，不夸张、不塑料感、不强 HDR。人物和活动元素应尽量少且处理克制，重点仍然是建筑在环境中的存在感与时间感。',
+    '北欧氛围感强调低饱和、冷灰调、柔和自然光和强烈的环境氛围。画面不追求商业效果图式的高清锐利，而是营造一种诗意、冷静、内敛、略带忧郁的建筑图像气质。\n\n建筑应与地形、植物、天空、雾气、雨雪、水体等自然环境深度融合，而不是像单独摆放在场景中的物体。画面通常采用阴天、薄雾、漫射光、侧光、逆光或冬季感光线，避免强烈直射阳光、纯净蓝天和过高饱和度。\n\n整体质感偏向绘画感与自然主义，更接近高级建筑摄影与数字手绘合成之间的状态。材质表现应真实但克制，不夸张、不塑料感、不强 HDR。人物和活动元素应尽量少且处理克制，重点仍然是建筑在环境中的存在感与时间感。',
   tags: ['低饱和', '冷灰调', '阴天漫射光', '薄雾空气感', '绘画感', '建筑融于环境', '冷静叙事', '北欧气质'],
   promptTemplate: {
     styleCore: '高度氛围化的建筑可视化表达，强调北欧自然主义气质、诗意叙事感和柔和绘画感，不追求硬质商业CG效果。',
@@ -1214,13 +1214,13 @@ export const mirStyle: StyleDefinition = {
   },
 };
 
-export const luxigonStyle: StyleDefinition = {
-  id: 'luxigon',
-  title: 'Luxigon 戏剧感',
+export const conceptualDramaStyle: StyleDefinition = {
+  id: 'conceptual_drama',
+  title: '概念戏剧感',
   shortDescription: '强对比 / 概念叙事 / 戏剧化冲击',
-  coverImage: '/assets/styles/luxigon/cover.jpg',
+  coverImage: '/assets/styles/conceptual_drama/cover.webp',
   detailedDescription:
-    'Luxigon 戏剧感强调强烈的视觉冲击力、概念叙事和电影化光影。画面不只是展示建筑外观，而是将建筑放入一个具有情绪、事件和故事张力的场景中，让建筑成为画面中的视觉主角和叙事核心。\n\n与 MIR 的冷静、低饱和、自然主义氛围不同，Luxigon 更偏向大胆、外放、艺术化和戏剧化的表达。画面可以使用更强烈的明暗反差、更鲜明的冷暖对比、更有表现力的天空、云层、烟雾、逆光、城市活动或超现实氛围，用来放大设计概念和空间情绪。\n\n这种风格适合让建筑图像更有传播性、记忆点和概念冲击力。人物、车辆、灯光、天气和城市配景可以更积极地参与画面叙事，但必须服务于建筑主体，不能让画面变得混乱或把建筑淹没。最终效果应接近一张高质量的建筑电影海报：有张力、有故事、有视觉中心，同时仍然保持建筑可视化的空间可信度和设计表达清晰度。',
+    '概念戏剧感强调强烈的视觉冲击力、概念叙事和电影化光影。画面不只是展示建筑外观，而是将建筑放入一个具有情绪、事件和故事张力的场景中，让建筑成为画面中的视觉主角和叙事核心。\n\n与冷静、低饱和、自然主义的氛围不同，概念戏剧感更偏向大胆、外放、艺术化和戏剧化的表达。画面可以使用更强烈的明暗反差、更鲜明的冷暖对比、更有表现力的天空、云层、烟雾、逆光、城市活动或超现实氛围，用来放大设计概念和空间情绪。\n\n这种风格适合让建筑图像更有传播性、记忆点和概念冲击力。人物、车辆、灯光、天气和城市配景可以更积极地参与画面叙事，但必须服务于建筑主体，不能让画面变得混乱或把建筑淹没。最终效果应接近一张高质量的建筑电影海报：有张力、有故事、有视觉中心，同时仍然保持建筑可视化的空间可信度和设计表达清晰度。',
   tags: ['戏剧光影', '强对比', '概念叙事', '电影感', '视觉冲击', '大胆色彩', '城市事件', '海报感'],
   promptTemplate: {
     styleCore: '戏剧化、概念叙事导向的建筑可视化表达，强调强烈视觉冲击、电影化场景、情绪张力和设计概念的视觉放大。建筑必须保持清晰主体地位，而不是被环境元素淹没。',
@@ -1235,13 +1235,13 @@ export const luxigonStyle: StyleDefinition = {
   },
 };
 
-export const binyanStyle: StyleDefinition = {
-  id: 'binyan',
-  title: 'Binyan 高级感',
+export const premiumRealEstateStyle: StyleDefinition = {
+  id: 'premium_real_estate',
+  title: '高端地产感',
   shortDescription: '超真实 / 精致质感 / 温暖叙事',
-  coverImage: '/assets/styles/binyan/cover.jpg',
+  coverImage: '/assets/styles/premium_real_estate/cover.webp',
   detailedDescription:
-    'Binyan 高级感强调高度真实、精致材质和具有生活温度的建筑可视化表达。它不像 MIR 那样偏向冷静、诗意和自然主义氛围，也不像 Luxigon 那样追求戏剧冲击和概念张力，而是更关注高端项目本身的商业完成度、空间品质、材料可信度和生活方式吸引力。\n\n画面应呈现明亮、通透、干净、成熟且昂贵的视觉气质。建筑主体需要被清晰、优雅地展示，体块关系、立面材质、入口界面、景观层次、室内外过渡和公共空间都应具有明确秩序。光线通常自然、柔和、受控，可以是清晨柔光、黄昏暖光、晴朗但不过曝的日光，或精致的室内外灯光，整体应让空间显得真实可信、舒适且有吸引力。\n\n人物、车辆、家具、绿化、水景、灯光和生活配景可以适度出现，用来增强尺度感、生活感和归属感，但不应喧宾夺主。整体效果应接近高端住宅、酒店、商业综合体或品牌地产项目的正式宣传图：画面精修、材质高级、氛围温暖、细节完整，让观者产生对空间品质和生活方式的信任与向往。',
+    '高端地产感强调高度真实、精致材质和具有生活温度的建筑可视化表达。它不像北欧氛围感那样偏向冷静、诗意和自然主义氛围，也不像概念戏剧感那样追求戏剧冲击和概念张力，而是更关注高端项目本身的商业完成度、空间品质、材料可信度和生活方式吸引力。\n\n画面应呈现明亮、通透、干净、成熟且昂贵的视觉气质。建筑主体需要被清晰、优雅地展示，体块关系、立面材质、入口界面、景观层次、室内外过渡和公共空间都应具有明确秩序。光线通常自然、柔和、受控，可以是清晨柔光、黄昏暖光、晴朗但不过曝的日光，或精致的室内外灯光，整体应让空间显得真实可信、舒适且有吸引力。\n\n人物、车辆、家具、绿化、水景、灯光和生活配景可以适度出现，用来增强尺度感、生活感和归属感，但不应喧宾夺主。整体效果应接近高端住宅、酒店、商业综合体或品牌地产项目的正式宣传图：画面精修、材质高级、氛围温暖、细节完整，让观者产生对空间品质和生活方式的信任与向往。',
   tags: ['超真实', '精致质感', '温暖叙事', '高端商业', '生活方式', '明亮通透', '高级材质', '可信真实'],
   promptTemplate: {
     styleCore: '高端商业建筑与地产营销导向的建筑可视化表达，强调真实可信、精致完成度、温暖生活方式和成熟高级的项目气质。建筑主体必须清晰、优雅、有吸引力。',
@@ -1256,15 +1256,44 @@ export const binyanStyle: StyleDefinition = {
   },
 };
 
-export const styleDefinitions: StyleDefinition[] = [mirStyle, luxigonStyle, binyanStyle];
+export const painterlyExpressionStyle: StyleDefinition = {
+  id: 'painterly_expression',
+  title: '绘画感表现',
+  shortDescription: '绘画质感 / 艺术表达 / 诗意优雅',
+  coverImage: '/assets/styles/painterly_expression/cover.webp',
+  detailedDescription:
+    '绘画感表现强调建筑图像的艺术表达、诗意氛围和具有手工气质的视觉诠释。它不追求单纯的照片级真实，而是在真实空间关系和建筑逻辑的基础上，加入更明显的绘画感、后期处理感和图像作品气质，让画面更像一张经过艺术构建的建筑作品，而不是普通写实渲染图。\n\n与北欧氛围感的冷静自然主义、概念戏剧感的戏剧冲击、高端地产感的商业完成度不同，这类视觉偏好更注重优雅、细腻、克制且富有诗意的光影诠释，以及建筑与场所之间更具情感和艺术性的关系。画面通常具有柔和但丰富的层次、统一而精致的色彩、轻微的绘画笔触感或后期加工感，适合文化建筑、竞赛方案、公共建筑和概念性较强的设计表达。\n\n建筑主体必须保持清晰可读，空间关系、体块逻辑和场所氛围应明确呈现。人物、植物、天空、地面、水体和环境元素需要共同服务整体图像气质，允许适度的艺术化柔化和抽象处理，但不能让画面变成纯插画、纯拼贴或失去建筑表达。最终效果应具有绘画质感、设计表达力和视觉统一性，让图像呈现优雅、艺术化、富有辨识度的建筑表现气质。',
+  tags: ['绘画感', '艺术表达', '诗意光影', '优雅氛围', '竞赛气质', '后期加工感', '细腻质感', '设计导向'],
+  promptTemplate: {
+    styleCore: '艺术化、绘画感导向的建筑可视化表达，强调设计概念、图像气质、诗意叙事和竞赛表现感，而不是单纯的照片级写实。建筑主体必须保持清晰、优雅和可读。',
+    color: '使用统一、克制且具有艺术感的色彩关系，可采用柔和灰调、米色、土色、暖白、低饱和绿植色、粉灰色或精致的暖冷平衡。整体色彩应丰富但和谐，避免廉价高饱和、脏乱综合色和商业广告式过强滤镜感。',
+    lighting: '采用柔和、细腻、富有表现力的光线，可使用漫射光、柔和侧光、轻微逆光、安静的天空光和温和的体积氛围。光线重点服务空间气质、层次和诗意，而不是夸张戏剧冲突或过强物理写实。',
+    atmosphere: '营造安静、优雅、诗意、具有艺术感和设计气质的图像氛围。允许轻微颗粒感、纸感、绘画感、拼贴感或柔化处理，让画面更接近建筑竞赛图、艺术化表现图和具有作者气质的建筑图像。',
+    architectureEnvironment: '建筑应清晰呈现，并与地形、植物、街道、天空、水体、人物和场地环境形成统一的图像表达。环境不只是陪衬，而应共同参与塑造完整的场所感和设计叙事。',
+    composition: '使用清晰、稳定、优雅、具有版面感和图像秩序的构图，强调建筑主体、空间层次和设计逻辑。构图应具有艺术作品感和竞赛表达气质，避免过于普通的销售图视角或过度戏剧海报式构图。',
+    material: '材质表现应建立在真实基础上，但允许适度柔化、统一和艺术处理。表面应细腻、温和、具有触感和图像质感，避免过强锐化、塑料感、廉价反光、粗糙未完成感和纯CG表面。',
+    entourage: '人物、植物、车辆和环境元素应克制、统一并具有图像感，用来增强尺度、氛围和叙事，但不应显得零碎杂乱或喧宾夺主。人物应自然、安静、适度，服务整体艺术叙事。',
+    avoid: '避免强烈商业销售图感、过度HDR、过强锐化、廉价高饱和、纯冷硬照片级CG感、塑料材质、过度戏剧化舞台光、杂乱拼贴、完全插画化、建筑主体不清晰、缺乏设计表达和图像统一性。',
+  },
+};
+
+export const styleDefinitions: StyleDefinition[] = [
+  nordicAtmosphereStyle,
+  conceptualDramaStyle,
+  premiumRealEstateStyle,
+  painterlyExpressionStyle,
+];
 
 export const STYLE_PRESETS = styleDefinitions;
 
 const STYLE_PRESET_BY_ID = new Map(styleDefinitions.map((style) => [style.id, style]));
 const LEGACY_STYLE_ID_MAP: Record<string, string> = {
-  mir_atmosphere: 'mir',
-  luxigon_drama: 'luxigon',
-  binyan_estate: 'binyan',
+  mir: 'nordic_atmosphere',
+  mir_atmosphere: 'nordic_atmosphere',
+  luxigon: 'conceptual_drama',
+  luxigon_drama: 'conceptual_drama',
+  binyan: 'premium_real_estate',
+  binyan_estate: 'premium_real_estate',
 };
 
 export function getStylePresetById(id: string | null | undefined) {

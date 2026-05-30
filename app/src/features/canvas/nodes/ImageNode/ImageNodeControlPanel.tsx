@@ -972,15 +972,15 @@ export function ImageNodeControlPanel({
                 height: 50,
                 padding: selectedStyle ? 0 : '4px',
                 background: selectedStyle ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.04)',
-                border: selectedStyle ? '1px solid rgba(255,255,255,0.34)' : '1px solid rgba(255,255,255,0.10)',
-                boxShadow: selectedStyle ? 'inset 0 0 0 1px rgba(255,255,255,0.08)' : 'none',
+                border: selectedStyle ? '1px solid rgba(168,85,247,0.72)' : '1px solid rgba(255,255,255,0.10)',
+                boxShadow: selectedStyle ? '0 0 0 1px rgba(168,85,247,0.22), inset 0 0 0 1px rgba(255,255,255,0.08)' : 'none',
                 opacity: 1,
               }}
               title={t('style.selectStyle')}
             >
               {selectedStyle ? (
                 <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
-                  <img src={selectedStyle.coverImage} alt="" className="h-full w-full object-cover opacity-90" draggable={false} />
+                  <img src={selectedStyle.coverImage} alt="" className="h-full w-full object-cover opacity-95" draggable={false} />
                 </span>
               ) : (
                 <>

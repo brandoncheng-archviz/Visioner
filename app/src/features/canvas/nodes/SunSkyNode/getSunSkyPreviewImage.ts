@@ -47,7 +47,7 @@ export function getSunSkyPreviewImage(params: { elevation: number; azimuth: numb
   const nearestElevation = findNearestSunSkyLevel(clampedElevation, SUN_SKY_MATRIX_ELEVATIONS);
   const nearestAzimuth = findNearestSunSkyAzimuth(normalizedAzimuth);
 
-  return `${MATRIX_PREVIEW_PATH}/elevation-${pad2(nearestElevation)}/azimuth-${pad3(nearestAzimuth)}.jpg`;
+  return `${MATRIX_PREVIEW_PATH}/elevation-${pad2(nearestElevation)}/azimuth-${pad3(nearestAzimuth)}.webp`;
 }
 
 function getLevelNeighborIndexes<T>(items: T[], index: number): number[] {
@@ -65,13 +65,13 @@ export function getNearbySunSkyPreviewImages(params: { elevation: number; azimut
 
   for (const nearbyElevationIndex of getLevelNeighborIndexes(SUN_SKY_MATRIX_ELEVATIONS, elevationIndex)) {
     const elevation = SUN_SKY_MATRIX_ELEVATIONS[nearbyElevationIndex];
-    paths.add(`${MATRIX_PREVIEW_PATH}/elevation-${pad2(elevation)}/azimuth-${pad3(nearestAzimuth)}.jpg`);
+    paths.add(`${MATRIX_PREVIEW_PATH}/elevation-${pad2(elevation)}/azimuth-${pad3(nearestAzimuth)}.webp`);
   }
 
   for (const offset of [-1, 0, 1]) {
     const nearbyAzimuthIndex = (azimuthIndex + offset + SUN_SKY_MATRIX_AZIMUTHS.length) % SUN_SKY_MATRIX_AZIMUTHS.length;
     const azimuth = SUN_SKY_MATRIX_AZIMUTHS[nearbyAzimuthIndex];
-    paths.add(`${MATRIX_PREVIEW_PATH}/elevation-${pad2(nearestElevation)}/azimuth-${pad3(azimuth)}.jpg`);
+    paths.add(`${MATRIX_PREVIEW_PATH}/elevation-${pad2(nearestElevation)}/azimuth-${pad3(azimuth)}.webp`);
   }
 
   return [...paths];

@@ -411,17 +411,21 @@ const enUS = {
     clearStyle: "Clear Preference",
     confirmSelection: "Confirm Selection",
     clickToChange: "Click to change style",
-    mir: {
-      title: "MIR Atmosphere",
+    nordic_atmosphere: {
+      title: "Nordic Atmosphere",
       description: "Low saturation / poetic atmosphere / soft natural light",
     },
-    luxigon: {
-      title: "Luxigon Drama",
+    conceptual_drama: {
+      title: "Conceptual Drama",
       description: "High contrast / conceptual narrative / dramatic impact",
     },
-    binyan: {
-      title: "Binyan Premium",
+    premium_real_estate: {
+      title: "Premium Real Estate",
       description: "Photoreal / refined material / warm narrative",
+    },
+    painterly_expression: {
+      title: "Painterly Expression",
+      description: "Painterly texture / artistic expression / poetic elegance",
     },
   },
 
