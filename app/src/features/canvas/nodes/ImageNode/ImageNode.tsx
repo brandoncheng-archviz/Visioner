@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
 import type { ImageRole, PromptContent, ReferenceInfo } from '../../types/imageNode.types';
 import type { MarkItem, ModelParams } from '../../types/canvas.types';
+import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
 import {
   normalizeGeneratedImages,
@@ -58,7 +59,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   /* ─── Extended node state ─── */
   const [promptText, setPromptText] = useState((data.prompt as string) || '');
   const [promptContent, setPromptContent] = useState<PromptContent[]>((data.promptContent as PromptContent[]) || []);
-  const [marks, setMarks] = useState<MarkItem[]>((data.marks as MarkItem[]) || []);
+  const [marks] = useState<MarkItem[]>((data.marks as MarkItem[]) || []);
+  const [lightPreview, setLightPreview] = useState<LightPreviewData | null>((data.lightPreview as LightPreviewData | null | undefined) ?? null);
   const [selectedPresets, setSelectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
@@ -190,7 +192,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const canGenerate = !isGenerating && (references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0);
 
   const handleGenerate = useCallback(async () => {
-    const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references);
+    const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references, lightPreview);
 
     // Abort any previous running generation
     abortControllerRef.current?.abort();
@@ -323,9 +325,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, promptContent: content } } : n)));
   };
 
-  const handleMarksChange = (newMarks: MarkItem[]) => {
-    setMarks(newMarks);
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, marks: newMarks } } : n)));
+  const handleLightPreviewChange = (data: LightPreviewData | null) => {
+    setLightPreview(data);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, lightPreview: data } } : n)));
   };
 
   const handlePresetsChange = (presets: string[]) => {
@@ -431,6 +433,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (!file) return;
     const name = file.name.replace(/\.[^/.]+$/, '');
     const url = URL.createObjectURL(file);
+    const onRegisterObjectUrl = data.onRegisterObjectUrl as ((url: string) => void) | undefined;
+    if (onRegisterObjectUrl) onRegisterObjectUrl(url);
 
     const imgEl = new window.Image();
     imgEl.onload = () => {
@@ -518,18 +522,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     onCreateUpscaleNode(id, resolved.imageUrl, resolved.width, resolved.height);
   }, [data, id, showToast, t]);
 
-  const handleSunSky = useCallback(() => {
-    const resolved = resolveNodeImage(data);
-    if (!resolved) {
-      showToast(t('imageNode.noImageForSunSky'));
-      return;
-    }
-
-    const onCreateSunSkyNode = data.onCreateSunSkyNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
-    if (!onCreateSunSkyNode) return;
-    onCreateSunSkyNode(id, resolved.imageUrl, resolved.width, resolved.height);
-  }, [data, id, showToast, t]);
-
   const handleCompare = useCallback(() => {
     const resolved = resolveNodeImage(data);
     if (!resolved) {
@@ -582,7 +574,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {displayImage && isOnlySelected && (
         <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
-            onSunSky={handleSunSky}
             onUpscale={handleUpscale}
             onCompare={handleCompare}
             onPreview={handlePreview}
@@ -697,10 +688,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               alt=""
               className="w-full h-full object-contain"
               draggable={false}
-              onDoubleClick={(event) => {
-                event.stopPropagation();
-                handlePreview();
-              }}
             />
           ) : (
             <div className="flex items-center justify-center">
@@ -842,8 +829,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onPromptChange={handlePromptChange}
               promptContent={promptContent}
               onPromptContentChange={handlePromptContentChange}
-              marks={marks}
-              onMarksChange={handleMarksChange}
+              lightPreview={lightPreview}
+              onLightPreviewChange={handleLightPreviewChange}
               selectedPresets={selectedPresets}
               onPresetsChange={handlePresetsChange}
               selectedStyleId={selectedStyleId}

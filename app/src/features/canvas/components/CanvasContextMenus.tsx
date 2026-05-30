@@ -22,9 +22,6 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
 
   const items = [
     { type: 'image', label: t('canvas.addImageNode'), icon: Image, color: '#22d3ee' },
-    { type: 'upscale', label: t('canvas.addUpscaleNode'), icon: Sparkles, color: '#a855f7' },
-    { type: 'compare', label: t('canvas.addCompareNode'), icon: Columns2, color: '#94a3b8' },
-    { type: 'sunSky', label: t('canvas.addSunSkyNode'), icon: Sun, color: '#f59e0b' },
   ];
 
   return (

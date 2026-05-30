@@ -5,7 +5,7 @@ import {
   Image,
   X,
   Bookmark,
-  MapPin,
+  Sun,
   Palette,
   ChevronDown,
   Zap,
@@ -20,7 +20,8 @@ import type {
   ImageRole,
   PresetItem,
 } from '../../types/imageNode.types';
-import type { MarkAction, MarkItem, ModelParams } from '../../types/canvas.types';
+import type { ModelParams } from '../../types/canvas.types';
+import type { LightPreviewData } from '../../types/lightPreview.types';
 import {
   FLOATING_PANEL_BACKGROUND,
   FLOATING_PANEL_BORDER,
@@ -31,8 +32,6 @@ import {
   RESOLUTION_OPTIONS,
   RATIO_OPTIONS,
   COUNT_OPTIONS,
-  MARK_ACTION_LABELS,
-  MARK_ACTION_COLORS,
 } from '../../constants/canvasConstants';
 import { UNIQUE_USAGES, imageRoleOptions, getImageRoleLabel, getImageRoleColor, validateCustomReferenceLabel } from '../../constants/imageUsages';
 import {
@@ -46,14 +45,15 @@ import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUt
 import { togglePresetSelection } from '../../utils/presetSelection';
 import { StylePickerModal } from '../../components/StylePickerModal';
 import { PresetPickerModal } from '../../components/PresetPickerModal';
+import { LightPreviewPanel } from '../../components/LightPreviewPanel';
 
 export function ImageNodeControlPanel({
   promptText,
   onPromptChange,
   promptContent,
   onPromptContentChange,
-  marks,
-  onMarksChange,
+  lightPreview,
+  onLightPreviewChange,
   selectedPresets,
   onPresetsChange,
   selectedStyleId,
@@ -75,8 +75,8 @@ export function ImageNodeControlPanel({
   onPromptChange: (value: string) => void;
   promptContent: PromptContent[];
   onPromptContentChange: (content: PromptContent[]) => void;
-  marks: MarkItem[];
-  onMarksChange: (marks: MarkItem[]) => void;
+  lightPreview?: LightPreviewData | null;
+  onLightPreviewChange: (data: LightPreviewData | null) => void;
   selectedPresets: string[];
   onPresetsChange: (presets: string[]) => void;
   selectedStyleId: string | null;
@@ -95,7 +95,7 @@ export function ImageNodeControlPanel({
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
-  const [showMarkPanel, setShowMarkPanel] = useState(false);
+  const [showLightPreview, setShowLightPreview] = useState(false);
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [showStylePicker, setShowStylePicker] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -116,9 +116,7 @@ export function ImageNodeControlPanel({
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
   const [editingPromptBlockId, setEditingPromptBlockId] = useState<string | null>(null);
   const [editingPromptText, setEditingPromptText] = useState('');
-  const [markName, setMarkName] = useState('');
-  const [markAction, setMarkAction] = useState<MarkAction>('enhance');
-  const [markDesc, setMarkDesc] = useState('');
+
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashIndex, setSlashIndex] = useState(0);
@@ -387,29 +385,6 @@ export function ImageNodeControlPanel({
 
   const selectPreset = (presetId: string) => {
     onPresetsChange(togglePresetSelection(selectedPresets, presetId));
-  };
-
-  const addMark = () => {
-    if (!markName.trim()) return;
-    const newMark: MarkItem = {
-      id: `mark-${Date.now()}`,
-      name: markName.trim(),
-      action: markAction,
-      sourceIndex: 1,
-      description: markDesc.trim(),
-    };
-    onMarksChange([...marks, newMark]);
-    // 只插入元素锚点，不自动追加动作描述
-    const markPrompt = `@${newMark.name}（@${newMark.sourceIndex}）`;
-    const newText = promptText ? `${promptText}\n${markPrompt}` : markPrompt;
-    onPromptChange(newText);
-    setMarkName('');
-    setMarkDesc('');
-    setShowMarkPanel(false);
-  };
-
-  const removeMark = (markId: string) => {
-    onMarksChange(marks.filter((m) => m.id !== markId));
   };
 
   const closeReferenceMenus = () => {
@@ -898,19 +873,20 @@ export function ImageNodeControlPanel({
           {/* Preset */}
           <div className="relative">
             <button
-              onClick={() => { setShowPresetModal(true); setShowMarkPanel(false); setShowStylePicker(false); }}
-              className="relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/[0.07]"
+              onClick={() => { setShowPresetModal(true); setShowLightPreview(false); setShowStylePicker(false); }}
+              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
+                selectedPresetCount > 0
+                  ? 'border-[rgba(180,184,194,0.72)] bg-[rgba(180,184,194,0.08)] shadow-[0_0_0_1px_rgba(180,184,194,0.14),0_0_12px_rgba(180,184,194,0.08)] hover:border-[rgba(180,184,194,0.82)] hover:bg-[rgba(180,184,194,0.10)]'
+                  : 'border-white/[0.10] bg-white/[0.04] hover:border-[rgba(180,184,194,0.72)] hover:bg-[rgba(180,184,194,0.05)]'
+              }`}
               style={{
                 width: 54,
                 height: 50,
                 padding: '4px',
-                background: selectedPresetCount > 0 ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.04)',
-                border: selectedPresetCount > 0 ? '1px solid rgba(255,255,255,0.34)' : '1px solid rgba(255,255,255,0.10)',
-                boxShadow: selectedPresetCount > 0 ? 'inset 0 0 0 1px rgba(255,255,255,0.08)' : 'none',
               }}
             >
-              <Bookmark className="w-4 h-4" style={{ color: selectedPresetCount > 0 ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.50)' }} />
-              <span style={{ fontSize: 12, color: selectedPresetCount > 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.56)' }}>{t('imageNode.preset')}</span>
+              <Bookmark className="w-4 h-4" style={{ color: selectedPresetCount > 0 ? 'rgba(226,229,236,0.92)' : 'rgba(180,184,194,0.58)' }} />
+              <span style={{ fontSize: 12, color: selectedPresetCount > 0 ? 'rgba(226,229,236,0.94)' : 'rgba(180,184,194,0.62)' }}>{t('imageNode.preset')}</span>
             </button>
             {showPresetModal && (
               <PresetPickerModal
@@ -921,36 +897,53 @@ export function ImageNodeControlPanel({
               />
             )}
           </div>
-          {/* Mark */}
+          {/* Light Preview */}
           <div className="relative">
-            <button
-              onClick={() => { setShowMarkPanel(!showMarkPanel); setShowStylePicker(false); }}
-              className="flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/5"
-              style={{ width: 54, height: 50, padding: '4px', background: marks.length > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.025)', border: FLOATING_PANEL_BORDER }}
-            >
-              <MapPin className="w-4 h-4" style={{ color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.7)' }} />
-              <span style={{ fontSize: 12, color: marks.length > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>{t('imageNode.mark')}</span>
-            </button>
-            {showMarkPanel && (
-              <div className="absolute top-full left-0 mt-1 p-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 220 }}>
-                <div className="text-[12px] text-white/55 mb-2">{t('imageNode.addElementMark')}</div>
-                <input value={markName} onChange={(e) => setMarkName(e.target.value)} placeholder={t('imageNode.elementNamePlaceholder')} className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
-                <select value={markAction} onChange={(e) => setMarkAction(e.target.value as MarkAction)} className="w-full bg-transparent text-[13px] mb-2 outline-none" style={{ color: 'rgba(255,255,255,0.9)', background: FLOATING_PANEL_BACKGROUND }} onPointerDown={(e) => e.stopPropagation()}>
-                  {Object.entries(MARK_ACTION_LABELS).map(([key]) => (<option key={key} value={key}>{t(`mark.${key}`)}</option>))}
-                </select>
-                <input value={markDesc} onChange={(e) => setMarkDesc(e.target.value)} placeholder={t('imageNode.actionDescPlaceholder')} className="w-full bg-transparent outline-none text-[13px] mb-2" style={{ color: 'rgba(255,255,255,0.9)', borderBottom: '1px solid rgba(255,255,255,0.12)' }} onPointerDown={(e) => e.stopPropagation()} />
-                <button onClick={addMark} className="w-full text-center text-[12px] py-1.5 rounded bg-white/10 text-white/90 hover:bg-white/15 transition-colors">{t('imageNode.add')}</button>
-                {marks.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {marks.map((m) => (
-                      <div key={m.id} className="flex items-center justify-between text-[12px]">
-                        <span style={{ color: MARK_ACTION_COLORS[m.action] }}>@{m.name}（{t(`mark.${m.action}`)}）</span>
-                        <button onClick={() => removeMark(m.id)} className="text-white/30 hover:text-white/60">×</button>
-                      </div>
-                    ))}
+            {lightPreview?.enabled ? (
+              <button
+                onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
+                className="group/light-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border border-[rgba(245,158,11,0.45)] transition-colors hover:border-[rgba(245,158,11,0.78)] hover:bg-[rgba(245,158,11,0.08)]"
+                style={{ width: 54, height: 50, padding: 0 }}
+              >
+                <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
+                  <img src={lightPreview.derived.previewImagePath} alt="" className="h-full w-full object-cover" draggable={false} />
+                </span>
+                {/* Hover tooltip */}
+                <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[220px] rounded-xl p-2.5 text-left group-hover/light-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
+                  <div className="text-[12px] font-medium text-white/90">光影</div>
+                  <div className="mt-1 text-[11px] text-white/55">{lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}</div>
+                  <div className="mt-1.5 space-y-0.5 text-[11px] text-white/48">
+                    <div>太阳高度：{lightPreview.sun.elevation}°</div>
+                    <div>太阳方位：{lightPreview.sun.azimuth}°</div>
+                    <div>天空：{lightPreview.derived.skyLabel}</div>
+                    <div>阴影：{lightPreview.derived.shadowLengthLabel} · {lightPreview.derived.shadowBlurLabel}</div>
                   </div>
-                )}
-              </div>
+                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.72)' }}>点击可重新设置</div>
+                </div>
+              </button>
+            ) : (
+              <button
+                onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
+                className="flex flex-col items-center justify-center gap-0.5 rounded-lg border border-white/[0.10] bg-white/[0.025] transition-colors hover:border-[rgba(245,158,11,0.62)] hover:bg-[rgba(245,158,11,0.055)]"
+                style={{ width: 54, height: 50, padding: '4px' }}
+              >
+                <Sun className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.7)' }} />
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>光影</span>
+              </button>
+            )}
+            {showLightPreview && (
+              <LightPreviewPanel
+                initialSun={lightPreview?.sun}
+                onApply={(sun, derived) => {
+                  onLightPreviewChange({ enabled: true, sun, derived });
+                  setShowLightPreview(false);
+                }}
+                onClear={() => {
+                  onLightPreviewChange(null);
+                  setShowLightPreview(false);
+                }}
+                onClose={() => setShowLightPreview(false)}
+              />
             )}
           </div>
           {/* Style */}
@@ -958,22 +951,25 @@ export function ImageNodeControlPanel({
             <button
               onClick={() => {
                 setShowStylePicker(true);
-                setShowMarkPanel(false);
+                setShowPresetModal(false);
+                setShowLightPreview(false);
               }}
               onPointerDown={(e) => {
                 if (e.button !== 0) return;
                 e.stopPropagation();
                 setShowStylePicker(true);
-                setShowMarkPanel(false);
+                setShowPresetModal(false);
+                setShowLightPreview(false);
               }}
-              className="group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg transition-colors hover:bg-white/[0.07]"
+              className={`group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
+                selectedStyle
+                  ? 'border-white/[0.72] bg-white/[0.06] shadow-[0_0_0_1px_rgba(255,255,255,0.16),0_0_14px_rgba(255,255,255,0.08)] hover:border-white/[0.72] hover:bg-white/[0.08]'
+                  : 'border-white/[0.10] bg-white/[0.04] hover:border-white/[0.42] hover:bg-white/[0.04]'
+              }`}
               style={{
                 width: 54,
                 height: 50,
                 padding: selectedStyle ? 0 : '4px',
-                background: selectedStyle ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.04)',
-                border: selectedStyle ? '1px solid rgba(168,85,247,0.72)' : '1px solid rgba(255,255,255,0.10)',
-                boxShadow: selectedStyle ? '0 0 0 1px rgba(168,85,247,0.22), inset 0 0 0 1px rgba(255,255,255,0.08)' : 'none',
                 opacity: 1,
               }}
               title={t('style.selectStyle')}
@@ -997,6 +993,13 @@ export function ImageNodeControlPanel({
               )}
             </button>
           </div>
+          {orderedRefs.length > 0 && (
+            <div
+              aria-hidden="true"
+              className="mx-1 h-6 w-px flex-shrink-0"
+              style={{ background: 'rgba(255,255,255,0.12)' }}
+            />
+          )}
           {/* Reference thumbnails — supports drag sorting */}
           <div className="flex items-center gap-2">
             {orderedRefs.map((ref, idx) => (
@@ -1112,7 +1115,7 @@ export function ImageNodeControlPanel({
         <div className="px-3.5 pb-1">
           <div
             className="nodrag nowheel flex min-w-0 flex-wrap items-start gap-2 overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg px-2 py-1.5"
-            style={{ maxHeight: 88, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)' }}
+            style={{ maxHeight: 88, background: 'rgba(180,184,194,0.035)', border: '1px solid rgba(180,184,194,0.14)' }}
             onPointerDown={(event) => event.stopPropagation()}
             onPointerMove={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
@@ -1122,7 +1125,7 @@ export function ImageNodeControlPanel({
             {selectedPresetItems.map((preset) => (
               <span
                 key={preset.id}
-                className="inline-flex h-6 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full border border-white/[0.14] bg-white/[0.06] px-2 text-[12px] text-white/[0.72] transition-colors hover:border-white/[0.22] hover:bg-white/[0.09] hover:text-white/[0.86]"
+                className="inline-flex h-6 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full border border-[rgba(180,184,194,0.24)] bg-[rgba(180,184,194,0.06)] px-2 text-[12px] text-[rgba(226,229,236,0.76)] transition-colors hover:border-[rgba(180,184,194,0.48)] hover:bg-[rgba(180,184,194,0.10)] hover:text-[rgba(226,229,236,0.92)]"
               >
                 <span className="min-w-0 truncate">{preset.title || preset.name}</span>
                 <button

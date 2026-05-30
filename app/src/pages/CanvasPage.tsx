@@ -49,6 +49,40 @@ const UPSCALE_NODE_DEFAULTS: Record<string, unknown> = {
   mpUltra: 30,
 };
 
+type ImageFileRejectReason = 'unsupported-type' | 'too-large' | 'decode-failed';
+
+type ImageFileReject = {
+  file: File;
+  reason: ImageFileRejectReason;
+};
+
+function getImageRejectMessage(rejectedFiles: ImageFileReject[], successCount: number): string {
+  if (rejectedFiles.length === 0) return '';
+
+  if (successCount > 0) {
+    return '部分图片未添加，可能是格式不支持、超过 10MB 或图片无法读取。';
+  }
+
+  const reasons = new Set(rejectedFiles.map((item) => item.reason));
+  const hasTooLarge = reasons.has('too-large');
+  const hasUnsupported = reasons.has('unsupported-type');
+  const hasDecodeFailed = reasons.has('decode-failed');
+
+  if (hasTooLarge && !hasUnsupported && !hasDecodeFailed) {
+    return '图片太大，已跳过。单张图片不能超过 10MB。';
+  }
+
+  if (hasUnsupported && !hasTooLarge && !hasDecodeFailed) {
+    return '图片格式不支持。请使用 PNG、JPG、WEBP 或 GIF。';
+  }
+
+  if (hasDecodeFailed && !hasTooLarge && !hasUnsupported) {
+    return '图片无法读取，已跳过。';
+  }
+
+  return '没有可添加的图片。请检查图片格式或文件大小。';
+}
+
 /* ─── Flow Inner ─── */
 
 function FlowCanvas() {
@@ -66,7 +100,9 @@ function FlowCanvas() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(defaultData.nodes as Node[]);
   const { screenToFlowPosition, setViewport, getViewport, fitView } = useReactFlow();
-  const { msg: toastMsg } = useToast();
+  const { msg: toastMsg, show: showToast } = useToast();
+  const objectUrlsRef = useRef<Set<string>>(new Set());
+  useRevokeObjectUrlsOnUnmount(objectUrlsRef);
 
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number } } | null>(null);
@@ -497,6 +533,7 @@ function FlowCanvas() {
         onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' ? createUpscaleNode : undefined,
         onCreateSunSkyNode: n.type === 'image' ? createSunSkyNode : undefined,
         onCreateCompareNode: n.type === 'image' ? createCompareNode : undefined,
+        onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
   }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode]);
@@ -805,6 +842,7 @@ function FlowCanvas() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadToast, setUploadToast] = useState<{ msg: string; type: 'loading' | 'success' } | null>(null);
   const dragLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // ─── Toolbar State ───
   const [showMinimap, setShowMinimap] = useState(false);
@@ -884,14 +922,39 @@ function FlowCanvas() {
     );
   }
 
+  function getFilesFromClipboard(clipboardData: DataTransfer): File[] {
+    const filesFromItems = Array.from(clipboardData.items ?? [])
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    const filesFromFiles = Array.from(clipboardData.files ?? []);
+
+    const seen = new Set<string>();
+    const files: File[] = [];
+    for (const file of [...filesFromItems, ...filesFromFiles]) {
+      const key = `${file.name}-${file.size}-${file.type}-${file.lastModified}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        files.push(file);
+      }
+    }
+
+    return files;
+  }
+
   const createImageNodesFromFiles = useCallback(
     (files: File[], basePosition: { x: number; y: number }) => {
+      const rejectedFiles: ImageFileReject[] = [];
+
       const validFiles = files.filter((file) => {
         if (!isAcceptedImageFile(file)) {
+          rejectedFiles.push({ file, reason: 'unsupported-type' });
           console.warn(`[Canvas] Skipped unsupported image: ${file.name || 'unnamed'} (type: ${file.type || 'unknown'})`);
           return false;
         }
         if (file.size > MAX_IMAGE_UPLOAD_SIZE) {
+          rejectedFiles.push({ file, reason: 'too-large' });
           console.warn(
             `[Canvas] Skipped oversized image: ${file.name || 'unnamed'} (${(file.size / 1024 / 1024).toFixed(1)}MB > 10MB)`,
           );
@@ -900,14 +963,19 @@ function FlowCanvas() {
         return true;
       });
 
-      if (validFiles.length === 0) return;
+      const preCheckMessage = getImageRejectMessage(rejectedFiles, validFiles.length);
+      if (validFiles.length === 0) {
+        if (preCheckMessage) showToast(preCheckMessage);
+        return;
+      }
 
       setUploadToast({ msg: t('canvas.uploading'), type: 'loading' });
 
       Promise.all(
         validFiles.map((file, index) => {
-          return new Promise<{ node: Node; index: number }>((resolve) => {
+          return new Promise<{ node: Node; index: number } | null>((resolve) => {
             const url = URL.createObjectURL(file);
+            objectUrlsRef.current.add(url);
             const imgEl = new window.Image();
             imgEl.onload = () => {
               const offsetX = index * 40;
@@ -931,20 +999,42 @@ function FlowCanvas() {
               };
               resolve({ node: newNode, index });
             };
+            imgEl.onerror = () => {
+              URL.revokeObjectURL(url);
+              objectUrlsRef.current.delete(url);
+              rejectedFiles.push({ file, reason: 'decode-failed' });
+              console.warn(`[Canvas] Failed to decode image: ${file.name || 'unnamed'}`);
+              resolve(null);
+            };
             imgEl.src = url;
           });
         }),
       ).then((results) => {
-        const newNodes = results.map((r) => r.node);
+        const newNodes = results
+          .filter((result): result is { node: Node; index: number } => Boolean(result))
+          .map((r) => r.node);
+
+        if (newNodes.length === 0) {
+          setUploadToast(null);
+          const finalMessage = getImageRejectMessage(rejectedFiles, newNodes.length);
+          if (finalMessage) showToast(finalMessage);
+          return;
+        }
+
         setNodes((nds) => [
           ...nds.map((n) => ({ ...n, selected: false })),
           ...newNodes,
         ]);
         setUploadToast({ msg: t('canvas.uploadSuccess'), type: 'success' });
         setTimeout(() => setUploadToast(null), 2500);
+
+        if (rejectedFiles.length > 0) {
+          const partialMessage = getImageRejectMessage(rejectedFiles, newNodes.length);
+          if (partialMessage) showToast(partialMessage);
+        }
       });
     },
-    [setNodes, t],
+    [setNodes, t, showToast],
   );
 
   const handleDropFiles = useCallback(
@@ -962,41 +1052,25 @@ function FlowCanvas() {
       const clipboardData = event.clipboardData;
       if (!clipboardData) return;
 
-      const items = Array.from(clipboardData.items ?? []);
-      const filesFromItems = items
-        .filter((item) => item.type.startsWith('image/'))
-        .map((item) => item.getAsFile())
-        .filter(Boolean) as File[];
+      const clipboardFiles = getFilesFromClipboard(clipboardData);
 
-      const filesFromFiles = Array.from(clipboardData.files ?? []).filter((file) =>
-        file.type.startsWith('image/'),
-      );
-
-      const seen = new Set<string>();
-      const imageFiles: File[] = [];
-      for (const file of [...filesFromItems, ...filesFromFiles]) {
-        const key = `${file.name}-${file.size}-${file.type}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          imageFiles.push(file);
-        }
-      }
-
-      if (imageFiles.length > 0) {
+      if (clipboardFiles.length > 0) {
         event.preventDefault();
-        const centerPos = screenToFlowPosition({
+        const pastePoint = lastPointerPositionRef.current || {
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
+        };
+        const centerPos = screenToFlowPosition({
+          x: pastePoint.x,
+          y: pastePoint.y,
         });
-        createImageNodesFromFiles(imageFiles, centerPos);
+        createImageNodesFromFiles(clipboardFiles, centerPos);
         return;
       }
 
       if (clipboardRef.current.length > 0) {
         event.preventDefault();
         pasteNodes();
-      } else {
-        event.preventDefault();
       }
     },
     [screenToFlowPosition, createImageNodesFromFiles, pasteNodes],
@@ -1007,6 +1081,18 @@ function FlowCanvas() {
     window.addEventListener('paste', handler);
     return () => window.removeEventListener('paste', handler);
   }, [handlePaste]);
+
+  useEffect(() => {
+    const updatePointerPosition = (event: PointerEvent) => {
+      lastPointerPositionRef.current = { x: event.clientX, y: event.clientY };
+    };
+    window.addEventListener('pointermove', updatePointerPosition, true);
+    window.addEventListener('pointerdown', updatePointerPosition, true);
+    return () => {
+      window.removeEventListener('pointermove', updatePointerPosition, true);
+      window.removeEventListener('pointerdown', updatePointerPosition, true);
+    };
+  }, []);
 
   // ─── Canvas Stage Handlers ───
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
@@ -1273,6 +1359,23 @@ function FlowCanvas() {
       />
     </div>
   );
+}
+
+/* ─── Page-level cleanup: revoke all registered objectURLs on unmount ─── */
+function useRevokeObjectUrlsOnUnmount(objectUrlsRef: React.RefObject<Set<string> | null>) {
+  useEffect(() => {
+    return () => {
+      if (!objectUrlsRef.current) return;
+      objectUrlsRef.current.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore already-revoked or invalid URLs
+        }
+      });
+      objectUrlsRef.current.clear();
+    };
+  }, [objectUrlsRef]);
 }
 
 /* ─── Wrapper ─── */

@@ -1,6 +1,7 @@
 import type { GenerationHistoryItem, GenerationTask } from './generation.types';
 import type { ImageRole, PromptContent } from './imageNode.types';
 import type { MarkItem, ModelParams } from './canvas.types';
+import type { LightPreviewData } from './lightPreview.types';
 
 /**
  * Typed data shape for an ImageNode.
@@ -36,6 +37,7 @@ export interface ImageNodeData {
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
+  lightPreview?: LightPreviewData;
 }
 
 function castRecord(data: unknown): Record<string, unknown> {

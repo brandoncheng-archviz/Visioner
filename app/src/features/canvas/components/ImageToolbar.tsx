@@ -1,10 +1,10 @@
 import type { MouseEvent, PointerEvent } from 'react';
-import { Sun, Sparkles, Columns2, Maximize2, Download } from 'lucide-react';
+import { Sparkles, Columns2, Maximize2, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ToolbarAction {
-  icon: typeof Sun;
+  icon: typeof Sparkles;
   label: string;
   tooltipLabel?: string;
   action: () => void;
@@ -12,14 +12,12 @@ interface ToolbarAction {
 }
 
 export function ImageToolbar({
-  onSunSky,
   onUpscale,
   onCompare,
   onPreview,
   onDownload,
   hasImage,
 }: {
-  onSunSky: () => void;
   onUpscale: () => void;
   onCompare: () => void;
   onPreview: () => void;
@@ -29,7 +27,6 @@ export function ImageToolbar({
   const { t } = useTranslation();
 
   const tools: ToolbarAction[] = [
-    { icon: Sun, label: t('imageNode.sunSky'), action: onSunSky, disabled: !hasImage },
     { icon: Sparkles, label: t('imageNode.upscale'), tooltipLabel: t('imageNode.upscaleShort'), action: onUpscale, disabled: !hasImage },
     { icon: Columns2, label: t('imageNode.compare'), action: onCompare, disabled: !hasImage },
     { icon: Maximize2, label: t('imageNode.preview'), action: onPreview, disabled: !hasImage },

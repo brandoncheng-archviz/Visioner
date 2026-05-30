@@ -1,4 +1,5 @@
 import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition, PromptTemplate } from '../types/imageNode.types';
+import type { LightPreviewData } from '../types/lightPreview.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
 
@@ -128,6 +129,7 @@ export function buildPromptSubmission(
   selectedPresetIds: string[],
   selectedStyle: StyleDefinition | null,
   nodeReferences: ReferenceInfo[] = [],
+  lightPreview?: LightPreviewData | null,
 ) {
   const trimmedUserText = userText.trim();
   const imageRefBlocks = promptContent
@@ -203,6 +205,10 @@ export function buildPromptSubmission(
   if (selectedStyle) {
     sections.push(`最终全局 Look / LUT / 视觉语言：${serializeStylePrompt(selectedStyle)}`);
   }
+  if (lightPreview?.enabled && lightPreview.derived?.promptText) {
+    sections.push(`光影控制：${lightPreview.derived.promptText}`);
+  }
+
   if (nodeReferences.length) {
     sections.push('维度控制约束：参考图按各自定义用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
   }

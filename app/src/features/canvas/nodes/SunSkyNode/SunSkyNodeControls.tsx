@@ -1,4 +1,5 @@
 import { Compass, Sun } from 'lucide-react';
+import type { SyntheticEvent } from 'react';
 
 export interface SunSkyNodeControlsProps {
   elevation: number;
@@ -73,9 +74,21 @@ function SunSlider({
   onChange: (value: number) => void;
 }) {
   const percent = ((value - min) / (max - min)) * 100;
+  const stopSliderEvent = (event: SyntheticEvent) => {
+    event.stopPropagation();
+  };
 
   return (
-    <div className="nodrag nowheel grid items-center gap-3" style={{ gridTemplateColumns: '96px minmax(0, 1fr) 70px' }}>
+    <div
+      className="nodrag nopan nowheel grid items-center gap-3"
+      style={{ gridTemplateColumns: '96px minmax(0, 1fr) 70px' }}
+      onWheel={stopSliderEvent}
+      onPointerDown={stopSliderEvent}
+      onPointerMove={stopSliderEvent}
+      onMouseDown={stopSliderEvent}
+      onTouchStart={stopSliderEvent}
+      onTouchMove={stopSliderEvent}
+    >
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-[13px] font-semibold text-white/78">
           <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>
@@ -90,6 +103,12 @@ function SunSlider({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
+          onWheel={stopSliderEvent}
+          onPointerDown={stopSliderEvent}
+          onPointerMove={stopSliderEvent}
+          onMouseDown={stopSliderEvent}
+          onTouchStart={stopSliderEvent}
+          onTouchMove={stopSliderEvent}
           className="h-1.5 w-full cursor-pointer appearance-none rounded-full"
           style={{
             background: `linear-gradient(to right, #208cff 0%, #208cff ${percent}%, rgba(255,255,255,0.12) ${percent}%, rgba(255,255,255,0.12) 100%)`,
