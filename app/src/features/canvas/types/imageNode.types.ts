@@ -3,15 +3,25 @@ import type { Building2 } from 'lucide-react';
 export type ImageRole =
   | 'primary_building'
   | 'atmosphere_reference'
-  | 'vegetation_reference'
-  | 'people_reference'
-  | 'sky_reference'
+  | 'local_reference'
   | 'custom_reference'
   | 'undefined_usage'
   | 'material_reference'
   | 'lighting_reference'
   | 'overall_reference'
+  // Legacy roles (read-only compatibility, mapped to local_reference)
+  | 'vegetation_reference'
+  | 'people_reference'
+  | 'sky_reference'
   | 'plant_reference';
+
+export type LocalReferenceType =
+  | 'vegetation'
+  | 'people'
+  | 'sky'
+  | 'water'
+  | 'retail'
+  | 'other';
 
 export interface PromptTemplate {
   goal: string;
@@ -109,6 +119,8 @@ export interface ReferenceInfo {
   role: ImageRole | null;
   roleLabel: string;
   customRoleLabel?: string;
+  localReferenceType?: LocalReferenceType;
+  localReferenceLabel?: string;
   imageUrl: string;
   width?: number;
   height?: number;

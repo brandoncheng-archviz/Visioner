@@ -1,4 +1,5 @@
 import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition, PromptTemplate } from '../types/imageNode.types';
+import { getNormalizedRole, getLocalReferenceTypeFromRole, getLocalReferenceOption } from '../constants/imageUsages';
 import type { LightPreviewData } from '../types/lightPreview.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
@@ -70,20 +71,21 @@ export function stripReferencePromptMetadata(promptText: string) {
 }
 
 export function getImageReferencePromptText(reference: ReferenceInfo) {
-  if (reference.role === 'primary_building' || reference.roleLabel.includes('主体建筑')) {
+  const normalizedRole = getNormalizedRole(reference.role);
+
+  if (normalizedRole === 'primary_building' || reference.roleLabel.includes('主体建筑')) {
     return '保持建筑结构、体块比例、立面关系、相机角度和构图比例不变。';
   }
-  if (reference.role === 'atmosphere_reference' || reference.role === 'overall_reference' || reference.roleLabel.includes('氛围')) {
+  if (normalizedRole === 'atmosphere_reference' || reference.role === 'overall_reference' || reference.roleLabel.includes('氛围')) {
     return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
   }
-  if (reference.role === 'vegetation_reference' || reference.role === 'plant_reference' || reference.roleLabel.includes('植物')) {
-    return '参考植物种类、种植密度、层次关系、季节状态和景观氛围。';
-  }
-  if (reference.role === 'people_reference' || reference.roleLabel.includes('人物')) {
-    return '参考人物类型、姿态、尺度关系、活动状态和画面中的生活感。';
-  }
-  if (reference.role === 'sky_reference' || reference.roleLabel.includes('天空')) {
-    return '参考天空状态、云量、光线方向、大气透明度和整体天气感。';
+  if (normalizedRole === 'local_reference') {
+    const type = reference.localReferenceType || getLocalReferenceTypeFromRole(reference.role);
+    if (type) {
+      const option = getLocalReferenceOption(type);
+      if (option) return option.promptText;
+    }
+    return '只重点参考该图中的指定局部元素，不复制整体建筑体块与构图。';
   }
   if (reference.role === 'custom_reference') {
     const customUsage = reference.customRoleLabel?.trim() || reference.roleLabel.trim();
@@ -146,13 +148,15 @@ export function buildPromptSubmission(
   const customUsages = imageRefBlocks.filter((block) => blockRole(block) === 'custom_reference' || block.usage?.includes('自定义'));
   const localRefs = imageRefBlocks.filter(
     (block) =>
+      blockRole(block) === 'local_reference' ||
       blockRole(block) === 'vegetation_reference' ||
       blockRole(block) === 'plant_reference' ||
       blockRole(block) === 'people_reference' ||
       blockRole(block) === 'sky_reference' ||
       block.usage?.includes('植物') ||
       block.usage?.includes('人物') ||
-      block.usage?.includes('天空'),
+      block.usage?.includes('天空') ||
+      block.usage?.includes('局部'),
   );
   const atmosphereRefs = imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围'));
   const undefinedRefs = imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未定义用途');
@@ -221,6 +225,7 @@ export function buildPromptSubmission(
       usageKey: reference.role ?? 'undefined_usage',
       usageLabel: reference.roleLabel || '未定义用途',
       customUsageName: reference.customRoleLabel,
+      localReferenceType: reference.localReferenceType,
       promptText: getImageReferencePromptText(reference),
     })),
     promptBlocks: promptContent.map((block) =>
@@ -242,6 +247,7 @@ export function buildPromptSubmission(
       imageId: reference.nodeId,
       sourceNodeId: reference.nodeId,
       usage: reference.roleLabel || '未定义用途',
+      localReferenceType: reference.localReferenceType,
     })),
   };
 }

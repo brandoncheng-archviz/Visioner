@@ -1,20 +1,29 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { imageRoleOptions, getImageRoleOption, validateCustomReferenceLabel } from '../constants/imageUsages';
+import {
+  imageRoleOptions,
+  getImageRoleOption,
+  getImageRoleLabel,
+  getImageRoleColor,
+  validateCustomReferenceLabel,
+  localReferenceOptions,
+} from '../constants/imageUsages';
 import { FLOATING_PANEL_BACKGROUND } from '../constants/canvasConstants';
-import type { ImageRole } from '../types/imageNode.types';
+import type { ImageRole, LocalReferenceType } from '../types/imageNode.types';
 
 export function ImageRoleTag({
   role,
   customRoleLabel,
+  localReferenceType,
   onChange,
   open: controlledOpen,
   onOpenChange,
 }: {
   role: ImageRole | null;
   customRoleLabel?: string;
-  onChange: (role: ImageRole, customRoleLabel?: string) => void;
+  localReferenceType?: LocalReferenceType;
+  onChange: (role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType) => void;
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
 }) {
@@ -26,10 +35,16 @@ export function ImageRoleTag({
   const [isTagHovered, setIsTagHovered] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInput, setCustomInput] = useState('');
+  const [expandedLocalRef, setExpandedLocalRef] = useState(false);
   const customInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const displayLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType);
   const selectedOption = getImageRoleOption(role, customRoleLabel);
-  const previewOption = getImageRoleOption(hoveredRole || role, hoveredRole === 'custom_reference' ? customInput : customRoleLabel);
+  const selectedRoleColor = getImageRoleColor(role, localReferenceType);
+  const previewOption = getImageRoleOption(
+    hoveredRole || role,
+    hoveredRole === 'custom_reference' ? customInput : customRoleLabel,
+  );
   const DisplayIcon = selectedOption?.Icon || Building2;
   const customUsageSuggestions = [
     t('imageNode.customSuggestions.paving', { defaultValue: '铺装参考' }),
@@ -42,6 +57,7 @@ export function ImageRoleTag({
     if (!open) {
       setShowCustomInput(false);
       setHoveredRole(null);
+      setExpandedLocalRef(false);
     }
   }, [open]);
 
@@ -63,6 +79,12 @@ export function ImageRoleTag({
     setOpen(false);
   };
 
+  const handleSelectLocalType = (type: LocalReferenceType) => {
+    onChange('local_reference', undefined, type);
+    setExpandedLocalRef(false);
+    setOpen(false);
+  };
+
   useEffect(() => {
     if (!open) return;
 
@@ -78,6 +100,7 @@ export function ImageRoleTag({
       if (event.key !== 'Escape') return;
       setOpen(false);
       setShowCustomInput(false);
+      setExpandedLocalRef(false);
     };
 
     document.addEventListener('pointerdown', closeOnOutside, true);
@@ -112,9 +135,9 @@ export function ImageRoleTag({
             boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
           }}
         >
-          <DisplayIcon className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.74)' }} />
-          <span>{selectedOption?.label || t('imageNode.definePurpose')}</span>
-          <ChevronDown className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
+          <DisplayIcon className="h-3 w-3" style={{ color: selectedOption ? selectedRoleColor : 'rgba(255,255,255,0.74)' }} />
+          <span>{displayLabel || t('imageNode.definePurpose')}</span>
+          <ChevronDown className="h-3 w-3" style={{ color: selectedOption ? selectedRoleColor : 'rgba(255,255,255,0.68)' }} />
         </button>
       </div>
 
@@ -133,31 +156,62 @@ export function ImageRoleTag({
           {imageRoleOptions.map((option) => {
             const active = option.value === role;
             const hovered = hoveredRole === option.value;
+            const isLocalRef = option.value === 'local_reference';
+            const isExpandedLocal = isLocalRef && expandedLocalRef;
             return (
-              <button
-                key={option.value}
-                type="button"
-                onMouseEnter={() => setHoveredRole(option.value)}
-                onFocus={() => setHoveredRole(option.value)}
-                onClick={() => {
-                  if (option.value === 'custom_reference') {
-                    setShowCustomInput(true);
-                    setCustomInput('');
-                    return;
-                  }
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-                className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors"
-                style={{
-                  background: hovered ? 'rgba(255,255,255,0.09)' : active ? 'rgba(255,255,255,0.045)' : 'transparent',
-                  color: hovered ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.82)',
-                }}
-              >
-                <option.Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />
-                <span className="flex-1 font-medium">{option.label}</span>
-                {active && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
-              </button>
+              <div key={option.value}>
+                <button
+                  type="button"
+                  onMouseEnter={() => setHoveredRole(option.value)}
+                  onFocus={() => setHoveredRole(option.value)}
+                  onClick={() => {
+                    if (option.value === 'custom_reference') {
+                      setShowCustomInput(true);
+                      setCustomInput('');
+                      return;
+                    }
+                    if (isLocalRef) {
+                      setExpandedLocalRef(true);
+                      return;
+                    }
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors"
+                  style={{
+                    background: hovered ? 'rgba(255,255,255,0.09)' : active ? 'rgba(255,255,255,0.045)' : 'transparent',
+                    color: hovered ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.82)',
+                  }}
+                >
+                  <option.Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />
+                  <span className="flex-1 font-medium">{option.label}</span>
+                  {active && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
+                </button>
+                {isExpandedLocal && (
+                  <div className="mx-1.5 mb-1.5 mt-0.5 rounded-[10px] p-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="mb-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      {t('reference.selectLocalElement', { defaultValue: '选择参考的局部元素' })}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {localReferenceOptions.map((sub) => (
+                        <button
+                          key={sub.value}
+                          type="button"
+                          onClick={() => handleSelectLocalType(sub.value)}
+                          className="rounded-lg px-1.5 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
+                          style={{
+                            background: localReferenceType === sub.value ? `${sub.color}2e` : 'rgba(255,255,255,0.045)',
+                            border: localReferenceType === sub.value ? `1px solid ${sub.color}66` : '1px solid rgba(255,255,255,0.08)',
+                            color: localReferenceType === sub.value ? sub.color : 'rgba(255,255,255,0.75)',
+                          }}
+                        >
+                          {sub.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
           {showCustomInput && (
@@ -213,7 +267,7 @@ export function ImageRoleTag({
               </div>
             </div>
           )}
-          {!showCustomInput && (
+          {!showCustomInput && !expandedLocalRef && (
             <div
               className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[12px] leading-relaxed"
               style={{

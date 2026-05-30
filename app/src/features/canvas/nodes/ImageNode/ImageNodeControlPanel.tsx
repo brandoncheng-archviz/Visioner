@@ -18,6 +18,7 @@ import type {
   ImageReferencePromptBlock,
   ReferenceInfo,
   ImageRole,
+  LocalReferenceType,
   PresetItem,
 } from '../../types/imageNode.types';
 import type { ModelParams } from '../../types/canvas.types';
@@ -33,7 +34,7 @@ import {
   RATIO_OPTIONS,
   COUNT_OPTIONS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, imageRoleOptions, getImageRoleLabel, getImageRoleColor, validateCustomReferenceLabel } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, imageRoleOptions, localReferenceOptions, getImageRoleLabel, getImageRoleColor, validateCustomReferenceLabel } from '../../constants/imageUsages';
 import {
   PRESET_DATA,
   PRESET_TABS,
@@ -91,7 +92,7 @@ export function ImageNodeControlPanel({
   onRemoveReference: (nodeId: string) => void;
   onReorderReferences: (newOrder: string[]) => void;
   onUseReference: (reference: ReferenceInfo) => void;
-  onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string) => ReferenceInfo | null;
+  onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType) => ReferenceInfo | null;
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
@@ -110,8 +111,10 @@ export function ImageNodeControlPanel({
   const [usageConflict, setUsageConflict] = useState<{
     role: ImageRole;
     customRoleLabel?: string;
+    localReferenceType?: LocalReferenceType;
     conflictingRef: ReferenceInfo;
   } | null>(null);
+  const [pendingLocalRefExpanded, setPendingLocalRefExpanded] = useState(false);
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
   const [editingPromptBlockId, setEditingPromptBlockId] = useState<string | null>(null);
@@ -391,6 +394,7 @@ export function ImageNodeControlPanel({
     setShowReferenceMenu(false);
     setPendingReference(null);
     setPendingCustomInput(false);
+    setPendingLocalRefExpanded(false);
     setPendingCustomValue('');
     setUsageConflict(null);
   };
@@ -535,9 +539,9 @@ export function ImageNodeControlPanel({
     }
   }, [pendingCustomInput]);
 
-  const applyReferenceRole = (reference: ReferenceInfo, role: ImageRole, customRoleLabel?: string, insertPromptBlock = true) => {
-    const roleLabel = getImageRoleLabel(role, customRoleLabel);
-    const updatedReference = onAssignReferenceRole(reference.nodeId, role, customRoleLabel) || { ...reference, role, roleLabel, customRoleLabel };
+  const applyReferenceRole = (reference: ReferenceInfo, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, insertPromptBlock = true) => {
+    const roleLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType);
+    const updatedReference = onAssignReferenceRole(reference.nodeId, role, customRoleLabel, localReferenceType) || { ...reference, role, roleLabel, customRoleLabel, localReferenceType };
     onUseReference(updatedReference);
     if (insertPromptBlock) {
       insertReferenceBlock(updatedReference);
@@ -548,24 +552,28 @@ export function ImageNodeControlPanel({
     return updatedReference;
   };
 
-  const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string) => {
+  const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType) => {
     if (!pendingReference) return;
+    if (role === 'local_reference' && !localReferenceType) {
+      setPendingLocalRefExpanded(true);
+      return;
+    }
     // 检查唯一用途冲突
     if (UNIQUE_USAGES.includes(role)) {
       const conflictingRef = references.find((ref) => ref.nodeId !== pendingReference.nodeId && ref.role === role);
       if (conflictingRef) {
-        setUsageConflict({ role, customRoleLabel, conflictingRef });
+        setUsageConflict({ role, customRoleLabel, localReferenceType, conflictingRef });
         return;
       }
     }
-    applyReferenceRole(pendingReference, role, customRoleLabel);
+    applyReferenceRole(pendingReference, role, customRoleLabel, localReferenceType);
   };
 
   const replaceConflictingReference = () => {
     if (!pendingReference || !usageConflict) return;
     const oldBlock = imageReferenceBlocks.find((block) => block.sourceNodeId === usageConflict.conflictingRef.nodeId);
     onRemoveReference(usageConflict.conflictingRef.nodeId);
-    const updatedReference = applyReferenceRole(pendingReference, usageConflict.role, usageConflict.customRoleLabel, false);
+    const updatedReference = applyReferenceRole(pendingReference, usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType, false);
     if (!oldBlock) return;
     const nextBlock = createImageReferenceBlock(updatedReference);
     onPromptContentChange(
@@ -654,7 +662,11 @@ export function ImageNodeControlPanel({
 
     if (pendingReference && event.key === 'Escape') {
       event.preventDefault();
-      closeReferenceMenus();
+      if (pendingLocalRefExpanded) {
+        setPendingLocalRefExpanded(false);
+      } else {
+        closeReferenceMenus();
+      }
     }
 
     // Prompt input line break shortcuts (when no menu is open)
@@ -1060,7 +1072,7 @@ export function ImageNodeControlPanel({
                   className="relative h-full w-full overflow-hidden rounded-lg"
                   style={{
               background: ref.role === 'undefined_usage' ? 'rgba(156,163,175,0.08)' : 'rgba(255,255,255,0.04)',
-              border: ref.role === 'undefined_usage' ? '1px solid rgba(156,163,175,0.20)' : `1px solid ${getImageRoleColor(ref.role)}`,
+              border: ref.role === 'undefined_usage' ? '1px solid rgba(156,163,175,0.20)' : `1px solid ${getImageRoleColor(ref.role, ref.localReferenceType)}`,
             }}
                 >
                   {ref.imageUrl ? (
@@ -1156,7 +1168,7 @@ export function ImageNodeControlPanel({
                 const previewImage = reference?.imageUrl || block.thumbnailUrl;
                 const highlighted = highlightedPromptBlockId === block.id;
                 const hovered = hoveredPromptBlockId === block.id;
-                const usageColor = getImageRoleColor(reference?.role ?? null);
+                const usageColor = getImageRoleColor(reference?.role ?? null, reference?.localReferenceType);
                 const isEditing = editingPromptBlockId === block.id;
                 const displayPromptText = stripReferencePromptMetadata(block.promptText);
 
@@ -1335,7 +1347,7 @@ export function ImageNodeControlPanel({
                       <Image className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.45)' }} />
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{reference.roleLabel || t('imageNode.undefinedUsage')}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{getImageRoleLabel(reference.role, reference.customRoleLabel, reference.localReferenceType) || t('imageNode.undefinedUsage')}</span>
                 </button>
               ))}
             </div>
@@ -1358,7 +1370,7 @@ export function ImageNodeControlPanel({
               {usageConflict && (
                 <div className="mx-2 mb-1 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.10)' }}>
                   <div className="text-[12px] leading-5" style={{ color: 'rgba(255,255,255,0.72)' }}>
-                    {t('imageNode.usageConflictTitle', { role: getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel) })}
+                    {t('imageNode.usageConflictTitle', { role: getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType) })}
                   </div>
                   <div className="mt-2 flex gap-1.5">
                     <button
@@ -1390,23 +1402,50 @@ export function ImageNodeControlPanel({
               )}
               {imageRoleOptions.map((option) => {
                 const RoleIcon = option.Icon;
+                const isLocalRef = option.value === 'local_reference';
+                const isExpandedLocal = isLocalRef && pendingLocalRefExpanded;
                 return (
-                  <button
-                    key={option.value}
-                    onClick={() => {
-                      if (option.value === 'custom_reference') {
-                        setPendingCustomInput(true);
-                        setPendingCustomValue('');
-                        return;
-                      }
-                      handleReferenceRoleSelect(option.value);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] transition-colors hover:bg-white/5"
-                    style={{ color: 'rgba(255,255,255,0.86)' }}
-                  >
-                    <RoleIcon className="h-4 w-4" style={{ color: option.color }} />
-                    {option.label}
-                  </button>
+                  <div key={option.value}>
+                    <button
+                      onClick={() => {
+                        if (option.value === 'custom_reference') {
+                          setPendingCustomInput(true);
+                          setPendingCustomValue('');
+                          return;
+                        }
+                        handleReferenceRoleSelect(option.value);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] transition-colors hover:bg-white/5"
+                      style={{ color: 'rgba(255,255,255,0.86)' }}
+                    >
+                      <RoleIcon className="h-4 w-4" style={{ color: option.color }} />
+                      {option.label}
+                    </button>
+                    {isExpandedLocal && (
+                      <div className="mx-3 mb-2 mt-0.5 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div className="mb-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                          {t('reference.selectLocalElement', { defaultValue: '选择参考的局部元素' })}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {localReferenceOptions.map((sub) => (
+                            <button
+                              key={sub.value}
+                              type="button"
+                              onClick={() => handleReferenceRoleSelect('local_reference', undefined, sub.value)}
+                              className="rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
+                              style={{
+                                background: 'rgba(255,255,255,0.045)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                color: 'rgba(255,255,255,0.75)',
+                              }}
+                            >
+                              {sub.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
               {pendingCustomInput && (

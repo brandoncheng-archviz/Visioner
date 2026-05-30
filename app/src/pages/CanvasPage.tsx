@@ -317,8 +317,8 @@ function FlowCanvas() {
     });
   }, []);
 
-  const assignReferenceEdgeRole = useCallback((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string) => {
-    const roleData = getRoleData(role, customRoleLabel);
+  const assignReferenceEdgeRole = useCallback((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: import('../features/canvas/types/imageNode.types').LocalReferenceType) => {
+    const roleData = getRoleData(role, customRoleLabel, localReferenceType);
     setEdges((eds) =>
       eds.map((edge) =>
         edge.source === sourceNodeId && edge.target === targetNodeId

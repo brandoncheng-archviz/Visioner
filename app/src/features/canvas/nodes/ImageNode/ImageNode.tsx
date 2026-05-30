@@ -4,7 +4,7 @@ import { Image, Plus, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
-import type { ImageRole, PromptContent, ReferenceInfo } from '../../types/imageNode.types';
+import type { ImageRole, PromptContent, ReferenceInfo, LocalReferenceType } from '../../types/imageNode.types';
 import type { MarkItem, ModelParams } from '../../types/canvas.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
@@ -23,7 +23,7 @@ import {
   IMAGE_NODE_CONTROL_HEIGHT,
   DEFAULT_MODEL_PARAMS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole } from '../../constants/imageUsages';
 import { getStylePresetById, getPresetById } from '../../constants/presets';
 import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
@@ -43,8 +43,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const inputImage = getInputImage(data);
   const currentImage = getCurrentImage(data);
-  const role = (data.role as ImageRole | null | undefined) ?? null;
+  const rawRole = (data.role as ImageRole | null | undefined) ?? null;
+  const role = rawRole;
   const customRoleLabel = data.customRoleLabel as string | undefined;
+  const localReferenceType = (data.localReferenceType as LocalReferenceType | undefined) ?? getLocalReferenceTypeFromRole(rawRole);
   const fileRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || 'Image');
@@ -122,18 +124,22 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (sourceNode?.type === 'sunSky') return [];
     const edgeRole = edge.data?.role as ImageRole | null | undefined;
     const edgeCustomRoleLabel = edge.data?.customRoleLabel as string | undefined;
+    const edgeLocalRefType = edge.data?.localReferenceType as LocalReferenceType | undefined;
     const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
     const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
+    const sourceLocalRefType = sourceNode?.data?.localReferenceType as LocalReferenceType | undefined;
     const referenceRole = edgeRole ?? sourceRole;
     const referenceCustomRoleLabel = edgeCustomRoleLabel ?? sourceCustomRoleLabel;
+    const referenceLocalRefType = edgeLocalRefType ?? sourceLocalRefType ?? getLocalReferenceTypeFromRole(referenceRole);
     const imageUrl = getCurrentImage(sourceNode?.data);
     if (!imageUrl) return [];
     return [{
       nodeId: edge.source,
       index: 0,
       role: referenceRole,
-      roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel),
+      roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel, referenceLocalRefType),
       customRoleLabel: referenceCustomRoleLabel,
+      localReferenceType: referenceLocalRefType,
       imageUrl,
       width: getNodeWidth(sourceNode?.data),
       height: getNodeHeight(sourceNode?.data),
@@ -155,6 +161,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       role: reference.role,
       roleLabel: reference.roleLabel,
       customRoleLabel: reference.customRoleLabel,
+      localReferenceType: reference.localReferenceType,
       imageUrl: reference.imageUrl,
       width: reference.width,
       height: reference.height,
@@ -179,6 +186,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               usageKey: reference.role ?? 'undefined_usage',
               usageLabel: reference.roleLabel || t('imageNode.undefinedUsage'),
               customUsageName: reference.customRoleLabel,
+              localReferenceType: reference.localReferenceType,
             })),
             referencesSignature,
           },
@@ -401,12 +409,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     );
   };
 
-  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string) => {
+  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType) => {
     const roleOption = getImageRoleOption(nextRole, nextCustomRoleLabel);
-    const roleData = getRoleData(nextRole, nextCustomRoleLabel);
-    const assignReferenceEdgeRole = data.onAssignReferenceEdgeRole as ((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string) => void) | undefined;
+    const roleData = getRoleData(nextRole, nextCustomRoleLabel, nextLocalRefType);
+    const assignReferenceEdgeRole = data.onAssignReferenceEdgeRole as ((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType) => void) | undefined;
     if (assignReferenceEdgeRole) {
-      assignReferenceEdgeRole(id, sourceNodeId, nextRole, nextCustomRoleLabel);
+      assignReferenceEdgeRole(id, sourceNodeId, nextRole, nextCustomRoleLabel, nextLocalRefType);
     } else {
       setEdges((eds) =>
         eds.map((edge) =>
@@ -424,7 +432,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       ...existingReference,
       role: nextRole,
       customRoleLabel: nextCustomRoleLabel,
-      roleLabel: roleOption?.label || existingReference.roleLabel,
+      localReferenceType: nextLocalRefType,
+      roleLabel: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType) || roleOption?.label || existingReference.roleLabel,
     };
   };
 
@@ -473,7 +482,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label: newName } } : n)));
   };
 
-  const handleRoleChange = (nextRole: ImageRole, nextCustomRoleLabel?: string) => {
+  const handleRoleChange = (nextRole: ImageRole, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType) => {
     if (UNIQUE_USAGES.includes(nextRole)) {
       const affectedTargetIds = allEdges.filter((edge) => edge.source === id).map((edge) => edge.target);
       const conflictingTarget = affectedTargetIds.find((targetId) =>
@@ -485,11 +494,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         }),
       );
       if (conflictingTarget) {
-        showToast(t('reference.downstreamConflict', { role: getImageRoleLabel(nextRole, nextCustomRoleLabel) }));
+        showToast(t('reference.downstreamConflict', { role: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType) }));
         return;
       }
     }
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole, nextCustomRoleLabel) } } : n)));
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole, nextCustomRoleLabel, nextLocalRefType) } } : n)));
   };
 
   const stopTitleInteraction = (event: React.SyntheticEvent) => {
@@ -601,13 +610,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   setRoleMenuOpen(true);
                 }}
                 className="flex-shrink-0 cursor-pointer select-none transition-all hover:brightness-125"
-                style={{ color: getImageRoleColor(role), fontSize: 11 }}
+                style={{ color: getImageRoleColor(role, localReferenceType), fontSize: 11 }}
                 title={t('imageNode.setImagePurpose')}
               >
                 {RoleIconForTitle && (
                   <RoleIconForTitle className="inline-block" style={{ width: 11, height: 11, marginRight: 3, verticalAlign: '-0.1em' }} />
                 )}
-                {roleOption?.label || t('imageNode.undefinedUsage')}
+                {getImageRoleLabel(role, customRoleLabel, localReferenceType) || t('imageNode.undefinedUsage')}
               </span>
             )}
             {editingName ? (
@@ -668,7 +677,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         )}
 
         {displayImage && (isOnlySelected || roleMenuOpen) && (
-          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
+          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} localReferenceType={localReferenceType} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}
