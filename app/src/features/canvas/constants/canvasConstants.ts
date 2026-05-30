@@ -66,3 +66,12 @@ export const RATIO_OPTIONS = [
 ];
 
 export const COUNT_OPTIONS = ['1张', '2张', '4张'];
+
+export const MAX_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
+
+export const ACCEPTED_IMAGE_UPLOAD_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+]);

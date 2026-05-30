@@ -14,7 +14,7 @@ import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
-import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
@@ -713,15 +713,10 @@ function FlowCanvas() {
       const tag = target.tagName.toLowerCase();
       const isEditing = tag === 'input' || tag === 'textarea' || target.isContentEditable;
 
-      // Copy / Paste (global)
+      // Copy (global)
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         copyRef.current();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-        e.preventDefault();
-        pasteRef.current();
         return;
       }
 
@@ -856,55 +851,162 @@ function FlowCanvas() {
     [setNodes],
   );
 
-  const handleDropFiles = useCallback(
-    (files: FileList, screenX: number, screenY: number) => {
-      const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
-      if (imageFiles.length === 0) return;
+  function isEditablePasteTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tagName = target.tagName.toLowerCase();
+    return (
+      tagName === 'input' ||
+      tagName === 'textarea' ||
+      target.isContentEditable ||
+      Boolean(target.closest('[contenteditable="true"]')) ||
+      Boolean(target.closest('[data-paste-ignore="true"]'))
+    );
+  }
 
-      const basePos = screenToFlowPosition({ x: screenX, y: screenY });
+  function formatPastedImageLabel(file: File, index: number, total: number): string {
+    if (file.name && file.name !== 'image.png') {
+      return file.name.replace(/\.[^/.]+$/, '');
+    }
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    return total === 1 ? `pasted-image-${ts}` : `pasted-image-${ts}-${index + 1}`;
+  }
+
+  function isAcceptedImageFile(file: File): boolean {
+    if (ACCEPTED_IMAGE_UPLOAD_TYPES.has(file.type)) return true;
+    const name = file.name.toLowerCase();
+    return (
+      name.endsWith('.png') ||
+      name.endsWith('.jpg') ||
+      name.endsWith('.jpeg') ||
+      name.endsWith('.webp') ||
+      name.endsWith('.gif')
+    );
+  }
+
+  const createImageNodesFromFiles = useCallback(
+    (files: File[], basePosition: { x: number; y: number }) => {
+      const validFiles = files.filter((file) => {
+        if (!isAcceptedImageFile(file)) {
+          console.warn(`[Canvas] Skipped unsupported image: ${file.name || 'unnamed'} (type: ${file.type || 'unknown'})`);
+          return false;
+        }
+        if (file.size > MAX_IMAGE_UPLOAD_SIZE) {
+          console.warn(
+            `[Canvas] Skipped oversized image: ${file.name || 'unnamed'} (${(file.size / 1024 / 1024).toFixed(1)}MB > 10MB)`,
+          );
+          return false;
+        }
+        return true;
+      });
+
+      if (validFiles.length === 0) return;
+
       setUploadToast({ msg: t('canvas.uploading'), type: 'loading' });
 
       Promise.all(
-        imageFiles.map((file, index) => {
-          return new Promise<void>((resolve) => {
+        validFiles.map((file, index) => {
+          return new Promise<{ node: Node; index: number }>((resolve) => {
             const url = URL.createObjectURL(file);
             const imgEl = new window.Image();
             imgEl.onload = () => {
               const offsetX = index * 40;
               const offsetY = index * 40;
-              const position = { x: basePos.x + offsetX, y: basePos.y + offsetY };
+              const position = { x: basePosition.x + offsetX, y: basePosition.y + offsetY };
               const newNode: Node = {
                 id: `image-${Date.now()}-${index}`,
                 type: 'image',
                 position,
                 data: {
-                  label: file.name.replace(/\.[^/.]+$/, ''),
+                  label: formatPastedImageLabel(file, index, validFiles.length),
                   image: url,
                   inputImage: url,
                   currentImage: url,
                   currentResultId: null,
-                  width: imgEl.width,
-                  height: imgEl.height,
+                  width: imgEl.naturalWidth,
+                  height: imgEl.naturalHeight,
                   ...getRoleData(null),
                 },
                 selected: index === 0,
               };
-              setNodes((nds) => [
-                ...nds.map((n) => ({ ...n, selected: false })),
-                newNode,
-              ]);
-              resolve();
+              resolve({ node: newNode, index });
             };
             imgEl.src = url;
           });
         }),
-      ).then(() => {
+      ).then((results) => {
+        const newNodes = results.map((r) => r.node);
+        setNodes((nds) => [
+          ...nds.map((n) => ({ ...n, selected: false })),
+          ...newNodes,
+        ]);
         setUploadToast({ msg: t('canvas.uploadSuccess'), type: 'success' });
         setTimeout(() => setUploadToast(null), 2500);
       });
     },
-    [screenToFlowPosition, setNodes],
+    [setNodes, t],
   );
+
+  const handleDropFiles = useCallback(
+    (files: FileList, screenX: number, screenY: number) => {
+      const basePos = screenToFlowPosition({ x: screenX, y: screenY });
+      createImageNodesFromFiles(Array.from(files), basePos);
+    },
+    [screenToFlowPosition, createImageNodesFromFiles],
+  );
+
+  const handlePaste = useCallback(
+    (event: ClipboardEvent) => {
+      if (isEditablePasteTarget(event.target)) return;
+
+      const clipboardData = event.clipboardData;
+      if (!clipboardData) return;
+
+      const items = Array.from(clipboardData.items ?? []);
+      const filesFromItems = items
+        .filter((item) => item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter(Boolean) as File[];
+
+      const filesFromFiles = Array.from(clipboardData.files ?? []).filter((file) =>
+        file.type.startsWith('image/'),
+      );
+
+      const seen = new Set<string>();
+      const imageFiles: File[] = [];
+      for (const file of [...filesFromItems, ...filesFromFiles]) {
+        const key = `${file.name}-${file.size}-${file.type}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        event.preventDefault();
+        const centerPos = screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+        createImageNodesFromFiles(imageFiles, centerPos);
+        return;
+      }
+
+      if (clipboardRef.current.length > 0) {
+        event.preventDefault();
+        pasteNodes();
+      } else {
+        event.preventDefault();
+      }
+    },
+    [screenToFlowPosition, createImageNodesFromFiles, pasteNodes],
+  );
+
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => handlePaste(e);
+    window.addEventListener('paste', handler);
+    return () => window.removeEventListener('paste', handler);
+  }, [handlePaste]);
 
   // ─── Canvas Stage Handlers ───
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
