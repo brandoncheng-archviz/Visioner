@@ -71,6 +71,8 @@ export function ImageNodeControlPanel({
   onUseReference,
   onAssignReferenceRole,
   showToast,
+  autoOpenLightPanel,
+  onAcknowledgeAutoOpen,
 }: {
   promptText: string;
   onPromptChange: (value: string) => void;
@@ -88,6 +90,8 @@ export function ImageNodeControlPanel({
   canGenerate: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
+  autoOpenLightPanel?: boolean;
+  onAcknowledgeAutoOpen?: () => void;
   references: ReferenceInfo[];
   onRemoveReference: (nodeId: string) => void;
   onReorderReferences: (newOrder: string[]) => void;
@@ -97,6 +101,17 @@ export function ImageNodeControlPanel({
 }) {
   const { t } = useTranslation();
   const [showLightPreview, setShowLightPreview] = useState(false);
+
+  useEffect(() => {
+    if (autoOpenLightPanel) {
+      const timer = setTimeout(() => {
+        setShowLightPreview(true);
+        onAcknowledgeAutoOpen?.();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenLightPanel]);
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [showStylePicker, setShowStylePicker] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);

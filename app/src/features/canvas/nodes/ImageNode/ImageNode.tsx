@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Image, Plus, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
@@ -23,12 +23,13 @@ import {
   IMAGE_NODE_CONTROL_HEIGHT,
   DEFAULT_MODEL_PARAMS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole, getLocalReferenceLabel } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole, getLocalReferenceLabel, getReferenceUsageInfo, localReferenceOptions } from '../../constants/imageUsages';
 import { getStylePresetById, getPresetById } from '../../constants/presets';
 import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
 import { resolveImageNodeSize } from '../../utils/imageNodeSizing';
+import { identifyImageElement } from '../../services/identifyElement';
 import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
@@ -50,13 +51,28 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const localReferenceLabel = (data.localReferenceLabel as string | undefined) ?? getLocalReferenceLabel(rawRole, data.localReferenceType as LocalReferenceType | undefined, data.localReferenceLabel as string | undefined, customRoleLabel);
   const fileRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [nodeName, setNodeName] = useState((data.label as string) || 'Image');
+  const [nodeName, setNodeName] = useState((data.label as string) || t('canvas.nodeLabels.image', { defaultValue: '图片' }));
   const [previewImage, setPreviewImage] = useState(currentImage);
   const [editingName, setEditingName] = useState(false);
   const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const displayImage = previewImage || currentImage;
+
+  /* ─── Point-pick mode for local reference ─── */
+  const [isPointPickMode, setIsPointPickMode] = useState(false);
+  const [manualInputSignal, setManualInputSignal] = useState(0);
+  const [pendingLightPanelOpen, setPendingLightPanelOpen] = useState(false);
+  const [pointPickLoading, setPointPickLoading] = useState(false);
+  const [pointPickResult, setPointPickResult] = useState<{ label: string; normalizedType?: string; confidence?: number } | null>(null);
+  const [pointPickError, setPointPickError] = useState(false);
+  const [pointPickPosition, setPointPickPosition] = useState<{ x: number; y: number } | null>(null);
+  const [pointPickImageRect, setPointPickImageRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const [isEditingPointPickLabel, setIsEditingPointPickLabel] = useState(false);
+  const [pointPickEditLabel, setPointPickEditLabel] = useState('');
+  const pointPickEditRef = useRef<HTMLInputElement>(null);
   const { setNodes, setEdges } = useReactFlow();
 
   /* ─── Extended node state ─── */
@@ -102,6 +118,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [data.currentImage, data.image, data.inputImage]);
 
   useEffect(() => {
+    const nextName = (data.label as string | undefined) || t('canvas.nodeLabels.image', { defaultValue: '图片' });
+    if (!editingName) {
+      setNodeName((prev) => (prev === nextName ? prev : nextName));
+    }
+  }, [data.label, editingName, t]);
+
+  useEffect(() => {
     const next = normalizeGeneratedImages(data.generatedImages);
     setGeneratedImages((prev) => {
       if (prev.length !== next.length) return next;
@@ -134,18 +157,22 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       const sourceLocalRefLabel = sourceNode?.data?.localReferenceLabel as string | undefined;
       const referenceRole = edgeRole ?? sourceRole;
       const referenceCustomRoleLabel = edgeCustomRoleLabel ?? sourceCustomRoleLabel;
-      const referenceLocalRefType = edgeLocalRefType ?? sourceLocalRefType ?? getLocalReferenceTypeFromRole(referenceRole);
-      const referenceLocalRefLabel = edgeLocalRefLabel ?? sourceLocalRefLabel;
+      const usageInfo = getReferenceUsageInfo(
+        referenceRole,
+        referenceCustomRoleLabel,
+        edgeLocalRefType ?? sourceLocalRefType,
+        edgeLocalRefLabel ?? sourceLocalRefLabel,
+      );
       const imageUrl = getCurrentImage(sourceNode?.data);
       if (!imageUrl) return [];
       return [{
         nodeId: edge.source,
         index: 0,
         role: referenceRole,
-        roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel, referenceLocalRefType, referenceLocalRefLabel),
+        roleLabel: usageInfo.label,
         customRoleLabel: referenceCustomRoleLabel,
-        localReferenceType: referenceLocalRefType,
-        localReferenceLabel: referenceLocalRefLabel,
+        localReferenceType: usageInfo.localReferenceType,
+        localReferenceLabel: usageInfo.localReferenceLabel,
         imageUrl,
         width: getNodeWidth(sourceNode?.data),
         height: getNodeHeight(sourceNode?.data),
@@ -509,14 +536,459 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       }
     }
     const safeRole = nextRole ?? 'undefined_usage';
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...getRoleData(safeRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel) } } : n)));
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                ...getRoleData(safeRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel),
+                localReferencePoint: undefined,
+              },
+            }
+          : n,
+      ),
+    );
   };
+
+  const exitPointPickMode = useCallback(() => {
+    setIsPointPickMode(false);
+    setPointPickLoading(false);
+    setPointPickResult(null);
+    setPointPickError(false);
+    setPointPickPosition(null);
+    setPointPickImageRect(null);
+    setIsEditingPointPickLabel(false);
+    setPointPickEditLabel('');
+  }, []);
+
+  const resolveDisplayedImageRect = useCallback(() => {
+    const img = imgRef.current;
+    if (!img || !img.naturalWidth || !img.naturalHeight) return null;
+
+    const rect = img.getBoundingClientRect();
+    const scale = Math.min(rect.width / img.naturalWidth, rect.height / img.naturalHeight);
+    const width = img.naturalWidth * scale;
+    const height = img.naturalHeight * scale;
+    const left = rect.left + (rect.width - width) / 2;
+    const top = rect.top + (rect.height - height) / 2;
+
+    return { left, top, width, height };
+  }, []);
+
+  useEffect(() => {
+    if (!isPointPickMode || !displayImage) return;
+
+    let frameId = 0;
+    const updateRect = () => {
+      const nextRect = resolveDisplayedImageRect();
+      setPointPickImageRect((prev) => {
+        if (
+          prev &&
+          nextRect &&
+          Math.abs(prev.left - nextRect.left) < 0.5 &&
+          Math.abs(prev.top - nextRect.top) < 0.5 &&
+          Math.abs(prev.width - nextRect.width) < 0.5 &&
+          Math.abs(prev.height - nextRect.height) < 0.5
+        ) {
+          return prev;
+        }
+        return nextRect;
+      });
+      frameId = requestAnimationFrame(updateRect);
+    };
+
+    updateRect();
+    return () => cancelAnimationFrame(frameId);
+  }, [displayImage, isPointPickMode, resolveDisplayedImageRect]);
+
+  const handleImageClick = async (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!isPointPickMode || !displayImage || !imgRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const displayedRect = resolveDisplayedImageRect();
+    if (!displayedRect) return;
+
+    if (
+      e.clientX < displayedRect.left ||
+      e.clientX > displayedRect.left + displayedRect.width ||
+      e.clientY < displayedRect.top ||
+      e.clientY > displayedRect.top + displayedRect.height
+    ) {
+      return;
+    }
+
+    const normalizedX = (e.clientX - displayedRect.left) / displayedRect.width;
+    const normalizedY = (e.clientY - displayedRect.top) / displayedRect.height;
+
+    setPointPickPosition({ x: normalizedX, y: normalizedY });
+    setPointPickLoading(true);
+    setPointPickError(false);
+    setPointPickResult(null);
+    setIsEditingPointPickLabel(false);
+
+    try {
+      const result = await identifyImageElement({
+        imageUrl: displayImage,
+        point: { x: normalizedX, y: normalizedY },
+      });
+      setPointPickResult(result);
+    } catch {
+      setPointPickError(true);
+    } finally {
+      setPointPickLoading(false);
+    }
+  };
+
+  const applyPointPickResult = () => {
+    if (!pointPickResult) return;
+    const isFixedType = pointPickResult.normalizedType && pointPickResult.normalizedType !== 'custom';
+    const fixedItem = localReferenceOptions.find((opt) => opt.value === pointPickResult.normalizedType);
+
+    let nextType: LocalReferenceType;
+    let nextLabel: string;
+
+    if (isFixedType && fixedItem) {
+      nextType = fixedItem.value as LocalReferenceType;
+      nextLabel = fixedItem.label;
+    } else {
+      nextType = 'custom';
+      nextLabel = pointPickResult.label;
+    }
+
+    const safeRole: ImageRole = 'local_reference';
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                ...getRoleData(safeRole, undefined, nextType, nextLabel),
+                localReferencePoint: pointPickPosition,
+              },
+            }
+          : n,
+      ),
+    );
+    exitPointPickMode();
+  };
+
+  const applyEditedPointPickLabel = () => {
+    if (!pointPickEditLabel.trim() || !pointPickPosition) return;
+    const safeRole: ImageRole = 'local_reference';
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                ...getRoleData(safeRole, undefined, 'custom', pointPickEditLabel.trim()),
+                localReferencePoint: pointPickPosition,
+              },
+            }
+          : n,
+      ),
+    );
+    exitPointPickMode();
+  };
+
+  const openPointPickManualInput = () => {
+    exitPointPickMode();
+    setRoleMenuOpen(true);
+    setManualInputSignal((s) => s + 1);
+  };
+
+  // Esc to exit point-pick mode
+  useEffect(() => {
+    if (!isPointPickMode) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        exitPointPickMode();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isPointPickMode, exitPointPickMode]);
+
+  const stopPointPickOverlayEvent = useCallback((event: SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
+  const pointPickCardWidth = imgRef.current?.getBoundingClientRect().width ?? pointPickImageRect?.width ?? 280;
+  const pointPickResultPanelWidth = Math.min(320, Math.max(180, pointPickCardWidth));
+  const pointPickResultPanelLeft = pointPickImageRect
+    ? Math.min(
+        Math.max(16, pointPickImageRect.left + pointPickImageRect.width / 2 - pointPickResultPanelWidth / 2),
+        Math.max(16, window.innerWidth - pointPickResultPanelWidth - 16),
+      )
+    : 16;
+  const pointPickResultPanelTop = pointPickImageRect
+    ? pointPickImageRect.top + pointPickImageRect.height + 14
+    : 16;
+  const pointPickModeBarWidth = Math.min(420, window.innerWidth - 32);
+  const pointPickModePortal = isPointPickMode && pointPickImageRect
+    ? createPortal(
+        <>
+          {[
+            { left: 0, top: 0, width: '100vw', height: pointPickImageRect.top },
+            { left: 0, top: pointPickImageRect.top + pointPickImageRect.height, width: '100vw', height: `calc(100vh - ${pointPickImageRect.top + pointPickImageRect.height}px)` },
+            { left: 0, top: pointPickImageRect.top, width: pointPickImageRect.left, height: pointPickImageRect.height },
+            { left: pointPickImageRect.left + pointPickImageRect.width, top: pointPickImageRect.top, width: `calc(100vw - ${pointPickImageRect.left + pointPickImageRect.width}px)`, height: pointPickImageRect.height },
+          ].map((rect, index) => (
+            <div
+              key={index}
+              className="fixed z-[80] cursor-default"
+              style={{
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+                background: 'rgba(0,0,0,0.74)',
+                backdropFilter: 'brightness(0.42)',
+                WebkitBackdropFilter: 'brightness(0.42)',
+              }}
+              onClick={stopPointPickOverlayEvent}
+              onDoubleClick={stopPointPickOverlayEvent}
+              onPointerDown={stopPointPickOverlayEvent}
+              onPointerMove={stopPointPickOverlayEvent}
+              onMouseDown={stopPointPickOverlayEvent}
+              onWheel={stopPointPickOverlayEvent}
+              onContextMenu={stopPointPickOverlayEvent}
+            />
+          ))}
+          <div
+            className="fixed z-[120] flex items-center gap-3 rounded-full px-4 py-2 text-[12px] shadow-[0_12px_34px_rgba(0,0,0,0.45)]"
+            style={{
+              left: Math.max(16, window.innerWidth / 2 - pointPickModeBarWidth / 2),
+              top: 72,
+              width: pointPickModeBarWidth,
+              background: 'rgba(37,37,38,0.96)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.86)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+            }}
+            onPointerDown={stopPointPickOverlayEvent}
+            onClick={stopPointPickOverlayEvent}
+            onWheel={stopPointPickOverlayEvent}
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ background: '#2dd4bf', boxShadow: '0 0 10px rgba(45,212,191,0.72)' }} />
+              <span className="shrink-0 font-semibold">{t('reference.pointPickTitle', { defaultValue: '点选参考元素' })}</span>
+              <span className="min-w-0 truncate" style={{ color: 'rgba(255,255,255,0.58)' }}>
+                {t('reference.pointPickModeHint', { defaultValue: '点击当前图片中要参考的部分' })}
+              </span>
+              <span className="shrink-0" style={{ color: 'rgba(255,255,255,0.42)' }}>{t('reference.pointPickEsc', { defaultValue: 'Esc 退出' })}</span>
+            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                stopPointPickOverlayEvent(event);
+                exitPointPickMode();
+              }}
+              className="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-white/10"
+              style={{ color: 'rgba(255,255,255,0.72)', background: 'rgba(255,255,255,0.06)' }}
+            >
+              {t('common.exit', { defaultValue: '退出' })}
+            </button>
+          </div>
+        </>,
+        document.body,
+      )
+    : null;
+  const pointPickResultPortal = isPointPickMode && pointPickImageRect && (pointPickLoading || pointPickResult || pointPickError)
+    ? createPortal(
+        <div
+          className="fixed z-[130] rounded-xl p-3 nodrag nowheel shadow-[0_14px_36px_rgba(0,0,0,0.46)]"
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerMove={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}
+          onTouchStart={(event) => event.stopPropagation()}
+          onTouchMove={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}
+          style={{
+            left: pointPickResultPanelLeft,
+            top: pointPickResultPanelTop,
+            width: pointPickResultPanelWidth,
+            background: 'rgba(10,10,15,0.94)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+          }}
+        >
+          {pointPickLoading && (
+            <div className="flex items-center gap-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-teal-400" />
+              {t('reference.identifying', { defaultValue: '正在识别...' })}
+            </div>
+          )}
+
+          {pointPickError && (
+            <div>
+              <div className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                {t('reference.recognizeFailed', { defaultValue: '未能识别该区域' })}
+              </div>
+              <div className="mt-0.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {t('reference.recognizeFailedHint', { defaultValue: '请重新点选，或手动输入参考元素' })}
+              </div>
+              <div className="mt-2.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPointPickResult(null);
+                    setPointPickError(false);
+                    setPointPickPosition(null);
+                  }}
+                  className="flex-1 rounded-md py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
+                  style={{ color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.06)' }}
+                >
+                  {t('reference.repick', { defaultValue: '重新点选' })}
+                </button>
+                <button
+                  type="button"
+                  onClick={openPointPickManualInput}
+                  className="flex-1 rounded-md py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
+                  style={{ color: '#2dd4bf', background: 'rgba(20,184,166,0.15)' }}
+                >
+                  {t('reference.manualInput', { defaultValue: '手动输入' })}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pointPickResult && !pointPickError && (
+            <div>
+              {!isEditingPointPickLabel ? (
+                <>
+                  <div className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                    {t('reference.selectedElement', { defaultValue: `已选择：${pointPickResult.label}`, label: pointPickResult.label })}
+                  </div>
+                  <div className="mt-0.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {t('reference.selectedFromArea', { defaultValue: '来自你点击的图片区域' })}
+                  </div>
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={applyPointPickResult}
+                      className="flex-1 rounded-md py-1.5 text-[11px] font-medium transition-colors"
+                      style={{ color: '#ffffff', background: 'rgba(20,184,166,0.35)' }}
+                    >
+                      {t('common.apply', { defaultValue: '应用' })}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPointPickResult(null);
+                        setPointPickPosition(null);
+                      }}
+                      className="flex-1 rounded-md py-1.5 text-[11px] transition-colors hover:bg-white/10"
+                      style={{ color: 'rgba(255,255,255,0.65)', background: 'rgba(255,255,255,0.06)' }}
+                    >
+                      {t('reference.repick', { defaultValue: '重新点选' })}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPointPickEditLabel(pointPickResult.label);
+                        setIsEditingPointPickLabel(true);
+                      }}
+                      className="flex-1 rounded-md py-1.5 text-[11px] transition-colors hover:bg-white/10"
+                      style={{ color: 'rgba(255,255,255,0.65)', background: 'rgba(255,255,255,0.06)' }}
+                    >
+                      {t('reference.editName', { defaultValue: '修改名称' })}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {t('reference.elementNameLabel', { defaultValue: '参考元素名称' })}
+                  </div>
+                  <input
+                    ref={pointPickEditRef}
+                    value={pointPickEditLabel}
+                    onChange={(e) => setPointPickEditLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (pointPickEditLabel.trim()) applyEditedPointPickLabel();
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setIsEditingPointPickLabel(false);
+                        setPointPickEditLabel('');
+                      }
+                    }}
+                    className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
+                    style={{
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'rgba(255,255,255,0.9)',
+                    }}
+                  />
+                  <div className="mt-2 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingPointPickLabel(false);
+                        setPointPickEditLabel('');
+                      }}
+                      className="rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-white/10"
+                      style={{ color: 'rgba(255,255,255,0.62)' }}
+                    >
+                      {t('common.cancel', { defaultValue: '取消' })}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applyEditedPointPickLabel}
+                      disabled={!pointPickEditLabel.trim()}
+                      className="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      style={{
+                        color: pointPickEditLabel.trim() ? '#ffffff' : 'rgba(255,255,255,0.35)',
+                        background: pointPickEditLabel.trim() ? 'rgba(20,184,166,0.35)' : 'rgba(255,255,255,0.06)',
+                        cursor: pointPickEditLabel.trim() ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      {t('common.apply', { defaultValue: '应用' })}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>,
+        document.body,
+      )
+    : null;
+
+  // Auto-open light panel when node was created for relighting
+  const autoOpenLightPreview = data.autoOpenLightPreview as boolean | undefined;
+  useEffect(() => {
+    if (autoOpenLightPreview) {
+      setPendingLightPanelOpen(true);
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? { ...n, data: { ...n.data, autoOpenLightPreview: undefined } }
+            : n,
+        ),
+      );
+    }
+  }, [autoOpenLightPreview, id, setNodes]);
 
   const stopTitleInteraction = (event: React.SyntheticEvent) => {
     event.stopPropagation();
   };
 
-  const displayImage = previewImage || currentImage;
   const sourceWidth = imgSize?.width || getNodeWidth(data) || 1;
   const sourceHeight = imgSize?.height || getNodeHeight(data) || 1;
   const { cardWidth, cardHeight, imageDisplayScale } = resolveImageNodeSize({
@@ -541,6 +1013,18 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (!onCreateUpscaleNode) return;
     onCreateUpscaleNode(id, resolved.imageUrl, resolved.width, resolved.height);
   }, [data, id, showToast, t]);
+
+  const handleRelight = useCallback(() => {
+    const resolved = resolveNodeImage(data);
+    if (!resolved) {
+      // Empty node: open current node's light panel directly
+      setPendingLightPanelOpen(true);
+      return;
+    }
+    const onCreateRelightNode = data.onCreateRelightNode as ((sourceNodeId: string) => void) | undefined;
+    if (!onCreateRelightNode) return;
+    onCreateRelightNode(id);
+  }, [data, id]);
 
   const handleCompare = useCallback(() => {
     const resolved = resolveNodeImage(data);
@@ -590,11 +1074,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   return (
     <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
-      {/* Toolbar — shown above title when image exists and node is selected */}
+      {pointPickModePortal}
+      {pointPickResultPortal}
+      {/* Toolbar — shown above title only when this node has a real image/result */}
       {displayImage && isOnlySelected && (
         <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
             onUpscale={handleUpscale}
+            onRelight={handleRelight}
             onCompare={handleCompare}
             onPreview={handlePreview}
             onDownload={handleDownload}
@@ -688,7 +1175,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         )}
 
         {displayImage && (isOnlySelected || roleMenuOpen) && (
-          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} localReferenceType={localReferenceType} localReferenceLabel={localReferenceLabel} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
+          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} localReferenceType={localReferenceType} localReferenceLabel={localReferenceLabel} onChange={handleRoleChange} onStartPointPick={() => setIsPointPickMode(true)} openManualInputSignal={manualInputSignal} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}
@@ -703,12 +1190,25 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           }}
         >
           {displayImage ? (
-            <img
-              src={displayImage}
-              alt=""
-              className="w-full h-full object-contain"
-              draggable={false}
-            />
+            <div className="relative w-full h-full">
+              <img
+                ref={imgRef}
+                src={displayImage}
+                alt=""
+                className="w-full h-full object-contain"
+                draggable={false}
+                onClick={handleImageClick}
+                onPointerDown={(event) => {
+                  if (!isPointPickMode) return;
+                  event.stopPropagation();
+                }}
+                onMouseDown={(event) => {
+                  if (!isPointPickMode) return;
+                  event.stopPropagation();
+                }}
+                style={{ cursor: isPointPickMode ? 'crosshair' : 'default' }}
+              />
+            </div>
           ) : (
             <div className="flex items-center justify-center">
               {/* Clean placeholder icon */}
@@ -867,6 +1367,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onUseReference={handleUseReference}
               onAssignReferenceRole={handleAssignReferenceRole}
               showToast={showToast}
+              autoOpenLightPanel={pendingLightPanelOpen}
+              onAcknowledgeAutoOpen={() => setPendingLightPanelOpen(false)}
             />
           </div>
 

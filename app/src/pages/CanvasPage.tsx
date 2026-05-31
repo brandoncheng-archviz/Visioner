@@ -16,11 +16,25 @@ import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
+import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
 import { CanvasContextMenus } from '../features/canvas/components/CanvasContextMenus';
 import { CanvasToolbar } from '../features/canvas/components/CanvasToolbar';
+
+const NODE_BASE_TITLES: Record<string, string> = {
+  image: '图片',
+  text: '文本',
+  video: '视频',
+  audio: '音频',
+  script: '脚本',
+  'video-merge': '视频合成',
+  upscale: '高清细节',
+  compare: '对比',
+  sunSky: '光影',
+  relight: '改光',
+};
 
 const UPSCALE_NODE_DEFAULTS: Record<string, unknown> = {
   engine: 'magnific_precision_v2',
@@ -329,12 +343,17 @@ function FlowCanvas() {
     setNodes((nds) => nds.map((node) => (node.id === sourceNodeId ? { ...node, data: { ...node.data, ...roleData } } : node)));
   }, []);
 
+  const getAllNodeLabels = useCallback(
+    () => nodes.map((n) => (n.data?.label as string) || '').filter(Boolean),
+    [nodes],
+  );
+
   const createUpscaleNode = useCallback((sourceNodeId: string, inputImage: string, width: number, height: number) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) return;
 
     const newNodeId = `upscale-${Date.now()}`;
-    const label = t('canvas.nodeLabels.upscale');
+    const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.upscale);
     const spacing = 80;
     const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
 
@@ -377,14 +396,14 @@ function FlowCanvas() {
         maxZoom: Math.min(getViewport().zoom, 1.2),
       });
     }, 50);
-  }, [nodes, setNodes, setEdges, fitView, getViewport, t]);
+  }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
 
   const createSunSkyNode = useCallback((sourceNodeId: string, inputImage: string, width: number, height: number) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) return;
 
     const newNodeId = `sunSky-${Date.now()}`;
-    const label = t('canvas.nodeLabels.sunSky');
+    const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.sunSky);
     const spacing = 80;
     const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
 
@@ -426,7 +445,61 @@ function FlowCanvas() {
         maxZoom: Math.min(getViewport().zoom, 1.2),
       });
     }, 50);
-  }, [nodes, setNodes, setEdges, fitView, getViewport, t]);
+  }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
+
+  const createRelightNode = useCallback((sourceNodeId: string) => {
+    const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+    if (!sourceNode) return;
+
+    const newNodeId = `image-${Date.now()}`;
+    const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.relight);
+    const spacing = 80;
+    const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
+
+    const newNode: Node = {
+      id: newNodeId,
+      type: 'image',
+      position: {
+        x: sourceNode.position.x + estimatedWidth + spacing,
+        y: sourceNode.position.y,
+      },
+      data: {
+        label,
+        prompt: '',
+        promptContent: [],
+        selectedPresets: [],
+        selectedStyleId: null,
+        currentResultId: null,
+        generatedImages: [],
+        autoOpenLightPreview: true,
+        lightPreview: undefined,
+        ...getRoleData(null),
+      },
+      selected: true,
+    };
+
+    setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
+    setEdges((eds) => [
+      ...eds,
+      {
+        id: `e-${Date.now()}`,
+        source: sourceNodeId,
+        target: newNodeId,
+        sourceHandle: 'right-source',
+        targetHandle: 'left-target',
+        style: { stroke: '#555', strokeWidth: 1 },
+      },
+    ]);
+
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: newNodeId }],
+        duration: 300,
+        padding: 0.15,
+        maxZoom: Math.min(getViewport().zoom, 1.2),
+      });
+    }, 50);
+  }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
 
   const createCompareNode = useCallback((sourceNodeId: string, _inputImage: string, _width: number, _height: number) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
@@ -480,7 +553,7 @@ function FlowCanvas() {
 
     // ── Fallback: create a brand-new CompareNode ──
     const newNodeId = `compare-${Date.now()}`;
-    const label = t('canvas.nodeLabels.compare');
+    const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.compare);
     const spacing = 80;
     const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
 
@@ -519,7 +592,7 @@ function FlowCanvas() {
         maxZoom: Math.min(getViewport().zoom, 1.2),
       });
     }, 50);
-  }, [nodes, edges, setNodes, setEdges, fitView, getViewport, t]);
+  }, [nodes, edges, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
 
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
@@ -533,10 +606,11 @@ function FlowCanvas() {
         onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' ? createUpscaleNode : undefined,
         onCreateSunSkyNode: n.type === 'image' ? createSunSkyNode : undefined,
         onCreateCompareNode: n.type === 'image' ? createCompareNode : undefined,
+        onCreateRelightNode: n.type === 'image' ? createRelightNode : undefined,
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode]);
+  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode]);
 
   // ─── Copy / Paste / Delete ───
   const clipboardRef = useRef<{ type: string; data: Record<string, unknown>; position: { x: number; y: number } }[]>([]);
@@ -557,15 +631,26 @@ function FlowCanvas() {
     if (clipboardRef.current.length === 0) return;
     pasteOffsetRef.current += 40;
     const offset = pasteOffsetRef.current;
-    const pasted = clipboardRef.current.map((n, i) => ({
-      id: `${n.type}-${Date.now()}-${i}`,
-      type: n.type,
-      position: { x: n.position.x + offset, y: n.position.y + offset },
-      data: { ...n.data },
-      selected: true,
-    }));
+    const existingLabels = getAllNodeLabels();
+    const assignedLabels: string[] = [];
+    const pasted = clipboardRef.current.map((n, i) => {
+      const fallbackBaseTitle = NODE_BASE_TITLES[n.type] || n.type;
+      const nextLabel = getNextCopiedNodeTitle(
+        [...existingLabels, ...assignedLabels],
+        (n.data.label as string | undefined) || '',
+        fallbackBaseTitle,
+      );
+      assignedLabels.push(nextLabel);
+      return {
+        id: `${n.type}-${Date.now()}-${i}`,
+        type: n.type,
+        position: { x: n.position.x + offset, y: n.position.y + offset },
+        data: { ...n.data, label: nextLabel },
+        selected: true,
+      };
+    });
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), ...pasted]);
-  }, [setNodes]);
+  }, [getAllNodeLabels, setNodes]);
 
   const deleteSelected = useCallback(() => {
     const hasSelectedNodes = nodes.some((n) => n.selected);
@@ -634,15 +719,18 @@ function FlowCanvas() {
   const duplicateNode = useCallback((id: string) => {
     const node = nodes.find((n) => n.id === id);
     if (!node) return;
+    const fallbackBaseTitle = NODE_BASE_TITLES[node.type || ''] || node.type || '节点';
+    const label = getNextCopiedNodeTitle(getAllNodeLabels(), (node.data?.label as string | undefined) || '', fallbackBaseTitle);
     const newNode: Node = {
       ...node,
       id: `${node.type}-${Date.now()}`,
       position: { x: node.position.x + 40, y: node.position.y + 40 },
+      data: { ...node.data, label },
       selected: true,
     };
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
     setNodeContextMenu(null);
-  }, [nodes, setNodes]);
+  }, [getAllNodeLabels, nodes, setNodes]);
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
@@ -862,23 +950,14 @@ function FlowCanvas() {
   const addNode = useCallback(
     (type: string, pos?: { x: number; y: number }, customLabel?: string) => {
       const position = pos || { x: 400 + Math.random() * 100, y: 200 + Math.random() * 100 };
-      const labels: Record<string, string> = {
-        text: t('canvas.nodeLabels.text'),
-        image: t('canvas.nodeLabels.image'),
-        upscale: t('canvas.nodeLabels.upscale'),
-        compare: t('canvas.nodeLabels.compare'),
-        video: t('canvas.nodeLabels.video'),
-        audio: t('canvas.nodeLabels.audio'),
-        script: t('canvas.nodeLabels.script'),
-        'video-merge': t('canvas.nodeLabels.video-merge'),
-        sunSky: t('canvas.nodeLabels.sunSky'),
-      };
+      const baseTitle = customLabel || NODE_BASE_TITLES[type] || type;
+      const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
       const newNode: Node = {
         id: `${type}-${Date.now()}`,
         type,
         position,
         data: {
-          label: customLabel || labels[type] || type,
+          label,
           ...(type === 'image' ? getRoleData(null) : {}),
           ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
         },
@@ -886,7 +965,7 @@ function FlowCanvas() {
       setNodes((nds) => [...nds, newNode]);
       setContextMenu(null);
     },
-    [setNodes],
+    [setNodes, getAllNodeLabels],
   );
 
   function isEditablePasteTarget(target: EventTarget | null): boolean {
@@ -901,13 +980,11 @@ function FlowCanvas() {
     );
   }
 
-  function formatPastedImageLabel(file: File, index: number, total: number): string {
+  function formatPastedImageLabel(file: File): string {
     if (file.name && file.name !== 'image.png') {
       return file.name.replace(/\.[^/.]+$/, '');
     }
-    const now = new Date();
-    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-    return total === 1 ? `pasted-image-${ts}` : `pasted-image-${ts}-${index + 1}`;
+    return 'pasted-image';
   }
 
   function isAcceptedImageFile(file: File): boolean {
@@ -971,6 +1048,15 @@ function FlowCanvas() {
 
       setUploadToast({ msg: t('canvas.uploading'), type: 'loading' });
 
+      const allLabels = getAllNodeLabels();
+      const assignedLabels: string[] = [];
+      const fileFinalLabels = validFiles.map((file) => {
+        const baseTitle = formatPastedImageLabel(file);
+        const label = getNextNodeTitle([...allLabels, ...assignedLabels], baseTitle);
+        assignedLabels.push(label);
+        return label;
+      });
+
       Promise.all(
         validFiles.map((file, index) => {
           return new Promise<{ node: Node; index: number } | null>((resolve) => {
@@ -986,7 +1072,7 @@ function FlowCanvas() {
                 type: 'image',
                 position,
                 data: {
-                  label: formatPastedImageLabel(file, index, validFiles.length),
+                  label: fileFinalLabels[index],
                   image: url,
                   inputImage: url,
                   currentImage: url,
@@ -1194,18 +1280,14 @@ function FlowCanvas() {
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
     const newNodeId = `${type}-${Date.now()}`;
-    const labels: Record<string, string> = {
-      image: t('canvas.nodeLabels.image'),
-      upscale: t('canvas.nodeLabels.upscale'),
-      compare: t('canvas.nodeLabels.compare'),
-      sunSky: t('canvas.nodeLabels.sunSky'),
-    };
+    const baseTitle = NODE_BASE_TITLES[type] || type;
+    const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
     const newNode: Node = {
       id: newNodeId,
       type,
       position: createMenu.flowPos,
       data: {
-        label: labels[type] || type,
+        label,
         ...(type === 'image' ? getRoleData(null) : {}),
         ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
       },
@@ -1213,7 +1295,7 @@ function FlowCanvas() {
     setNodes((nds) => [...nds, newNode]);
     setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId }]);
     setCreateMenu(null);
-  }, [createMenu, setNodes, setEdges]);
+  }, [createMenu, getAllNodeLabels, setNodes, setEdges]);
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));

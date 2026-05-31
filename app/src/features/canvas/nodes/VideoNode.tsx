@@ -5,8 +5,9 @@ import { NodeShell } from '../components/NodeShell';
 
 export function VideoNode({ data, selected }: NodeProps) {
   const { t } = useTranslation();
+  const label = (data.label as string | undefined) || t('canvas.nodeLabels.video');
   return (
-    <NodeShell label={t('canvas.nodeLabels.video')} selected={selected}>
+    <NodeShell label={label} selected={selected}>
       <div className="px-4 py-3">
         <div className="text-xs font-medium text-white mb-1 flex items-center gap-1.5">
           <Play className="w-3.5 h-3.5 text-[#22d3ee]" /> {t('canvas.nodeLabels.video')}

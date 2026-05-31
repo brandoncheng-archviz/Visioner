@@ -1,5 +1,5 @@
 import type { MouseEvent, PointerEvent } from 'react';
-import { Sparkles, Columns2, Maximize2, Download } from 'lucide-react';
+import { Sparkles, Columns2, Maximize2, Download, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -16,18 +16,21 @@ export function ImageToolbar({
   onCompare,
   onPreview,
   onDownload,
+  onRelight,
   hasImage,
 }: {
   onUpscale: () => void;
   onCompare: () => void;
   onPreview: () => void;
   onDownload: () => void;
+  onRelight: () => void;
   hasImage: boolean;
 }) {
   const { t } = useTranslation();
 
   const tools: ToolbarAction[] = [
-    { icon: Sparkles, label: t('imageNode.upscale'), tooltipLabel: t('imageNode.upscaleShort'), action: onUpscale, disabled: !hasImage },
+    { icon: Sun, label: t('imageNode.relight'), tooltipLabel: t('imageNode.relightTooltip', { defaultValue: '调整阳光方向' }), action: onRelight },
+    { icon: Sparkles, label: t('imageNode.upscale'), tooltipLabel: t('imageNode.upscaleShort', { defaultValue: '高清细节' }), action: onUpscale, disabled: !hasImage },
     { icon: Columns2, label: t('imageNode.compare'), action: onCompare, disabled: !hasImage },
     { icon: Maximize2, label: t('imageNode.preview'), action: onPreview, disabled: !hasImage },
     { icon: Download, label: t('common.download'), action: onDownload, disabled: !hasImage },

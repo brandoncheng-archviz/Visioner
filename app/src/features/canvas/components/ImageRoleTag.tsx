@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Check, Building2 } from 'lucide-react';
+import { ChevronDown, Check, Building2, MousePointerClick } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   imageRoleOptions,
@@ -17,6 +17,8 @@ export function ImageRoleTag({
   localReferenceType,
   localReferenceLabel,
   onChange,
+  onStartPointPick,
+  openManualInputSignal,
   open: controlledOpen,
   onOpenChange,
 }: {
@@ -24,7 +26,9 @@ export function ImageRoleTag({
   customRoleLabel?: string;
   localReferenceType?: LocalReferenceType;
   localReferenceLabel?: string;
-  onChange: (role: ImageRole | null, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => void;
+  onChange: (role: ImageRole | null, customRoleLabel?: string, localRefType?: LocalReferenceType, localRefLabel?: string) => void;
+  onStartPointPick?: () => void;
+  openManualInputSignal?: number;
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
 }) {
@@ -35,6 +39,7 @@ export function ImageRoleTag({
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
   const [isTagHovered, setIsTagHovered] = useState(false);
   const [expandedLocalRef, setExpandedLocalRef] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const customInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -48,22 +53,36 @@ export function ImageRoleTag({
 
   useEffect(() => {
     if (!open) {
-      setHoveredRole(null);
-      setExpandedLocalRef(false);
-      setCustomInput('');
+      const raf = requestAnimationFrame(() => {
+        setHoveredRole(null);
+        setExpandedLocalRef(false);
+        setShowCustomInput(false);
+        setCustomInput('');
+      });
+      return () => cancelAnimationFrame(raf);
     }
   }, [open]);
 
   useEffect(() => {
-    if (expandedLocalRef) {
+    if (openManualInputSignal) {
+      const timer = setTimeout(() => {
+        setExpandedLocalRef(true);
+        setShowCustomInput(true);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openManualInputSignal]);
+
+  useEffect(() => {
+    if (showCustomInput) {
       customInputRef.current?.focus();
     }
-  }, [expandedLocalRef]);
+  }, [showCustomInput]);
 
   const handleSelectPrimary = (nextRole: ImageRole) => {
     if (nextRole === 'local_reference') {
       setExpandedLocalRef(true);
-      onChange('local_reference');
       return;
     }
     onChange(nextRole);
@@ -80,11 +99,12 @@ export function ImageRoleTag({
     const result = validateCustomReferenceLabel(customInput);
     if (!result.ok) {
       setCustomInput('');
-      setExpandedLocalRef(false);
+      setShowCustomInput(false);
       return;
     }
     onChange('local_reference', undefined, 'custom', result.label);
     setCustomInput('');
+    setShowCustomInput(false);
     setExpandedLocalRef(false);
     setOpen(false);
   };
@@ -92,6 +112,13 @@ export function ImageRoleTag({
   const handleClearUsage = () => {
     onChange('undefined_usage', undefined, undefined, undefined);
     setOpen(false);
+  };
+
+  const handleStartPointPick = () => {
+    if (onStartPointPick) {
+      onStartPointPick();
+      setOpen(false);
+    }
   };
 
   useEffect(() => {
@@ -107,6 +134,11 @@ export function ImageRoleTag({
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (showCustomInput) {
+        setShowCustomInput(false);
+        setCustomInput('');
+        return;
+      }
       if (expandedLocalRef) {
         setExpandedLocalRef(false);
         setCustomInput('');
@@ -121,7 +153,7 @@ export function ImageRoleTag({
       document.removeEventListener('pointerdown', closeOnOutside, true);
       document.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [open, setOpen, expandedLocalRef]);
+  }, [open, setOpen, expandedLocalRef, showCustomInput]);
 
   return (
     <div
@@ -191,9 +223,12 @@ export function ImageRoleTag({
                 </button>
                 {isLocalRef && expandedLocalRef && (
                   <div className="mx-1.5 mb-1.5 mt-0.5 rounded-[10px] p-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    {/* Section title */}
                     <div className="mb-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      {t('reference.selectLocalElement', { defaultValue: '选择或输入参考元素' })}
+                      {t('reference.selectLocalElement', { defaultValue: '选择参考元素' })}
                     </div>
+
+                    {/* Fixed chips */}
                     <div className="grid grid-cols-3 gap-1.5">
                       {localReferenceOptions.map((sub) => (
                         <button
@@ -211,60 +246,94 @@ export function ImageRoleTag({
                         </button>
                       ))}
                     </div>
-                    <div className="mt-2.5">
-                      <input
-                        ref={customInputRef}
-                        value={customInput}
-                        onChange={(event) => setCustomInput(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            if (customInput.trim()) submitCustomLocal();
-                          }
-                          if (event.key === 'Escape') {
-                            event.preventDefault();
-                            setExpandedLocalRef(false);
-                            setCustomInput('');
-                          }
-                        }}
-                        placeholder={t('imageNode.customPurposeInputPlaceholder', { defaultValue: '这张图主要参考什么？' })}
-                        className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
-                        style={{
-                          background: 'rgba(255,255,255,0.08)',
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          color: 'rgba(255,255,255,0.9)',
-                        }}
-                      />
-                      <div className="mt-1.5 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
-                        {t('imageNode.customPurposeExample', { defaultValue: '例如：铺装 / 水景 / 入口 / 栏杆' })}
+
+                    {/* Point-pick entry */}
+                    <button
+                      type="button"
+                      onClick={handleStartPointPick}
+                      className="mt-2.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    >
+                      <MousePointerClick className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#2dd4bf' }} />
+                      <div className="flex-1">
+                        <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.82)' }}>
+                          {t('reference.pointPickTitle', { defaultValue: '点选参考元素' })}
+                        </div>
+                        <div className="mt-0.5 text-[10px] leading-4" style={{ color: 'rgba(255,255,255,0.48)' }}>
+                          {t('reference.pointPickHint', { defaultValue: '点击图片中的目标区域，选择要参考的局部内容' })}
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-2 flex items-center justify-end gap-2">
+                    </button>
+
+                    {/* Manual input entry (collapsed) */}
+                    {!showCustomInput && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setExpandedLocalRef(false);
-                          setCustomInput('');
-                        }}
-                        className="rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-white/10"
-                        style={{ color: 'rgba(255,255,255,0.62)' }}
+                        onClick={() => setShowCustomInput(true)}
+                        className="mt-1.5 flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] transition-colors hover:bg-white/5"
+                        style={{ color: 'rgba(255,255,255,0.55)' }}
                       >
-                        {t('common.cancel', { defaultValue: '取消' })}
+                        {t('reference.manualInputTitle', { defaultValue: '手动输入其他元素' })}
                       </button>
-                      <button
-                        type="button"
-                        onClick={submitCustomLocal}
-                        disabled={!customInput.trim()}
-                        className="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                        style={{
-                          color: customInput.trim() ? '#ffffff' : 'rgba(255,255,255,0.35)',
-                          background: customInput.trim() ? 'rgba(20,184,166,0.35)' : 'rgba(255,255,255,0.06)',
-                          cursor: customInput.trim() ? 'pointer' : 'not-allowed',
-                        }}
-                      >
-                        {t('common.apply', { defaultValue: '应用' })}
-                      </button>
-                    </div>
+                    )}
+
+                    {/* Manual input area (expanded) */}
+                    {showCustomInput && (
+                      <div className="mt-2">
+                        <div className="mb-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                          {t('reference.elementNameLabel', { defaultValue: '参考元素名称' })}
+                        </div>
+                        <input
+                          ref={customInputRef}
+                          value={customInput}
+                          onChange={(event) => setCustomInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              if (customInput.trim()) submitCustomLocal();
+                            }
+                            if (event.key === 'Escape') {
+                              event.preventDefault();
+                              setShowCustomInput(false);
+                              setCustomInput('');
+                            }
+                          }}
+                          placeholder={t('reference.elementNamePlaceholder', { defaultValue: '例如：海水、家具、灯具、栏杆' })}
+                          className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
+                          style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            color: 'rgba(255,255,255,0.9)',
+                          }}
+                        />
+                        <div className="mt-2 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomInput(false);
+                              setCustomInput('');
+                            }}
+                            className="rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-white/10"
+                            style={{ color: 'rgba(255,255,255,0.62)' }}
+                          >
+                            {t('common.cancel', { defaultValue: '取消' })}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={submitCustomLocal}
+                            disabled={!customInput.trim()}
+                            className="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                            style={{
+                              color: customInput.trim() ? '#ffffff' : 'rgba(255,255,255,0.35)',
+                              background: customInput.trim() ? 'rgba(20,184,166,0.35)' : 'rgba(255,255,255,0.06)',
+                              cursor: customInput.trim() ? 'pointer' : 'not-allowed',
+                            }}
+                          >
+                            {t('common.apply', { defaultValue: '应用' })}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

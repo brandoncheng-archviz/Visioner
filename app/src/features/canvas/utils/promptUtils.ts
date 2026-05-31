@@ -150,22 +150,21 @@ export function buildPromptSubmission(
 
   const referenceById = new Map(nodeReferences.map((reference) => [reference.nodeId, reference]));
   const blockRole = (block: ImageReferencePromptBlock) => referenceById.get(block.sourceNodeId)?.role ?? null;
+  const isLocalReferenceBlock = (block: ImageReferencePromptBlock) =>
+    blockRole(block) === 'local_reference' ||
+    blockRole(block) === 'custom_reference' ||
+    blockRole(block) === 'vegetation_reference' ||
+    blockRole(block) === 'plant_reference' ||
+    blockRole(block) === 'people_reference' ||
+    blockRole(block) === 'sky_reference' ||
+    block.usage?.includes('植物') ||
+    block.usage?.includes('人物') ||
+    block.usage?.includes('天空') ||
+    block.usage?.includes('局部');
 
   const primaryBuilding = imageRefBlocks.filter((block) => blockRole(block) === 'primary_building' || block.usage?.includes('主体建筑'));
-  const customUsages = imageRefBlocks.filter((block) => blockRole(block) === 'custom_reference' || block.usage?.includes('自定义'));
-  const localRefs = imageRefBlocks.filter(
-    (block) =>
-      blockRole(block) === 'local_reference' ||
-      blockRole(block) === 'custom_reference' ||
-      blockRole(block) === 'vegetation_reference' ||
-      blockRole(block) === 'plant_reference' ||
-      blockRole(block) === 'people_reference' ||
-      blockRole(block) === 'sky_reference' ||
-      block.usage?.includes('植物') ||
-      block.usage?.includes('人物') ||
-      block.usage?.includes('天空') ||
-      block.usage?.includes('局部'),
-  );
+  const localRefs = imageRefBlocks.filter(isLocalReferenceBlock);
+  const customUsages = imageRefBlocks.filter((block) => !isLocalReferenceBlock(block) && block.usage?.includes('自定义'));
   const atmosphereRefs = imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围'));
   const undefinedRefs = imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未定义用途');
 

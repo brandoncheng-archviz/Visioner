@@ -24,6 +24,8 @@ export interface ImageNodeData {
   customRoleLabel?: string;
   localReferenceType?: import('./imageNode.types').LocalReferenceType;
   localReferenceLabel?: string;
+  localReferencePoint?: { x: number; y: number };
+  autoOpenLightPreview?: boolean;
   width?: number;
   height?: number;
   finalPrompt?: string;
@@ -39,6 +41,7 @@ export interface ImageNodeData {
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
+  onCreateRelightNode?: (sourceNodeId: string) => void;
   lightPreview?: LightPreviewData;
 }
 

@@ -89,6 +89,8 @@ export const localReferenceOptions: LocalReferenceOption[] = [
   },
 ];
 
+export const CUSTOM_LOCAL_REFERENCE_COLOR = '#94A3B8';
+
 /* ─── Color map ─── */
 export const roleColorMap: Record<ImageRole | 'null' | 'local_reference', string> = {
   primary_building: '#3B82F6',
@@ -139,6 +141,11 @@ export function getLocalReferenceTypeFromRole(
 export function getLocalReferenceOption(type: LocalReferenceType | undefined): LocalReferenceOption | undefined {
   if (!type) return undefined;
   return localReferenceOptions.find((o) => o.value === type);
+}
+
+export function getLocalReferenceColor(type: LocalReferenceType | undefined) {
+  if (type === 'custom') return CUSTOM_LOCAL_REFERENCE_COLOR;
+  return getLocalReferenceOption(type)?.color;
 }
 
 export function getLocalReferenceLabel(
@@ -212,11 +219,30 @@ export function getImageRoleLabel(
 
 export function getImageRoleColor(role: ImageRole | null | undefined, localRefType?: LocalReferenceType) {
   if (role === 'local_reference' && localRefType) {
-    return getLocalReferenceOption(localRefType)?.color || roleColorMap.local_reference;
+    return getLocalReferenceColor(localRefType) || roleColorMap.local_reference;
   }
   const inferredType = getLocalReferenceTypeFromRole(role);
   if (inferredType) {
-    return getLocalReferenceOption(inferredType)?.color || roleColorMap[role ?? 'null'];
+    return getLocalReferenceColor(inferredType) || roleColorMap[role ?? 'null'];
   }
   return roleColorMap[role ?? 'null'] || roleColorMap.null;
+}
+
+export function getReferenceUsageInfo(
+  role: ImageRole | null | undefined,
+  customLabel?: string,
+  localRefType?: LocalReferenceType,
+  localRefLabel?: string,
+) {
+  const normalizedRole = getNormalizedRole(role);
+  const resolvedLocalReferenceType = localRefType ?? getLocalReferenceTypeFromRole(role);
+  const resolvedLocalReferenceLabel = getLocalReferenceLabel(role, resolvedLocalReferenceType, localRefLabel, customLabel);
+
+  return {
+    normalizedRole,
+    localReferenceType: resolvedLocalReferenceType,
+    localReferenceLabel: resolvedLocalReferenceLabel,
+    label: getImageRoleLabel(role, customLabel, resolvedLocalReferenceType, resolvedLocalReferenceLabel),
+    color: getImageRoleColor(role, resolvedLocalReferenceType),
+  };
 }

@@ -24,6 +24,11 @@ export type LocalReferenceType =
   | 'paving'
   | 'custom';
 
+export interface LocalReferencePoint {
+  x: number;
+  y: number;
+}
+
 export interface PromptTemplate {
   goal: string;
   style?: string;
@@ -122,6 +127,7 @@ export interface ReferenceInfo {
   customRoleLabel?: string;
   localReferenceType?: LocalReferenceType;
   localReferenceLabel?: string;
+  localReferencePoint?: LocalReferencePoint;
   imageUrl: string;
   width?: number;
   height?: number;
