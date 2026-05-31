@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { ChevronDown, Check, Building2, MousePointerClick } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -21,6 +21,10 @@ export function ImageRoleTag({
   openManualInputSignal,
   open: controlledOpen,
   onOpenChange,
+  rootClassName = 'absolute z-30 nodrag nowheel',
+  rootStyle,
+  hideTrigger = false,
+  popoverTop = 28,
 }: {
   role: ImageRole | null;
   customRoleLabel?: string;
@@ -31,6 +35,10 @@ export function ImageRoleTag({
   openManualInputSignal?: number;
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
+  rootClassName?: string;
+  rootStyle?: CSSProperties;
+  hideTrigger?: boolean;
+  popoverTop?: number;
 }) {
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -158,38 +166,41 @@ export function ImageRoleTag({
   return (
     <div
       ref={rootRef}
-      className="absolute z-30 nodrag nowheel"
-      style={{ top: 9, left: 9 }}
+      className={rootClassName}
+      style={rootStyle || { top: 9, left: 9 }}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          onMouseEnter={() => setIsTagHovered(true)}
-          onMouseLeave={() => setIsTagHovered(false)}
-          className="image-role-tag-button flex h-6 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium transition-all"
-          style={{
-            background: isTagHovered ? 'rgba(30, 41, 59, 0.86)' : 'rgba(15, 23, 42, 0.72)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            border: `1px solid ${isTagHovered ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.12)'}`,
-            color: 'rgba(255,255,255,0.88)',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
-          }}
-        >
-          <DisplayIcon className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.74)' }} />
-          <span>{displayLabel || t('imageNode.definePurpose')}</span>
-          <ChevronDown className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
-        </button>
-      </div>
+      {!hideTrigger && (
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            onMouseEnter={() => setIsTagHovered(true)}
+            onMouseLeave={() => setIsTagHovered(false)}
+            className="image-role-tag-button flex h-6 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium transition-all"
+            style={{
+              background: isTagHovered ? 'rgba(30, 41, 59, 0.86)' : 'rgba(15, 23, 42, 0.72)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              border: `1px solid ${isTagHovered ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.12)'}`,
+              color: 'rgba(255,255,255,0.88)',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
+            }}
+          >
+            <DisplayIcon className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.74)' }} />
+            <span>{displayLabel || t('imageNode.definePurpose')}</span>
+            <ChevronDown className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
+          </button>
+        </div>
+      )}
 
       {open && (
         <div
-          className="absolute left-0 top-[28px] overflow-hidden rounded-[14px] p-1.5"
+          className="absolute left-0 overflow-hidden rounded-[14px] p-1.5"
           onMouseLeave={() => setHoveredRole(null)}
           style={{
+            top: popoverTop,
             width: 300,
             maxWidth: 'calc(100vw - 32px)',
             background: FLOATING_PANEL_BACKGROUND,
@@ -248,22 +259,24 @@ export function ImageRoleTag({
                     </div>
 
                     {/* Point-pick entry */}
-                    <button
-                      type="button"
-                      onClick={handleStartPointPick}
-                      className="mt-2.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    >
-                      <MousePointerClick className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#2dd4bf' }} />
-                      <div className="flex-1">
-                        <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.82)' }}>
-                          {t('reference.pointPickTitle', { defaultValue: '点选参考元素' })}
+                    {onStartPointPick && (
+                      <button
+                        type="button"
+                        onClick={handleStartPointPick}
+                        className="mt-2.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                      >
+                        <MousePointerClick className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#2dd4bf' }} />
+                        <div className="flex-1">
+                          <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.82)' }}>
+                            {t('reference.pointPickTitle', { defaultValue: '点选参考元素' })}
+                          </div>
+                          <div className="mt-0.5 text-[10px] leading-4" style={{ color: 'rgba(255,255,255,0.48)' }}>
+                            {t('reference.pointPickHint', { defaultValue: '点击图片中的目标区域，选择要参考的局部内容' })}
+                          </div>
                         </div>
-                        <div className="mt-0.5 text-[10px] leading-4" style={{ color: 'rgba(255,255,255,0.48)' }}>
-                          {t('reference.pointPickHint', { defaultValue: '点击图片中的目标区域，选择要参考的局部内容' })}
-                        </div>
-                      </div>
-                    </button>
+                      </button>
+                    )}
 
                     {/* Manual input entry (collapsed) */}
                     {!showCustomInput && (

@@ -17,6 +17,7 @@ import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/i
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
+import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd } from '../features/canvas/utils/referenceLimits';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
@@ -198,9 +199,25 @@ function FlowCanvas() {
         }
       }
 
-      // 唯一用途检查
       const sourceNode = nodes.find((n) => n.id === nodeId);
-      const sourceRole = sourceNode?.data?.role as ImageRole | null;
+      const sourceRole = (sourceNode?.data?.role as ImageRole | null | undefined) ?? null;
+
+      if (targetNode?.type === 'image') {
+        const targetInputEdges = edges.filter((e) => e.target === targetId);
+        const targetReferences = targetInputEdges.map((edge) => {
+          const refNode = nodes.find((n) => n.id === edge.source);
+          return {
+            nodeId: edge.source,
+            role: (edge.data?.role as ImageRole | null | undefined) ?? ((refNode?.data?.role as ImageRole | null | undefined) ?? null),
+          };
+        });
+        const limitIssue = getReferenceLimitIssueForAdd(targetReferences, sourceRole);
+        if (limitIssue) {
+          return formatReferenceLimitIssue(limitIssue);
+        }
+      }
+
+      // 唯一用途检查
       if (sourceRole && UNIQUE_USAGES.includes(sourceRole)) {
         const targetInputEdges = edges.filter((e) => e.target === targetId);
         const hasSameRole = targetInputEdges.some((edge) => {
@@ -236,7 +253,7 @@ function FlowCanvas() {
         const error = validateTarget(targetId, null);
         if (error) {
           nodeEl.classList.add('cannot-connect');
-          setRejectTooltip({ x: e.clientX, y: e.clientY, message: t('canvas.cannotConnect') });
+          setRejectTooltip({ x: e.clientX, y: e.clientY, message: error });
         } else {
           nodeEl.classList.add('can-connect');
           setRejectTooltip(null);
@@ -278,7 +295,9 @@ function FlowCanvas() {
       const effectiveInputHandle = inputHandle ?? nodeEl.querySelector('.image-node-handle.input-port');
       const error = validateTarget(targetId, effectiveInputHandle);
       if (error) {
-        fail();
+        setRejectTooltip({ x: e.clientX, y: e.clientY, message: error });
+        setTimeout(() => setRejectTooltip((prev) => (prev ? null : prev)), 1200);
+        setTempLine(null);
         return;
       }
 

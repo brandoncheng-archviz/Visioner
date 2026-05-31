@@ -29,6 +29,7 @@ import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
 import { resolveImageNodeSize } from '../../utils/imageNodeSizing';
+import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { identifyImageElement } from '../../services/identifyElement';
 import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
@@ -236,6 +237,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const canGenerate = !isGenerating && (references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0);
 
   const handleGenerate = useCallback(async () => {
+    const referenceLimitIssue = getReferenceLimitIssueForGenerate(references);
+    if (referenceLimitIssue) {
+      showToast(formatReferenceLimitIssue(referenceLimitIssue));
+      return;
+    }
+
     const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references, lightPreview);
 
     // Abort any previous running generation
@@ -357,7 +364,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams]);
+  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams, showToast, lightPreview]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);

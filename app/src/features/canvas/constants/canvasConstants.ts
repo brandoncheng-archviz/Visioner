@@ -14,6 +14,10 @@ export const IMAGE_NODE_CONTROL_HEIGHT = 252;
 export const IMAGE_NODE_CONTROL_EXPANDED_HEIGHT = 344;
 export const FLOATING_PANEL_BACKGROUND = '#252526';
 export const FLOATING_PANEL_BORDER = '1px solid rgba(255,255,255,0.08)';
+export const MAX_REFERENCE_IMAGES_PER_NODE = 6;
+export const RECOMMENDED_REFERENCE_IMAGES_PER_NODE = 4;
+export const MAX_LOCAL_REFERENCES_PER_NODE = 4;
+export const REFERENCE_THUMBNAIL_VISIBLE_COUNT = 4;
 
 export const MARK_ACTION_LABELS: Record<MarkAction, string> = {
   reference: 'reference',

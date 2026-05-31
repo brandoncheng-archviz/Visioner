@@ -29,12 +29,14 @@ import {
   IMAGE_NODE_CONTROL_WIDTH,
   IMAGE_NODE_CONTROL_HEIGHT,
   IMAGE_NODE_CONTROL_EXPANDED_HEIGHT,
+  MAX_REFERENCE_IMAGES_PER_NODE,
+  RECOMMENDED_REFERENCE_IMAGES_PER_NODE,
   MODEL_OPTIONS,
   RESOLUTION_OPTIONS,
   RATIO_OPTIONS,
   COUNT_OPTIONS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, imageRoleOptions, localReferenceOptions, getImageRoleLabel, getImageRoleColor, validateCustomReferenceLabel } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
 import {
   PRESET_DATA,
   PRESET_TABS,
@@ -43,10 +45,12 @@ import {
 } from '../../constants/presets';
 import { createImageReferenceBlock, stripReferencePromptMetadata } from '../../utils/promptUtils';
 import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUtils';
+import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { togglePresetSelection } from '../../utils/presetSelection';
 import { StylePickerModal } from '../../components/StylePickerModal';
 import { PresetPickerModal } from '../../components/PresetPickerModal';
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
+import { ImageRoleTag } from '../../components/ImageRoleTag';
 
 export function ImageNodeControlPanel({
   promptText,
@@ -121,16 +125,6 @@ export function ImageNodeControlPanel({
   const [showReferenceMenu, setShowReferenceMenu] = useState(false);
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
   const [pendingReference, setPendingReference] = useState<ReferenceInfo | null>(null);
-  const [pendingCustomInput, setPendingCustomInput] = useState(false);
-  const [pendingCustomValue, setPendingCustomValue] = useState('');
-  const [usageConflict, setUsageConflict] = useState<{
-    role: ImageRole;
-    customRoleLabel?: string;
-    localReferenceType?: LocalReferenceType;
-    localReferenceLabel?: string;
-    conflictingRef: ReferenceInfo;
-  } | null>(null);
-  const [pendingLocalRefExpanded, setPendingLocalRefExpanded] = useState(false);
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
   const [editingPromptBlockId, setEditingPromptBlockId] = useState<string | null>(null);
@@ -147,11 +141,8 @@ export function ImageNodeControlPanel({
     maxHeight: number;
   } | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
-  const pendingCustomInputRef = useRef<HTMLInputElement>(null);
-  const pendingUsageMenuRef = useRef<HTMLDivElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const customUsageSuggestions = ['\u94fa\u88c5\u53c2\u8003', '\u6c34\u666f\u53c2\u8003', '\u7acb\u9762\u706f\u5149', '\u5ba4\u5185\u5bb6\u5177'];
 
   /* ─── Reference thumbnail drag-and-drop reorder ─── */
   const [orderedRefs, setOrderedRefs] = useState(references);
@@ -330,8 +321,111 @@ export function ImageNodeControlPanel({
 
   const handleThumbnailClick = (ref: ReferenceInfo) => {
     if (isDraggingRef.current) return;
+    if (!hasDefinedUsage(ref)) {
+      setPendingReference(ref);
+      setShowReferenceMenu(false);
+      return;
+    }
     requestReferenceInsert(ref);
   };
+
+  const renderReferenceThumbnail = (ref: ReferenceInfo, idx: number, sortable: boolean) => (
+    <div
+      key={ref.nodeId}
+      ref={(element) => {
+        if (!sortable) return;
+        if (element) {
+          referenceItemRefs.current.set(ref.nodeId, element);
+        } else {
+          referenceItemRefs.current.delete(ref.nodeId);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      draggable={false}
+      onClick={() => handleThumbnailClick(ref)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') handleThumbnailClick(ref);
+      }}
+      onPointerDown={sortable ? handleRefPointerDown(idx) : (event) => event.stopPropagation()}
+      onPointerCancel={() => sortable && resetPointerReferenceDrag(true)}
+      className={`nodrag nowheel group/ref relative flex-shrink-0 rounded-lg outline-none ${sortable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+      style={{
+        width: 54,
+        height: 50,
+        opacity: draggingRefId === ref.nodeId ? 0.48 : 1,
+        transform: draggingRefId === ref.nodeId ? 'scale(0.96)' : 'scale(1)',
+        transition: 'transform 160ms ease, opacity 120ms ease',
+        touchAction: 'none',
+      }}
+    >
+      {ref.imageUrl && draggingRefId === null && (
+        <div
+          className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/ref:block"
+          style={{
+            background: FLOATING_PANEL_BACKGROUND,
+            border: FLOATING_PANEL_BORDER,
+            boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
+          }}
+        >
+          <img
+            src={ref.imageUrl}
+            alt=""
+            className="block rounded-t-xl"
+            style={{
+              width: 'auto',
+              height: 'auto',
+              maxWidth: 220,
+              maxHeight: 200,
+            }}
+          />
+          <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: 'rgba(255,255,255,0.75)' }}>
+            {ref.roleLabel || t('imageNode.undefinedUsage')}
+          </div>
+        </div>
+      )}
+      <div
+        className="relative h-full w-full overflow-hidden rounded-lg"
+        style={{
+          background: ref.role === 'undefined_usage' ? 'rgba(156,163,175,0.08)' : 'rgba(255,255,255,0.04)',
+          border: ref.role === 'undefined_usage' ? '1px solid rgba(156,163,175,0.20)' : `1px solid ${getImageRoleColor(ref.role, ref.localReferenceType)}`,
+        }}
+      >
+        {ref.imageUrl ? (
+          <img src={ref.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <Image className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+          </div>
+        )}
+        <button
+          draggable={false}
+          type="button"
+          onPointerDownCapture={(event) => {
+            referenceDragRef.current = null;
+            isDraggingRef.current = false;
+            setDraggingRefId(null);
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onClickCapture={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onRemoveReference(ref.nodeId);
+          }}
+          onDragStart={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          className="nodrag nowheel absolute right-0 top-0 z-30 hidden items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/ref:flex"
+          style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
+          title={t('imageNode.removeReference')}
+        >
+          <X className="h-2.5 w-2.5" />
+        </button>
+      </div>
+    </div>
+  );
 
   const imageReferenceBlocks = promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference');
 
@@ -345,6 +439,8 @@ export function ImageNodeControlPanel({
     [selectedPresets],
   );
   const selectedPresetCount = selectedPresetItems.length;
+  const hasTooManyReferences = orderedRefs.length > MAX_REFERENCE_IMAGES_PER_NODE;
+  const hasManyReferences = orderedRefs.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
 
   const getSlashPresetName = (preset: PresetItem) =>
     t(`preset.${preset.id}.name`, { defaultValue: preset.title || preset.name });
@@ -405,39 +501,19 @@ export function ImageNodeControlPanel({
     onPresetsChange(togglePresetSelection(selectedPresets, presetId));
   };
 
+  const handleGenerateClick = () => {
+    const limitIssue = getReferenceLimitIssueForGenerate(references);
+    if (limitIssue) {
+      showToast?.(formatReferenceLimitIssue(limitIssue));
+      return;
+    }
+    void onGenerate();
+  };
+
   const closeReferenceMenus = () => {
     setShowReferenceMenu(false);
     setPendingReference(null);
-    setPendingCustomInput(false);
-    setPendingLocalRefExpanded(false);
-    setPendingCustomValue('');
-    setUsageConflict(null);
   };
-
-  useEffect(() => {
-    if (!pendingReference) return;
-
-    const closeOnOutside = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && pendingUsageMenuRef.current?.contains(target)) {
-        return;
-      }
-      closeReferenceMenus();
-    };
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        closeReferenceMenus();
-      }
-    };
-
-    document.addEventListener('pointerdown', closeOnOutside, true);
-    document.addEventListener('keydown', closeOnEscape, true);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutside, true);
-      document.removeEventListener('keydown', closeOnEscape, true);
-    };
-  }, [pendingReference]);
 
   useEffect(() => {
     const referencesById = new Map(references.map((reference) => [reference.nodeId, reference]));
@@ -550,12 +626,6 @@ export function ImageNodeControlPanel({
     insertReferenceBlock(reference);
   };
 
-  useEffect(() => {
-    if (pendingCustomInput) {
-      pendingCustomInputRef.current?.focus();
-    }
-  }, [pendingCustomInput]);
-
   const applyReferenceRole = (reference: ReferenceInfo, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string, insertPromptBlock = true) => {
     const roleLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
     const updatedReference = onAssignReferenceRole(reference.nodeId, role, customRoleLabel, localReferenceType, localReferenceLabel) || { ...reference, role, roleLabel, customRoleLabel, localReferenceType, localReferenceLabel };
@@ -571,51 +641,20 @@ export function ImageNodeControlPanel({
 
   const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => {
     if (!pendingReference) return;
-    if (role === 'local_reference' && !localReferenceType && !localReferenceLabel) {
-      setPendingLocalRefExpanded(true);
+    const limitIssue = getReferenceLimitIssueForAdd(references, role, pendingReference.nodeId);
+    if (limitIssue) {
+      showToast?.(formatReferenceLimitIssue(limitIssue));
       return;
     }
     // 检查唯一用途冲突
     if (UNIQUE_USAGES.includes(role)) {
       const conflictingRef = references.find((ref) => ref.nodeId !== pendingReference.nodeId && ref.role === role);
       if (conflictingRef) {
-        setUsageConflict({ role, customRoleLabel, localReferenceType, localReferenceLabel, conflictingRef });
+        showToast?.(t('reference.usageConflict', { role: getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel) }));
         return;
       }
     }
     applyReferenceRole(pendingReference, role, customRoleLabel, localReferenceType, localReferenceLabel);
-  };
-
-  const replaceConflictingReference = () => {
-    if (!pendingReference || !usageConflict) return;
-    const oldBlock = imageReferenceBlocks.find((block) => block.sourceNodeId === usageConflict.conflictingRef.nodeId);
-    onRemoveReference(usageConflict.conflictingRef.nodeId);
-    const updatedReference = applyReferenceRole(pendingReference, usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType, usageConflict.localReferenceLabel, false);
-    if (!oldBlock) return;
-    const nextBlock = createImageReferenceBlock(updatedReference);
-    onPromptContentChange(
-      promptContent.map((item) =>
-        item.type === 'image_reference' && item.sourceNodeId === usageConflict.conflictingRef.nodeId
-          ? nextBlock
-          : item,
-      ),
-    );
-    setHighlightedPromptBlockId(nextBlock.id);
-    window.setTimeout(() => {
-      setHighlightedPromptBlockId((currentId) => (currentId === nextBlock.id ? null : currentId));
-    }, 900);
-  };
-
-  const submitPendingCustomRole = () => {
-    const existingCustomLabels = references
-      .filter((ref) => ref.role === 'local_reference' && ref.localReferenceType === 'custom' && ref.nodeId !== pendingReference?.nodeId)
-      .map((ref) => ref.localReferenceLabel || ref.roleLabel);
-    const result = validateCustomReferenceLabel(pendingCustomValue, existingCustomLabels);
-    if (!result.ok) {
-      showToast?.(result.message);
-      return;
-    }
-    handleReferenceRoleSelect('local_reference', undefined, 'custom', result.label);
   };
 
   const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -679,11 +718,7 @@ export function ImageNodeControlPanel({
 
     if (pendingReference && event.key === 'Escape') {
       event.preventDefault();
-      if (pendingLocalRefExpanded) {
-        setPendingLocalRefExpanded(false);
-      } else {
-        closeReferenceMenus();
-      }
+      closeReferenceMenus();
     }
 
     // Prompt input line break shortcuts (when no menu is open)
@@ -1030,103 +1065,8 @@ export function ImageNodeControlPanel({
             />
           )}
           {/* Reference thumbnails — supports drag sorting */}
-          <div className="flex items-center gap-2">
-            {orderedRefs.map((ref, idx) => (
-              <div
-                key={ref.nodeId}
-                ref={(element) => {
-                  if (element) {
-                    referenceItemRefs.current.set(ref.nodeId, element);
-                  } else {
-                    referenceItemRefs.current.delete(ref.nodeId);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                draggable={false}
-                onClick={() => handleThumbnailClick(ref)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') handleThumbnailClick(ref);
-                }}
-                onPointerDown={handleRefPointerDown(idx)}
-                onPointerCancel={() => resetPointerReferenceDrag(true)}
-                className="nodrag nowheel group/ref relative flex-shrink-0 cursor-grab rounded-lg outline-none active:cursor-grabbing"
-                style={{
-                  width: 54,
-                  height: 50,
-                  opacity: draggingRefId === ref.nodeId ? 0.48 : 1,
-                  transform: draggingRefId === ref.nodeId ? 'scale(0.96)' : 'scale(1)',
-                  transition: 'transform 160ms ease, opacity 120ms ease',
-                  touchAction: 'none',
-                }}
-              >
-                {ref.imageUrl && draggingRefId === null && (
-                  <div
-                    className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/ref:block"
-                    style={{
-                      background: FLOATING_PANEL_BACKGROUND,
-                      border: FLOATING_PANEL_BORDER,
-                      boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
-                    }}
-                  >
-                    <img
-                      src={ref.imageUrl}
-                      alt=""
-                      className="block rounded-t-xl"
-                      style={{
-                        width: 'auto',
-                        height: 'auto',
-                        maxWidth: 220,
-                        maxHeight: 200,
-                      }}
-                    />
-                    <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                      {ref.roleLabel || t('imageNode.undefinedUsage')}
-                    </div>
-                  </div>
-                )}
-                <div
-                  className="relative h-full w-full overflow-hidden rounded-lg"
-                  style={{
-              background: ref.role === 'undefined_usage' ? 'rgba(156,163,175,0.08)' : 'rgba(255,255,255,0.04)',
-              border: ref.role === 'undefined_usage' ? '1px solid rgba(156,163,175,0.20)' : `1px solid ${getImageRoleColor(ref.role, ref.localReferenceType)}`,
-            }}
-                >
-                  {ref.imageUrl ? (
-                    <img src={ref.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                      <Image className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
-                    </div>
-                  )}
-                  <button
-                    draggable={false}
-                    type="button"
-                    onPointerDownCapture={(event) => {
-                      referenceDragRef.current = null;
-                      isDraggingRef.current = false;
-                      setDraggingRefId(null);
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onClickCapture={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onRemoveReference(ref.nodeId);
-                    }}
-                    onDragStart={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    className="nodrag nowheel absolute right-0 top-0 z-30 hidden items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/ref:flex"
-                    style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-                    title={t('imageNode.removeReference')}
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="relative flex items-center gap-2">
+            {orderedRefs.map((ref, idx) => renderReferenceThumbnail(ref, idx, true))}
           </div>
         </div>
         {/* Expand */}
@@ -1139,6 +1079,23 @@ export function ImageNodeControlPanel({
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {hasManyReferences && (
+        <div className="px-3.5 pb-1">
+          <div
+            className="rounded-lg px-2 py-1.5 text-[12px]"
+            style={{
+              color: hasTooManyReferences ? '#fca5a5' : 'rgba(255,255,255,0.52)',
+              background: hasTooManyReferences ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.035)',
+              border: hasTooManyReferences ? '1px solid rgba(239,68,68,0.24)' : '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            {hasTooManyReferences
+              ? '当前引用图数量超过上限，建议删除部分引用图。'
+              : '参考图较多，可能影响生成稳定性'}
+          </div>
+        </div>
+      )}
 
       {selectedPresetItems.length > 0 && (
         <div className="px-3.5 pb-1">
@@ -1300,26 +1257,6 @@ export function ImageNodeControlPanel({
                     >
                       <X className="h-2.5 w-2.5" />
                     </button>
-                    {!isEditing && (
-                      <div
-                        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden rounded-xl text-left group-hover/prompt-ref:block"
-                        style={{
-                          background: FLOATING_PANEL_BACKGROUND,
-                          border: FLOATING_PANEL_BORDER,
-                          boxShadow: '0 16px 34px rgba(0,0,0,0.5)',
-                        }}
-                      >
-                        {previewImage && (
-                          <img
-                            src={previewImage}
-                            alt=""
-                            className="block rounded-t-xl"
-                            style={{ width: 'auto', height: 'auto', maxWidth: 240, maxHeight: 220 }}
-                          />
-                        )}
-                        <div className="px-2 py-1.5 text-center text-[12px] font-medium leading-5" style={{ color: 'rgba(255,255,255,0.78)' }}>{block.usage}</div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1370,157 +1307,27 @@ export function ImageNodeControlPanel({
             </div>
           )}
           {pendingReference && (
-            <div
-              ref={pendingUsageMenuRef}
-              className="absolute left-0 top-7 z-40 overflow-hidden rounded-xl py-1"
-              style={{
-                width: 300,
-                maxWidth: 'calc(100vw - 32px)',
-                maxHeight: 300,
-                overflowY: 'auto',
-                background: FLOATING_PANEL_BACKGROUND,
-                border: FLOATING_PANEL_BORDER,
-                boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
+            <ImageRoleTag
+              role={pendingReference.role}
+              customRoleLabel={pendingReference.customRoleLabel}
+              localReferenceType={pendingReference.localReferenceType}
+              localReferenceLabel={pendingReference.localReferenceLabel}
+              onChange={(role, customRoleLabel, localReferenceType, localReferenceLabel) => {
+                if (!role) {
+                  closeReferenceMenus();
+                  return;
+                }
+                handleReferenceRoleSelect(role, customRoleLabel, localReferenceType, localReferenceLabel);
               }}
-              onWheel={(e) => e.stopPropagation()}
-            >
-              <div className="px-3 py-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.58)' }}>{t('imageNode.selectImagePurpose')}</div>
-              {usageConflict && (
-                <div className="mx-2 mb-1 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.10)' }}>
-                  <div className="text-[12px] leading-5" style={{ color: 'rgba(255,255,255,0.72)' }}>
-                    {t('imageNode.usageConflictTitle', { role: getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType, usageConflict.localReferenceLabel) })}
-                  </div>
-                  <div className="mt-2 flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={replaceConflictingReference}
-                      className="rounded-md px-2 py-1 text-[12px] font-medium transition-colors hover:bg-white/15"
-                      style={{ color: '#ffffff', background: 'rgba(255,255,255,0.10)' }}
-                    >
-                      {t('common.replace')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={closeReferenceMenus}
-                      className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
-                      style={{ color: 'rgba(255,255,255,0.62)' }}
-                    >
-                      {t('common.cancel')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUsageConflict(null)}
-                      className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
-                      style={{ color: 'rgba(255,255,255,0.62)' }}
-                    >
-                      {t('imageNode.changeUsage')}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {imageRoleOptions.map((option) => {
-                const RoleIcon = option.Icon;
-                const isLocalRef = option.value === 'local_reference';
-                const isExpandedLocal = isLocalRef && pendingLocalRefExpanded;
-                return (
-                  <div key={option.value}>
-                    <button
-                      onClick={() => handleReferenceRoleSelect(option.value)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] transition-colors hover:bg-white/5"
-                      style={{ color: 'rgba(255,255,255,0.86)' }}
-                    >
-                      <RoleIcon className="h-4 w-4" style={{ color: option.color }} />
-                      {option.label}
-                    </button>
-                    {isExpandedLocal && (
-                      <div className="mx-3 mb-2 mt-0.5 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div className="mb-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                          {t('reference.selectLocalElement', { defaultValue: '选择参考的局部元素' })}
-                        </div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {localReferenceOptions.map((sub) => (
-                            <button
-                              key={sub.value}
-                              type="button"
-                              onClick={() => handleReferenceRoleSelect('local_reference', undefined, sub.value, sub.label)}
-                              className="rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
-                              style={{
-                                background: 'rgba(255,255,255,0.045)',
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                color: 'rgba(255,255,255,0.75)',
-                              }}
-                            >
-                              {sub.label}
-                            </button>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => { setPendingCustomInput(true); setPendingCustomValue(''); }}
-                            className="rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
-                            style={{
-                              background: 'rgba(255,255,255,0.045)',
-                              border: '1px solid rgba(255,255,255,0.08)',
-                              color: 'rgba(255,255,255,0.55)',
-                            }}
-                          >
-                            {t('imageNode.customReference', { defaultValue: '其他...' })}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {pendingCustomInput && (
-                <div className="px-3 py-2">
-                  <input
-                    ref={pendingCustomInputRef}
-                    value={pendingCustomValue}
-                    onChange={(event) => setPendingCustomValue(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        submitPendingCustomRole();
-                      }
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        setPendingCustomInput(false);
-                      }
-                    }}
-                    placeholder={t('imageNode.customPurposeInputPlaceholder', { defaultValue: '这张图主要参考什么？' })}
-                    className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
-                    style={{
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      color: 'rgba(255,255,255,0.9)',
-                    }}
-                  />
-                  <div className="mt-1.5 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
-                    {t('imageNode.customPurposeExample', { defaultValue: '例如：铺装 / 水景 / 入口 / 栏杆' })}
-                  </div>
-                  <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
-                    {t('reference.customReferenceDesc')}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {customUsageSuggestions.map((label) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => setPendingCustomValue(label)}
-                        className="rounded-md px-1.5 py-0.5 text-[10px] transition-colors hover:bg-white/12"
-                        style={{
-                          background: 'rgba(255,255,255,0.055)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          color: 'rgba(255,255,255,0.64)',
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+              open
+              onOpenChange={(open) => {
+                if (!open) closeReferenceMenus();
+              }}
+              hideTrigger
+              popoverTop={0}
+              rootClassName="absolute left-0 top-7 z-50 nodrag nowheel"
+              rootStyle={{ left: 0, top: 28 }}
+            />
           )}
         </div>
       </div>
@@ -1621,7 +1428,7 @@ export function ImageNodeControlPanel({
           </div>
           {generationTask?.status === 'failed' && generationTask.errorMessage ? (
             <button
-              onClick={onGenerate}
+              onClick={handleGenerateClick}
               disabled={isGenerating}
               className="flex items-center justify-center gap-1 rounded-lg transition-colors"
               style={{
@@ -1642,7 +1449,7 @@ export function ImageNodeControlPanel({
             </button>
           ) : (
             <button
-              onClick={onGenerate}
+              onClick={handleGenerateClick}
               disabled={!canGenerate}
               className="flex items-center justify-center rounded-lg transition-colors"
               style={{
