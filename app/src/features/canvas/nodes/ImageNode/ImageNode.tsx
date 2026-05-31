@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Image, Plus, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
@@ -23,7 +23,7 @@ import {
   IMAGE_NODE_CONTROL_HEIGHT,
   DEFAULT_MODEL_PARAMS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole, getLocalReferenceLabel } from '../../constants/imageUsages';
 import { getStylePresetById, getPresetById } from '../../constants/presets';
 import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
@@ -35,7 +35,7 @@ import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
 
 export function ImageNode({ data, selected, id }: NodeProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { show: showToast } = useToast();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
@@ -47,6 +47,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const role = rawRole;
   const customRoleLabel = data.customRoleLabel as string | undefined;
   const localReferenceType = (data.localReferenceType as LocalReferenceType | undefined) ?? getLocalReferenceTypeFromRole(rawRole);
+  const localReferenceLabel = (data.localReferenceLabel as string | undefined) ?? getLocalReferenceLabel(rawRole, data.localReferenceType as LocalReferenceType | undefined, data.localReferenceLabel as string | undefined, customRoleLabel);
   const fileRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || 'Image');
@@ -117,44 +118,50 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   /* ─── Reference tracking ─── */
   const allEdges = useStore((state) => state.edges);
   const allNodes = useStore((state) => state.nodes);
-  const inputEdges = allEdges.filter((e) => e.target === id);
   const referenceOrder = (data.referenceOrder as string[]) || [];
-  const rawReferences = inputEdges.flatMap((edge) => {
-    const sourceNode = allNodes.find((n) => n.id === edge.source);
-    if (sourceNode?.type === 'sunSky') return [];
-    const edgeRole = edge.data?.role as ImageRole | null | undefined;
-    const edgeCustomRoleLabel = edge.data?.customRoleLabel as string | undefined;
-    const edgeLocalRefType = edge.data?.localReferenceType as LocalReferenceType | undefined;
-    const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
-    const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
-    const sourceLocalRefType = sourceNode?.data?.localReferenceType as LocalReferenceType | undefined;
-    const referenceRole = edgeRole ?? sourceRole;
-    const referenceCustomRoleLabel = edgeCustomRoleLabel ?? sourceCustomRoleLabel;
-    const referenceLocalRefType = edgeLocalRefType ?? sourceLocalRefType ?? getLocalReferenceTypeFromRole(referenceRole);
-    const imageUrl = getCurrentImage(sourceNode?.data);
-    if (!imageUrl) return [];
-    return [{
-      nodeId: edge.source,
-      index: 0,
-      role: referenceRole,
-      roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel, referenceLocalRefType),
-      customRoleLabel: referenceCustomRoleLabel,
-      localReferenceType: referenceLocalRefType,
-      imageUrl,
-      width: getNodeWidth(sourceNode?.data),
-      height: getNodeHeight(sourceNode?.data),
-    }];
-  });
-  const references: ReferenceInfo[] = rawReferences
-    .sort((a, b) => {
-      const aIndex = referenceOrder.indexOf(a.nodeId);
-      const bIndex = referenceOrder.indexOf(b.nodeId);
-      if (aIndex >= 0 && bIndex >= 0) return aIndex - bIndex;
-      if (aIndex >= 0) return -1;
-      if (bIndex >= 0) return 1;
-      return 0;
-    })
-    .map((ref, idx) => ({ ...ref, index: idx + 1 }));
+  const references: ReferenceInfo[] = useMemo(() => {
+    const inputEdges = allEdges.filter((e) => e.target === id);
+    const rawReferences = inputEdges.flatMap((edge) => {
+      const sourceNode = allNodes.find((n) => n.id === edge.source);
+      if (sourceNode?.type === 'sunSky') return [];
+      const edgeRole = edge.data?.role as ImageRole | null | undefined;
+      const edgeCustomRoleLabel = edge.data?.customRoleLabel as string | undefined;
+      const edgeLocalRefType = edge.data?.localReferenceType as LocalReferenceType | undefined;
+      const edgeLocalRefLabel = edge.data?.localReferenceLabel as string | undefined;
+      const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
+      const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
+      const sourceLocalRefType = sourceNode?.data?.localReferenceType as LocalReferenceType | undefined;
+      const sourceLocalRefLabel = sourceNode?.data?.localReferenceLabel as string | undefined;
+      const referenceRole = edgeRole ?? sourceRole;
+      const referenceCustomRoleLabel = edgeCustomRoleLabel ?? sourceCustomRoleLabel;
+      const referenceLocalRefType = edgeLocalRefType ?? sourceLocalRefType ?? getLocalReferenceTypeFromRole(referenceRole);
+      const referenceLocalRefLabel = edgeLocalRefLabel ?? sourceLocalRefLabel;
+      const imageUrl = getCurrentImage(sourceNode?.data);
+      if (!imageUrl) return [];
+      return [{
+        nodeId: edge.source,
+        index: 0,
+        role: referenceRole,
+        roleLabel: getImageRoleLabel(referenceRole, referenceCustomRoleLabel, referenceLocalRefType, referenceLocalRefLabel),
+        customRoleLabel: referenceCustomRoleLabel,
+        localReferenceType: referenceLocalRefType,
+        localReferenceLabel: referenceLocalRefLabel,
+        imageUrl,
+        width: getNodeWidth(sourceNode?.data),
+        height: getNodeHeight(sourceNode?.data),
+      }];
+    });
+    return rawReferences
+      .sort((a, b) => {
+        const aIndex = referenceOrder.indexOf(a.nodeId);
+        const bIndex = referenceOrder.indexOf(b.nodeId);
+        if (aIndex >= 0 && bIndex >= 0) return aIndex - bIndex;
+        if (aIndex >= 0) return -1;
+        if (bIndex >= 0) return 1;
+        return 0;
+      })
+      .map((ref, idx) => ({ ...ref, index: idx + 1 }));
+  }, [allEdges, allNodes, id, referenceOrder, i18n.language]);
   const referencesSignature = JSON.stringify(
     references.map((reference) => ({
       nodeId: reference.nodeId,
@@ -162,6 +169,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       roleLabel: reference.roleLabel,
       customRoleLabel: reference.customRoleLabel,
       localReferenceType: reference.localReferenceType,
+      localReferenceLabel: reference.localReferenceLabel,
       imageUrl: reference.imageUrl,
       width: reference.width,
       height: reference.height,
@@ -187,6 +195,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               usageLabel: reference.roleLabel || t('imageNode.undefinedUsage'),
               customUsageName: reference.customRoleLabel,
               localReferenceType: reference.localReferenceType,
+              localReferenceLabel: reference.localReferenceLabel,
             })),
             referencesSignature,
           },
@@ -409,12 +418,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     );
   };
 
-  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType) => {
+  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType, nextLocalRefLabel?: string) => {
     const roleOption = getImageRoleOption(nextRole, nextCustomRoleLabel);
-    const roleData = getRoleData(nextRole, nextCustomRoleLabel, nextLocalRefType);
-    const assignReferenceEdgeRole = data.onAssignReferenceEdgeRole as ((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType) => void) | undefined;
+    const roleData = getRoleData(nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel);
+    const assignReferenceEdgeRole = data.onAssignReferenceEdgeRole as ((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => void) | undefined;
     if (assignReferenceEdgeRole) {
-      assignReferenceEdgeRole(id, sourceNodeId, nextRole, nextCustomRoleLabel, nextLocalRefType);
+      assignReferenceEdgeRole(id, sourceNodeId, nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel);
     } else {
       setEdges((eds) =>
         eds.map((edge) =>
@@ -433,7 +442,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       role: nextRole,
       customRoleLabel: nextCustomRoleLabel,
       localReferenceType: nextLocalRefType,
-      roleLabel: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType) || roleOption?.label || existingReference.roleLabel,
+      localReferenceLabel: nextLocalRefLabel,
+      roleLabel: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel) || roleOption?.label || existingReference.roleLabel,
     };
   };
 
@@ -482,8 +492,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label: newName } } : n)));
   };
 
-  const handleRoleChange = (nextRole: ImageRole, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType) => {
-    if (UNIQUE_USAGES.includes(nextRole)) {
+  const handleRoleChange = (nextRole: ImageRole | null, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType, nextLocalRefLabel?: string) => {
+    if (nextRole && UNIQUE_USAGES.includes(nextRole)) {
       const affectedTargetIds = allEdges.filter((edge) => edge.source === id).map((edge) => edge.target);
       const conflictingTarget = affectedTargetIds.find((targetId) =>
         allEdges.some((edge) => {
@@ -494,11 +504,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         }),
       );
       if (conflictingTarget) {
-        showToast(t('reference.downstreamConflict', { role: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType) }));
+        showToast(t('reference.downstreamConflict', { role: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel) }));
         return;
       }
     }
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...getRoleData(nextRole, nextCustomRoleLabel, nextLocalRefType) } } : n)));
+    const safeRole = nextRole ?? 'undefined_usage';
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...getRoleData(safeRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel) } } : n)));
   };
 
   const stopTitleInteraction = (event: React.SyntheticEvent) => {
@@ -616,7 +627,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 {RoleIconForTitle && (
                   <RoleIconForTitle className="inline-block" style={{ width: 11, height: 11, marginRight: 3, verticalAlign: '-0.1em' }} />
                 )}
-                {getImageRoleLabel(role, customRoleLabel, localReferenceType) || t('imageNode.undefinedUsage')}
+                {getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel) || t('imageNode.undefinedUsage')}
               </span>
             )}
             {editingName ? (
@@ -677,7 +688,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         )}
 
         {displayImage && (isOnlySelected || roleMenuOpen) && (
-          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} localReferenceType={localReferenceType} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
+          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} localReferenceType={localReferenceType} localReferenceLabel={localReferenceLabel} onChange={handleRoleChange} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}

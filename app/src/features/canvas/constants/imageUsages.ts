@@ -1,7 +1,8 @@
-import { Building2, Layers, Pencil, Palette, Sun, CircleHelp, Focus } from 'lucide-react';
+import { Building2, Layers, Focus } from 'lucide-react';
 import i18n from '@/i18n';
 import type { ImageRole, ImageRoleOption, LocalReferenceType } from '../types/imageNode.types';
 
+/* Reserved labels that cannot be used as custom local-reference names */
 export const SYSTEM_USAGE_LABELS = [
   '主体建筑',
   '氛围参考',
@@ -38,24 +39,6 @@ export const imageRoleOptions: ImageRoleOption[] = [
     constraints: ['userDefinedContent'],
     Icon: Focus,
     color: '#14B8A6',
-  },
-  {
-    value: 'custom_reference',
-    label: i18n.t('reference.customReference'),
-    description: i18n.t('reference.customReference'),
-    detail: i18n.t('reference.customReferenceDetail'),
-    constraints: ['userDefinedContent'],
-    Icon: Pencil,
-    color: '#EF4444',
-  },
-  {
-    value: 'undefined_usage',
-    label: i18n.t('imageNode.undefinedUsage'),
-    description: i18n.t('imageNode.undefinedUsage'),
-    detail: i18n.t('reference.undefinedUsageDetail'),
-    constraints: ['neutralVisualReference'],
-    Icon: CircleHelp,
-    color: '#9CA3AF',
   },
 ];
 
@@ -99,10 +82,10 @@ export const localReferenceOptions: LocalReferenceOption[] = [
     color: '#EC4899',
   },
   {
-    value: 'other',
-    label: i18n.t('reference.localReferenceOther'),
-    promptText: '只参考用户指定的局部元素，不复制整体建筑体块与构图。',
-    color: '#9CA3AF',
+    value: 'paving',
+    label: i18n.t('reference.localReferencePaving'),
+    promptText: '只参考该图中的铺装材质、铺装尺度、地面纹理、场地细节和空间氛围，不复制整体建筑体块与构图。',
+    color: '#A78BFA',
   },
 ];
 
@@ -117,7 +100,7 @@ export const roleColorMap: Record<ImageRole | 'null' | 'local_reference', string
   plant_reference: '#22C55E',
   material_reference: '#EF4444',
   lighting_reference: '#EF4444',
-  // Legacy roles that map to local_reference — their colors are handled by sub-type inference
+  // Legacy roles that map to local_reference
   vegetation_reference: '#22C55E',
   people_reference: '#F97316',
   sky_reference: '#FACC15',
@@ -128,27 +111,7 @@ export const roleColorMap: Record<ImageRole | 'null' | 'local_reference', string
 export const UNIQUE_USAGES: ImageRole[] = ['primary_building', 'atmosphere_reference'];
 
 /* ─── Legacy options for old data compatibility ─── */
-export const legacyImageRoleOptions: Partial<Record<ImageRole, ImageRoleOption>> = {
-  overall_reference: imageRoleOptions.find((option) => option.value === 'atmosphere_reference'),
-  material_reference: {
-    value: 'material_reference',
-    label: i18n.t('reference.materialReference'),
-    description: i18n.t('reference.materialReference'),
-    detail: i18n.t('reference.materialReferenceDetail'),
-    constraints: ['materialReference'],
-    Icon: Palette,
-    color: '#EF4444',
-  },
-  lighting_reference: {
-    value: 'lighting_reference',
-    label: i18n.t('reference.lightingReference'),
-    description: i18n.t('reference.lightingReference'),
-    detail: i18n.t('reference.lightingReferenceDetail'),
-    constraints: ['lightingReference'],
-    Icon: Sun,
-    color: '#EF4444',
-  },
-};
+export const legacyImageRoleOptions: Partial<Record<ImageRole, ImageRoleOption>> = {};
 
 /* ─── Legacy role normalization ─── */
 export function getNormalizedRole(role: ImageRole | null | undefined): ImageRole | null {
@@ -156,6 +119,8 @@ export function getNormalizedRole(role: ImageRole | null | undefined): ImageRole
   if (role === 'vegetation_reference' || role === 'plant_reference') return 'local_reference';
   if (role === 'people_reference') return 'local_reference';
   if (role === 'sky_reference') return 'local_reference';
+  if (role === 'custom_reference') return 'local_reference';
+  if (role === 'undefined_usage') return null;
   return role;
 }
 
@@ -167,12 +132,27 @@ export function getLocalReferenceTypeFromRole(
   if (role === 'vegetation_reference' || role === 'plant_reference') return 'vegetation';
   if (role === 'people_reference') return 'people';
   if (role === 'sky_reference') return 'sky';
+  if (role === 'custom_reference') return 'custom';
   return undefined;
 }
 
 export function getLocalReferenceOption(type: LocalReferenceType | undefined): LocalReferenceOption | undefined {
   if (!type) return undefined;
   return localReferenceOptions.find((o) => o.value === type);
+}
+
+export function getLocalReferenceLabel(
+  role: ImageRole | null | undefined,
+  localRefType?: LocalReferenceType,
+  localRefLabel?: string,
+  customRoleLabel?: string,
+): string | undefined {
+  if (localRefLabel) return localRefLabel;
+  if (role === 'custom_reference' && customRoleLabel) return customRoleLabel;
+  if (localRefType && localRefType !== 'custom') {
+    return getLocalReferenceOption(localRefType)?.label;
+  }
+  return undefined;
 }
 
 /* ─── Helpers ─── */
@@ -211,16 +191,21 @@ export function getImageRoleOption(role: ImageRole | null | undefined, customLab
   return { ...option, label };
 }
 
-export function getImageRoleLabel(role: ImageRole | null | undefined, customLabel?: string, localRefType?: LocalReferenceType) {
+export function getImageRoleLabel(
+  role: ImageRole | null | undefined,
+  customLabel?: string,
+  localRefType?: LocalReferenceType,
+  localRefLabel?: string,
+): string {
   const normalizedRole = getNormalizedRole(role) || role;
+  if (!normalizedRole) {
+    return i18n.t('imageNode.undefinedUsage');
+  }
   const option = getImageRoleOption(normalizedRole, customLabel);
   const baseLabel = option?.label || i18n.t('imageNode.undefinedUsage');
   if (normalizedRole === 'local_reference') {
-    const type = localRefType || getLocalReferenceTypeFromRole(role);
-    if (type) {
-      const subLabel = getLocalReferenceOption(type)?.label;
-      if (subLabel) return `${baseLabel} · ${subLabel}`;
-    }
+    const subLabel = getLocalReferenceLabel(role, localRefType, localRefLabel, customLabel);
+    if (subLabel) return `${baseLabel} · ${subLabel}`;
   }
   return baseLabel;
 }

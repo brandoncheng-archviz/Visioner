@@ -10,11 +10,11 @@ function isDefinedUsageValue(value: unknown) {
 export function hasDefinedUsage(reference: ReferenceInfo) {
   if (reference.role === 'undefined_usage') return true;
   if (!isDefinedUsageValue(reference.role)) return false;
+  if (reference.role === 'local_reference') {
+    return isDefinedUsageValue(reference.localReferenceType) || isDefinedUsageValue(reference.localReferenceLabel);
+  }
   if (reference.role === 'custom_reference') {
     return isDefinedUsageValue(reference.customRoleLabel) && reference.customRoleLabel !== '自定义用途...';
-  }
-  if (reference.role === 'local_reference') {
-    return isDefinedUsageValue(reference.localReferenceType);
   }
   return isDefinedUsageValue(reference.roleLabel);
 }
@@ -27,6 +27,7 @@ export function areReferencesEqual(a: ReferenceInfo, b: ReferenceInfo) {
     a.roleLabel === b.roleLabel &&
     a.customRoleLabel === b.customRoleLabel &&
     a.localReferenceType === b.localReferenceType &&
+    a.localReferenceLabel === b.localReferenceLabel &&
     a.imageUrl === b.imageUrl &&
     a.width === b.width &&
     a.height === b.height
@@ -37,12 +38,13 @@ export function areReferenceListsEqual(a: ReferenceInfo[], b: ReferenceInfo[]) {
   return a.length === b.length && a.every((reference, index) => areReferencesEqual(reference, b[index]));
 }
 
-export function getRoleData(role: ImageRole | null, customRoleLabel?: string, localReferenceType?: LocalReferenceType) {
+export function getRoleData(role: ImageRole | null, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) {
   const isPrimary = role === 'primary_building';
   return {
     role,
     customRoleLabel: role === 'custom_reference' ? customRoleLabel : undefined,
     localReferenceType: role === 'local_reference' ? localReferenceType : undefined,
+    localReferenceLabel: role === 'local_reference' ? localReferenceLabel : undefined,
     preserveStructure: isPrimary,
     preserveCamera: isPrimary,
     preserveComposition: isPrimary,

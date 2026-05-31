@@ -21,7 +21,8 @@ export type LocalReferenceType =
   | 'sky'
   | 'water'
   | 'retail'
-  | 'other';
+  | 'paving'
+  | 'custom';
 
 export interface PromptTemplate {
   goal: string;

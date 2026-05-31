@@ -1,5 +1,5 @@
 import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition, PromptTemplate } from '../types/imageNode.types';
-import { getNormalizedRole, getLocalReferenceTypeFromRole, getLocalReferenceOption } from '../constants/imageUsages';
+import { getNormalizedRole, getLocalReferenceTypeFromRole, getLocalReferenceOption, getLocalReferenceLabel } from '../constants/imageUsages';
 import type { LightPreviewData } from '../types/lightPreview.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
@@ -81,9 +81,16 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
   }
   if (normalizedRole === 'local_reference') {
     const type = reference.localReferenceType || getLocalReferenceTypeFromRole(reference.role);
+    const label = getLocalReferenceLabel(reference.role, reference.localReferenceType, reference.localReferenceLabel, reference.customRoleLabel);
+    if (type === 'custom' && label) {
+      return `只参考该图中的「${label}」相关视觉信息，不复制整体建筑体块与构图。`;
+    }
     if (type) {
       const option = getLocalReferenceOption(type);
       if (option) return option.promptText;
+    }
+    if (label) {
+      return `只参考该图中的「${label}」相关视觉信息，不复制整体建筑体块与构图。`;
     }
     return '只重点参考该图中的指定局部元素，不复制整体建筑体块与构图。';
   }
@@ -149,6 +156,7 @@ export function buildPromptSubmission(
   const localRefs = imageRefBlocks.filter(
     (block) =>
       blockRole(block) === 'local_reference' ||
+      blockRole(block) === 'custom_reference' ||
       blockRole(block) === 'vegetation_reference' ||
       blockRole(block) === 'plant_reference' ||
       blockRole(block) === 'people_reference' ||

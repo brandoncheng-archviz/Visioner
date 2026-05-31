@@ -92,7 +92,7 @@ export function ImageNodeControlPanel({
   onRemoveReference: (nodeId: string) => void;
   onReorderReferences: (newOrder: string[]) => void;
   onUseReference: (reference: ReferenceInfo) => void;
-  onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType) => ReferenceInfo | null;
+  onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => ReferenceInfo | null;
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
@@ -112,6 +112,7 @@ export function ImageNodeControlPanel({
     role: ImageRole;
     customRoleLabel?: string;
     localReferenceType?: LocalReferenceType;
+    localReferenceLabel?: string;
     conflictingRef: ReferenceInfo;
   } | null>(null);
   const [pendingLocalRefExpanded, setPendingLocalRefExpanded] = useState(false);
@@ -136,7 +137,6 @@ export function ImageNodeControlPanel({
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const customUsageSuggestions = ['\u94fa\u88c5\u53c2\u8003', '\u6c34\u666f\u53c2\u8003', '\u7acb\u9762\u706f\u5149', '\u5ba4\u5185\u5bb6\u5177'];
-  const customUsagePlaceholderProps: Record<string, string> = { placeholder: '\u8f93\u5165\u81ea\u5b9a\u4e49\u7528\u9014' };
 
   /* ─── Reference thumbnail drag-and-drop reorder ─── */
   const [orderedRefs, setOrderedRefs] = useState(references);
@@ -435,11 +435,13 @@ export function ImageNodeControlPanel({
         return [];
       }
       const nextBlock = createImageReferenceBlock(reference);
+      const currentPromptText = stripReferencePromptMetadata(block.promptText || '');
+      const shouldRefreshPromptText = block.usage !== nextBlock.usage || !currentPromptText;
       const updatedBlock = {
         ...block,
         usage: nextBlock.usage,
         thumbnailUrl: nextBlock.thumbnailUrl,
-        promptText: stripReferencePromptMetadata(block.promptText || nextBlock.promptText),
+        promptText: shouldRefreshPromptText ? nextBlock.promptText : currentPromptText,
       };
       if (updatedBlock.usage !== block.usage || updatedBlock.thumbnailUrl !== block.thumbnailUrl || updatedBlock.promptText !== block.promptText) {
         changed = true;
@@ -539,9 +541,9 @@ export function ImageNodeControlPanel({
     }
   }, [pendingCustomInput]);
 
-  const applyReferenceRole = (reference: ReferenceInfo, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, insertPromptBlock = true) => {
-    const roleLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType);
-    const updatedReference = onAssignReferenceRole(reference.nodeId, role, customRoleLabel, localReferenceType) || { ...reference, role, roleLabel, customRoleLabel, localReferenceType };
+  const applyReferenceRole = (reference: ReferenceInfo, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string, insertPromptBlock = true) => {
+    const roleLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
+    const updatedReference = onAssignReferenceRole(reference.nodeId, role, customRoleLabel, localReferenceType, localReferenceLabel) || { ...reference, role, roleLabel, customRoleLabel, localReferenceType, localReferenceLabel };
     onUseReference(updatedReference);
     if (insertPromptBlock) {
       insertReferenceBlock(updatedReference);
@@ -552,9 +554,9 @@ export function ImageNodeControlPanel({
     return updatedReference;
   };
 
-  const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType) => {
+  const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => {
     if (!pendingReference) return;
-    if (role === 'local_reference' && !localReferenceType) {
+    if (role === 'local_reference' && !localReferenceType && !localReferenceLabel) {
       setPendingLocalRefExpanded(true);
       return;
     }
@@ -562,18 +564,18 @@ export function ImageNodeControlPanel({
     if (UNIQUE_USAGES.includes(role)) {
       const conflictingRef = references.find((ref) => ref.nodeId !== pendingReference.nodeId && ref.role === role);
       if (conflictingRef) {
-        setUsageConflict({ role, customRoleLabel, localReferenceType, conflictingRef });
+        setUsageConflict({ role, customRoleLabel, localReferenceType, localReferenceLabel, conflictingRef });
         return;
       }
     }
-    applyReferenceRole(pendingReference, role, customRoleLabel, localReferenceType);
+    applyReferenceRole(pendingReference, role, customRoleLabel, localReferenceType, localReferenceLabel);
   };
 
   const replaceConflictingReference = () => {
     if (!pendingReference || !usageConflict) return;
     const oldBlock = imageReferenceBlocks.find((block) => block.sourceNodeId === usageConflict.conflictingRef.nodeId);
     onRemoveReference(usageConflict.conflictingRef.nodeId);
-    const updatedReference = applyReferenceRole(pendingReference, usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType, false);
+    const updatedReference = applyReferenceRole(pendingReference, usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType, usageConflict.localReferenceLabel, false);
     if (!oldBlock) return;
     const nextBlock = createImageReferenceBlock(updatedReference);
     onPromptContentChange(
@@ -591,14 +593,14 @@ export function ImageNodeControlPanel({
 
   const submitPendingCustomRole = () => {
     const existingCustomLabels = references
-      .filter((ref) => ref.role === 'custom_reference' && ref.nodeId !== pendingReference?.nodeId)
-      .map((ref) => ref.customRoleLabel || ref.roleLabel);
+      .filter((ref) => ref.role === 'local_reference' && ref.localReferenceType === 'custom' && ref.nodeId !== pendingReference?.nodeId)
+      .map((ref) => ref.localReferenceLabel || ref.roleLabel);
     const result = validateCustomReferenceLabel(pendingCustomValue, existingCustomLabels);
     if (!result.ok) {
       showToast?.(result.message);
       return;
     }
-    handleReferenceRoleSelect('custom_reference', result.label);
+    handleReferenceRoleSelect('local_reference', undefined, 'custom', result.label);
   };
 
   const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1347,7 +1349,7 @@ export function ImageNodeControlPanel({
                       <Image className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.45)' }} />
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{getImageRoleLabel(reference.role, reference.customRoleLabel, reference.localReferenceType) || t('imageNode.undefinedUsage')}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{getImageRoleLabel(reference.role, reference.customRoleLabel, reference.localReferenceType, reference.localReferenceLabel) || t('imageNode.undefinedUsage')}</span>
                 </button>
               ))}
             </div>
@@ -1357,7 +1359,8 @@ export function ImageNodeControlPanel({
               ref={pendingUsageMenuRef}
               className="absolute left-0 top-7 z-40 overflow-hidden rounded-xl py-1"
               style={{
-                width: 260,
+                width: 300,
+                maxWidth: 'calc(100vw - 32px)',
                 maxHeight: 300,
                 overflowY: 'auto',
                 background: FLOATING_PANEL_BACKGROUND,
@@ -1370,7 +1373,7 @@ export function ImageNodeControlPanel({
               {usageConflict && (
                 <div className="mx-2 mb-1 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.10)' }}>
                   <div className="text-[12px] leading-5" style={{ color: 'rgba(255,255,255,0.72)' }}>
-                    {t('imageNode.usageConflictTitle', { role: getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType) })}
+                    {t('imageNode.usageConflictTitle', { role: getImageRoleLabel(usageConflict.role, usageConflict.customRoleLabel, usageConflict.localReferenceType, usageConflict.localReferenceLabel) })}
                   </div>
                   <div className="mt-2 flex gap-1.5">
                     <button
@@ -1407,14 +1410,7 @@ export function ImageNodeControlPanel({
                 return (
                   <div key={option.value}>
                     <button
-                      onClick={() => {
-                        if (option.value === 'custom_reference') {
-                          setPendingCustomInput(true);
-                          setPendingCustomValue('');
-                          return;
-                        }
-                        handleReferenceRoleSelect(option.value);
-                      }}
+                      onClick={() => handleReferenceRoleSelect(option.value)}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-[14px] transition-colors hover:bg-white/5"
                       style={{ color: 'rgba(255,255,255,0.86)' }}
                     >
@@ -1431,7 +1427,7 @@ export function ImageNodeControlPanel({
                             <button
                               key={sub.value}
                               type="button"
-                              onClick={() => handleReferenceRoleSelect('local_reference', undefined, sub.value)}
+                              onClick={() => handleReferenceRoleSelect('local_reference', undefined, sub.value, sub.label)}
                               className="rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
                               style={{
                                 background: 'rgba(255,255,255,0.045)',
@@ -1442,6 +1438,18 @@ export function ImageNodeControlPanel({
                               {sub.label}
                             </button>
                           ))}
+                          <button
+                            type="button"
+                            onClick={() => { setPendingCustomInput(true); setPendingCustomValue(''); }}
+                            className="rounded-md px-1 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
+                            style={{
+                              background: 'rgba(255,255,255,0.045)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              color: 'rgba(255,255,255,0.55)',
+                            }}
+                          >
+                            {t('imageNode.customReference', { defaultValue: '其他...' })}
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1464,8 +1472,7 @@ export function ImageNodeControlPanel({
                         setPendingCustomInput(false);
                       }
                     }}
-                    placeholder={t('imageNode.customPurposePlaceholder')}
-                    {...customUsagePlaceholderProps}
+                    placeholder={t('imageNode.customPurposeInputPlaceholder', { defaultValue: '这张图主要参考什么？' })}
                     className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
                     style={{
                       background: 'rgba(255,255,255,0.08)',
@@ -1473,6 +1480,9 @@ export function ImageNodeControlPanel({
                       color: 'rgba(255,255,255,0.9)',
                     }}
                   />
+                  <div className="mt-1.5 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
+                    {t('imageNode.customPurposeExample', { defaultValue: '例如：铺装 / 水景 / 入口 / 栏杆' })}
+                  </div>
                   <div className="mt-2 text-[11px] leading-4" style={{ color: 'rgba(255,255,255,0.46)' }}>
                     {t('reference.customReferenceDesc')}
                   </div>
