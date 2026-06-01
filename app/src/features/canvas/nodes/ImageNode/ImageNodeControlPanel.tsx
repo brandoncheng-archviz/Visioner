@@ -52,10 +52,9 @@ import { LightPreviewPanel } from '../../components/LightPreviewPanel';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
-  'border-[#94A3B8] bg-transparent text-[#CBD5E1] hover:border-[#CBD5E1] hover:bg-[rgba(148,163,184,0.10)]';
+  'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
 const GENERATION_CONTROL_BUTTON_SELECTED_CLASS =
-  'border-[#94A3B8] bg-[rgba(148,163,184,0.08)] text-[#CBD5E1] shadow-none hover:border-[#CBD5E1] hover:bg-[rgba(148,163,184,0.10)]';
-const GENERATION_CONTROL_TEXT_COLOR = '#CBD5E1';
+  'border-[#94A3B8] bg-[rgba(148,163,184,0.12)] text-[#E2E8F0] shadow-none';
 
 export function ImageNodeControlPanel({
   promptText,
@@ -956,8 +955,8 @@ export function ImageNodeControlPanel({
                 padding: '4px',
               }}
             >
-              <Bookmark className="w-4 h-4" style={{ color: GENERATION_CONTROL_TEXT_COLOR }} />
-              <span style={{ fontSize: 12, color: GENERATION_CONTROL_TEXT_COLOR }}>{t('imageNode.preset')}</span>
+              <Bookmark className="w-4 h-4" />
+              <span style={{ fontSize: 12 }}>{t('imageNode.preset')}</span>
             </button>
             {showPresetModal && (
               <PresetPickerModal
@@ -998,8 +997,8 @@ export function ImageNodeControlPanel({
                 className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${GENERATION_CONTROL_BUTTON_CLASS}`}
                 style={{ width: 54, height: 50, padding: '4px' }}
               >
-                <Sun className="w-4 h-4" style={{ color: GENERATION_CONTROL_TEXT_COLOR }} />
-                <span style={{ fontSize: 12, color: GENERATION_CONTROL_TEXT_COLOR }}>光影</span>
+                <Sun className="w-4 h-4" />
+                <span style={{ fontSize: 12 }}>光影</span>
               </button>
             )}
             {showLightPreview && (
@@ -1051,8 +1050,8 @@ export function ImageNodeControlPanel({
                 </span>
               ) : (
                 <>
-                  <Palette className="w-4 h-4" style={{ color: GENERATION_CONTROL_TEXT_COLOR }} />
-                  <span style={{ fontSize: 12, color: GENERATION_CONTROL_TEXT_COLOR }}>{t('imageNode.style')}</span>
+                  <Palette className="w-4 h-4" />
+                  <span style={{ fontSize: 12 }}>{t('imageNode.style')}</span>
                 </>
               )}
               {selectedStyle && (
