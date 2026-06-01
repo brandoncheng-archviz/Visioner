@@ -6,6 +6,7 @@ import {
   getImageRoleOption,
   getImageRoleLabel,
   localReferenceOptions,
+  normalizeLocalReferenceType,
   validateCustomReferenceLabel,
 } from '../constants/imageUsages';
 import { FLOATING_PANEL_BACKGROUND } from '../constants/canvasConstants';
@@ -53,6 +54,7 @@ export function ImageRoleTag({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const displayLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
+  const normalizedLocalReferenceType = normalizeLocalReferenceType(localReferenceType);
   const selectedOption = getImageRoleOption(role, customRoleLabel);
   const previewOption = getImageRoleOption(hoveredRole || role);
   const DisplayIcon = selectedOption?.Icon || Building2;
@@ -248,9 +250,9 @@ export function ImageRoleTag({
                           onClick={() => handleSelectLocalType(sub.value, sub.label)}
                           className="rounded-lg px-1 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
                           style={{
-                            background: localReferenceType === sub.value && !localReferenceLabel ? 'rgba(20,184,166,0.18)' : 'rgba(255,255,255,0.045)',
-                            border: localReferenceType === sub.value && !localReferenceLabel ? '1px solid rgba(20,184,166,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                            color: localReferenceType === sub.value && !localReferenceLabel ? '#2dd4bf' : 'rgba(255,255,255,0.75)',
+                            background: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? 'rgba(20,184,166,0.18)' : 'rgba(255,255,255,0.045)',
+                            border: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? '1px solid rgba(20,184,166,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                            color: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? '#2dd4bf' : 'rgba(255,255,255,0.75)',
                           }}
                         >
                           {sub.label}
@@ -311,7 +313,7 @@ export function ImageRoleTag({
                               setCustomInput('');
                             }
                           }}
-                          placeholder={t('reference.elementNamePlaceholder', { defaultValue: '例如：海水、家具、灯具、栏杆' })}
+                          placeholder={t('reference.elementNamePlaceholder', { defaultValue: '例如：铺装 / 家具 / 灯具 / 栏杆' })}
                           className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
                           style={{
                             background: 'rgba(255,255,255,0.08)',
@@ -361,7 +363,7 @@ export function ImageRoleTag({
                 className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors hover:bg-white/5"
                 style={{ color: 'rgba(255,255,255,0.58)' }}
               >
-                <span className="flex-1">{t('reference.clearUsage', { defaultValue: '清除用途' })}</span>
+                <span className="flex-1">{t('reference.clearUsage', { defaultValue: '清除参考用途' })}</span>
               </button>
             </div>
           )}

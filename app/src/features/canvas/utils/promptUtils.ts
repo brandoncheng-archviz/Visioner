@@ -1,8 +1,17 @@
 import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition, PromptTemplate } from '../types/imageNode.types';
-import { getNormalizedRole, getLocalReferenceTypeFromRole, getLocalReferenceOption, getLocalReferenceLabel } from '../constants/imageUsages';
+import {
+  getNormalizedRole,
+  getLocalReferenceTypeFromRole,
+  getLocalReferenceOption,
+  getLocalReferenceLabel,
+  normalizeLocalReferenceType,
+} from '../constants/imageUsages';
 import type { LightPreviewData } from '../types/lightPreview.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
+import i18n from '@/i18n';
+
+const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
 
 function serializePromptTemplate(template: string | PromptTemplate): string {
   if (typeof template === 'string') return template;
@@ -80,7 +89,7 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
     return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
   }
   if (normalizedRole === 'local_reference') {
-    const type = reference.localReferenceType || getLocalReferenceTypeFromRole(reference.role);
+    const type = normalizeLocalReferenceType(reference.localReferenceType) || getLocalReferenceTypeFromRole(reference.role);
     const label = getLocalReferenceLabel(reference.role, reference.localReferenceType, reference.localReferenceLabel, reference.customRoleLabel);
     if (type === 'custom' && label) {
       return `只参考该图中的「${label}」相关视觉信息，不复制整体建筑体块与构图。`;
@@ -96,10 +105,10 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
   }
   if (reference.role === 'custom_reference') {
     const customUsage = reference.customRoleLabel?.trim() || reference.roleLabel.trim();
-    if (customUsage && customUsage !== '自定义用途...' && customUsage !== '未定义用途') {
-      return `参考该图片中的${customUsage.replace(/参考/, '')}视觉信息。维度：由用户定义。`;
+    if (customUsage && customUsage !== LEGACY_CUSTOM_REFERENCE_LABEL && customUsage !== '未设置参考用途' && customUsage !== '未定义用途') {
+      return `只参考该图片中的${customUsage.replace(/参考/, '')}相关视觉信息，不复制整体建筑体块与构图。`;
     }
-    return '参考该图片中用户指定的自定义视觉信息。维度：由用户定义。';
+    return '只参考该图片中用户指定的局部参考视觉信息，不复制整体建筑体块与构图。';
   }
   if (reference.role === 'undefined_usage') {
     return '该图片尚未明确控制维度，仅作为中性视觉参考处理。';
@@ -119,7 +128,7 @@ export function createImageReferenceBlock(reference: ReferenceInfo): ImageRefere
     id: `image-ref-${reference.nodeId}`,
     imageId: reference.nodeId,
     sourceNodeId: reference.nodeId,
-    usage: reference.roleLabel || '未定义用途',
+    usage: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
     thumbnailUrl: reference.imageUrl,
     promptText: stripReferencePromptMetadata(getImageReferencePromptText(reference)),
   };
@@ -150,6 +159,8 @@ export function buildPromptSubmission(
 
   const referenceById = new Map(nodeReferences.map((reference) => [reference.nodeId, reference]));
   const blockRole = (block: ImageReferencePromptBlock) => referenceById.get(block.sourceNodeId)?.role ?? null;
+  const blockLocalReferenceType = (block: ImageReferencePromptBlock) =>
+    normalizeLocalReferenceType(referenceById.get(block.sourceNodeId)?.localReferenceType);
   const isLocalReferenceBlock = (block: ImageReferencePromptBlock) =>
     blockRole(block) === 'local_reference' ||
     blockRole(block) === 'custom_reference' ||
@@ -157,16 +168,19 @@ export function buildPromptSubmission(
     blockRole(block) === 'plant_reference' ||
     blockRole(block) === 'people_reference' ||
     blockRole(block) === 'sky_reference' ||
+    Boolean(blockLocalReferenceType(block)) ||
     block.usage?.includes('植物') ||
     block.usage?.includes('人物') ||
     block.usage?.includes('天空') ||
+    block.usage?.includes('海水') ||
+    block.usage?.includes('城市') ||
+    block.usage?.includes('雾气') ||
     block.usage?.includes('局部');
 
   const primaryBuilding = imageRefBlocks.filter((block) => blockRole(block) === 'primary_building' || block.usage?.includes('主体建筑'));
   const localRefs = imageRefBlocks.filter(isLocalReferenceBlock);
-  const customUsages = imageRefBlocks.filter((block) => !isLocalReferenceBlock(block) && block.usage?.includes('自定义'));
   const atmosphereRefs = imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围'));
-  const undefinedRefs = imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未定义用途');
+  const undefinedRefs = imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未设置参考用途' || block.usage === '未定义用途');
 
   const selectedPresetsList = selectedPresetIds
     .map(getPresetById)
@@ -209,7 +223,6 @@ export function buildPromptSubmission(
     sections.push(presetSection);
   }
   if (primaryBuilding.length) sections.push(`主体建筑约束：${primaryBuilding.map((block) => block.promptText).join('；')}`);
-  if (customUsages.length) sections.push(`自定义用途约束：${customUsages.map((block) => block.promptText).join('；')}`);
   if (localRefs.length) sections.push(`局部参考：${localRefs.map((block) => block.promptText).join('；')}`);
   if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((block) => block.promptText).join('；')}`);
   if (undefinedRefs.length) sections.push(`未定义参考：${undefinedRefs.map((block) => block.promptText).join('；')}`);
@@ -221,7 +234,7 @@ export function buildPromptSubmission(
   }
 
   if (nodeReferences.length) {
-    sections.push('维度控制约束：参考图按各自定义用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
+    sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空、海水、城市、雾气等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
   }
 
   return {
@@ -230,7 +243,7 @@ export function buildPromptSubmission(
       imageId: reference.nodeId,
       imageUrl: reference.imageUrl,
       usageKey: reference.role ?? 'undefined_usage',
-      usageLabel: reference.roleLabel || '未定义用途',
+      usageLabel: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
       customUsageName: reference.customRoleLabel,
       localReferenceType: reference.localReferenceType,
       promptText: getImageReferencePromptText(reference),
@@ -253,7 +266,7 @@ export function buildPromptSubmission(
     imageReferences: nodeReferences.map((reference) => ({
       imageId: reference.nodeId,
       sourceNodeId: reference.nodeId,
-      usage: reference.roleLabel || '未定义用途',
+      usage: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
       localReferenceType: reference.localReferenceType,
     })),
   };

@@ -18,12 +18,13 @@ import {
   getNodeHeight,
 } from '../../types/imageNodeData.types';
 import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
+import { checkGenerationRequestSafety, checkGenerationResultSafety } from '../../utils/contentSafety';
 import {
   IMAGE_NODE_CONTROL_WIDTH,
   IMAGE_NODE_CONTROL_HEIGHT,
   DEFAULT_MODEL_PARAMS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole, getLocalReferenceLabel, getReferenceUsageInfo, localReferenceOptions } from '../../constants/imageUsages';
+import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole, getLocalReferenceLabel, getReferenceUsageInfo, normalizeLocalReferenceType, localReferenceOptions } from '../../constants/imageUsages';
 import { getStylePresetById, getPresetById } from '../../constants/presets';
 import { buildPromptSubmission } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
@@ -48,8 +49,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const rawRole = (data.role as ImageRole | null | undefined) ?? null;
   const role = rawRole;
   const customRoleLabel = data.customRoleLabel as string | undefined;
-  const localReferenceType = (data.localReferenceType as LocalReferenceType | undefined) ?? getLocalReferenceTypeFromRole(rawRole);
-  const localReferenceLabel = (data.localReferenceLabel as string | undefined) ?? getLocalReferenceLabel(rawRole, data.localReferenceType as LocalReferenceType | undefined, data.localReferenceLabel as string | undefined, customRoleLabel);
+  const localReferenceType = normalizeLocalReferenceType((data.localReferenceType as LocalReferenceType | undefined)) ?? getLocalReferenceTypeFromRole(rawRole);
+  const localReferenceLabel = (data.localReferenceLabel as string | undefined) ?? getLocalReferenceLabel(rawRole, localReferenceType, data.localReferenceLabel as string | undefined, customRoleLabel);
   const fileRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || t('canvas.nodeLabels.image', { defaultValue: '图片' }));
@@ -245,6 +246,25 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
     const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references, lightPreview);
 
+    // Content safety check — request phase
+    const safetyResult = await checkGenerationRequestSafety({
+      prompt: textPrompt,
+      referenceImages: referenceImages.map((ref) => ({
+        id: ref.imageId,
+        url: ref.imageUrl,
+        usage: ref.usageKey,
+        label: ref.usageLabel,
+      })),
+    });
+    if (!safetyResult.allowed) {
+      showToast(safetyResult.message ?? '当前内容不适合生成，请修改后再试。');
+      return;
+    }
+    const safePrompt =
+      safetyResult.level === 'rewrite' && safetyResult.rewrittenPrompt
+        ? safetyResult.rewrittenPrompt
+        : textPrompt;
+
     // Abort any previous running generation
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -252,7 +272,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
     const task = createGenerationTask({
       sourceNodeId: id,
-      prompt: textPrompt,
+      prompt: safePrompt,
       inputRefs: referenceImages.map((ref) => ({
         imageId: ref.imageId,
         imageUrl: ref.imageUrl,
@@ -273,7 +293,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       const result = await simulateGeneration(
         {
           sourceNodeId: id,
-          prompt: textPrompt,
+          prompt: safePrompt,
           inputRefs: task.inputRefs,
           modelParams: {
             model: modelParams.model,
@@ -289,13 +309,40 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         controller.signal,
       );
 
+      // Content safety check — result phase
+      const resultSafety = await checkGenerationResultSafety({
+        imageUrl: result.imageUrl,
+      });
+      if (!resultSafety.allowed) {
+        showToast(resultSafety.message ?? '生成结果未通过安全检查，请调整提示词后重试。');
+        setGenerationTask((prev) =>
+          prev && prev.taskId === task.taskId
+            ? { ...prev, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() }
+            : prev,
+        );
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
+                  },
+                }
+              : n,
+          ),
+        );
+        return;
+      }
+
       const batchId = result.taskId;
       const historyItem: GenerationHistoryItem = {
         resultId: result.taskId,
         batchId,
         batchIndex: 1,
         imageUrl: result.imageUrl,
-        prompt: textPrompt,
+        prompt: safePrompt,
         userPrompt: userPrompt || '',
         inputRefs: task.inputRefs,
         presetIds: selectedPresets,
@@ -328,7 +375,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   image: result.imageUrl,
                   currentImage: result.imageUrl,
                   currentResultId: result.taskId,
-                  finalPrompt: textPrompt,
+                  finalPrompt: safePrompt,
                   textPrompt,
                   imageReferences,
                   referenceImages,

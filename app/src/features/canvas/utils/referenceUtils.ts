@@ -1,6 +1,8 @@
 import type { ImageRole, ReferenceInfo, LocalReferenceType } from '../types/imageNode.types';
+import { normalizeLocalReferenceType } from '../constants/imageUsages';
 
-const UNDEFINED_USAGE_VALUES = new Set(['', 'unknown', 'unassigned', 'undefined', 'null', '未定义用途']);
+const UNDEFINED_USAGE_VALUES = new Set(['', 'unknown', 'unassigned', 'undefined', 'null', '未设置参考用途', '未定义用途']);
+const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
 
 function isDefinedUsageValue(value: unknown) {
   if (typeof value !== 'string') return value !== undefined && value !== null;
@@ -14,7 +16,7 @@ export function hasDefinedUsage(reference: ReferenceInfo) {
     return isDefinedUsageValue(reference.localReferenceType) || isDefinedUsageValue(reference.localReferenceLabel);
   }
   if (reference.role === 'custom_reference') {
-    return isDefinedUsageValue(reference.customRoleLabel) && reference.customRoleLabel !== '自定义用途...';
+    return isDefinedUsageValue(reference.customRoleLabel) && reference.customRoleLabel !== LEGACY_CUSTOM_REFERENCE_LABEL;
   }
   return isDefinedUsageValue(reference.roleLabel);
 }
@@ -40,10 +42,11 @@ export function areReferenceListsEqual(a: ReferenceInfo[], b: ReferenceInfo[]) {
 
 export function getRoleData(role: ImageRole | null, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) {
   const isPrimary = role === 'primary_building';
+  const normalizedLocalReferenceType = normalizeLocalReferenceType(localReferenceType);
   return {
     role,
     customRoleLabel: role === 'custom_reference' ? customRoleLabel : undefined,
-    localReferenceType: role === 'local_reference' ? localReferenceType : undefined,
+    localReferenceType: role === 'local_reference' ? normalizedLocalReferenceType : undefined,
     localReferenceLabel: role === 'local_reference' ? localReferenceLabel : undefined,
     preserveStructure: isPrimary,
     preserveCamera: isPrimary,

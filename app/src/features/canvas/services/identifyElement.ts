@@ -24,14 +24,28 @@ const FIXED_TYPES = [
   { label: '植物', type: 'vegetation' },
   { label: '人物', type: 'people' },
   { label: '天空', type: 'sky' },
-  { label: '水体', type: 'water' },
-  { label: '商铺', type: 'retail' },
-  { label: '铺装', type: 'paving' },
+  { label: '海水', type: 'seawater' },
+  { label: '城市', type: 'city' },
+  { label: '雾气', type: 'mist' },
 ];
 
 const CUSTOM_LABELS = [
   '海水',
+  '海面',
+  '海浪',
+  '海岸',
+  '海岸线',
   '水景',
+  '城市',
+  '城市背景',
+  '街道',
+  '街景',
+  '天际线',
+  '雾气',
+  '薄雾',
+  '晨雾',
+  '山雾',
+  '空气感',
   '家具',
   '灯具',
   '栏杆',
@@ -42,6 +56,24 @@ const CUSTOM_LABELS = [
   '幕墙',
   '入口雨棚',
 ];
+
+const CUSTOM_LABEL_TO_TYPE: Record<string, string> = {
+  海水: 'seawater',
+  海面: 'seawater',
+  海浪: 'seawater',
+  海岸: 'seawater',
+  海岸线: 'seawater',
+  城市: 'city',
+  城市背景: 'city',
+  街道: 'city',
+  街景: 'city',
+  天际线: 'city',
+  雾气: 'mist',
+  薄雾: 'mist',
+  晨雾: 'mist',
+  山雾: 'mist',
+  空气感: 'mist',
+};
 
 /**
  * Mock implementation — returns a deterministic pseudo-random result
@@ -69,9 +101,10 @@ export async function identifyImageElement(
   }
 
   const label = CUSTOM_LABELS[seed % CUSTOM_LABELS.length];
+  const mappedType = CUSTOM_LABEL_TO_TYPE[label];
   return {
     label,
-    normalizedType: 'custom',
+    normalizedType: mappedType || 'custom',
     confidence: 0.6 + (seed % 25) / 100,
     reason: 'mock result',
   };

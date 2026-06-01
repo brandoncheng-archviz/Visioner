@@ -7,8 +7,15 @@ export const SYSTEM_USAGE_LABELS = [
   '主体建筑',
   '氛围参考',
   '局部参考',
-  '自定义用途',
+  '植物',
+  '人物',
+  '天空',
+  '海水',
+  '城市',
+  '雾气',
+  '未设置参考用途',
   '未定义用途',
+  '手动输入其他元素',
 ] as const;
 
 /* ─── Primary role options (shown in creation UI) ─── */
@@ -67,29 +74,45 @@ export const localReferenceOptions: LocalReferenceOption[] = [
     value: 'sky',
     label: i18n.t('reference.localReferenceSky'),
     promptText: '只参考该图中的天空状态、云量、天气感和时间段氛围，不复制整体建筑体块与构图。',
-    color: '#FACC15',
+    color: '#7DD3FC',
   },
   {
-    value: 'water',
+    value: 'seawater',
     label: i18n.t('reference.localReferenceWater'),
-    promptText: '只参考该图中的水面状态、反射关系、湿润感和水体氛围，不复制整体建筑体块与构图。',
-    color: '#3B82F6',
+    promptText: '只参考该图中的海水状态、反射关系、湿润感和滨海氛围，不复制整体建筑体块与构图。',
+    color: '#06B6D4',
   },
   {
-    value: 'retail',
+    value: 'city',
     label: i18n.t('reference.localReferenceRetail'),
-    promptText: '只参考该图中的首层商业、店铺界面、橱窗展示、招牌尺度和街道商业氛围，不复制整体建筑体块与构图。',
-    color: '#EC4899',
+    promptText: '只参考该图中的城市界面、街道关系、建筑背景和都市氛围，不复制整体建筑体块与构图。',
+    color: '#64748B',
   },
   {
-    value: 'paving',
+    value: 'mist',
     label: i18n.t('reference.localReferencePaving'),
-    promptText: '只参考该图中的铺装材质、铺装尺度、地面纹理、场地细节和空间氛围，不复制整体建筑体块与构图。',
+    promptText: '只参考该图中的雾气浓度、空气透视、远近虚实和朦胧氛围，不复制整体建筑体块与构图。',
     color: '#A78BFA',
   },
 ];
 
 export const CUSTOM_LOCAL_REFERENCE_COLOR = '#94A3B8';
+
+const LOCAL_REFERENCE_TYPE_ALIASES: Partial<Record<string, LocalReferenceType>> = {
+  water: 'seawater',
+  retail: 'city',
+  paving: 'mist',
+};
+
+const LOCAL_REFERENCE_TYPE_VALUES = new Set<LocalReferenceType>([
+  'vegetation',
+  'people',
+  'sky',
+  'seawater',
+  'city',
+  'mist',
+  'custom',
+]);
 
 /* ─── Color map ─── */
 export const roleColorMap: Record<ImageRole | 'null' | 'local_reference', string> = {
@@ -138,9 +161,19 @@ export function getLocalReferenceTypeFromRole(
   return undefined;
 }
 
+export function normalizeLocalReferenceType(
+  type: LocalReferenceType | string | undefined | null,
+): LocalReferenceType | undefined {
+  if (!type) return undefined;
+  const normalized = LOCAL_REFERENCE_TYPE_ALIASES[type] ?? type;
+  return LOCAL_REFERENCE_TYPE_VALUES.has(normalized as LocalReferenceType) ? normalized as LocalReferenceType : undefined;
+}
+
 export function getLocalReferenceOption(type: LocalReferenceType | undefined): LocalReferenceOption | undefined {
   if (!type) return undefined;
-  return localReferenceOptions.find((o) => o.value === type);
+  const normalized = normalizeLocalReferenceType(type);
+  if (!normalized) return undefined;
+  return localReferenceOptions.find((o) => o.value === normalized);
 }
 
 export function getLocalReferenceColor(type: LocalReferenceType | undefined) {
@@ -156,8 +189,9 @@ export function getLocalReferenceLabel(
 ): string | undefined {
   if (localRefLabel) return localRefLabel;
   if (role === 'custom_reference' && customRoleLabel) return customRoleLabel;
-  if (localRefType && localRefType !== 'custom') {
-    return getLocalReferenceOption(localRefType)?.label;
+  const normalized = normalizeLocalReferenceType(localRefType);
+  if (normalized && normalized !== 'custom') {
+    return getLocalReferenceOption(normalized)?.label;
   }
   return undefined;
 }
@@ -235,7 +269,7 @@ export function getReferenceUsageInfo(
   localRefLabel?: string,
 ) {
   const normalizedRole = getNormalizedRole(role);
-  const resolvedLocalReferenceType = localRefType ?? getLocalReferenceTypeFromRole(role);
+  const resolvedLocalReferenceType = normalizeLocalReferenceType(localRefType) ?? getLocalReferenceTypeFromRole(role);
   const resolvedLocalReferenceLabel = getLocalReferenceLabel(role, resolvedLocalReferenceType, localRefLabel, customLabel);
 
   return {

@@ -1,4 +1,5 @@
 import type { GenerationInput, GenerationResult, GenerationTask, GenerationCallbacks } from '../types/generation.types';
+import { checkGenerationRequestSafety, isContentSafetyAllowed } from './contentSafety';
 
 let taskCounter = 0;
 
@@ -38,11 +39,29 @@ export function createGenerationTask(input: GenerationInput): GenerationTask {
   };
 }
 
-export function simulateGeneration(
+export async function simulateGeneration(
   input: GenerationInput,
   callbacks?: GenerationCallbacks,
   signal?: AbortSignal,
 ): Promise<GenerationResult> {
+  try {
+    const reviewResult = await checkGenerationRequestSafety({
+      prompt: input.prompt,
+      referenceImages: input.inputRefs.map((ref) => ({
+        id: ref.imageId,
+        url: ref.imageUrl,
+        usage: ref.usageKey,
+        label: ref.usageLabel,
+      })),
+    });
+
+    if (!isContentSafetyAllowed(reviewResult)) {
+      throw new Error(reviewResult.message || '内容审核未通过');
+    }
+  } catch {
+    // Development mock is fail-open: incomplete review plumbing must not block generation.
+  }
+
   return new Promise((resolve, reject) => {
     const totalDuration = 2000 + Math.random() * 3000; // 2~5s
     const updateInterval = 120; // ms
@@ -74,7 +93,6 @@ export function simulateGeneration(
             '生成超时，请稍后重试',
             '模型服务暂时不可用',
             '输入参数异常，请检查引用图和提示词',
-            '生成结果被安全策略拦截，请修改提示词',
           ];
           const message = errorMessages[Math.floor(Math.random() * errorMessages.length)];
           reject(new Error(message));

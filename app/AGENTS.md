@@ -2,7 +2,7 @@
 
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
-**Important:** All application source code, configuration, and build assets live inside the `app/` subdirectory. The repository root only contains `.git/`, `package-lock.json`, and the `app/` folder. Every command below should be run from `app/` unless noted otherwise. The `src/` directory at the repository root is effectively empty (contains only `.DS_Store` files) and is not part of the build.
+**Important:** The current working directory (`d:\CX\Cx_work\Kimi\Visioner\app`) is the project root. All source code, configuration, and build assets live here. There is no nested `app/` subdirectory inside this directory. The `src/` directory at the repository root (one level up) is effectively empty and is not part of this build.
 
 ---
 
@@ -49,14 +49,14 @@ Runtime requirement: **Node.js 20**.
 ## Project Structure
 
 ```
-app/
+app/  (project root — current working directory)
 ├── public/
 │   ├── images/              # Static image assets (show covers, project thumbs)
 │   └── assets/
 │       ├── examples/home/   # Home page banner images
 │       ├── mock/generation-results/  # Mock AI generation result images
 │       ├── presets/         # Preset thumbnail images (realism, season, time, weather)
-│       ├── styles/          # Style cover images
+│       ├── styles/          # Style cover images (binyan, luxigon, mir)
 │       └── sun-sky/matrix-preview/  # SunSky lighting preview matrix (136 images)
 ├── src/
 │   ├── components/
@@ -99,7 +99,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,184 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,490 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -121,16 +121,16 @@ app/
 
 **Source file counts (actual):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 68 files (components, nodes, sunSky, types, constants, utils, hooks)
-- `src/` total: 146 TypeScript / TSX source files; 149 total files under `src/` (including 2 CSS and 1 Python file)
+- `src/features/canvas/`: 74 files (components, nodes, sunSky, types, constants, utils, hooks, services)
+- `src/` total: 154 TypeScript / TSX source files
 
 **Key file sizes (approximate):**
-- `CanvasPage.tsx`: ~1,184 lines (page entry + core state container)
-- `ImageNode.tsx`: ~880 lines
-- `ImageNodeControlPanel.tsx`: ~1,484 lines
+- `CanvasPage.tsx`: ~1,490 lines (page entry + core state container)
+- `ImageNode.tsx`: ~1,396 lines
+- `ImageNodeControlPanel.tsx`: ~1,486 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
-- `PresetPickerModal.tsx`: ~621 lines
-- `presets.ts`: ~941 lines
+- `PresetPickerModal.tsx`: ~633 lines
+- `presets.ts`: ~1,302 lines
 - `CompareNode.tsx`: ~565 lines
 - `UpscaleNode.tsx`: ~642 lines
 - `UpscaleParamPanel.tsx`: ~309 lines
@@ -140,11 +140,9 @@ app/
 
 ## Build & Development Commands
 
-All commands must be run from the `app/` directory:
+All commands should be run from the project root (current working directory):
 
 ```bash
-cd app
-
 # Install dependencies
 npm install
 
@@ -209,7 +207,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,184 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,490 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper
@@ -229,7 +227,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
 - `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
 - `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
-- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`, `LightPreviewPanel.tsx`
 
 **Node components (`src/features/canvas/nodes/`):**
 - `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
@@ -252,10 +250,11 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`
+- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`
 - `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
-- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`
+- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`, `nodeNaming.ts`, `referenceLimits.ts`
 - `hooks/` — `useToast.ts`
+- `services/` — `identifyElement.ts`
 
 **Canvas architecture rules:**
 - Do **not** put new node UI, new panel UI, new toolbar UI, or new business logic back into `CanvasPage.tsx`.
@@ -308,7 +307,7 @@ The app uses `react-i18next` with two locale files:
 - `zh-CN.ts` — Default language (简体中文)
 - `en-US.ts` — Fallback language
 
-Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`).
+Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`, `lightPreview`).
 
 ### Data Layer (`src/data/siteData.ts`)
 
@@ -332,7 +331,7 @@ Mock API service for user account features (profile, credits, usage, billing, de
 
 There are **no test files** in the project currently. No test runner (Jest, Vitest, Playwright, etc.) is installed.
 
-If you add tests, the conventional location would be alongside source files (e.g., `*.test.tsx`) or in a top-level `tests/` directory inside `app/`.
+If you add tests, the conventional location would be alongside source files (e.g., `*.test.tsx`) or in a top-level `tests/` directory inside the project root.
 
 ---
 
@@ -347,7 +346,7 @@ If you add tests, the conventional location would be alongside source files (e.g
 
 ## Adding shadcn/ui Components
 
-This project uses the shadcn/ui "New York" style with CSS variables. To add a new component from inside `app/`:
+This project uses the shadcn/ui "New York" style with CSS variables. To add a new component from inside the project root:
 
 ```bash
 npx shadcn add <component-name>

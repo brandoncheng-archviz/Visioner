@@ -19,10 +19,14 @@ export type LocalReferenceType =
   | 'vegetation'
   | 'people'
   | 'sky'
+  | 'seawater'
+  | 'city'
+  | 'mist'
+  | 'custom'
+  // Legacy values (read-only compatibility)
   | 'water'
   | 'retail'
-  | 'paving'
-  | 'custom';
+  | 'paving';
 
 export interface LocalReferencePoint {
   x: number;
