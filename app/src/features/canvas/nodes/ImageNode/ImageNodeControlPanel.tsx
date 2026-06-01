@@ -8,7 +8,6 @@ import {
   Sun,
   Palette,
   ChevronDown,
-  Zap,
   ArrowUp,
   Maximize2,
   Pencil,
@@ -52,6 +51,12 @@ import { PresetPickerModal } from '../../components/PresetPickerModal';
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
 
+const GENERATION_CONTROL_BUTTON_CLASS =
+  'border-[#94A3B8] bg-transparent text-[#CBD5E1] hover:border-[#CBD5E1] hover:bg-[rgba(148,163,184,0.10)]';
+const GENERATION_CONTROL_BUTTON_SELECTED_CLASS =
+  'border-[#94A3B8] bg-[rgba(148,163,184,0.08)] text-[#CBD5E1] shadow-none hover:border-[#CBD5E1] hover:bg-[rgba(148,163,184,0.10)]';
+const GENERATION_CONTROL_TEXT_COLOR = '#CBD5E1';
+
 export function ImageNodeControlPanel({
   promptText,
   onPromptChange,
@@ -66,6 +71,7 @@ export function ImageNodeControlPanel({
   modelParams,
   onModelParamsChange,
   onGenerate,
+  onPreviewGenerate,
   canGenerate,
   isGenerating,
   generationTask,
@@ -91,6 +97,7 @@ export function ImageNodeControlPanel({
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void | Promise<void>;
+  onPreviewGenerate?: () => void | Promise<void>;
   canGenerate: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
@@ -940,8 +947,8 @@ export function ImageNodeControlPanel({
               onClick={() => { setShowPresetModal(true); setShowLightPreview(false); setShowStylePicker(false); }}
               className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
                 selectedPresetCount > 0
-                  ? 'border-[rgba(180,184,194,0.72)] bg-[rgba(180,184,194,0.08)] shadow-[0_0_0_1px_rgba(180,184,194,0.14),0_0_12px_rgba(180,184,194,0.08)] hover:border-[rgba(180,184,194,0.82)] hover:bg-[rgba(180,184,194,0.10)]'
-                  : 'border-white/[0.10] bg-white/[0.04] hover:border-[rgba(180,184,194,0.72)] hover:bg-[rgba(180,184,194,0.05)]'
+                  ? GENERATION_CONTROL_BUTTON_SELECTED_CLASS
+                  : GENERATION_CONTROL_BUTTON_CLASS
               }`}
               style={{
                 width: 54,
@@ -949,8 +956,8 @@ export function ImageNodeControlPanel({
                 padding: '4px',
               }}
             >
-              <Bookmark className="w-4 h-4" style={{ color: selectedPresetCount > 0 ? 'rgba(226,229,236,0.92)' : 'rgba(180,184,194,0.58)' }} />
-              <span style={{ fontSize: 12, color: selectedPresetCount > 0 ? 'rgba(226,229,236,0.94)' : 'rgba(180,184,194,0.62)' }}>{t('imageNode.preset')}</span>
+              <Bookmark className="w-4 h-4" style={{ color: GENERATION_CONTROL_TEXT_COLOR }} />
+              <span style={{ fontSize: 12, color: GENERATION_CONTROL_TEXT_COLOR }}>{t('imageNode.preset')}</span>
             </button>
             {showPresetModal && (
               <PresetPickerModal
@@ -966,7 +973,7 @@ export function ImageNodeControlPanel({
             {lightPreview?.enabled ? (
               <button
                 onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
-                className="group/light-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border border-[rgba(245,158,11,0.45)] transition-colors hover:border-[rgba(245,158,11,0.78)] hover:bg-[rgba(245,158,11,0.08)]"
+                className={`group/light-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${GENERATION_CONTROL_BUTTON_SELECTED_CLASS}`}
                 style={{ width: 54, height: 50, padding: 0 }}
               >
                 <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
@@ -988,11 +995,11 @@ export function ImageNodeControlPanel({
             ) : (
               <button
                 onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
-                className="flex flex-col items-center justify-center gap-0.5 rounded-lg border border-white/[0.10] bg-white/[0.025] transition-colors hover:border-[rgba(245,158,11,0.62)] hover:bg-[rgba(245,158,11,0.055)]"
+                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${GENERATION_CONTROL_BUTTON_CLASS}`}
                 style={{ width: 54, height: 50, padding: '4px' }}
               >
-                <Sun className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.7)' }} />
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>光影</span>
+                <Sun className="w-4 h-4" style={{ color: GENERATION_CONTROL_TEXT_COLOR }} />
+                <span style={{ fontSize: 12, color: GENERATION_CONTROL_TEXT_COLOR }}>光影</span>
               </button>
             )}
             {showLightPreview && (
@@ -1027,8 +1034,8 @@ export function ImageNodeControlPanel({
               }}
               className={`group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
                 selectedStyle
-                  ? 'border-white/[0.72] bg-white/[0.06] shadow-[0_0_0_1px_rgba(255,255,255,0.16),0_0_14px_rgba(255,255,255,0.08)] hover:border-white/[0.72] hover:bg-white/[0.08]'
-                  : 'border-white/[0.10] bg-white/[0.04] hover:border-white/[0.42] hover:bg-white/[0.04]'
+                  ? GENERATION_CONTROL_BUTTON_SELECTED_CLASS
+                  : GENERATION_CONTROL_BUTTON_CLASS
               }`}
               style={{
                 width: 54,
@@ -1044,8 +1051,8 @@ export function ImageNodeControlPanel({
                 </span>
               ) : (
                 <>
-                  <Palette className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.50)' }} />
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.56)' }}>{t('imageNode.style')}</span>
+                  <Palette className="w-4 h-4" style={{ color: GENERATION_CONTROL_TEXT_COLOR }} />
+                  <span style={{ fontSize: 12, color: GENERATION_CONTROL_TEXT_COLOR }}>{t('imageNode.style')}</span>
                 </>
               )}
               {selectedStyle && (
@@ -1406,7 +1413,7 @@ export function ImageNodeControlPanel({
           </div>
         </div>
         {/* Generate button */}
-        <div className="relative flex items-center gap-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: FLOATING_PANEL_BORDER, padding: '5px 6px 5px 12px' }}>
+        <div className="relative flex items-center rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: FLOATING_PANEL_BORDER, padding: '5px 6px 5px 12px', gap: 8 }}>
           <button
             onClick={() => { setShowCountMenu(!showCountMenu); setShowModelMenu(false); setShowRatioMenu(false); }}
             className="flex items-center gap-1 transition-colors hover:text-white"
@@ -1422,10 +1429,25 @@ export function ImageNodeControlPanel({
               ))}
             </div>
           )}
-          <div className="flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.62)' }}>
-            <Zap className="w-3.5 h-3.5" />
-            <span style={{ fontSize: 15 }}>14</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => onPreviewGenerate?.()}
+            disabled={!canGenerate || !onPreviewGenerate}
+            className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.08] hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              width: 92,
+              height: 34,
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'rgba(255,255,255,0.72)',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.10)',
+            }}
+            title={isGenerating ? t('imageNode.generating') : '低成本生成小图，用于确认方向'}
+            aria-label="快速预览"
+          >
+            快速预览
+          </button>
           {generationTask?.status === 'failed' && generationTask.errorMessage ? (
             <button
               onClick={handleGenerateClick}
@@ -1458,7 +1480,7 @@ export function ImageNodeControlPanel({
                 background: canGenerate ? '#ffffff' : 'rgba(255,255,255,0.14)',
                 opacity: canGenerate ? 1 : 0.45,
               }}
-              title={isGenerating ? t('imageNode.generating') : t('imageNode.generate')}
+              title={isGenerating ? t('imageNode.generating') : '生成高清正式结果'}
             >
               {isGenerating ? (
                 <div className="relative flex items-center justify-center">

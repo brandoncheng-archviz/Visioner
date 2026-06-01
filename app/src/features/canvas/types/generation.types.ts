@@ -61,6 +61,7 @@ export interface GenerationHistoryItem {
   width: number;
   height: number;
   createdAt: number;
+  kind?: 'preview' | 'final';
 }
 
 export interface GenerationCallbacks {

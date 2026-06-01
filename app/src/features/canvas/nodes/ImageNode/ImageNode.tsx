@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Image, Plus, Upload } from 'lucide-react';
+import { Image, Plus, Upload, Zap } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
@@ -352,6 +352,181 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         width: result.width,
         height: result.height,
         createdAt: Date.now(),
+        kind: 'final',
+      };
+      const nextGeneratedImages = [...generatedImages, historyItem];
+      setPreviewImage(result.imageUrl);
+      setGeneratedImages(nextGeneratedImages);
+
+      const resultImage = new window.Image();
+      resultImage.onload = () => {
+        setImgSize({ width: resultImage.width, height: resultImage.height });
+      };
+      resultImage.src = result.imageUrl;
+
+      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'success', progress: 100, result, updatedAt: Date.now() } : prev));
+
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  image: result.imageUrl,
+                  currentImage: result.imageUrl,
+                  currentResultId: result.taskId,
+                  finalPrompt: safePrompt,
+                  textPrompt,
+                  imageReferences,
+                  referenceImages,
+                  references,
+                  promptBlocks,
+                  userPrompt,
+                  globalStyle,
+                  presets,
+                  promptContent,
+                  generatedImages: nextGeneratedImages,
+                  generationTask: { ...task, status: 'success', progress: 100, result, updatedAt: Date.now() },
+                  width: result.width,
+                  height: result.height,
+                },
+              }
+            : n,
+        ),
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '生成失败';
+      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'failed', errorMessage, updatedAt: Date.now() } : prev));
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  generationTask: { ...task, status: 'failed', errorMessage, updatedAt: Date.now() },
+                },
+              }
+            : n,
+        ),
+      );
+    }
+  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams, showToast, lightPreview]);
+
+  const handlePreviewGenerate = useCallback(async () => {
+    const referenceLimitIssue = getReferenceLimitIssueForGenerate(references);
+    if (referenceLimitIssue) {
+      showToast(formatReferenceLimitIssue(referenceLimitIssue));
+      return;
+    }
+
+    const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references, lightPreview);
+
+    const safetyResult = await checkGenerationRequestSafety({
+      prompt: textPrompt,
+      referenceImages: referenceImages.map((ref) => ({
+        id: ref.imageId,
+        url: ref.imageUrl,
+        usage: ref.usageKey,
+        label: ref.usageLabel,
+      })),
+    });
+    if (!safetyResult.allowed) {
+      showToast(safetyResult.message ?? '当前内容不适合生成，请修改后再试。');
+      return;
+    }
+    const safePrompt =
+      safetyResult.level === 'rewrite' && safetyResult.rewrittenPrompt
+        ? safetyResult.rewrittenPrompt
+        : textPrompt;
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const task = createGenerationTask({
+      sourceNodeId: id,
+      prompt: safePrompt,
+      inputRefs: referenceImages.map((ref) => ({
+        imageId: ref.imageId,
+        imageUrl: ref.imageUrl,
+        usageKey: ref.usageKey,
+        usageLabel: ref.usageLabel,
+        customUsageName: ref.customUsageName,
+        promptText: ref.promptText,
+      })),
+      modelParams: {
+        model: modelParams.model,
+        ratio: modelParams.ratio,
+        resolution: modelParams.resolution,
+      },
+    });
+    setGenerationTask(task);
+
+    try {
+      const result = await simulateGeneration(
+        {
+          sourceNodeId: id,
+          prompt: safePrompt,
+          inputRefs: task.inputRefs,
+          modelParams: {
+            model: modelParams.model,
+            ratio: modelParams.ratio,
+            resolution: modelParams.resolution,
+          },
+        },
+        {
+          onProgress: (progress) => {
+            setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress, updatedAt: Date.now() } : prev));
+          },
+        },
+        controller.signal,
+      );
+
+      const resultSafety = await checkGenerationResultSafety({
+        imageUrl: result.imageUrl,
+      });
+      if (!resultSafety.allowed) {
+        showToast(resultSafety.message ?? '生成结果未通过安全检查，请调整提示词后重试。');
+        setGenerationTask((prev) =>
+          prev && prev.taskId === task.taskId
+            ? { ...prev, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() }
+            : prev,
+        );
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
+                  },
+                }
+              : n,
+          ),
+        );
+        return;
+      }
+
+      const batchId = result.taskId;
+      const historyItem: GenerationHistoryItem = {
+        resultId: result.taskId,
+        batchId,
+        batchIndex: 1,
+        imageUrl: result.imageUrl,
+        prompt: safePrompt,
+        userPrompt: userPrompt || '',
+        inputRefs: task.inputRefs,
+        presetIds: selectedPresets,
+        styleId: selectedStyleId,
+        modelParams: { ...modelParams },
+        seed: result.seed,
+        width: result.width,
+        height: result.height,
+        createdAt: Date.now(),
+        kind: 'preview',
       };
       const nextGeneratedImages = [...generatedImages, historyItem];
       setPreviewImage(result.imageUrl);
@@ -1307,9 +1482,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   border: currentResultId === item.resultId ? '1.5px solid #00d4ff' : '1.5px solid transparent',
                   boxShadow: currentResultId === item.resultId ? '0 0 0 1px rgba(0,212,255,0.3)' : 'none',
                 }}
-                title={`${idx + 1}`}
+                title={item.kind === 'preview' ? `预览 ${idx + 1}` : `${idx + 1}`}
               >
                 <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                {item.kind === 'preview' && (
+                  <div className="absolute bottom-0 right-0 flex items-center justify-center rounded-tl-sm" style={{ background: 'rgba(0,0,0,0.58)', width: 10, height: 10 }}>
+                    <Zap className="w-[7px] h-[7px]" style={{ color: '#fbbf24' }} />
+                  </div>
+                )}
               </button>
             ))}
           </div>
@@ -1412,6 +1592,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               modelParams={modelParams}
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
+              onPreviewGenerate={handlePreviewGenerate}
               canGenerate={canGenerate}
               isGenerating={isGenerating}
               generationTask={generationTask}
