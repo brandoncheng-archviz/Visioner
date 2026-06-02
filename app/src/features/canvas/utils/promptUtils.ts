@@ -1,4 +1,4 @@
-import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition, PromptTemplate } from '../types/imageNode.types';
+import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition } from '../types/imageNode.types';
 import {
   getNormalizedRole,
   getLocalReferenceTypeFromRole,
@@ -13,9 +13,17 @@ import i18n from '@/i18n';
 
 const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
 
-function serializePromptTemplate(template: string | PromptTemplate): string {
-  if (typeof template === 'string') return template;
-  const parts = [
+function normalizeSentence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  return /[。！？.!?]$/u.test(trimmed) ? trimmed : `${trimmed}。`;
+}
+
+export function getPresetPromptText(preset: PresetItem): string {
+  const template = preset.promptTemplate;
+  if (typeof template === 'string') return template.trim();
+
+  const mainParts = [
     template.goal,
     template.style,
     template.image,
@@ -29,13 +37,18 @@ function serializePromptTemplate(template: string | PromptTemplate): string {
     template.material,
     template.materialImpact,
     template.output,
-  ].filter(Boolean);
-  return parts.join(' ');
-}
+  ]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
 
-function extractConstraints(template: string | PromptTemplate): string | null {
-  if (typeof template === 'string') return null;
-  return template.constraints || null;
+  const constraintText = template.constraints?.trim();
+  const sentences = mainParts.map(normalizeSentence);
+  if (constraintText) {
+    const normalizedConstraint = normalizeSentence(constraintText.replace(/^(避免|不要)[：:，,、\s]*/u, ''));
+    sentences.push(`避免${normalizedConstraint}`);
+  }
+
+  return sentences.join('');
 }
 
 function serializeStylePrompt(style: StyleDefinition): string {
@@ -186,42 +199,15 @@ export function buildPromptSubmission(
     .map(getPresetById)
     .filter((preset): preset is PresetItem => Boolean(preset));
 
-  const presetPrompts = selectedPresetsList.map((preset) => {
-    const prompt = serializePromptTemplate(preset.promptTemplate);
-    return preset.owner === 'user' ? `${preset.name}：${prompt}` : prompt;
-  });
-
-  const allConstraints: string[] = [];
-  selectedPresetsList.forEach((preset) => {
-    const c = extractConstraints(preset.promptTemplate);
-    if (c) allConstraints.push(c);
-  });
-
   const presets = selectedPresetsList.map((preset) => ({
     presetKey: preset.id,
     presetLabel: preset.name,
-    presetPrompt: serializePromptTemplate(preset.promptTemplate),
+    presetPrompt: getPresetPromptText(preset),
     presetType: getPresetType(preset),
   }));
 
   const sections: string[] = [];
-  if (trimmedUserText) sections.push(`用户明确要求：${trimmedUserText}`);
-  if (presetPrompts.length) {
-    let presetSection = `预设增强：${presetPrompts.join('。')}`;
-    if (allConstraints.length > 0) {
-      const constraintSet = new Set<string>();
-      allConstraints.forEach((c) => {
-        c.split(/[;；]/).forEach((part) => {
-          const trimmed = part.trim();
-          if (trimmed) constraintSet.add(trimmed);
-        });
-      });
-      if (constraintSet.size > 0) {
-        presetSection += `\n约束：${Array.from(constraintSet).join('；')}`;
-      }
-    }
-    sections.push(presetSection);
-  }
+  if (trimmedUserText) sections.push(trimmedUserText);
   if (primaryBuilding.length) sections.push(`主体建筑约束：${primaryBuilding.map((block) => block.promptText).join('；')}`);
   if (localRefs.length) sections.push(`局部参考：${localRefs.map((block) => block.promptText).join('；')}`);
   if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((block) => block.promptText).join('；')}`);

@@ -2,6 +2,7 @@ import type { GenerationHistoryItem, GenerationTask } from './generation.types';
 import type { ImageRole, PromptContent } from './imageNode.types';
 import type { MarkItem, ModelParams } from './canvas.types';
 import type { LightPreviewData } from './lightPreview.types';
+import type { CurrentResultSet } from './history.types';
 
 /**
  * Typed data shape for an ImageNode.
@@ -14,6 +15,7 @@ export interface ImageNodeData {
   inputImage?: string;
   currentImage?: string;
   currentResultId?: string | null;
+  currentResultSet?: CurrentResultSet | null;
   generatedImages?: GenerationHistoryItem[] | string[];
   generationTask?: GenerationTask | null;
   prompt?: string;
@@ -42,6 +44,7 @@ export interface ImageNodeData {
   onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateRelightNode?: (sourceNodeId: string) => void;
+  onOpenNodeHistory?: (nodeId: string) => void;
   lightPreview?: LightPreviewData;
 }
 

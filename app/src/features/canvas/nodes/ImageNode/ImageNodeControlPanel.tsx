@@ -42,10 +42,9 @@ import {
   getPresetById,
   getStylePresetById,
 } from '../../constants/presets';
-import { createImageReferenceBlock, stripReferencePromptMetadata } from '../../utils/promptUtils';
+import { createImageReferenceBlock, getPresetPromptText, stripReferencePromptMetadata } from '../../utils/promptUtils';
 import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUtils';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
-import { togglePresetSelection } from '../../utils/presetSelection';
 import { StylePickerModal } from '../../components/StylePickerModal';
 import { PresetPickerModal } from '../../components/PresetPickerModal';
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
@@ -503,8 +502,28 @@ export function ImageNodeControlPanel({
     setSlashMenuStyle({ top, left, width, maxHeight });
   }, []);
 
-  const selectPreset = (presetId: string) => {
-    onPresetsChange(togglePresetSelection(selectedPresets, presetId));
+  const buildPresetTextBlock = (preset: PresetItem, includeTitle: boolean) => {
+    const prompt = getPresetPromptText(preset);
+    if (!includeTitle) return prompt;
+    return `【${preset.title || preset.name}】\n${prompt}`;
+  };
+
+  const appendPresetPromptBlocks = (presetIds: string[]) => {
+    const blocks = presetIds
+      .map((presetId) => getPresetById(presetId))
+      .filter((preset): preset is PresetItem => Boolean(preset))
+      .map((preset) => buildPresetTextBlock(preset, true))
+      .filter(Boolean);
+    if (!blocks.length) return;
+
+    const separator = promptText.trim() ? '\n\n' : '';
+    onPromptChange(`${promptText}${separator}${blocks.join('\n\n')}`);
+  };
+
+  const handlePresetModalApply = (presetIds: string[]) => {
+    const newlySelectedPresetIds = presetIds.filter((presetId) => !selectedPresets.includes(presetId));
+    appendPresetPromptBlocks(newlySelectedPresetIds.length > 0 ? newlySelectedPresetIds : presetIds);
+    onPresetsChange(presetIds);
   };
 
   const handleGenerateClick = () => {
@@ -782,22 +801,34 @@ export function ImageNodeControlPanel({
   }, [showSlashMenu, slashActiveTab, slashQuery, updateSlashMenuPosition]);
 
   const insertSlashPreset = (presetId: string) => {
-    selectPreset(presetId);
-    closeSlashMenu();
-    // Remove the slash query from prompt text
+    const preset = getPresetById(presetId);
+    if (!preset) {
+      closeSlashMenu();
+      return;
+    }
+
     const input = promptInputRef.current;
     const cursor = input?.selectionStart ?? promptText.length;
     const textBefore = promptText.slice(0, cursor);
     const textAfter = promptText.slice(cursor);
     const lastSlashIndex = textBefore.lastIndexOf('/');
     if (lastSlashIndex >= 0) {
-      const newText = promptText.slice(0, lastSlashIndex) + textAfter;
+      const beforeSlash = promptText.slice(0, lastSlashIndex);
+      const insertText = buildPresetTextBlock(preset, false);
+      const prefix = beforeSlash && !beforeSlash.endsWith('\n') ? '\n\n' : '';
+      const suffix = textAfter && !textAfter.startsWith('\n') ? '\n\n' : '';
+      const newCursor = beforeSlash.length + prefix.length + insertText.length;
+      const newText = `${beforeSlash}${prefix}${insertText}${suffix}${textAfter}`;
       onPromptChange(newText);
+      closeSlashMenu();
       requestAnimationFrame(() => {
         promptInputRef.current?.focus();
-        promptInputRef.current?.setSelectionRange(lastSlashIndex, lastSlashIndex);
+        promptInputRef.current?.setSelectionRange(newCursor, newCursor);
       });
+      return;
     }
+
+    closeSlashMenu();
   };
 
   const handlePromptChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -962,7 +993,7 @@ export function ImageNodeControlPanel({
               <PresetPickerModal
                 open={showPresetModal}
                 selectedPresetIds={selectedPresets}
-                onApply={onPresetsChange}
+                onApply={handlePresetModalApply}
                 onClose={() => setShowPresetModal(false)}
               />
             )}

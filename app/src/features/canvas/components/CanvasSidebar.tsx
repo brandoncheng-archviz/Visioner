@@ -9,6 +9,7 @@ import {
   Headphones,
   X,
 } from 'lucide-react';
+import { HistoryPanel } from './HistoryPanel';
 import { useTranslation } from 'react-i18next';
 
 export interface CanvasSidebarProps {
@@ -89,24 +90,26 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
             left: 72,
             top: 56,
             bottom: 0,
-            width: 280,
+            width: activePanel === 'history' ? 720 : 280,
             background: '#252526',
             borderRight: '1px solid #2a2a35',
           }}
           onWheel={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a35]">
-            <span className="text-sm font-medium text-white">
-              {sidebarTools.find((toolItem) => toolItem.id === activePanel)?.label}
-            </span>
-            <button
-              onClick={() => onSetActivePanel(null)}
-              className="w-6 h-6 rounded flex items-center justify-center text-[#e0e0e0] hover:text-white hover:bg-[#1e1e28] transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="p-4">
+          {activePanel !== 'history' && (
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a35]">
+              <span className="text-sm font-medium text-white">
+                {sidebarTools.find((toolItem) => toolItem.id === activePanel)?.label}
+              </span>
+              <button
+                onClick={() => onSetActivePanel(null)}
+                className="w-6 h-6 rounded flex items-center justify-center text-[#e0e0e0] hover:text-white hover:bg-[#1e1e28] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          <div className={activePanel === 'history' ? 'h-full' : 'p-4'}>
             {activePanel === 'add' && (
               <div className="space-y-2">
                 <p className="text-xs text-[#6a6a7a] mb-2">{t('sidebar.addNode')}</p>
@@ -149,20 +152,8 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
               </div>
             )}
             {activePanel === 'history' && (
-              <div>
-                <div className="flex gap-4 mb-3 text-xs">
-                  <span className="text-white">{t('sidebar.imageHistory', { count: 6 })}</span>
-                  <span className="text-[#6a6a7a]">{t('sidebar.videoHistory', { count: 0 })}</span>
-                  <span className="text-[#6a6a7a]">{t('sidebar.audioHistory', { count: 0 })}</span>
-                </div>
-                <p className="text-[10px] text-[#6a6a7a] mb-2">2026-04-23</p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="aspect-square rounded-lg bg-[#1e1e28] overflow-hidden">
-                      <img src={`/images/show-cover-${i}.jpg`} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
-                </div>
+              <div className="h-full">
+                <HistoryPanel scope="global" onClose={() => onSetActivePanel(null)} />
               </div>
             )}
             {activePanel === 'support' && (

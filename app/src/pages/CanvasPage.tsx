@@ -18,6 +18,9 @@ import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_U
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd } from '../features/canvas/utils/referenceLimits';
+import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
+import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
+import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
@@ -120,6 +123,7 @@ function FlowCanvas() {
   useRevokeObjectUrlsOnUnmount(objectUrlsRef);
 
   const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [historyPanelNodeId, setHistoryPanelNodeId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number } } | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
 
@@ -626,6 +630,7 @@ function FlowCanvas() {
         onCreateSunSkyNode: n.type === 'image' ? createSunSkyNode : undefined,
         onCreateCompareNode: n.type === 'image' ? createCompareNode : undefined,
         onCreateRelightNode: n.type === 'image' ? createRelightNode : undefined,
+        onOpenNodeHistory: n.type === 'image' ? (nodeId: string) => setHistoryPanelNodeId(nodeId) : undefined,
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
@@ -1327,6 +1332,37 @@ function FlowCanvas() {
     setViewport({ x: current.x, y: current.y, zoom: nextZoom }, { duration: 0 });
   }, [getViewport, setViewport]);
 
+  const handleUseHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch) => {
+    if (!historyPanelNodeId || images.length === 0) return;
+
+    const selectedImage = images[0];
+    const batchId = sourceBatch?.batchId || `history-use-${Date.now()}`;
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === historyPanelNodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                currentResultSet: {
+                  batchId,
+                  mode: sourceBatch?.mode || 'final',
+                  images,
+                  selectedIndex: 0,
+                  isExpanded: false,
+                },
+                image: selectedImage.imageUrl,
+                currentImage: selectedImage.imageUrl,
+                currentResultId: selectedImage.resultId,
+                width: selectedImage.width,
+                height: selectedImage.height,
+              },
+            }
+          : node,
+      ),
+    );
+  }, [historyPanelNodeId, setNodes]);
+
   return (
     <div className="h-screen relative" style={{ background: '#000' }}>
       <GlobalDropForwarder />
@@ -1422,6 +1458,28 @@ function FlowCanvas() {
         onAddNode={addNode}
       />
 
+      {/* Node history floating panel */}
+      {historyPanelNodeId && (
+        <div
+          className="fixed z-[100] rounded-xl overflow-hidden shadow-2xl"
+          style={{
+            right: 20,
+            top: 72,
+            width: 320,
+            height: 480,
+            background: '#252526',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          <HistoryPanel
+            scope="node"
+            nodeId={historyPanelNodeId}
+            onClose={() => setHistoryPanelNodeId(null)}
+            onUseImages={handleUseHistoryImages}
+          />
+        </div>
+      )}
+
       <CanvasContextMenus
         contextMenu={contextMenu}
         onCloseContextMenu={handleCloseContextMenu}
@@ -1483,8 +1541,10 @@ function useRevokeObjectUrlsOnUnmount(objectUrlsRef: React.RefObject<Set<string>
 
 export default function CanvasPage() {
   return (
-    <ReactFlowProvider>
-      <FlowCanvas />
-    </ReactFlowProvider>
+    <HistoryProvider>
+      <ReactFlowProvider>
+        <FlowCanvas />
+      </ReactFlowProvider>
+    </HistoryProvider>
   );
 }

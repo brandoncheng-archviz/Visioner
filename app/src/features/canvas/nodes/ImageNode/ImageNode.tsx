@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Image, Plus, Upload, Zap } from 'lucide-react';
+import { Download, Image, Plus, Upload, Zap } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
@@ -8,15 +8,15 @@ import type { ImageRole, PromptContent, ReferenceInfo, LocalReferenceType } from
 import type { MarkItem, ModelParams } from '../../types/canvas.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
+import type { CurrentResultSet, ResultSetBatch, GeneratedImage } from '../../types/history.types';
 import {
   normalizeGeneratedImages,
   getCurrentImage,
-  getInputImage,
   getNodeGenerationTask,
-  getCurrentResultId,
   getNodeWidth,
   getNodeHeight,
 } from '../../types/imageNodeData.types';
+import { useHistory } from '../../contexts/HistoryContext';
 import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
 import { checkGenerationRequestSafety, checkGenerationResultSafety } from '../../utils/contentSafety';
 import {
@@ -44,7 +44,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const inverseScale = 1 / zoom;
   const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
 
-  const inputImage = getInputImage(data);
   const currentImage = getCurrentImage(data);
   const rawRole = (data.role as ImageRole | null | undefined) ?? null;
   const role = rawRole;
@@ -61,7 +60,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const displayImage = previewImage || currentImage;
 
   /* ─── Point-pick mode for local reference ─── */
   const [isPointPickMode, setIsPointPickMode] = useState(false);
@@ -87,7 +85,46 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
   const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
-  const [currentResultId, setCurrentResultId] = useState<string | null>(getCurrentResultId(data));
+
+  /* ─── Current Result Set ─── */
+  const { addBatch, getBatchesByNodeId } = useHistory();
+  const nodeHistoryCount = getBatchesByNodeId(id).length;
+  const parseCount = useCallback((count: string): number => {
+    if (count === '1张') return 1;
+    if (count === '2张') return 2;
+    if (count === '4张') return 4;
+    return 1;
+  }, []);
+
+  const legacyCurrentResultSet = useMemo((): CurrentResultSet | null => {
+    const legacy = normalizeGeneratedImages(data.generatedImages);
+    if (legacy.length === 0) return null;
+    const lastBatchId = legacy[legacy.length - 1]?.batchId;
+    const lastBatch = legacy.filter((item) => item.batchId === lastBatchId);
+    if (lastBatch.length === 0) return null;
+    return {
+      batchId: lastBatchId,
+      mode: lastBatch[0]?.kind === 'preview' ? 'preview' : 'final',
+      images: lastBatch.map((item) => ({
+        resultId: item.resultId,
+        imageUrl: item.imageUrl,
+        width: item.width,
+        height: item.height,
+        seed: item.seed,
+      })),
+      selectedIndex: 0,
+      isExpanded: false,
+    };
+  }, [data.generatedImages]);
+
+  const [currentResultSet, setCurrentResultSet] = useState<CurrentResultSet | null>(
+    (data.currentResultSet as CurrentResultSet | undefined) || legacyCurrentResultSet,
+  );
+
+  const selectedResultImage = currentResultSet?.images[currentResultSet.selectedIndex] || null;
+  const displayImage = currentResultSet
+    ? selectedResultImage?.imageUrl
+    : previewImage || currentImage;
 
   // Cleanup: abort running generation on unmount
   useEffect(() => {
@@ -120,6 +157,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [data.currentImage, data.image, data.inputImage]);
 
   useEffect(() => {
+    if (!selectedResultImage) return;
+    setImgSize({ width: selectedResultImage.width, height: selectedResultImage.height });
+  }, [selectedResultImage]);
+
+  useEffect(() => {
     const nextName = (data.label as string | undefined) || t('canvas.nodeLabels.image', { defaultValue: '图片' });
     if (!editingName) {
       setNodeName((prev) => (prev === nextName ? prev : nextName));
@@ -136,9 +178,62 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [data.generatedImages]);
 
   useEffect(() => {
-    const next = getCurrentResultId(data);
-    setCurrentResultId((prev) => (prev === next ? prev : next));
-  }, [data.currentResultId]);
+    const next = (data.currentResultSet as CurrentResultSet | null | undefined) || null;
+    setCurrentResultSet((prev) => {
+      if (!prev && !next) return prev;
+      if (
+        prev &&
+        next &&
+        prev.batchId === next.batchId &&
+        prev.selectedIndex === next.selectedIndex &&
+        prev.isExpanded === next.isExpanded &&
+        prev.images.length === next.images.length &&
+        prev.images.every((image, index) => image.resultId === next.images[index]?.resultId)
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [data.currentResultSet]);
+
+  // Sync currentResultSet and selected result image back to node.data.
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== id) return n;
+        const existing = n.data.currentResultSet as CurrentResultSet | undefined;
+        const selectedImage = currentResultSet?.images[currentResultSet.selectedIndex] || null;
+        const nextImageUrl = selectedImage?.imageUrl;
+        if (
+          existing &&
+          currentResultSet &&
+          existing.batchId === currentResultSet.batchId &&
+          existing.selectedIndex === currentResultSet.selectedIndex &&
+          existing.isExpanded === currentResultSet.isExpanded &&
+          n.data.currentImage === nextImageUrl &&
+          n.data.currentResultId === selectedImage?.resultId
+        ) {
+          return n;
+        }
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            currentResultSet,
+            ...(selectedImage
+              ? {
+                  image: selectedImage.imageUrl,
+                  currentImage: selectedImage.imageUrl,
+                  currentResultId: selectedImage.resultId,
+                  width: selectedImage.width,
+                  height: selectedImage.height,
+                }
+              : {}),
+          },
+        };
+      }),
+    );
+  }, [id, currentResultSet, setNodes]);
 
   /* ─── Reference tracking ─── */
   const allEdges = useStore((state) => state.edges);
@@ -235,186 +330,47 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const selectedStyle = getStylePresetById(selectedStyleId);
   const isGenerating = generationTask?.status === 'running';
-  const canGenerate = !isGenerating && (references.length > 0 || role !== null || marks.length > 0 || selectedPresets.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0);
+  const canGenerate = !isGenerating && (references.length > 0 || role !== null || marks.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0);
 
-  const handleGenerate = useCallback(async () => {
-    const referenceLimitIssue = getReferenceLimitIssueForGenerate(references);
-    if (referenceLimitIssue) {
-      showToast(formatReferenceLimitIssue(referenceLimitIssue));
-      return;
-    }
-
-    const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references, lightPreview);
-
-    // Content safety check — request phase
-    const safetyResult = await checkGenerationRequestSafety({
-      prompt: textPrompt,
-      referenceImages: referenceImages.map((ref) => ({
-        id: ref.imageId,
-        url: ref.imageUrl,
-        usage: ref.usageKey,
-        label: ref.usageLabel,
-      })),
+  const selectResultImage = useCallback((index: number) => {
+    setCurrentResultSet((prev) => {
+      if (!prev || !prev.images[index]) return prev;
+      return { ...prev, selectedIndex: index };
     });
-    if (!safetyResult.allowed) {
-      showToast(safetyResult.message ?? '当前内容不适合生成，请修改后再试。');
-      return;
-    }
-    const safePrompt =
-      safetyResult.level === 'rewrite' && safetyResult.rewrittenPrompt
-        ? safetyResult.rewrittenPrompt
-        : textPrompt;
+  }, []);
 
-    // Abort any previous running generation
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  const downloadResultImage = useCallback((image: GeneratedImage) => {
+    const link = document.createElement('a');
+    link.href = image.imageUrl;
+    link.download = `visioner-result-${image.resultId}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
 
-    const task = createGenerationTask({
-      sourceNodeId: id,
-      prompt: safePrompt,
-      inputRefs: referenceImages.map((ref) => ({
-        imageId: ref.imageId,
-        imageUrl: ref.imageUrl,
-        usageKey: ref.usageKey,
-        usageLabel: ref.usageLabel,
-        customUsageName: ref.customUsageName,
-        promptText: ref.promptText,
-      })),
-      modelParams: {
-        model: modelParams.model,
-        ratio: modelParams.ratio,
-        resolution: modelParams.resolution,
-      },
-    });
-    setGenerationTask(task);
+  const buildHistoryBatchFromCurrentResultSet = useCallback(
+    (resultSet: CurrentResultSet, fallbackPrompt: string, fallbackUserPrompt: string): ResultSetBatch => {
+      const batchHistoryItems = generatedImages.filter((item) => item.batchId === resultSet.batchId);
+      const firstHistoryItem = batchHistoryItems[0];
 
-    try {
-      const result = await simulateGeneration(
-        {
-          sourceNodeId: id,
-          prompt: safePrompt,
-          inputRefs: task.inputRefs,
-          modelParams: {
-            model: modelParams.model,
-            ratio: modelParams.ratio,
-            resolution: modelParams.resolution,
-          },
-        },
-        {
-          onProgress: (progress) => {
-            setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress, updatedAt: Date.now() } : prev));
-          },
-        },
-        controller.signal,
-      );
-
-      // Content safety check — result phase
-      const resultSafety = await checkGenerationResultSafety({
-        imageUrl: result.imageUrl,
-      });
-      if (!resultSafety.allowed) {
-        showToast(resultSafety.message ?? '生成结果未通过安全检查，请调整提示词后重试。');
-        setGenerationTask((prev) =>
-          prev && prev.taskId === task.taskId
-            ? { ...prev, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() }
-            : prev,
-        );
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
-                  },
-                }
-              : n,
-          ),
-        );
-        return;
-      }
-
-      const batchId = result.taskId;
-      const historyItem: GenerationHistoryItem = {
-        resultId: result.taskId,
-        batchId,
-        batchIndex: 1,
-        imageUrl: result.imageUrl,
-        prompt: safePrompt,
-        userPrompt: userPrompt || '',
-        inputRefs: task.inputRefs,
-        presetIds: selectedPresets,
-        styleId: selectedStyleId,
-        modelParams: { ...modelParams },
-        seed: result.seed,
-        width: result.width,
-        height: result.height,
-        createdAt: Date.now(),
-        kind: 'final',
+      return {
+        batchId: resultSet.batchId,
+        nodeId: id,
+        mode: resultSet.mode,
+        images: resultSet.images,
+        prompt: firstHistoryItem?.prompt || fallbackPrompt,
+        userPrompt: firstHistoryItem?.userPrompt || fallbackUserPrompt,
+        inputRefs: firstHistoryItem?.inputRefs || [],
+        presetIds: firstHistoryItem?.presetIds || selectedPresets,
+        styleId: firstHistoryItem?.styleId ?? selectedStyleId,
+        modelParams: firstHistoryItem?.modelParams || { ...modelParams },
+        createdAt: firstHistoryItem?.createdAt || Date.now(),
       };
-      const nextGeneratedImages = [...generatedImages, historyItem];
-      setPreviewImage(result.imageUrl);
-      setGeneratedImages(nextGeneratedImages);
+    },
+    [generatedImages, id, modelParams, selectedPresets, selectedStyleId],
+  );
 
-      const resultImage = new window.Image();
-      resultImage.onload = () => {
-        setImgSize({ width: resultImage.width, height: resultImage.height });
-      };
-      resultImage.src = result.imageUrl;
-
-      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'success', progress: 100, result, updatedAt: Date.now() } : prev));
-
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  image: result.imageUrl,
-                  currentImage: result.imageUrl,
-                  currentResultId: result.taskId,
-                  finalPrompt: safePrompt,
-                  textPrompt,
-                  imageReferences,
-                  referenceImages,
-                  references,
-                  promptBlocks,
-                  userPrompt,
-                  globalStyle,
-                  presets,
-                  promptContent,
-                  generatedImages: nextGeneratedImages,
-                  generationTask: { ...task, status: 'success', progress: 100, result, updatedAt: Date.now() },
-                  width: result.width,
-                  height: result.height,
-                },
-              }
-            : n,
-        ),
-      );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '生成失败';
-      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'failed', errorMessage, updatedAt: Date.now() } : prev));
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  generationTask: { ...task, status: 'failed', errorMessage, updatedAt: Date.now() },
-                },
-              }
-            : n,
-        ),
-      );
-    }
-  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams, showToast, lightPreview]);
-
-  const handlePreviewGenerate = useCallback(async () => {
+  const runGeneration = useCallback(async (mode: 'preview' | 'final') => {
     const referenceLimitIssue = getReferenceLimitIssueForGenerate(references);
     if (referenceLimitIssue) {
       showToast(formatReferenceLimitIssue(referenceLimitIssue));
@@ -465,56 +421,85 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setGenerationTask(task);
 
     try {
-      const result = await simulateGeneration(
-        {
-          sourceNodeId: id,
-          prompt: safePrompt,
-          inputRefs: task.inputRefs,
-          modelParams: {
-            model: modelParams.model,
-            ratio: modelParams.ratio,
-            resolution: modelParams.resolution,
-          },
-        },
-        {
-          onProgress: (progress) => {
-            setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress, updatedAt: Date.now() } : prev));
-          },
-        },
-        controller.signal,
-      );
+      const count = parseCount(modelParams.count);
+      const results: import('../../types/generation.types').GenerationResult[] = [];
 
-      const resultSafety = await checkGenerationResultSafety({
-        imageUrl: result.imageUrl,
-      });
-      if (!resultSafety.allowed) {
-        showToast(resultSafety.message ?? '生成结果未通过安全检查，请调整提示词后重试。');
-        setGenerationTask((prev) =>
-          prev && prev.taskId === task.taskId
-            ? { ...prev, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() }
-            : prev,
+      for (let i = 0; i < count; i++) {
+        const result = await simulateGeneration(
+          {
+            sourceNodeId: id,
+            prompt: safePrompt,
+            inputRefs: task.inputRefs,
+            modelParams: {
+              model: modelParams.model,
+              ratio: modelParams.ratio,
+              resolution: modelParams.resolution,
+            },
+          },
+          {
+            onProgress: (progress) => {
+              const overall = Math.floor(((i + progress / 100) / count) * 100);
+              setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress: overall, updatedAt: Date.now() } : prev));
+            },
+          },
+          controller.signal,
         );
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === id
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
-                  },
-                }
-              : n,
-          ),
-        );
-        return;
+        results.push(result);
       }
 
-      const batchId = result.taskId;
-      const historyItem: GenerationHistoryItem = {
+      if (results.length > 0) {
+        const resultSafety = await checkGenerationResultSafety({
+          imageUrl: results[0].imageUrl,
+        });
+        if (!resultSafety.allowed) {
+          showToast(resultSafety.message ?? '生成结果未通过安全检查，请调整提示词后重试。');
+          setGenerationTask((prev) =>
+            prev && prev.taskId === task.taskId
+              ? { ...prev, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() }
+              : prev,
+          );
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === id
+                ? {
+                    ...n,
+                    data: {
+                      ...n.data,
+                      generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
+                    },
+                  }
+                : n,
+            ),
+          );
+          return;
+        }
+      }
+
+      if (currentResultSet && currentResultSet.images.length > 0) {
+        addBatch(buildHistoryBatchFromCurrentResultSet(currentResultSet, safePrompt, userPrompt || ''));
+      }
+
+      const batchId = task.taskId;
+      const generatedImageItems: GeneratedImage[] = results.map((result) => ({
+        resultId: result.taskId,
+        imageUrl: result.imageUrl,
+        width: result.width,
+        height: result.height,
+        seed: result.seed,
+      }));
+
+      const newResultSet: CurrentResultSet = {
+        batchId,
+        mode,
+        images: generatedImageItems,
+        selectedIndex: 0,
+        isExpanded: false,
+      };
+
+      const newHistoryItems: GenerationHistoryItem[] = results.map((result, index) => ({
         resultId: result.taskId,
         batchId,
-        batchIndex: 1,
+        batchIndex: index + 1,
         imageUrl: result.imageUrl,
         prompt: safePrompt,
         userPrompt: userPrompt || '',
@@ -526,19 +511,34 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         width: result.width,
         height: result.height,
         createdAt: Date.now(),
-        kind: 'preview',
-      };
-      const nextGeneratedImages = [...generatedImages, historyItem];
-      setPreviewImage(result.imageUrl);
+        kind: mode,
+      }));
+
+      const nextGeneratedImages = [...generatedImages, ...newHistoryItems];
+      addBatch({
+        batchId,
+        nodeId: id,
+        mode,
+        images: generatedImageItems,
+        prompt: safePrompt,
+        userPrompt: userPrompt || '',
+        inputRefs: task.inputRefs,
+        presetIds: selectedPresets,
+        styleId: selectedStyleId,
+        modelParams: { ...modelParams },
+        createdAt: Date.now(),
+      });
+      setCurrentResultSet(newResultSet);
+      setPreviewImage(generatedImageItems[0]?.imageUrl || '');
       setGeneratedImages(nextGeneratedImages);
 
-      const resultImage = new window.Image();
-      resultImage.onload = () => {
-        setImgSize({ width: resultImage.width, height: resultImage.height });
+      const firstImage = new window.Image();
+      firstImage.onload = () => {
+        setImgSize({ width: firstImage.width, height: firstImage.height });
       };
-      resultImage.src = result.imageUrl;
+      firstImage.src = generatedImageItems[0]?.imageUrl || '';
 
-      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'success', progress: 100, result, updatedAt: Date.now() } : prev));
+      setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'success', progress: 100, result: results[0], updatedAt: Date.now() } : prev));
 
       setNodes((nds) =>
         nds.map((n) =>
@@ -547,9 +547,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 ...n,
                 data: {
                   ...n.data,
-                  image: result.imageUrl,
-                  currentImage: result.imageUrl,
-                  currentResultId: result.taskId,
+                  currentResultSet: newResultSet,
+                  image: generatedImageItems[0]?.imageUrl,
+                  currentImage: generatedImageItems[0]?.imageUrl,
+                  currentResultId: generatedImageItems[0]?.resultId,
                   finalPrompt: safePrompt,
                   textPrompt,
                   imageReferences,
@@ -561,9 +562,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   presets,
                   promptContent,
                   generatedImages: nextGeneratedImages,
-                  generationTask: { ...task, status: 'success', progress: 100, result, updatedAt: Date.now() },
-                  width: result.width,
-                  height: result.height,
+                  generationTask: { ...task, status: 'success', progress: 100, result: results[0], updatedAt: Date.now() },
+                  width: results[0]?.width,
+                  height: results[0]?.height,
                 },
               }
             : n,
@@ -586,7 +587,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams, showToast, lightPreview]);
+  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
+
+  const handleGenerate = useCallback(() => runGeneration('final'), [runGeneration]);
+  const handlePreviewGenerate = useCallback(() => runGeneration('preview'), [runGeneration]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
@@ -646,32 +650,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const handleUseReference = () => {
     // Shared entry point for top thumbnails and the @ reference menu.
-  };
-
-  const handleSelectResult = (resultId: string | null) => {
-    if (resultId === null) {
-      setPreviewImage(inputImage);
-      setCurrentResultId(null);
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === id
-            ? { ...n, data: { ...n.data, image: inputImage, currentImage: inputImage, currentResultId: null } }
-            : n,
-        ),
-      );
-      return;
-    }
-    const item = generatedImages.find((g) => g.resultId === resultId);
-    if (!item) return;
-    setPreviewImage(item.imageUrl);
-    setCurrentResultId(resultId);
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id
-          ? { ...n, data: { ...n.data, image: item.imageUrl, currentImage: item.imageUrl, currentResultId: resultId } }
-          : n,
-      ),
-    );
   };
 
   const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType, nextLocalRefLabel?: string) => {
@@ -1377,6 +1355,21 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               {imgSize ? `${imgSize.width}×${imgSize.height}` : `${getNodeWidth(data) || 1024}×${getNodeHeight(data) || 1024}`}
             </span>
           )}
+          {/* Node history entry */}
+          {nodeHistoryCount > 0 && isOnlySelected && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const onOpen = data.onOpenNodeHistory as ((nodeId: string) => void) | undefined;
+                if (onOpen) onOpen(id);
+              }}
+              className="flex-shrink-0 ml-2 rounded px-1.5 py-0.5 text-[10px] transition-colors hover:bg-white/10"
+              style={{ color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              历史 {nodeHistoryCount}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1409,7 +1402,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
-          className="node-preview-card w-full rounded-xl flex items-center justify-center transition-all overflow-hidden"
+          className="node-preview-card w-full rounded-xl flex items-center justify-center transition-all overflow-hidden relative"
           style={{
             width: cardWidth,
             height: displayImage ? Math.round(sourceHeight * imageDisplayScale) : cardHeight,
@@ -1418,7 +1411,121 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
           }}
         >
-          {displayImage ? (
+          {displayImage && currentResultSet && currentResultSet.images.length > 1 && !currentResultSet.isExpanded ? (
+            <div className="relative w-full h-full">
+              {currentResultSet.images
+                .filter((_, imageIndex) => imageIndex !== currentResultSet.selectedIndex)
+                .slice(0, 2)
+                .map((img, idx) => (
+                <div
+                  key={img.resultId}
+                  className="absolute rounded-lg overflow-hidden"
+                  style={{
+                    top: 4 + idx * 3,
+                    left: 4 + idx * 3,
+                    right: 4 - idx * 3,
+                    bottom: 4 - idx * 3,
+                    opacity: 0.35 - idx * 0.1,
+                    transform: `scale(${0.96 - idx * 0.02})`,
+                    zIndex: 1 + idx,
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <img src={img.imageUrl} alt="" className="w-full h-full object-cover" draggable={false} />
+                </div>
+              ))}
+              <div className="absolute inset-0 z-10">
+                <img
+                  ref={imgRef}
+                  src={displayImage}
+                  alt=""
+                  className="w-full h-full object-contain"
+                  draggable={false}
+                  onClick={handleImageClick}
+                  style={{ cursor: isPointPickMode ? 'crosshair' : 'default' }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentResultSet((prev) => prev ? { ...prev, isExpanded: true } : prev);
+                }}
+                className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-white/15"
+                style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(255,255,255,0.82)', border: '1px solid rgba(255,255,255,0.12)' }}
+              >
+                <span>{currentResultSet.images.length}张</span>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.7 }}>
+                  <path d="M2 4L5 7L8 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          ) : displayImage && currentResultSet && currentResultSet.images.length > 1 && currentResultSet.isExpanded ? (
+            <div className="relative w-full h-full p-2.5">
+              <div
+                className={currentResultSet.images.length === 2 ? 'flex h-full gap-2' : 'grid h-full gap-2'}
+                style={{
+                  gridTemplateColumns: currentResultSet.images.length === 2 ? undefined : '1fr 1fr',
+                  gridTemplateRows: currentResultSet.images.length <= 2 ? undefined : '1fr 1fr',
+                }}
+              >
+                {currentResultSet.images.map((img, idx) => (
+                  <div
+                    key={img.resultId}
+                    className="group/result relative h-full min-w-0 flex-1 overflow-hidden rounded-lg"
+                    style={{
+                      border: idx === currentResultSet.selectedIndex ? '1.5px solid #00d4ff' : '1.5px solid rgba(255,255,255,0.10)',
+                      background: 'rgba(255,255,255,0.035)',
+                    }}
+                  >
+                    <img src={img.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                    <div className="absolute right-1.5 top-1.5 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          downloadResultImage(img);
+                        }}
+                        className="flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-white/20"
+                        style={{ background: 'rgba(0,0,0,0.56)', color: 'rgba(255,255,255,0.82)', border: '1px solid rgba(255,255,255,0.12)' }}
+                        title="下载"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          selectResultImage(idx);
+                        }}
+                        className="h-6 rounded-md px-2 text-[11px] font-medium transition-colors hover:bg-white/20"
+                        style={{
+                          background: idx === currentResultSet.selectedIndex ? 'rgba(0,212,255,0.24)' : 'rgba(0,0,0,0.56)',
+                          color: idx === currentResultSet.selectedIndex ? '#bff4ff' : 'rgba(255,255,255,0.84)',
+                          border: idx === currentResultSet.selectedIndex ? '1px solid rgba(0,212,255,0.36)' : '1px solid rgba(255,255,255,0.12)',
+                        }}
+                      >
+                        {idx === currentResultSet.selectedIndex ? '主图' : '设为主图'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentResultSet((prev) => prev ? { ...prev, isExpanded: false } : prev);
+                }}
+                className="absolute top-2 right-2 z-20 flex items-center justify-center rounded-md transition-colors hover:bg-white/15"
+                style={{ width: 24, height: 24, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.12)' }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.8 }}>
+                  <path d="M2 6L5 3L8 6" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          ) : displayImage ? (
             <div className="relative w-full h-full">
               <img
                 ref={imgRef}
@@ -1451,8 +1558,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           )}
         </div>
 
-        {/* Result history thumbnails — shown at bottom of image when there are generated results */}
-        {displayImage && generatedImages.length > 0 && isOnlySelected && (
+        {/* Current result set thumbnails */}
+        {displayImage && currentResultSet && currentResultSet.images.length > 0 && isOnlySelected && (
           <div
             className="absolute z-20 flex items-center gap-1.5 nodrag nowheel"
             style={{
@@ -1469,23 +1576,39 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               overflowX: 'auto',
             }}
           >
-            {/* Generated result thumbnails */}
-            {generatedImages.map((item, idx) => (
+            <div
+              className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-1.5"
+              style={{
+                background: 'rgba(255,255,255,0.055)',
+                border: '1px solid rgba(255,255,255,0.10)',
+                color: 'rgba(255,255,255,0.66)',
+              }}
+              title={selectedStyle ? selectedStyle.title : '未选择风格'}
+            >
+              {selectedStyle ? (
+                <img src={selectedStyle.coverImage} alt="" className="h-5 w-5 rounded object-cover" draggable={false} />
+              ) : (
+                <span className="h-5 w-5 rounded bg-white/[0.06]" />
+              )}
+              <span className="max-w-[52px] truncate text-[10px]">{selectedStyle?.title || '风格'}</span>
+            </div>
+            {currentResultSet.images.map((img, idx) => (
               <button
-                key={item.resultId}
+                key={img.resultId}
                 type="button"
-                onClick={() => handleSelectResult(item.resultId)}
+                onClick={() => selectResultImage(idx)}
                 className="flex-shrink-0 relative rounded overflow-hidden transition-all"
                 style={{
-                  width: 28,
-                  height: 28,
-                  border: currentResultId === item.resultId ? '1.5px solid #00d4ff' : '1.5px solid transparent',
-                  boxShadow: currentResultId === item.resultId ? '0 0 0 1px rgba(0,212,255,0.3)' : 'none',
+                  width: 32,
+                  height: 32,
+                  border: currentResultSet.selectedIndex === idx ? '2px solid #00d4ff' : '1px solid rgba(255,255,255,0.14)',
+                  boxShadow: currentResultSet.selectedIndex === idx ? '0 0 0 1px rgba(0,212,255,0.26), 0 0 12px rgba(0,212,255,0.22)' : 'none',
+                  opacity: currentResultSet.selectedIndex === idx ? 1 : 0.72,
                 }}
-                title={item.kind === 'preview' ? `预览 ${idx + 1}` : `${idx + 1}`}
+                title={`${idx + 1}`}
               >
-                <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
-                {item.kind === 'preview' && (
+                <img src={img.imageUrl} alt="" className="w-full h-full object-cover" />
+                {currentResultSet.mode === 'preview' && idx === 0 && (
                   <div className="absolute bottom-0 right-0 flex items-center justify-center rounded-tl-sm" style={{ background: 'rgba(0,0,0,0.58)', width: 10, height: 10 }}>
                     <Zap className="w-[7px] h-[7px]" style={{ color: '#fbbf24' }} />
                   </div>
