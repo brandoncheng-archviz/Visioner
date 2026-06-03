@@ -498,9 +498,10 @@ export function ImageNodeControlPanel({
     return `【${preset.title || preset.name}】\n${prompt}`;
   };
 
-  const appendPresetPromptBlocks = (presetIds: string[]) => {
+  const appendPresetPromptBlocks = (presetIds: string[], appliedPresets?: PresetItem[]) => {
+    const appliedPresetMap = new Map((appliedPresets || []).map((preset) => [preset.id, preset]));
     const blocks = presetIds
-      .map((presetId) => getPresetById(presetId))
+      .map((presetId) => appliedPresetMap.get(presetId) || getPresetById(presetId))
       .filter((preset): preset is PresetItem => Boolean(preset))
       .map((preset) => buildPresetTextBlock(preset, true))
       .filter(Boolean);
@@ -510,9 +511,10 @@ export function ImageNodeControlPanel({
     onPromptChange(`${promptText}${separator}${blocks.join('\n\n')}`);
   };
 
-  const handlePresetModalApply = (presetIds: string[]) => {
+  const handlePresetModalApply = (presetIds: string[], appliedPresets?: PresetItem[]) => {
     const newlySelectedPresetIds = presetIds.filter((presetId) => !selectedPresets.includes(presetId));
-    appendPresetPromptBlocks(newlySelectedPresetIds.length > 0 ? newlySelectedPresetIds : presetIds);
+    const idsToInsert = newlySelectedPresetIds.length > 0 ? newlySelectedPresetIds : presetIds;
+    appendPresetPromptBlocks(idsToInsert, appliedPresets);
     onPresetsChange(presetIds);
   };
 

@@ -1,12 +1,12 @@
 import { useState, useMemo, useCallback, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Star, Bookmark, Plus, Pencil } from 'lucide-react';
+import { X, Star, Bookmark, Plus, Pencil } from 'lucide-react';
 
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../constants/canvasConstants';
 import { PRESET_DATA, PRESET_TABS, getPresetById } from '../constants/presets';
 import { CustomPresetFallbackCover } from './CustomPresetFallbackCover';
 import type { PresetItem } from '../types/imageNode.types';
-import { normalizePresetSelection, togglePresetSelection } from '../utils/presetSelection';
+import { getPresetPromptText } from '../utils/promptUtils';
 import {
   deleteUserPreset,
   loadUserPresets,
@@ -40,20 +40,6 @@ const PRESET_TAB_HINTS: Record<PresetTab, string> = {
   我的收藏: '显示你收藏的系统预设，以及你添加的自定义预设。',
 };
 
-const SELECTED_PRESET_GROUP_ORDER: Record<string, number> = {
-  realism_mode: 0,
-  enhancement: 1,
-  lighting_atmosphere: 2,
-  camera_view: 3,
-  architectural_representation: 4,
-  style_state: 5,
-  entourage_elements: 6,
-  time: 7,
-  weather: 8,
-  season: 9,
-  user_custom: 10,
-};
-
 function getPresetName(preset: PresetItem): string {
   return preset.title || preset.name;
 }
@@ -64,20 +50,18 @@ function getPresetShortDesc(preset: PresetItem): string {
 
 export function PresetPickerModal({
   open,
-  selectedPresetIds,
   onApply,
   onClose,
 }: {
   open: boolean;
   selectedPresetIds: string[];
-  onApply: (presetIds: string[]) => void;
+  onApply: (presetIds: string[], presets?: PresetItem[]) => void;
   onClose: () => void;
 }) {
-  const [draftPresetIds, setDraftPresetIds] = useState<string[]>(selectedPresetIds);
   const [activeTab, setActiveTab] = useState<PresetTab>('真实增强');
   const [userFavorites, setUserFavorites] = useState<Set<string>>(() => loadUserFavorites());
   const [userPresets, setUserPresets] = useState<PresetItem[]>(() => loadUserPresets());
-  const [focusedPresetId, setFocusedPresetId] = useState<string | null>(null);
+  const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
   const [editingPreset, setEditingPreset] = useState<PresetItem | null>(null);
   const [showPresetEditor, setShowPresetEditor] = useState(false);
   const [presetTitle, setPresetTitle] = useState('');
@@ -89,21 +73,6 @@ export function PresetPickerModal({
   const handleCancel = useCallback(() => {
     onClose();
   }, [onClose]);
-
-  const handleConfirm = useCallback(() => {
-    onApply(normalizePresetSelection(draftPresetIds));
-    onClose();
-  }, [draftPresetIds, onApply, onClose]);
-
-  const handleClear = useCallback(() => {
-    setDraftPresetIds([]);
-    setFocusedPresetId(null);
-  }, []);
-
-  const handleRemoveDraftPreset = useCallback((presetId: string) => {
-    setDraftPresetIds((ids) => ids.filter((id) => id !== presetId));
-    setFocusedPresetId((id) => (id === presetId ? null : id));
-  }, []);
 
   const openCreateEditor = useCallback(() => {
     setEditingPreset(null);
@@ -141,8 +110,9 @@ export function PresetPickerModal({
       thumbnail: presetThumbnail,
       userFavorite: editingPreset?.userFavorite,
     });
+    const savedPresetId = editingPreset?.id || nextPresets[nextPresets.length - 1]?.id || null;
     setUserPresets(nextPresets);
-    setFocusedPresetId(editingPreset?.id || nextPresets[nextPresets.length - 1]?.id || null);
+    setHoveredPresetId(savedPresetId);
     closePresetEditor();
   }, [closePresetEditor, editingPreset, presetPrompt, presetThumbnail, presetTitle, userPresets]);
 
@@ -151,14 +121,13 @@ export function PresetPickerModal({
 
     const nextPresets = deleteUserPreset(userPresets, presetId);
     setUserPresets(nextPresets);
-    setDraftPresetIds((ids) => ids.filter((id) => id !== presetId));
     setUserFavorites((favorites) => {
       const next = new Set(favorites);
       next.delete(presetId);
       saveUserFavorites(next);
       return next;
     });
-    setFocusedPresetId((id) => (id === presetId ? null : id));
+    setHoveredPresetId((id) => (id === presetId ? null : id));
   }, [userPresets]);
 
   const handleThumbnailUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -175,7 +144,6 @@ export function PresetPickerModal({
     event.target.value = '';
   }, []);
 
-  const isDraftSelected = useCallback((presetId: string) => draftPresetIds.includes(presetId), [draftPresetIds]);
   const isFavorite = useCallback((preset: PresetItem) => userFavorites.has(preset.id) || Boolean(preset.userFavorite), [userFavorites]);
 
   const toggleFavorite = useCallback((presetId: string) => {
@@ -209,11 +177,6 @@ export function PresetPickerModal({
     });
   }, [userPresets]);
 
-  const selectPreset = useCallback((presetId: string) => {
-    setDraftPresetIds((prev) => togglePresetSelection(prev, presetId));
-    setFocusedPresetId(presetId);
-  }, []);
-
   const visiblePresets = useMemo(() => {
     if (activeTab === '我的收藏') {
       return allPresets.filter(
@@ -230,37 +193,25 @@ export function PresetPickerModal({
     });
   }, [activeTab, allPresets, isFavorite]);
 
-  const detailPreset = useMemo(() => {
-    if (!focusedPresetId) return null;
-    return allPresets.find((preset) => preset.id === focusedPresetId) || getPresetById(focusedPresetId) || null;
-  }, [allPresets, focusedPresetId]);
+  const hoveredPreset = useMemo(() => {
+    if (!hoveredPresetId) return null;
+    return allPresets.find((preset) => preset.id === hoveredPresetId) || getPresetById(hoveredPresetId) || null;
+  }, [allPresets, hoveredPresetId]);
 
-  const selectedPresetPills = useMemo(() => {
-    return draftPresetIds
-      .map((id, index) => ({
-        id,
-        index,
-        preset: allPresets.find((preset) => preset.id === id) || getPresetById(id),
-      }))
-      .filter((item): item is { id: string; index: number; preset: PresetItem } => Boolean(item.preset))
-      .sort((a, b) => {
-        const aOrder = SELECTED_PRESET_GROUP_ORDER[a.preset.group] ?? 99;
-        const bOrder = SELECTED_PRESET_GROUP_ORDER[b.preset.group] ?? 99;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return a.index - b.index;
-      });
-  }, [allPresets, draftPresetIds]);
+  const hoveredPresetPrompt = useMemo(() => {
+    return hoveredPreset ? getPresetPromptText(hoveredPreset) : '';
+  }, [hoveredPreset]);
 
-  const handleCardClick = useCallback((presetId: string) => {
-    selectPreset(presetId);
-  }, [selectPreset]);
+  const handleCardClick = useCallback((preset: PresetItem) => {
+    onApply([preset.id], [preset]);
+    onClose();
+  }, [onApply, onClose]);
 
   const handleCardMouseEnter = useCallback((presetId: string) => {
-    setFocusedPresetId(presetId);
+    setHoveredPresetId(presetId);
   }, []);
 
   const renderPresetCard = useCallback((preset: PresetItem) => {
-    const selected = isDraftSelected(preset.id);
     const favorite = isFavorite(preset);
     const presetName = getPresetName(preset);
     const thumbnail = preset.thumbnail?.trim();
@@ -271,12 +222,11 @@ export function PresetPickerModal({
       <button
         key={preset.id}
         type="button"
-        onClick={() => handleCardClick(preset.id)}
+        onClick={() => handleCardClick(preset)}
         onMouseEnter={() => handleCardMouseEnter(preset.id)}
-        className={`group relative overflow-hidden rounded-lg border text-left transition-all ${selected ? 'border-white/[0.42]' : 'border-white/[0.12] hover:border-white/[0.24]'}`}
+        className="group relative overflow-hidden rounded-lg border border-white/[0.12] text-left transition-all hover:border-white/[0.28]"
         style={{
-          background: selected ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.025)',
-          boxShadow: selected ? '0 0 0 1px rgba(255,255,255,0.10), 0 10px 26px rgba(0,0,0,0.28)' : 'none',
+          background: 'rgba(255,255,255,0.025)',
         }}
       >
         {/* Thumbnail */}
@@ -318,12 +268,6 @@ export function PresetPickerModal({
           >
             <Star className="h-3 w-3" fill={favorite ? 'currentColor' : 'none'} />
           </span>
-          {/* Check indicator */}
-          {selected && (
-            <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'rgba(255,255,255,0.88)', color: '#111' }}>
-              <Check className="h-3.5 w-3.5" />
-            </span>
-          )}
         </div>
         {/* Info */}
         <div className="px-3 py-2">
@@ -332,7 +276,7 @@ export function PresetPickerModal({
         </div>
       </button>
     );
-  }, [isDraftSelected, isFavorite, handleCardClick, handleCardMouseEnter, toggleFavorite]);
+  }, [isFavorite, handleCardClick, handleCardMouseEnter, toggleFavorite]);
 
   if (!open) return null;
 
@@ -367,9 +311,9 @@ export function PresetPickerModal({
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between border-b px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
           <div>
-            <div className="text-[16px] font-semibold text-white/92">选择预设</div>
+            <div className="text-[16px] font-semibold text-white/92">预设库</div>
             <div className="mt-1 text-[12px]" style={{ color: 'rgba(255,255,255,0.48)' }}>
-              选择快捷预设，自动补充生成指令，快速调整画面效果。
+              浏览预设提示词。鼠标移动到卡片可预览完整提示词，点击卡片可插入到提示词框，也可以使用 / 快速搜索插入。
             </div>
           </div>
           <button
@@ -411,11 +355,11 @@ export function PresetPickerModal({
                   {PRESET_TAB_HINTS[activeTab]}
                 </div>
               </div>
-              {detailPreset?.owner === 'user' && (
+              {hoveredPreset?.owner === 'user' && (
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => openEditEditor(detailPreset)}
+                    onClick={() => openEditEditor(hoveredPreset)}
                     className="rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/8"
                     style={{ color: 'rgba(255,255,255,0.68)', border: '1px solid rgba(255,255,255,0.10)' }}
                   >
@@ -423,7 +367,7 @@ export function PresetPickerModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteUserPreset(detailPreset.id)}
+                    onClick={() => handleDeleteUserPreset(hoveredPreset.id)}
                     className="rounded-lg px-3 py-1.5 text-[12px] transition-colors hover:bg-white/8"
                     style={{ color: 'rgba(248,113,113,0.84)', border: '1px solid rgba(248,113,113,0.18)' }}
                   >
@@ -475,57 +419,31 @@ export function PresetPickerModal({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex h-20 shrink-0 items-center justify-between border-t px-5" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          <div className="flex min-w-0 flex-1 items-center gap-2 pr-4">
-            <span className="shrink-0 text-[12px] text-white/40">当前选择：</span>
-            {selectedPresetPills.length > 0 ? (
-              <>
-                <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-contain">
-                  {selectedPresetPills.map(({ id, preset }) => (
-                    <span
-                      key={id}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[12px]"
-                      style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.14)' }}
-                    >
-                      {getPresetName(preset)}
-                      <button type="button" onClick={() => handleRemoveDraftPreset(id)} className="rounded-full hover:bg-white/10" aria-label={`移除${getPresetName(preset)}`}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
+        {/* Hover prompt preview */}
+        <div className="flex h-[200px] shrink-0 flex-col border-t px-5 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(16,16,20,0.62)' }}>
+          {hoveredPreset ? (
+            <>
+              <div className="flex shrink-0 items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-semibold text-white/88">{getPresetName(hoveredPreset)}</div>
+                  <div className="mt-0.5 truncate text-[11px] text-white/42">{getPresetShortDesc(hoveredPreset)}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="shrink-0 text-[12px] transition-colors hover:text-white/70"
-                  style={{ color: 'rgba(255,255,255,0.42)' }}
-                >
-                  清除选择
-                </button>
-              </>
-            ) : (
-              <span className="text-[12px] text-white/25">未选择预设</span>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="rounded-lg px-3 py-2 text-[13px] transition-colors hover:bg-white/8"
-              style={{ color: 'rgba(255,255,255,0.62)' }}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="rounded-lg px-3 py-2 text-[13px] font-medium"
-              style={{ background: 'rgba(255,255,255,0.9)', color: '#111' }}
-            >
-              确认选择
-            </button>
-          </div>
+                <span className="shrink-0 rounded-md px-2 py-1 text-[11px]" style={{ color: 'rgba(255,255,255,0.48)', background: 'rgba(255,255,255,0.05)' }}>
+                  点击卡片插入
+                </span>
+              </div>
+              <div
+                className="mt-3 min-h-0 max-h-[132px] flex-1 overflow-y-auto overscroll-contain whitespace-pre-wrap rounded-lg px-3 py-2 text-[12px] leading-5"
+                style={{ color: 'rgba(255,255,255,0.76)', background: 'rgba(0,0,0,0.20)', border: '1px solid rgba(255,255,255,0.06)' }}
+              >
+                {hoveredPresetPrompt || '这个预设暂未配置提示词。'}
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-lg text-center text-[12px]" style={{ color: 'rgba(255,255,255,0.42)', background: 'rgba(0,0,0,0.16)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              将鼠标移到卡片上，可预览完整提示词；点击卡片可直接插入。
+            </div>
+          )}
         </div>
       </div>
       {showPresetEditor && (

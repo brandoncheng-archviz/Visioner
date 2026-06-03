@@ -203,20 +203,20 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
 
       {/* Batch action bar */}
       {batchMode && (
-        <div className="flex items-center justify-between px-4 py-2.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(24,24,28,0.96)' }}>
-          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.62)' }}>已选 {selectedImageCount} 张</span>
+        <div className="flex items-center justify-between px-4 py-2.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(13,13,16,0.98)' }}>
+          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.72)' }}>已选 {selectedImageCount} 张</span>
           <div className="flex items-center gap-2">
             <button
               onClick={handleBatchDelete}
               disabled={selectedCount === 0}
               className="rounded-md px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ color: 'rgba(248,113,113,0.72)' }}
+              style={{ color: 'rgba(255,255,255,0.72)' }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.color = 'rgba(248,113,113,0.95)';
-                event.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.92)';
+                event.currentTarget.style.background = 'rgba(255,255,255,0.07)';
               }}
               onMouseLeave={(event) => {
-                event.currentTarget.style.color = 'rgba(248,113,113,0.72)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.72)';
                 event.currentTarget.style.background = 'transparent';
               }}
             >
@@ -231,13 +231,13 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
               }}
               disabled={selectedCount === 0}
               className="rounded-md px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ color: 'rgba(255,255,255,0.62)' }}
+              style={{ color: 'rgba(255,255,255,0.72)' }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.color = 'rgba(255,255,255,0.9)';
-                event.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.92)';
+                event.currentTarget.style.background = 'rgba(255,255,255,0.07)';
               }}
               onMouseLeave={(event) => {
-                event.currentTarget.style.color = 'rgba(255,255,255,0.62)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.72)';
                 event.currentTarget.style.background = 'transparent';
               }}
             >
@@ -247,13 +247,13 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
               onClick={handleBatchUse}
               disabled={!canUse}
               className="rounded-md px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-              style={{ color: 'rgba(34,211,238,0.9)' }}
+              style={{ color: 'rgba(255,255,255,0.72)' }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.color = 'rgba(165,243,252,0.95)';
-                event.currentTarget.style.background = 'rgba(34,211,238,0.10)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.92)';
+                event.currentTarget.style.background = 'rgba(255,255,255,0.07)';
               }}
               onMouseLeave={(event) => {
-                event.currentTarget.style.color = 'rgba(34,211,238,0.9)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.72)';
                 event.currentTarget.style.background = 'transparent';
               }}
             >
@@ -262,13 +262,13 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
             <button
               onClick={() => { setSelectedIds(new Set()); }}
               className="rounded-md px-2.5 py-1 text-[11px] transition-colors"
-              style={{ color: 'rgba(255,255,255,0.45)' }}
+              style={{ color: 'rgba(255,255,255,0.72)' }}
               onMouseEnter={(event) => {
-                event.currentTarget.style.color = 'rgba(255,255,255,0.86)';
-                event.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.92)';
+                event.currentTarget.style.background = 'rgba(255,255,255,0.07)';
               }}
               onMouseLeave={(event) => {
-                event.currentTarget.style.color = 'rgba(255,255,255,0.45)';
+                event.currentTarget.style.color = 'rgba(255,255,255,0.72)';
                 event.currentTarget.style.background = 'transparent';
               }}
             >
