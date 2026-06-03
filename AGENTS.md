@@ -104,6 +104,7 @@ app/
 │   ├── features/canvas/     # Canvas editor feature module (refactored from CanvasPage.tsx)
 │   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus, modals)
 │   │   ├── constants/       # Canvas constants, presets, image usage configs
+│   │   ├── contexts/        # React contexts (HistoryContext)
 │   │   ├── hooks/           # Canvas-specific hooks (useToast)
 │   │   ├── nodes/           # Node type components (ImageNode/, VideoNode, TextNode, etc.)
 │   │   ├── sunSky/          # SunSky lighting analysis subsystem (types, utils, UI components)
@@ -147,15 +148,15 @@ app/
 └── index.html               # App entry HTML (title: "Visioner")
 ```
 
-**Source file counts (actual):**
+**Source file counts (verified):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 76 files (components, nodes, sunSky, types, constants, utils, hooks, services)
-- `src/` total: 158 TypeScript / TSX source files; 157 total files under `src/`
+- `src/features/canvas/`: 76 files (components, nodes, sunSky, types, constants, utils, hooks, services, contexts)
+- `src/` total: 158 TypeScript / TSX source files; 161 total files under `src/`
 
-**Key file sizes (approximate):**
+**Key file sizes (verified line counts):**
 - `CanvasPage.tsx`: ~1,550 lines (page entry + core state container)
-- `ImageNode.tsx`: ~1,747 lines
-- `ImageNodeControlPanel.tsx`: ~1,538 lines
+- `ImageNode.tsx`: ~1,843 lines
+- `ImageNodeControlPanel.tsx`: ~1,555 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
 - `PresetPickerModal.tsx`: ~633 lines
 - `presets.ts`: ~1,302 lines
@@ -257,7 +258,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
 - `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
 - `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
-- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `LightPreviewPanel.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `LightPreviewPanel.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`, `HistoryPanel.tsx`
 
 **Node components (`src/features/canvas/nodes/`):**
 - `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
@@ -280,11 +281,12 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`
+- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`, `history.types.ts`
 - `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
 - `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`, `nodeNaming.ts`, `referenceLimits.ts`, `contentSafety.ts`
 - `hooks/` — `useToast.ts`
 - `services/` — `identifyElement.ts`
+- `contexts/` — `HistoryContext.tsx`
 
 **Canvas architecture rules (from `CANVAS_RULES.md` at repo root):**
 - Do **not** put new node UI, new panel UI, new toolbar UI, or new business logic back into `CanvasPage.tsx`.
@@ -371,6 +373,12 @@ If you add tests, the conventional location would be alongside source files (e.g
 - No API keys or secrets are present in the source code.
 - `zod` is available for runtime schema validation if backend APIs are introduced later.
 - All images are loaded from the local `public/images/` directory or external avatar URLs (`dicebear.com`).
+
+---
+
+## Deployment & CI/CD
+
+There are **no deployment configurations** (Docker, Kubernetes, GitHub Actions, etc.) in this repository. The project is a static Vite SPA. The production build emits to `app/dist/`, which can be served by any static file server.
 
 ---
 

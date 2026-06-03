@@ -16,6 +16,10 @@ export interface ImageNodeData {
   currentImage?: string;
   currentResultId?: string | null;
   currentResultSet?: CurrentResultSet | null;
+  isHistoryAsset?: boolean;
+  isGeneratedResult?: boolean;
+  generationStatus?: 'completed' | string;
+  currentResultSource?: 'history' | string;
   generatedImages?: GenerationHistoryItem[] | string[];
   generationTask?: GenerationTask | null;
   prompt?: string;

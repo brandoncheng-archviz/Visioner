@@ -127,6 +127,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const resultImageCount = currentResultSet?.images.length ?? 0;
   const isMultiResultSet = resultImageCount > 1;
   const isResultResource = Boolean(currentResultSet && resultImageCount > 0 && generationTask?.status !== 'running');
+  const isHistoryAsset = Boolean(data.isHistoryAsset);
   const isMultiResultExpanded = Boolean(isMultiResultSet && currentResultSet?.isExpanded);
 
   // Cleanup: abort running generation on unmount
@@ -1784,7 +1785,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       </div>
 
       {/* Control panel — below the preview area */}
-      {isOnlySelected && !isMultiResultExpanded && (!displayImage || generatedImages.length > 0 || isGenerating || isResultResource) && (
+      {isOnlySelected && !isHistoryAsset && !isMultiResultExpanded && (!displayImage || generatedImages.length > 0 || isGenerating || isResultResource) && (
         <>
           <div
             className="absolute z-30"

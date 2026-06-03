@@ -14,13 +14,14 @@ import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
-import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, DEFAULT_MODEL_PARAMS, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd } from '../features/canvas/utils/referenceLimits';
 import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
 import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
+import type { GenerationHistoryItem, GenerationTask } from '../features/canvas/types/generation.types';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
@@ -99,6 +100,92 @@ function getImageRejectMessage(rejectedFiles: ImageFileReject[], successCount: n
   }
 
   return '没有可添加的图片。请检查图片格式或文件大小。';
+}
+
+function getHistoryBatchForImage(image: GeneratedImage, batches: ResultSetBatch[]): ResultSetBatch | undefined {
+  return batches.find((batch) =>
+    batch.images.some((batchImage) => batchImage.resultId === image.resultId || batchImage.imageUrl === image.imageUrl),
+  );
+}
+
+function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: ResultSetBatch) {
+  const batchId = batch?.batchId || `history-result-${image.resultId}`;
+  const createdAt = batch?.createdAt || Date.now();
+  const prompt = batch?.prompt || '';
+  const userPrompt = batch?.userPrompt || '';
+  const inputRefs = batch?.inputRefs || [];
+  const modelParams = batch?.modelParams || { ...DEFAULT_MODEL_PARAMS };
+  const result = {
+    taskId: image.resultId,
+    imageUrl: image.imageUrl,
+    width: image.width,
+    height: image.height,
+    seed: image.seed,
+    metadata: {
+      prompt,
+      model: modelParams.model,
+      resolution: modelParams.resolution,
+    },
+  };
+  const historyItem: GenerationHistoryItem = {
+    resultId: image.resultId,
+    batchId,
+    batchIndex: 1,
+    imageUrl: image.imageUrl,
+    prompt,
+    userPrompt,
+    inputRefs,
+    presetIds: batch?.presetIds || [],
+    styleId: batch?.styleId ?? null,
+    modelParams,
+    seed: image.seed,
+    width: image.width,
+    height: image.height,
+    createdAt,
+    kind: batch?.mode || 'final',
+  };
+  const generationTask: GenerationTask = {
+    taskId: batchId,
+    sourceNodeId: batch?.nodeId || '',
+    status: 'success',
+    progress: 100,
+    prompt,
+    inputRefs,
+    result,
+    errorMessage: null,
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  return {
+    image: image.imageUrl,
+    currentImage: image.imageUrl,
+    currentResultId: image.resultId,
+    currentResultSet: {
+      batchId,
+      mode: batch?.mode || 'final',
+      images: [image],
+      selectedIndex: 0,
+      isExpanded: false,
+    },
+    generatedImages: [historyItem],
+    generationTask,
+    prompt,
+    promptContent: [],
+    selectedPresets: batch?.presetIds || [],
+    selectedStyleId: batch?.styleId ?? null,
+    finalPrompt: prompt,
+    userPrompt,
+    references: [],
+    imageReferences: inputRefs,
+    referenceImages: inputRefs,
+    modelParams,
+    currentResultSource: 'history',
+    isGeneratedResult: true,
+    generationStatus: 'completed',
+    width: image.width,
+    height: image.height,
+  };
 }
 
 /* ─── Flow Inner ─── */
@@ -1332,11 +1419,11 @@ function FlowCanvas() {
     setViewport({ x: current.x, y: current.y, zoom: nextZoom }, { duration: 0 });
   }, [getViewport, setViewport]);
 
-  const handleUseHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch) => {
+  const handleUseNodeHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch) => {
     if (!historyPanelNodeId || images.length === 0) return;
 
     const selectedImage = images[0];
-    const batchId = sourceBatch?.batchId || `history-use-${Date.now()}`;
+    const generatedNodeData = createGeneratedNodeDataFromHistoryImage(selectedImage, sourceBatch);
     setNodes((nds) =>
       nds.map((node) =>
         node.id === historyPanelNodeId
@@ -1344,24 +1431,60 @@ function FlowCanvas() {
               ...node,
               data: {
                 ...node.data,
-                currentResultSet: {
-                  batchId,
-                  mode: sourceBatch?.mode || 'final',
-                  images,
-                  selectedIndex: 0,
-                  isExpanded: false,
-                },
-                image: selectedImage.imageUrl,
-                currentImage: selectedImage.imageUrl,
-                currentResultId: selectedImage.resultId,
-                width: selectedImage.width,
-                height: selectedImage.height,
+                ...generatedNodeData,
               },
             }
           : node,
       ),
     );
   }, [historyPanelNodeId, setNodes]);
+
+  const handleUseGlobalHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch, sourceBatches?: ResultSetBatch[]) => {
+    if (images.length === 0) return;
+
+    const viewportCenter = screenToFlowPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+    const currentZoom = getViewport().zoom || 1;
+    const spacingX = 260 / currentZoom;
+    const spacingY = 240 / currentZoom;
+    const columns = Math.ceil(Math.sqrt(images.length));
+    const rows = Math.ceil(images.length / columns);
+    const existingLabels = getAllNodeLabels();
+    const nextLabels: string[] = [];
+    const timestamp = Date.now();
+
+    const newNodes: Node[] = images.map((image, index) => {
+      const col = index % columns;
+      const row = Math.floor(index / columns);
+      const label = getNextNodeTitle([...existingLabels, ...nextLabels], NODE_BASE_TITLES.image);
+      nextLabels.push(label);
+
+      return {
+        id: `image-history-${timestamp}-${index}`,
+        type: 'image',
+        position: {
+          x: viewportCenter.x + (col - (columns - 1) / 2) * spacingX,
+          y: viewportCenter.y + (row - (rows - 1) / 2) * spacingY,
+        },
+        data: {
+          label,
+          ...createGeneratedNodeDataFromHistoryImage(
+            image,
+            getHistoryBatchForImage(image, sourceBatches || (sourceBatch ? [sourceBatch] : [])) || sourceBatch,
+          ),
+          ...getRoleData(null),
+        },
+        selected: index === images.length - 1,
+      };
+    });
+
+    setNodes((nds) => [
+      ...nds.map((node) => ({ ...node, selected: false })),
+      ...newNodes,
+    ]);
+  }, [getAllNodeLabels, getViewport, screenToFlowPosition, setNodes]);
 
   return (
     <div className="h-screen relative" style={{ background: '#000' }}>
@@ -1456,6 +1579,7 @@ function FlowCanvas() {
         activePanel={activePanel}
         onSetActivePanel={setActivePanel}
         onAddNode={addNode}
+        onUseHistoryImages={handleUseGlobalHistoryImages}
       />
 
       {/* Node history floating panel */}
@@ -1475,7 +1599,7 @@ function FlowCanvas() {
             scope="node"
             nodeId={historyPanelNodeId}
             onClose={() => setHistoryPanelNodeId(null)}
-            onUseImages={handleUseHistoryImages}
+            onUseImages={handleUseNodeHistoryImages}
           />
         </div>
       )}

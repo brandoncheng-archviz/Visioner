@@ -438,14 +438,6 @@ export function ImageNodeControlPanel({
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const selectedStyle = getStylePresetById(selectedStyleId);
-  const selectedPresetItems = useMemo(
-    () =>
-      selectedPresets
-        .map((presetId) => getPresetById(presetId))
-        .filter((preset): preset is PresetItem => Boolean(preset)),
-    [selectedPresets],
-  );
-  const selectedPresetCount = selectedPresetItems.length;
   const hasTooManyReferences = orderedRefs.length > MAX_REFERENCE_IMAGES_PER_NODE;
   const hasManyReferences = orderedRefs.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
 
@@ -456,10 +448,6 @@ export function ImageNodeControlPanel({
     t(`preset.${preset.id}.shortDescription`, {
       defaultValue: preset.shortDescription || preset.description || '',
     });
-
-  const removeSelectedPreset = useCallback((presetId: string) => {
-    onPresetsChange(selectedPresets.filter((id) => id !== presetId));
-  }, [onPresetsChange, selectedPresets]);
 
   const slashFilteredPresets = useMemo(() => {
     const query = slashQuery.trim().toLowerCase();
@@ -984,11 +972,7 @@ export function ImageNodeControlPanel({
           <div className="relative">
             <button
               onClick={() => { setShowPresetModal(true); setShowLightPreview(false); setShowStylePicker(false); }}
-              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
-                selectedPresetCount > 0
-                  ? GENERATION_CONTROL_BUTTON_SELECTED_CLASS
-                  : GENERATION_CONTROL_BUTTON_CLASS
-              }`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${GENERATION_CONTROL_BUTTON_CLASS}`}
               style={{
                 width: 54,
                 height: 50,
@@ -1139,41 +1123,6 @@ export function ImageNodeControlPanel({
             {hasTooManyReferences
               ? '当前引用图数量超过上限，建议删除部分引用图。'
               : '参考图较多，可能影响生成稳定性'}
-          </div>
-        </div>
-      )}
-
-      {selectedPresetItems.length > 0 && (
-        <div className="px-3.5 pb-1">
-          <div
-            className="nodrag nowheel flex min-w-0 flex-wrap items-start gap-2 overflow-x-hidden overflow-y-auto overscroll-contain rounded-lg px-2 py-1.5"
-            style={{ maxHeight: 88, background: 'rgba(180,184,194,0.035)', border: '1px solid rgba(180,184,194,0.14)' }}
-            onPointerDown={(event) => event.stopPropagation()}
-            onPointerMove={(event) => event.stopPropagation()}
-            onWheel={(event) => event.stopPropagation()}
-            onWheelCapture={(event) => event.stopPropagation()}
-          >
-            <span className="shrink-0 text-[12px]" style={{ color: 'rgba(255,255,255,0.42)' }}>已选预设：</span>
-            {selectedPresetItems.map((preset) => (
-              <span
-                key={preset.id}
-                className="inline-flex h-6 max-w-[180px] shrink-0 items-center gap-1.5 rounded-full border border-[rgba(180,184,194,0.24)] bg-[rgba(180,184,194,0.06)] px-2 text-[12px] text-[rgba(226,229,236,0.76)] transition-colors hover:border-[rgba(180,184,194,0.48)] hover:bg-[rgba(180,184,194,0.10)] hover:text-[rgba(226,229,236,0.92)]"
-              >
-                <span className="min-w-0 truncate">{preset.title || preset.name}</span>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    removeSelectedPreset(preset.id);
-                  }}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  className="flex h-4 w-4 items-center justify-center rounded-full text-white/[0.45] transition-colors hover:bg-white/10 hover:text-white/[0.70]"
-                  title={`移除${preset.title || preset.name}`}
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-              </span>
-            ))}
           </div>
         </div>
       )}

@@ -8,7 +8,7 @@ interface HistoryPanelProps {
   scope: 'global' | 'node';
   nodeId?: string;
   onClose?: () => void;
-  onUseImages?: (images: GeneratedImage[], sourceBatch?: ResultSetBatch) => void;
+  onUseImages?: (images: GeneratedImage[], sourceBatch?: ResultSetBatch, sourceBatches?: ResultSetBatch[]) => void;
 }
 
 function formatDateLabel(timestamp: number): string {
@@ -88,7 +88,7 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
       return;
     }
     if (onUseImages) {
-      onUseImages(allImages);
+      onUseImages(allImages, undefined, selectedBatches);
     } else {
       showToast('已选择历史结果，请在图片节点中使用');
     }
@@ -203,13 +203,22 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
 
       {/* Batch action bar */}
       {batchMode && (
-        <div className="flex items-center justify-between px-4 py-2.5 border-t" style={{ borderColor: '#2a2a35', background: '#1e1e28' }}>
-          <span className="text-xs text-[#a0a0b0]">已选 {selectedImageCount} 张</span>
+        <div className="flex items-center justify-between px-4 py-2.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(24,24,28,0.96)' }}>
+          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.62)' }}>已选 {selectedImageCount} 张</span>
           <div className="flex items-center gap-2">
             <button
               onClick={handleBatchDelete}
               disabled={selectedCount === 0}
-              className="px-2.5 py-1 rounded text-[11px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[#fca5a5] hover:bg-[rgba(239,68,68,0.12)]"
+              className="rounded-md px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ color: 'rgba(248,113,113,0.72)' }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.color = 'rgba(248,113,113,0.95)';
+                event.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.color = 'rgba(248,113,113,0.72)';
+                event.currentTarget.style.background = 'transparent';
+              }}
             >
               删除
             </button>
@@ -221,20 +230,47 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
                 });
               }}
               disabled={selectedCount === 0}
-              className="px-2.5 py-1 rounded text-[11px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[#a0a0b0] hover:bg-white/5"
+              className="rounded-md px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ color: 'rgba(255,255,255,0.62)' }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.color = 'rgba(255,255,255,0.9)';
+                event.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.color = 'rgba(255,255,255,0.62)';
+                event.currentTarget.style.background = 'transparent';
+              }}
             >
               下载
             </button>
             <button
               onClick={handleBatchUse}
               disabled={!canUse}
-              className="px-2.5 py-1 rounded text-[11px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[#00d4ff] hover:bg-[rgba(0,212,255,0.08)]"
+              className="rounded-md px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              style={{ color: 'rgba(34,211,238,0.9)' }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.color = 'rgba(165,243,252,0.95)';
+                event.currentTarget.style.background = 'rgba(34,211,238,0.10)';
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.color = 'rgba(34,211,238,0.9)';
+                event.currentTarget.style.background = 'transparent';
+              }}
             >
               使用
             </button>
             <button
               onClick={() => { setSelectedIds(new Set()); }}
-              className="px-2.5 py-1 rounded text-[11px] text-[#6a6a7a] hover:text-white hover:bg-white/5 transition-colors"
+              className="rounded-md px-2.5 py-1 text-[11px] transition-colors"
+              style={{ color: 'rgba(255,255,255,0.45)' }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.color = 'rgba(255,255,255,0.86)';
+                event.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.color = 'rgba(255,255,255,0.45)';
+                event.currentTarget.style.background = 'transparent';
+              }}
             >
               取消选择
             </button>

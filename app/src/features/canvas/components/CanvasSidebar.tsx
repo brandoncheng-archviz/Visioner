@@ -11,15 +11,33 @@ import {
 } from 'lucide-react';
 import { HistoryPanel } from './HistoryPanel';
 import { useTranslation } from 'react-i18next';
+import { useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { GeneratedImage, ResultSetBatch } from '../types/history.types';
 
 export interface CanvasSidebarProps {
   activePanel: string | null;
   onSetActivePanel: (panel: string | null) => void;
   onAddNode: (type: string) => void;
+  onUseHistoryImages?: (images: GeneratedImage[], sourceBatch?: ResultSetBatch) => void;
 }
 
-export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: CanvasSidebarProps) {
+export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseHistoryImages }: CanvasSidebarProps) {
   const { t } = useTranslation();
+  const isHistoryOpen = activePanel === 'history';
+
+  useEffect(() => {
+    if (!isHistoryOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onSetActivePanel(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isHistoryOpen, onSetActivePanel]);
 
   const sidebarTools = [
     { id: 'add', icon: Plus, label: t('sidebar.addNode') },
@@ -57,15 +75,13 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
           <div className="w-6 h-px bg-[#2a2a35]/50" />
 
           {sidebarTools.slice(1).map((tool) => (
-            <button
+            <SidebarToolButton
               key={tool.id}
+              active={activePanel === tool.id}
+              label={tool.label}
               onClick={() => onSetActivePanel(activePanel === tool.id ? null : tool.id)}
-              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
-              style={{ color: activePanel === tool.id ? '#00d4ff' : '#6a6a7a' }}
-              title={tool.label}
-            >
-              <tool.icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
-            </button>
+              icon={<tool.icon className="w-[18px] h-[18px]" strokeWidth={1.75} />}
+            />
           ))}
 
           <div className="w-6 h-px bg-[#2a2a35]/50" />
@@ -83,33 +99,63 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
       </div>
 
       {/* Side Panel */}
-      {activePanel && (
+      {isHistoryOpen && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center p-6"
+          style={{
+            background: 'rgba(0,0,0,0.58)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
+          onClick={() => onSetActivePanel(null)}
+          onWheel={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div
+            className="overflow-hidden rounded-[18px]"
+            style={{
+              width: 'min(88vw, 1120px)',
+              height: 'min(84vh, 760px)',
+              background: '#222222',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 20px 80px rgba(0,0,0,0.45)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <HistoryPanel scope="global" onClose={() => onSetActivePanel(null)} onUseImages={onUseHistoryImages} />
+          </div>
+        </div>
+      )}
+
+      {activePanel && activePanel !== 'history' && (
         <div
           className="fixed z-10 overflow-y-auto nowheel"
           style={{
             left: 72,
             top: 56,
             bottom: 0,
-            width: activePanel === 'history' ? 720 : 280,
+            width: 280,
             background: '#252526',
             borderRight: '1px solid #2a2a35',
           }}
           onWheel={(e) => e.stopPropagation()}
         >
-          {activePanel !== 'history' && (
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a35]">
-              <span className="text-sm font-medium text-white">
-                {sidebarTools.find((toolItem) => toolItem.id === activePanel)?.label}
-              </span>
-              <button
-                onClick={() => onSetActivePanel(null)}
-                className="w-6 h-6 rounded flex items-center justify-center text-[#e0e0e0] hover:text-white hover:bg-[#1e1e28] transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-          <div className={activePanel === 'history' ? 'h-full' : 'p-4'}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a35]">
+            <span className="text-sm font-medium text-white">
+              {sidebarTools.find((toolItem) => toolItem.id === activePanel)?.label}
+            </span>
+            <button
+              onClick={() => onSetActivePanel(null)}
+              className="w-6 h-6 rounded flex items-center justify-center text-[#e0e0e0] hover:text-white hover:bg-[#1e1e28] transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-4">
             {activePanel === 'add' && (
               <div className="space-y-2">
                 <p className="text-xs text-[#6a6a7a] mb-2">{t('sidebar.addNode')}</p>
@@ -151,11 +197,6 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
                 </div>
               </div>
             )}
-            {activePanel === 'history' && (
-              <div className="h-full">
-                <HistoryPanel scope="global" onClose={() => onSetActivePanel(null)} />
-              </div>
-            )}
             {activePanel === 'support' && (
               <div className="text-center py-8">
                 <Headphones className="w-10 h-10 text-[#3a3a4a] mx-auto mb-3" />
@@ -167,5 +208,42 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode }: Canv
         </div>
       )}
     </>
+  );
+}
+
+function SidebarToolButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="group w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+      style={{
+        color: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.68)',
+        background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+        border: active ? '1px solid rgba(255,255,255,0.14)' : '1px solid transparent',
+      }}
+      title={label}
+      onMouseEnter={(event) => {
+        if (active) return;
+        event.currentTarget.style.color = 'rgba(255,255,255,0.9)';
+        event.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+      }}
+      onMouseLeave={(event) => {
+        if (active) return;
+        event.currentTarget.style.color = 'rgba(255,255,255,0.68)';
+        event.currentTarget.style.background = 'transparent';
+      }}
+    >
+      {icon}
+    </button>
   );
 }
