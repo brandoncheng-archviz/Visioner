@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Image, Plus, Upload, Zap } from 'lucide-react';
+import { Check, Download, Image, Maximize2, Minimize2, Plus, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
@@ -87,8 +87,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
 
   /* ─── Current Result Set ─── */
-  const { addBatch, getBatchesByNodeId } = useHistory();
-  const nodeHistoryCount = getBatchesByNodeId(id).length;
+  const { addBatch } = useHistory();
   const parseCount = useCallback((count: string): number => {
     if (count === '1张') return 1;
     if (count === '2张') return 2;
@@ -125,6 +124,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const displayImage = currentResultSet
     ? selectedResultImage?.imageUrl
     : previewImage || currentImage;
+  const resultImageCount = currentResultSet?.images.length ?? 0;
+  const isMultiResultSet = resultImageCount > 1;
+  const isResultResource = Boolean(currentResultSet && resultImageCount > 0 && generationTask?.status !== 'running');
+  const isMultiResultExpanded = Boolean(isMultiResultSet && currentResultSet?.isExpanded);
 
   // Cleanup: abort running generation on unmount
   useEffect(() => {
@@ -337,6 +340,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       if (!prev || !prev.images[index]) return prev;
       return { ...prev, selectedIndex: index };
     });
+  }, []);
+
+  const setResultExpanded = useCallback((isExpanded: boolean) => {
+    setCurrentResultSet((prev) => (prev && prev.images.length > 1 ? { ...prev, isExpanded } : prev));
   }, []);
 
   const downloadResultImage = useCallback((image: GeneratedImage) => {
@@ -1203,6 +1210,37 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     sourceWidth,
     sourceHeight,
   });
+  const resultGridGap = 10;
+  const imageAspectRatio = sourceHeight / sourceWidth;
+  const displayCardWidth = isMultiResultExpanded ? Math.round(cardWidth * 1.92) : cardWidth;
+  const displayCardHeight = displayImage
+    ? isMultiResultExpanded
+      ? Math.round(
+          currentResultSet?.images.length === 2
+            ? ((displayCardWidth - resultGridGap) / 2) * imageAspectRatio
+            : ((displayCardWidth - resultGridGap) / 2) * imageAspectRatio * 2 + resultGridGap,
+        )
+      : Math.round(sourceHeight * imageDisplayScale)
+    : cardHeight;
+  const resultMainCardWidth = isMultiResultExpanded ? (displayCardWidth - resultGridGap) / 2 : displayCardWidth;
+  const resultMainCardHeight = isMultiResultExpanded
+    ? currentResultSet?.images.length === 2
+      ? displayCardHeight
+      : (displayCardHeight - resultGridGap) / 2
+    : displayCardHeight;
+  const resultHandleRight = isMultiResultExpanded ? displayCardWidth - resultMainCardWidth : 0;
+  const resultHandleTop = isMultiResultExpanded ? resultMainCardHeight / 2 : '50%';
+  const expandedResultSlots = useMemo(() => {
+    if (!currentResultSet?.images.length) return [];
+    const slots = currentResultSet.images.map((image, originalIndex) => ({ image, originalIndex }));
+    const primaryIndex = currentResultSet.selectedIndex;
+    if (primaryIndex > 0 && slots[primaryIndex]) {
+      const previousPrimary = slots[0];
+      slots[0] = slots[primaryIndex];
+      slots[primaryIndex] = previousPrimary;
+    }
+    return slots;
+  }, [currentResultSet]);
   const showTitleMeta = zoom >= 0.35;
   const roleOption = getImageRoleOption(role, customRoleLabel);
   const RoleIconForTitle = roleOption?.Icon;
@@ -1270,22 +1308,22 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       if (e.isComposing) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
         e.preventDefault();
-        if (isOnlySelected && canGenerate) {
+        if (!isResultResource && isOnlySelected && canGenerate) {
           handleGenerate();
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isOnlySelected, canGenerate, handleGenerate]);
+  }, [isResultResource, isOnlySelected, canGenerate, handleGenerate]);
 
   return (
-    <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
+    <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: displayCardWidth, cursor: 'default' }}>
       {pointPickModePortal}
       {pointPickResultPortal}
       {/* Toolbar — shown above title only when this node has a real image/result */}
-      {displayImage && isOnlySelected && (
-        <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: cardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
+      {displayImage && isOnlySelected && !isMultiResultExpanded && (
+        <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: displayCardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
             onUpscale={handleUpscale}
             onRelight={handleRelight}
@@ -1303,12 +1341,19 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         onPointerDownCapture={stopTitleInteraction}
         onMouseDownCapture={stopTitleInteraction}
         onClick={stopTitleInteraction}
-        style={{ top: -20 / zoom, left: 0, width: cardWidth * zoom, transform: `scale(${inverseScale})`, transformOrigin: 'top left' }}
+        style={{
+          top: -20 / zoom,
+          left: 0,
+          width: displayCardWidth * zoom,
+          transform: `scale(${inverseScale})`,
+          transformOrigin: 'top left',
+          display: isMultiResultExpanded ? 'none' : undefined,
+        }}
       >
         <div className="flex items-center justify-between overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
           <div className="flex flex-1 items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
             <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
-            {displayImage && (
+            {displayImage && !isResultResource && (
               <span
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1355,28 +1400,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               {imgSize ? `${imgSize.width}×${imgSize.height}` : `${getNodeWidth(data) || 1024}×${getNodeHeight(data) || 1024}`}
             </span>
           )}
-          {/* Node history entry */}
-          {nodeHistoryCount > 0 && isOnlySelected && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const onOpen = data.onOpenNodeHistory as ((nodeId: string) => void) | undefined;
-                if (onOpen) onOpen(id);
-              }}
-              className="flex-shrink-0 ml-2 rounded px-1.5 py-0.5 text-[10px] transition-colors hover:bg-white/10"
-              style={{ color: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              历史 {nodeHistoryCount}
-            </button>
-          )}
         </div>
       </div>
 
       {/* Image card wrapper — relative for handles/upload positioning */}
-      <div className="relative" style={{ width: cardWidth }}>
+      <div className="relative" style={{ width: displayCardWidth }}>
         {/* Upload icon — inside card top-right, hidden when node has input connection */}
-        {isOnlySelected && !hasInputConnection && (
+        {isOnlySelected && !hasInputConnection && !isResultResource && (
           <>
             <button
               onClick={() => fileRef.current?.click()}
@@ -1396,22 +1426,148 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </>
         )}
 
-        {displayImage && (isOnlySelected || roleMenuOpen) && (
+        {displayImage && !isResultResource && (isOnlySelected || roleMenuOpen) && (
           <ImageRoleTag role={role} customRoleLabel={customRoleLabel} localReferenceType={localReferenceType} localReferenceLabel={localReferenceLabel} onChange={handleRoleChange} onStartPointPick={() => setIsPointPickMode(true)} openManualInputSignal={manualInputSignal} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
-          className="node-preview-card w-full rounded-xl flex items-center justify-center transition-all overflow-hidden relative"
+          className={`node-preview-card w-full rounded-xl flex items-center justify-center transition-all relative ${isMultiResultSet && !isMultiResultExpanded ? 'overflow-visible' : 'overflow-hidden'}`}
           style={{
-            width: cardWidth,
-            height: displayImage ? Math.round(sourceHeight * imageDisplayScale) : cardHeight,
-            background: '#252526',
-            border: `1px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.06)'}`,
-            boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+            width: displayCardWidth,
+            height: displayCardHeight,
+            background: isMultiResultExpanded ? 'transparent' : '#252526',
+            border: isMultiResultExpanded ? 'none' : `1px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.06)'}`,
+            boxShadow: isMultiResultExpanded ? 'none' : selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
           }}
         >
-          {displayImage && currentResultSet && currentResultSet.images.length > 1 && !currentResultSet.isExpanded ? (
+          {displayImage && currentResultSet && isMultiResultSet ? (
+            currentResultSet.isExpanded ? (
+              <div className="relative h-full w-full">
+                <div
+                  className="grid h-full w-full"
+                  style={{
+                    gap: resultGridGap,
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                    gridTemplateRows: currentResultSet.images.length === 2 ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                  }}
+                >
+                  {expandedResultSlots.map(({ image: img, originalIndex }, slotIndex) => {
+                    const isPrimary = slotIndex === 0;
+                    return (
+                      <div
+                        key={img.resultId}
+                        className="group/result relative min-h-0 min-w-0 overflow-hidden rounded-xl"
+                        style={{
+                          border: isPrimary ? '1.5px solid rgba(0,212,255,0.55)' : '1px solid rgba(255,255,255,0.10)',
+                          background: '#101014',
+                          boxShadow: '0 12px 24px rgba(0,0,0,0.24)',
+                        }}
+                      >
+                        <img src={img.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                        {isPrimary && (
+                          <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'rgba(0,212,255,0.82)', color: '#061216' }}>
+                            <Check className="h-3.5 w-3.5" />
+                          </div>
+                        )}
+                        <div className="absolute right-2 top-2 flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              downloadResultImage(img);
+                            }}
+                            className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors hover:bg-white/20"
+                            style={{ background: 'rgba(22,12,9,0.62)', color: 'rgba(255,255,255,0.9)', border: '1px solid rgba(255,255,255,0.14)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                            title="下载"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            下载
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (isPrimary) {
+                                setResultExpanded(false);
+                                return;
+                              }
+                              selectResultImage(originalIndex);
+                            }}
+                            className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors hover:bg-white/20"
+                            style={{
+                              background: isPrimary ? 'rgba(0,212,255,0.72)' : 'rgba(22,12,9,0.62)',
+                              color: isPrimary ? '#061216' : 'rgba(255,255,255,0.9)',
+                              border: isPrimary ? '1px solid rgba(191,244,255,0.38)' : '1px solid rgba(255,255,255,0.14)',
+                              backdropFilter: 'blur(8px)',
+                              WebkitBackdropFilter: 'blur(8px)',
+                            }}
+                            title={isPrimary ? '收起' : '设为主图'}
+                          >
+                            {isPrimary ? <Minimize2 className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+                            {isPrimary ? '收起' : '设为主图'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="relative block h-full w-full overflow-visible rounded-xl text-left">
+                {currentResultSet.images
+                  .filter((_, imageIndex) => imageIndex !== currentResultSet.selectedIndex)
+                  .slice(0, Math.min(3, currentResultSet.images.length - 1))
+                  .map((img, idx) => (
+                    <div
+                      key={img.resultId}
+                      className="absolute overflow-hidden rounded-xl"
+                      style={{
+                        inset: 0,
+                        transform: `translate(${10 + idx * 10}px, ${3 + idx * 4}px) scale(${0.97 - idx * 0.035})`,
+                        transformOrigin: 'right center',
+                        zIndex: 3 - idx,
+                        opacity: 1,
+                        background: '#17171d',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        boxShadow: '0 12px 24px rgba(0,0,0,0.38)',
+                        filter: `brightness(${0.62 - idx * 0.12})`,
+                      }}
+                    >
+                      <img src={img.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                    </div>
+                  ))}
+                <div
+                  className="absolute inset-0 z-10 overflow-hidden rounded-xl"
+                  style={{
+                    border: '1px solid rgba(255,255,255,0.16)',
+                    boxShadow: '0 18px 42px rgba(0,0,0,0.34)',
+                    background: '#101014',
+                  }}
+                >
+                  <img ref={imgRef} src={displayImage} alt="" className="h-full w-full object-cover" draggable={false} />
+                </div>
+                <button
+                  type="button"
+                  className="absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[15px] font-semibold transition-colors hover:bg-black/80"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setResultExpanded(true);
+                  }}
+                  style={{
+                    background: 'rgba(15,12,10,0.68)',
+                    color: 'rgba(255,255,255,0.92)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                  }}
+                >
+                  <Maximize2 className="h-4 w-4" />
+                  {currentResultSet.images.length}张
+                </button>
+              </div>
+            )
+          ) : displayImage && currentResultSet && currentResultSet.images.length > 1 && !currentResultSet.isExpanded ? (
             <div className="relative w-full h-full">
               {currentResultSet.images
                 .filter((_, imageIndex) => imageIndex !== currentResultSet.selectedIndex)
@@ -1558,66 +1714,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           )}
         </div>
 
-        {/* Current result set thumbnails */}
-        {displayImage && currentResultSet && currentResultSet.images.length > 0 && isOnlySelected && (
-          <div
-            className="absolute z-20 flex items-center gap-1.5 nodrag nowheel"
-            style={{
-              bottom: 8,
-              left: '50%',
-              transform: `translateX(-50%)`,
-              padding: '4px 6px',
-              background: 'rgba(10,10,15,0.72)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.08)',
-              maxWidth: cardWidth - 16,
-              overflowX: 'auto',
-            }}
-          >
-            <div
-              className="flex h-8 shrink-0 items-center gap-1.5 rounded-md px-1.5"
-              style={{
-                background: 'rgba(255,255,255,0.055)',
-                border: '1px solid rgba(255,255,255,0.10)',
-                color: 'rgba(255,255,255,0.66)',
-              }}
-              title={selectedStyle ? selectedStyle.title : '未选择风格'}
-            >
-              {selectedStyle ? (
-                <img src={selectedStyle.coverImage} alt="" className="h-5 w-5 rounded object-cover" draggable={false} />
-              ) : (
-                <span className="h-5 w-5 rounded bg-white/[0.06]" />
-              )}
-              <span className="max-w-[52px] truncate text-[10px]">{selectedStyle?.title || '风格'}</span>
-            </div>
-            {currentResultSet.images.map((img, idx) => (
-              <button
-                key={img.resultId}
-                type="button"
-                onClick={() => selectResultImage(idx)}
-                className="flex-shrink-0 relative rounded overflow-hidden transition-all"
-                style={{
-                  width: 32,
-                  height: 32,
-                  border: currentResultSet.selectedIndex === idx ? '2px solid #00d4ff' : '1px solid rgba(255,255,255,0.14)',
-                  boxShadow: currentResultSet.selectedIndex === idx ? '0 0 0 1px rgba(0,212,255,0.26), 0 0 12px rgba(0,212,255,0.22)' : 'none',
-                  opacity: currentResultSet.selectedIndex === idx ? 1 : 0.72,
-                }}
-                title={`${idx + 1}`}
-              >
-                <img src={img.imageUrl} alt="" className="w-full h-full object-cover" />
-                {currentResultSet.mode === 'preview' && idx === 0 && (
-                  <div className="absolute bottom-0 right-0 flex items-center justify-center rounded-tl-sm" style={{ background: 'rgba(0,0,0,0.58)', width: 10, height: 10 }}>
-                    <Zap className="w-[7px] h-[7px]" style={{ color: '#fbbf24' }} />
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Left visual handle — Input (hidden when image exists) */}
         {!displayImage && (
           <div
@@ -1663,8 +1759,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           }}
           style={{
             position: 'absolute',
-            right: 0,
-            top: '50%',
+            right: resultHandleRight,
+            top: resultHandleTop,
             transform: 'translate(50%, -50%)',
             width: 28,
             height: 28,
@@ -1683,19 +1779,18 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         </div>
 
         {/* React Flow handles — positioned to overlap visual handles exactly */}
-        <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%' }} />
-        <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%' }} />
+        <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop }} />
+        <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop }} />
       </div>
 
       {/* Control panel — below the preview area */}
-      {/* 空节点或有生成历史的节点才显示控制面板；纯上传/拖入的素材节点隐藏；多选时也不显示 */}
-      {isOnlySelected && (!displayImage || generatedImages.length > 0) && (
+      {isOnlySelected && !isMultiResultExpanded && (!displayImage || generatedImages.length > 0 || isGenerating || isResultResource) && (
         <>
           <div
             className="absolute z-30"
             style={{
-              top: cardHeight + 12 / zoom,
-              left: cardWidth / 2,
+              top: displayCardHeight + 12 / zoom,
+              left: displayCardWidth / 2,
               width: IMAGE_NODE_CONTROL_WIDTH,
               transform: `translateX(-50%) scale(${inverseScale})`,
               transformOrigin: 'top center',
@@ -1716,6 +1811,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
               onPreviewGenerate={handlePreviewGenerate}
+              isResultMode={isResultResource}
               canGenerate={canGenerate}
               isGenerating={isGenerating}
               generationTask={generationTask}

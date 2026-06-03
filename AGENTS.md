@@ -3,14 +3,14 @@
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
 **Repository Layout:**
-- The repository root (`/Users/brandon/Documents/work/Visioner`) contains `.git/`, `package-lock.json`, `CANVAS_RULES.md`, and the `app/` directory.
+- The repository root contains `.git/`, `package-lock.json`, `CANVAS_RULES.md`, and the `app/` directory.
 - **All application source code, configuration, and build assets live inside the `app/` subdirectory.**
 - The `src/` directory at the repository root is effectively empty (contains only `.DS_Store` files) and is not part of the build.
 - **All commands below must be run from `app/` unless noted otherwise.**
 
 **Related Rule Files:**
-- `app/AGENTS.md` — Detailed day-to-day development guide (architecture, modules, file sizes, component inventory).
-- `CANVAS_RULES.md` — Canvas editor architecture constraints and development rules (in Chinese).
+- `app/AGENTS.md` — Detailed day-to-day development guide (architecture, modules, file sizes, component inventory). Kept in sync with this file.
+- `CANVAS_RULES.md` — Canvas editor architecture constraints and development rules (in Chinese). Must be read before modifying any canvas-related code.
 
 ---
 
@@ -51,6 +51,25 @@ Dev dependencies:
 - **tailwindcss-animate + tw-animate-css** — Tailwind animation utilities.
 
 Runtime requirement: **Node.js 20**.
+
+---
+
+## Key Configuration Files
+
+All configuration lives inside `app/`:
+
+| File | Purpose |
+|------|---------|
+| `package.json` | NPM manifest. Scripts: `dev`, `build`, `lint`, `preview`. No test runner configured. |
+| `vite.config.ts` | Vite config: `base: './'`, dev server port `3000`, `@/` → `./src` alias, `kimi-plugin-inspect-react` + `@vitejs/plugin-react`. |
+| `tsconfig.json` | Project references to `tsconfig.app.json` and `tsconfig.node.json`. |
+| `tsconfig.app.json` | Strict TypeScript for browser code: `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `noUncheckedSideEffectImports`. |
+| `tsconfig.node.json` | TypeScript config for Vite config file. |
+| `eslint.config.js` | ESLint flat config (`defineConfig`, `globalIgnores`). Lints `**/*.{ts,tsx}`, ignores `dist/`. Extends recommended JS, TS, react-hooks, and react-refresh rules. |
+| `tailwind.config.js` | Tailwind theme extending shadcn color tokens, border-radius scale, keyframes (accordion, caret-blink). Dark mode via `class`. |
+| `postcss.config.js` | Tailwind CSS + autoprefixer. |
+| `components.json` | shadcn/ui configuration: style `new-york`, baseColor `slate`, CSS variables enabled, icon library `lucide`. |
+| `index.html` | App entry HTML (title: "Visioner"). |
 
 ---
 
@@ -108,7 +127,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,490 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,550 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -130,13 +149,13 @@ app/
 
 **Source file counts (actual):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 74 files (components, nodes, sunSky, types, constants, utils, hooks, services)
-- `src/` total: 152 TypeScript / TSX source files; 157 total files under `src/`
+- `src/features/canvas/`: 76 files (components, nodes, sunSky, types, constants, utils, hooks, services)
+- `src/` total: 158 TypeScript / TSX source files; 157 total files under `src/`
 
 **Key file sizes (approximate):**
-- `CanvasPage.tsx`: ~1,490 lines (page entry + core state container)
-- `ImageNode.tsx`: ~1,443 lines
-- `ImageNodeControlPanel.tsx`: ~1,486 lines
+- `CanvasPage.tsx`: ~1,550 lines (page entry + core state container)
+- `ImageNode.tsx`: ~1,747 lines
+- `ImageNodeControlPanel.tsx`: ~1,538 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
 - `PresetPickerModal.tsx`: ~633 lines
 - `presets.ts`: ~1,302 lines
@@ -218,7 +237,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,490 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,550 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper

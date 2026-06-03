@@ -70,6 +70,7 @@ export function ImageNodeControlPanel({
   onModelParamsChange,
   onGenerate,
   onPreviewGenerate,
+  isResultMode,
   canGenerate,
   isGenerating,
   generationTask,
@@ -96,6 +97,7 @@ export function ImageNodeControlPanel({
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void | Promise<void>;
   onPreviewGenerate?: () => void | Promise<void>;
+  isResultMode?: boolean;
   canGenerate: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
@@ -871,6 +873,10 @@ export function ImageNodeControlPanel({
     event.stopPropagation();
   };
 
+  const stopControlEvent = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
   const openStylePicker = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
@@ -966,7 +972,10 @@ export function ImageNodeControlPanel({
         marginTop: 8,
         boxShadow: '0 16px 40px rgba(0,0,0,0.42)',
       }}
-      onPointerDown={(e) => e.stopPropagation()}
+      onPointerDown={stopControlEvent}
+      onMouseDown={stopControlEvent}
+      onWheel={stopControlEvent}
+      onWheelCapture={stopControlEvent}
     >
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
@@ -1170,8 +1179,8 @@ export function ImageNodeControlPanel({
       )}
 
       {/* Prompt input */}
-      <div style={{ padding: '4px 14px 12px' }}>
-        <div className="relative">
+      <div style={{ padding: '4px 14px 12px' }} onWheel={stopControlEvent} onWheelCapture={stopControlEvent}>
+        <div className="relative" onPointerDown={stopControlEvent} onMouseDown={stopControlEvent}>
           {imageReferenceBlocks.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {imageReferenceBlocks.map((block) => {
@@ -1231,7 +1240,10 @@ export function ImageNodeControlPanel({
                         <textarea
                           value={editingPromptText}
                           onChange={(event) => setEditingPromptText(event.target.value)}
-                          onPointerDown={(event) => event.stopPropagation()}
+                          onPointerDown={stopControlEvent}
+                          onMouseDown={stopControlEvent}
+                          onWheel={stopControlEvent}
+                          onWheelCapture={stopControlEvent}
                           className="basis-full resize-none rounded-md px-2 py-1.5 text-[12px] leading-5 outline-none nowheel"
                           style={{
                             minHeight: 74,
@@ -1308,7 +1320,10 @@ export function ImageNodeControlPanel({
             className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
             style={{ color: 'rgba(255,255,255,0.94)', fontSize: 14, lineHeight: 1.58, minHeight: promptExpanded ? 176 : 104 }}
             rows={promptExpanded ? 7 : 4}
-            onPointerDown={(e) => e.stopPropagation()}
+            onPointerDown={stopControlEvent}
+            onMouseDown={stopControlEvent}
+            onWheel={stopControlEvent}
+            onWheelCapture={stopControlEvent}
           />
           {showReferenceMenu && references.length > 0 && (
             <div
@@ -1459,25 +1474,27 @@ export function ImageNodeControlPanel({
               ))}
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => onPreviewGenerate?.()}
-            disabled={!canGenerate || !onPreviewGenerate}
-            className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.08] hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              width: 92,
-              height: 34,
-              fontSize: 13,
-              fontWeight: 500,
-              color: 'rgba(255,255,255,0.72)',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.10)',
-            }}
-            title={isGenerating ? t('imageNode.generating') : '低成本生成小图，用于确认方向'}
-            aria-label="快速预览"
-          >
-            快速预览
-          </button>
+          {!isResultMode && (
+            <button
+              type="button"
+              onClick={() => onPreviewGenerate?.()}
+              disabled={!canGenerate || !onPreviewGenerate}
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.08] hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                width: 92,
+                height: 34,
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'rgba(255,255,255,0.72)',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.10)',
+              }}
+              title={isGenerating ? t('imageNode.generating') : '低成本生成小图，用于确认方向'}
+              aria-label="快速生成"
+            >
+              快速生成
+            </button>
+          )}
           {generationTask?.status === 'failed' && generationTask.errorMessage ? (
             <button
               onClick={handleGenerateClick}
@@ -1510,7 +1527,7 @@ export function ImageNodeControlPanel({
                 background: canGenerate ? '#ffffff' : 'rgba(255,255,255,0.14)',
                 opacity: canGenerate ? 1 : 0.45,
               }}
-              title={isGenerating ? t('imageNode.generating') : '生成高清正式结果'}
+              title={isGenerating ? t('imageNode.generating') : '生成'}
             >
               {isGenerating ? (
                 <div className="relative flex items-center justify-center">
