@@ -162,6 +162,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   useEffect(() => {
     if (!selectedResultImage) return;
+    if (!selectedResultImage.width || !selectedResultImage.height) return;
     setImgSize({ width: selectedResultImage.width, height: selectedResultImage.height });
   }, [selectedResultImage]);
 
@@ -371,11 +372,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         inputRefs: firstHistoryItem?.inputRefs || [],
         presetIds: firstHistoryItem?.presetIds || selectedPresets,
         styleId: firstHistoryItem?.styleId ?? selectedStyleId,
+        lightPreview,
         modelParams: firstHistoryItem?.modelParams || { ...modelParams },
         createdAt: firstHistoryItem?.createdAt || Date.now(),
       };
     },
-    [generatedImages, id, modelParams, selectedPresets, selectedStyleId],
+    [generatedImages, id, lightPreview, modelParams, selectedPresets, selectedStyleId],
   );
 
   const runGeneration = useCallback(async (mode: 'preview' | 'final') => {
@@ -533,6 +535,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         inputRefs: task.inputRefs,
         presetIds: selectedPresets,
         styleId: selectedStyleId,
+        lightPreview,
         modelParams: { ...modelParams },
         createdAt: Date.now(),
       });
@@ -1292,6 +1295,16 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setShowPreview(true);
   }, [data]);
 
+  const handleDisplayImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = event.currentTarget;
+    if (!naturalWidth || !naturalHeight) return;
+    setImgSize((prev) => (
+      prev?.width === naturalWidth && prev?.height === naturalHeight
+        ? prev
+        : { width: naturalWidth, height: naturalHeight }
+    ));
+  }, []);
+
   const handleDownload = useCallback(() => {
     const resolved = resolveNodeImage(data);
     if (!resolved) return;
@@ -1546,7 +1559,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                     background: '#101014',
                   }}
                 >
-                  <img ref={imgRef} src={displayImage} alt="" className="h-full w-full object-cover" draggable={false} />
+                  <img ref={imgRef} src={displayImage} alt="" className="h-full w-full object-cover" draggable={false} onLoad={handleDisplayImageLoad} />
                 </div>
                 <button
                   type="button"
@@ -1598,6 +1611,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   alt=""
                   className="w-full h-full object-contain"
                   draggable={false}
+                  onLoad={handleDisplayImageLoad}
                   onClick={handleImageClick}
                   style={{ cursor: isPointPickMode ? 'crosshair' : 'default' }}
                 />
@@ -1690,6 +1704,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 alt=""
                 className="w-full h-full object-contain"
                 draggable={false}
+                onLoad={handleDisplayImageLoad}
                 onClick={handleImageClick}
                 onPointerDown={(event) => {
                   if (!isPointPickMode) return;

@@ -128,7 +128,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,550 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,674 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -154,11 +154,11 @@ app/
 - `src/` total: 158 TypeScript / TSX source files; 161 total files under `src/`
 
 **Key file sizes (verified line counts):**
-- `CanvasPage.tsx`: ~1,550 lines (page entry + core state container)
-- `ImageNode.tsx`: ~1,843 lines
-- `ImageNodeControlPanel.tsx`: ~1,555 lines
+- `CanvasPage.tsx`: ~1,674 lines (page entry + core state container)
+- `ImageNode.tsx`: ~1,844 lines
+- `ImageNodeControlPanel.tsx`: ~1,506 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
-- `PresetPickerModal.tsx`: ~633 lines
+- `PresetPickerModal.tsx`: ~551 lines
 - `presets.ts`: ~1,302 lines
 - `CompareNode.tsx`: ~565 lines
 - `UpscaleNode.tsx`: ~642 lines
@@ -238,7 +238,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,550 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,674 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper

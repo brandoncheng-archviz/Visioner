@@ -115,6 +115,7 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
   const userPrompt = batch?.userPrompt || '';
   const inputRefs = batch?.inputRefs || [];
   const modelParams = batch?.modelParams || { ...DEFAULT_MODEL_PARAMS };
+  const lightPreview = batch?.lightPreview ?? null;
   const result = {
     taskId: image.resultId,
     imageUrl: image.imageUrl,
@@ -171,7 +172,9 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
     generatedImages: [historyItem],
     generationTask,
     prompt,
+    textPrompt: prompt,
     promptContent: [],
+    promptBlocks: [],
     selectedPresets: batch?.presetIds || [],
     selectedStyleId: batch?.styleId ?? null,
     finalPrompt: prompt,
@@ -180,6 +183,7 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
     imageReferences: inputRefs,
     referenceImages: inputRefs,
     modelParams,
+    lightPreview,
     currentResultSource: 'history',
     isGeneratedResult: true,
     generationStatus: 'completed',

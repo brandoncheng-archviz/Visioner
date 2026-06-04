@@ -77,6 +77,8 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
     } else {
       showToast('已选择历史结果，请在图片节点中使用');
     }
+    setBatchMode(false);
+    setSelectedIds(new Set());
     onClose?.();
   }, [onUseImages, onClose, showToast]);
 

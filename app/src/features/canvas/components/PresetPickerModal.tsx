@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Star, Bookmark, Plus, Pencil } from 'lucide-react';
 
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../constants/canvasConstants';
-import { PRESET_DATA, PRESET_TABS, getPresetById } from '../constants/presets';
+import { PRESET_DATA, PRESET_TABS, getPresetById, isPresetVisibleInLibrary } from '../constants/presets';
 import { CustomPresetFallbackCover } from './CustomPresetFallbackCover';
 import type { PresetItem } from '../types/imageNode.types';
 import { getPresetPromptText } from '../utils/promptUtils';
@@ -68,7 +68,7 @@ export function PresetPickerModal({
   const [presetPrompt, setPresetPrompt] = useState('');
   const [presetThumbnail, setPresetThumbnail] = useState('');
 
-  const allPresets = useMemo(() => [...PRESET_DATA, ...userPresets], [userPresets]);
+  const allPresets = useMemo(() => [...PRESET_DATA.filter(isPresetVisibleInLibrary), ...userPresets], [userPresets]);
 
   const handleCancel = useCallback(() => {
     onClose();
@@ -313,7 +313,7 @@ export function PresetPickerModal({
           <div>
             <div className="text-[16px] font-semibold text-white/92">预设库</div>
             <div className="mt-1 text-[12px]" style={{ color: 'rgba(255,255,255,0.48)' }}>
-              浏览预设提示词。鼠标移动到卡片可预览完整提示词，点击卡片可插入到提示词框，也可以使用 / 快速搜索插入。
+              用于快速补充建筑图像生成、优化和调整指令。
             </div>
           </div>
           <button

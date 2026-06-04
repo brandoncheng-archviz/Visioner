@@ -41,6 +41,7 @@ import {
   PRESET_TABS,
   getPresetById,
   getStylePresetById,
+  isPresetVisibleInLibrary,
 } from '../../constants/presets';
 import { createImageReferenceBlock, getPresetPromptText, stripReferencePromptMetadata } from '../../utils/promptUtils';
 import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUtils';
@@ -452,7 +453,7 @@ export function ImageNodeControlPanel({
   const slashFilteredPresets = useMemo(() => {
     const query = slashQuery.trim().toLowerCase();
     const presetPool = PRESET_DATA.filter((preset) => {
-      if (preset.category === 'style' || preset.tabs.length === 0) return false;
+      if (!isPresetVisibleInLibrary(preset) || preset.category === 'style' || preset.tabs.length === 0) return false;
       if (slashActiveTab === '我的收藏') return false;
       return preset.tabs.includes(slashActiveTab);
     });
