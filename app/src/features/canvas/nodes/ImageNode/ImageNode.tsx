@@ -20,6 +20,7 @@ import { useHistory } from '../../contexts/HistoryContext';
 import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
 import { checkGenerationRequestSafety, checkGenerationResultSafety } from '../../utils/contentSafety';
 import {
+  CANVAS_NODE_CONTROL_SCALE,
   IMAGE_NODE_CONTROL_WIDTH,
   IMAGE_NODE_CONTROL_HEIGHT,
   DEFAULT_MODEL_PARAMS,
@@ -159,6 +160,22 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const nextCurrent = getCurrentImage(data);
     setPreviewImage((prev) => (prev === nextCurrent ? prev : nextCurrent));
   }, [data.currentImage, data.image, data.inputImage]);
+
+  useEffect(() => {
+    const next = (data.lightPreview as LightPreviewData | null | undefined) ?? null;
+    setLightPreview((prev) => {
+      if (prev === next) return prev;
+      if (
+        prev?.enabled === next?.enabled &&
+        prev?.sun.elevation === next?.sun.elevation &&
+        prev?.sun.azimuth === next?.sun.azimuth &&
+        prev?.derived.previewImagePath === next?.derived.previewImagePath
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [data.lightPreview]);
 
   useEffect(() => {
     if (!selectedResultImage) return;
@@ -1266,14 +1283,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const handleRelight = useCallback(() => {
     const resolved = resolveNodeImage(data);
     if (!resolved) {
-      // Empty node: open current node's light panel directly
-      setPendingLightPanelOpen(true);
+      showToast('当前节点没有可改光的图片。');
       return;
     }
-    const onCreateRelightNode = data.onCreateRelightNode as ((sourceNodeId: string) => void) | undefined;
+    const onCreateRelightNode = data.onCreateRelightNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
     if (!onCreateRelightNode) return;
-    onCreateRelightNode(id);
-  }, [data, id]);
+    onCreateRelightNode(id, resolved.imageUrl, resolved.width, resolved.height);
+  }, [data, id, showToast]);
 
   const handleCompare = useCallback(() => {
     const resolved = resolveNodeImage(data);
@@ -1808,7 +1824,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               top: displayCardHeight + 12 / zoom,
               left: displayCardWidth / 2,
               width: IMAGE_NODE_CONTROL_WIDTH,
-              transform: `translateX(-50%) scale(${inverseScale})`,
+              transform: `translateX(-50%) scale(${inverseScale * CANVAS_NODE_CONTROL_SCALE})`,
               transformOrigin: 'top center',
             }}
           >
@@ -1842,7 +1858,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             />
           </div>
 
-          <div style={{ height: (IMAGE_NODE_CONTROL_HEIGHT + 22) / zoom }} />
+          <div style={{ height: (IMAGE_NODE_CONTROL_HEIGHT * CANVAS_NODE_CONTROL_SCALE + 22) / zoom }} />
         </>
       )}
 

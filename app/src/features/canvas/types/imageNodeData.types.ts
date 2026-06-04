@@ -19,6 +19,9 @@ export interface ImageNodeData {
   isHistoryAsset?: boolean;
   isGeneratedResult?: boolean;
   generationStatus?: 'completed' | string;
+  generationMode?: 'relight' | string;
+  sourceImageNodeIds?: string[];
+  status?: 'empty' | 'previewing' | 'previewResult' | 'generating' | 'result' | string;
   currentResultSource?: 'history' | string;
   generatedImages?: GenerationHistoryItem[] | string[];
   generationTask?: GenerationTask | null;
@@ -47,7 +50,7 @@ export interface ImageNodeData {
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
-  onCreateRelightNode?: (sourceNodeId: string) => void;
+  onCreateRelightNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onOpenNodeHistory?: (nodeId: string) => void;
   lightPreview?: LightPreviewData;
 }

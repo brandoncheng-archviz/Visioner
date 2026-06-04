@@ -561,33 +561,29 @@ function FlowCanvas() {
     }, 50);
   }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
 
-  const createRelightNode = useCallback((sourceNodeId: string) => {
+  const createRelightNode = useCallback((sourceNodeId: string, _inputImage: string, width: number, height: number) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) return;
 
-    const newNodeId = `image-${Date.now()}`;
+    const newNodeId = `relight-${Date.now()}`;
     const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.relight);
     const spacing = 80;
     const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
 
     const newNode: Node = {
       id: newNodeId,
-      type: 'image',
+      type: 'relight',
       position: {
         x: sourceNode.position.x + estimatedWidth + spacing,
         y: sourceNode.position.y,
       },
       data: {
+        generationMode: 'relight',
         label,
-        prompt: '',
-        promptContent: [],
-        selectedPresets: [],
-        selectedStyleId: null,
-        currentResultId: null,
-        generatedImages: [],
-        autoOpenLightPreview: true,
-        lightPreview: undefined,
-        ...getRoleData(null),
+        sourceImageNodeIds: [sourceNodeId],
+        status: 'empty',
+        width,
+        height,
       },
       selected: true,
     };
@@ -613,9 +609,9 @@ function FlowCanvas() {
         maxZoom: Math.min(getViewport().zoom, 1.2),
       });
     }, 50);
-  }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
+  }, [nodes, setNodes, setEdges, fitView, getViewport, getAllNodeLabels]);
 
-  const createCompareNode = useCallback((sourceNodeId: string, _inputImage: string, _width: number, _height: number) => {
+  const createCompareNode = useCallback((sourceNodeId: string) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) return;
 
@@ -1394,17 +1390,20 @@ function FlowCanvas() {
 
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
-    const newNodeId = `${type}-${Date.now()}`;
-    const baseTitle = NODE_BASE_TITLES[type] || type;
+    if (type !== 'image') {
+      setCreateMenu(null);
+      return;
+    }
+    const newNodeId = `image-${Date.now()}`;
+    const baseTitle = NODE_BASE_TITLES.image;
     const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
     const newNode: Node = {
       id: newNodeId,
-      type,
+      type: 'image',
       position: createMenu.flowPos,
       data: {
         label,
-        ...(type === 'image' ? getRoleData(null) : {}),
-        ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
+        ...getRoleData(null),
       },
     };
     setNodes((nds) => [...nds, newNode]);

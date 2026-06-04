@@ -22,6 +22,7 @@ import { UpscaleNode } from '../nodes/UpscaleNode';
 import { ImageNode } from '../nodes/ImageNode';
 import { CompareNode } from '../nodes/CompareNode';
 import { SunSkyNode } from '../nodes/SunSkyNode';
+import { RelightNode } from '../nodes/RelightNode';
 import { TempConnectionLine } from './TempConnectionLine';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from '../constants/canvasConstants';
 
@@ -35,6 +36,7 @@ const nodeTypes = {
   script: ScriptNode,
   'video-merge': VideoMergeNode,
   sunSky: SunSkyNode,
+  relight: RelightNode,
 };
 
 export interface CanvasStageProps {

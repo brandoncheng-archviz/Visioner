@@ -6,22 +6,23 @@ export interface SunSkyNodeInfoProps {
   elevation: number;
   azimuth: number;
   derived: SunSkyNodeDerived;
+  compact?: boolean;
 }
 
-export function SunSkyNodeInfo({ elevation, azimuth, derived }: SunSkyNodeInfoProps) {
+export function SunSkyNodeInfo({ elevation, azimuth, derived, compact = false }: SunSkyNodeInfoProps) {
   const [expanded, setExpanded] = useState(false);
   const summary = `${derived.timeLabel} · ${derived.directionLabel} · ${derived.skyLabel} · ${derived.shadowLengthLabel} · ${derived.shadowBlurLabel}`;
 
   return (
     <div className="rounded-xl border border-white/[0.07] bg-white/[0.025]">
-      <div className="px-3 py-2.5">
-        <div className="mb-1.5 text-[12px] font-medium text-white/45">当前光影</div>
-        <p className="truncate text-[13px] font-medium text-white/76">{summary}</p>
+      <div className={compact ? 'px-3 py-2' : 'px-3 py-2.5'}>
+        <div className={compact ? 'mb-1 text-[11px] font-medium text-white/45' : 'mb-1.5 text-[12px] font-medium text-white/45'}>当前光影</div>
+        <p className={compact ? 'truncate text-[12px] font-medium text-white/76' : 'truncate text-[13px] font-medium text-white/76'}>{summary}</p>
       </div>
 
       <button
         type="button"
-        className="nodrag nowheel flex w-full items-center justify-between border-t border-white/[0.06] px-3 py-2 text-[12px] text-white/48 transition hover:bg-white/[0.035] hover:text-white/72"
+        className={`nodrag nowheel flex w-full items-center justify-between border-t border-white/[0.06] px-3 text-[12px] text-white/48 transition hover:bg-white/[0.035] hover:text-white/72 ${compact ? 'py-1.5' : 'py-2'}`}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
