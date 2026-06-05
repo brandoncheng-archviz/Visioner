@@ -22,6 +22,7 @@ import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
 import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
 import type { GenerationHistoryItem, GenerationTask } from '../features/canvas/types/generation.types';
+import type { RelightCreationOptions } from '../features/canvas/types/relight.types';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
@@ -559,14 +560,20 @@ function FlowCanvas() {
     }, 50);
   }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
 
-  const createRelightNode = useCallback((sourceNodeId: string, _inputImage: string, width: number, height: number) => {
+  const createRelightNode = useCallback((
+    sourceNodeId: string,
+    inputImage: string,
+    width: number,
+    height: number,
+    options?: RelightCreationOptions,
+  ) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) return;
 
     const newNodeId = `relight-${Date.now()}`;
     const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.relight);
     const spacing = 80;
-    const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
+    const estimatedWidth = sourceNode.measured?.width || sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
 
     const newNode: Node = {
       id: newNodeId,
@@ -580,8 +587,18 @@ function FlowCanvas() {
         label,
         sourceImageNodeIds: [sourceNodeId],
         status: 'empty',
+        viewMode: 'edit',
+        inputImage,
         width,
         height,
+        lightPreview: options?.lightPreview
+          ? {
+              ...options.lightPreview,
+              sun: { ...options.lightPreview.sun },
+              derived: { ...options.lightPreview.derived },
+            }
+          : undefined,
+        relightSettings: options?.relightSettings ? { ...options.relightSettings } : undefined,
       },
       selected: true,
     };
@@ -711,10 +728,10 @@ function FlowCanvas() {
         onRemoveReferenceEdge: removeReferenceEdge,
         onSwapCompareInputs: swapCompareInputs,
         onAssignReferenceEdgeRole: assignReferenceEdgeRole,
-        onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' ? createUpscaleNode : undefined,
+        onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' || n.type === 'relight' ? createUpscaleNode : undefined,
         onCreateSunSkyNode: n.type === 'image' ? createSunSkyNode : undefined,
-        onCreateCompareNode: n.type === 'image' ? createCompareNode : undefined,
-        onCreateRelightNode: n.type === 'image' ? createRelightNode : undefined,
+        onCreateCompareNode: n.type === 'image' || n.type === 'relight' ? createCompareNode : undefined,
+        onCreateRelightNode: n.type === 'image' || n.type === 'relight' ? createRelightNode : undefined,
         onOpenNodeHistory: n.type === 'image' ? (nodeId: string) => setHistoryPanelNodeId(nodeId) : undefined,
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },

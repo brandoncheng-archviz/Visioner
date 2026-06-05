@@ -18,6 +18,8 @@ export function ImageToolbar({
   onDownload,
   onRelight,
   hasImage,
+  relightLabel,
+  relightTooltip,
 }: {
   onUpscale: () => void;
   onCompare: () => void;
@@ -25,11 +27,18 @@ export function ImageToolbar({
   onDownload: () => void;
   onRelight: () => void;
   hasImage: boolean;
+  relightLabel?: string;
+  relightTooltip?: string;
 }) {
   const { t } = useTranslation();
 
   const tools: ToolbarAction[] = [
-    { icon: Sun, label: t('imageNode.relight'), tooltipLabel: t('imageNode.relightTooltip', { defaultValue: '调整阳光方向' }), action: onRelight },
+    {
+      icon: Sun,
+      label: relightLabel || t('imageNode.relight'),
+      tooltipLabel: relightTooltip || t('imageNode.relightTooltip', { defaultValue: '调整阳光方向' }),
+      action: onRelight,
+    },
     { icon: Sparkles, label: t('imageNode.upscale'), tooltipLabel: t('imageNode.upscaleShort', { defaultValue: '高清细节' }), action: onUpscale, disabled: !hasImage },
     { icon: Columns2, label: t('imageNode.compare'), action: onCompare, disabled: !hasImage },
     { icon: Maximize2, label: t('imageNode.preview'), action: onPreview, disabled: !hasImage },

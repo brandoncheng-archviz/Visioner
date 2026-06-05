@@ -1,4 +1,4 @@
-import { Cloud, CloudFog, Sparkles } from 'lucide-react';
+import { Cloud, CloudFog, Sparkles, Sunrise, SunMedium, SunDim, Sunset, Eclipse, Sun } from 'lucide-react';
 import { RELIGHT_PRESETS } from '../constants/relightPresets';
 import type {
   RelightCloudAmount,
@@ -21,6 +21,15 @@ const FOG_OPTIONS: Array<{ value: RelightFogLevel; label: string }> = [
   { value: 'heavy', label: '浓雾' },
 ];
 
+const PRESET_ICONS = {
+  'early-morning-low-light': Sunrise,
+  'morning-soft-light': SunDim,
+  'afternoon-side-light': SunMedium,
+  'golden-hour': Sunset,
+  'soft-backlight': Eclipse,
+  'clear-noon': Sun,
+} as const;
+
 export function RelightAdvancedSettings({
   settings,
   onSettingsChange,
@@ -31,43 +40,46 @@ export function RelightAdvancedSettings({
   onPresetSelect: (preset: RelightPreset) => void;
 }) {
   return (
-    <div className="h-full border-l border-white/[0.06] px-4 py-4">
+    <div className="h-full border-l border-white/[0.07] px-5 py-5">
       <OptionGroup
-        icon={<Cloud className="h-3.5 w-3.5" />}
+        icon={<Cloud className="h-4 w-4" />}
         label="云量"
         options={CLOUD_OPTIONS}
         value={settings.cloudAmount}
         onChange={(cloudAmount) => onSettingsChange({ ...settings, cloudAmount, lightingPresetId: undefined })}
       />
       <OptionGroup
-        icon={<CloudFog className="h-3.5 w-3.5" />}
+        icon={<CloudFog className="h-4 w-4" />}
         label="雾气"
         options={FOG_OPTIONS}
         value={settings.fogLevel}
         onChange={(fogLevel) => onSettingsChange({ ...settings, fogLevel, lightingPresetId: undefined })}
       />
-      <div className="mt-4">
-        <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-white/58">
-          <Sparkles className="h-3.5 w-3.5" />
+      <div className="mt-6">
+        <div className="mb-3 flex items-center gap-2 text-[15px] font-medium text-white/72">
+          <Sparkles className="h-4 w-4 text-white/52" />
           光影预设
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2.5">
           {RELIGHT_PRESETS.map((preset) => {
             const selected = settings.lightingPresetId === preset.id;
+            const PresetIcon = PRESET_ICONS[preset.id as keyof typeof PRESET_ICONS] || Sun;
             return (
               <button
                 key={preset.id}
                 type="button"
                 onClick={() => onPresetSelect(preset)}
-                className="min-h-[54px] rounded-lg px-2.5 py-2 text-left transition"
+                title={`${preset.name}：${preset.description}`}
+                aria-pressed={selected}
+                className="flex h-[76px] min-w-0 flex-col items-center justify-center gap-2 rounded-[9px] px-2 text-center transition duration-150 hover:brightness-125"
                 style={{
-                  color: selected ? '#dff8ff' : 'rgba(255,255,255,0.7)',
-                  background: selected ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.025)',
-                  border: selected ? '1px solid rgba(0,212,255,0.3)' : '1px solid rgba(255,255,255,0.055)',
+                  color: selected ? '#e5faff' : 'rgba(255,255,255,0.78)',
+                  background: selected ? 'rgba(0,212,255,0.075)' : 'rgba(255,255,255,0.025)',
+                  border: selected ? '1px solid rgba(0,212,255,0.26)' : '1px solid rgba(255,255,255,0.065)',
                 }}
               >
-                <div className="text-[12px] font-medium">{preset.name}</div>
-                <div className="mt-0.5 text-[10px] leading-4 text-white/34">{preset.description}</div>
+                <PresetIcon className="h-[18px] w-[18px] text-current opacity-65" strokeWidth={1.7} />
+                <span className="w-full truncate text-[13px] font-medium leading-4">{preset.name}</span>
               </button>
             );
           })}
@@ -91,12 +103,12 @@ function OptionGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="mb-3">
-      <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-white/58">
+    <div className="mb-5">
+      <div className="mb-2.5 flex items-center gap-2 text-[15px] font-medium text-white/72">
         {icon}
         {label}
       </div>
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-4 gap-2">
         {options.map((option) => {
           const selected = value === option.value;
           return (
@@ -104,11 +116,11 @@ function OptionGroup<T extends string>({
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
-              className="h-7 rounded-md text-[11px] transition"
+              className="h-9 rounded-[9px] px-3.5 text-[14px] font-medium transition duration-150 hover:brightness-125"
               style={{
-                color: selected ? '#fff' : 'rgba(255,255,255,0.46)',
-                background: selected ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.025)',
-                border: selected ? '1px solid rgba(255,255,255,0.16)' : '1px solid rgba(255,255,255,0.045)',
+                color: selected ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.58)',
+                background: selected ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.028)',
+                border: selected ? '1px solid rgba(0,212,255,0.25)' : '1px solid rgba(255,255,255,0.065)',
               }}
             >
               {option.label}

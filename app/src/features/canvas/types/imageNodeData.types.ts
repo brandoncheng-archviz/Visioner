@@ -3,6 +3,7 @@ import type { ImageRole, PromptContent } from './imageNode.types';
 import type { MarkItem, ModelParams } from './canvas.types';
 import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
+import type { RelightCreationOptions } from './relight.types';
 
 /**
  * Typed data shape for an ImageNode.
@@ -50,7 +51,7 @@ export interface ImageNodeData {
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
-  onCreateRelightNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
+  onCreateRelightNode?: (sourceNodeId: string, inputImage: string, width: number, height: number, options?: RelightCreationOptions) => void;
   onOpenNodeHistory?: (nodeId: string) => void;
   lightPreview?: LightPreviewData;
 }
