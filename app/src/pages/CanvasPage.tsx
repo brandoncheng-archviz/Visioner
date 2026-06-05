@@ -143,7 +143,6 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
     width: image.width,
     height: image.height,
     createdAt,
-    kind: batch?.mode || 'final',
   };
   const generationTask: GenerationTask = {
     taskId: batchId,
@@ -164,7 +163,6 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
     currentResultId: image.resultId,
     currentResultSet: {
       batchId,
-      mode: batch?.mode || 'final',
       images: [image],
       selectedIndex: 0,
       isExpanded: false,

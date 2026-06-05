@@ -104,7 +104,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (lastBatch.length === 0) return null;
     return {
       batchId: lastBatchId,
-      mode: lastBatch[0]?.kind === 'preview' ? 'preview' : 'final',
       images: lastBatch.map((item) => ({
         resultId: item.resultId,
         imageUrl: item.imageUrl,
@@ -382,7 +381,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       return {
         batchId: resultSet.batchId,
         nodeId: id,
-        mode: resultSet.mode,
         images: resultSet.images,
         prompt: firstHistoryItem?.prompt || fallbackPrompt,
         userPrompt: firstHistoryItem?.userPrompt || fallbackUserPrompt,
@@ -397,7 +395,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     [generatedImages, id, lightPreview, modelParams, selectedPresets, selectedStyleId],
   );
 
-  const runGeneration = useCallback(async (mode: 'preview' | 'final') => {
+  const runGeneration = useCallback(async () => {
     const referenceLimitIssue = getReferenceLimitIssueForGenerate(references);
     if (referenceLimitIssue) {
       showToast(formatReferenceLimitIssue(referenceLimitIssue));
@@ -517,7 +515,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
       const newResultSet: CurrentResultSet = {
         batchId,
-        mode,
         images: generatedImageItems,
         selectedIndex: 0,
         isExpanded: false,
@@ -538,14 +535,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         width: result.width,
         height: result.height,
         createdAt: Date.now(),
-        kind: mode,
       }));
 
       const nextGeneratedImages = [...generatedImages, ...newHistoryItems];
       addBatch({
         batchId,
         nodeId: id,
-        mode,
         images: generatedImageItems,
         prompt: safePrompt,
         userPrompt: userPrompt || '',
@@ -617,8 +612,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     }
   }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
 
-  const handleGenerate = useCallback(() => runGeneration('final'), [runGeneration]);
-  const handlePreviewGenerate = useCallback(() => runGeneration('preview'), [runGeneration]);
+  const handleGenerate = useCallback(() => runGeneration(), [runGeneration]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
@@ -1842,8 +1836,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               modelParams={modelParams}
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
-              onPreviewGenerate={handlePreviewGenerate}
-              isResultMode={isResultResource}
               canGenerate={canGenerate}
               isGenerating={isGenerating}
               generationTask={generationTask}

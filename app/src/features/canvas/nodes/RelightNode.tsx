@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
-import { Loader2, Play, Plus, Square, Sun, Zap } from 'lucide-react';
+import { ChevronRight, Loader2, Play, Plus, Square, Sun, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SunSkyNodeControls } from './SunSkyNode/SunSkyNodeControls';
-import { SunSkyNodeInfo } from './SunSkyNode/SunSkyNodeInfo';
-import { resolveSunSkyDerived } from './SunSkyNode/resolveSunSkyDerived';
-import { clamp, snapToStep } from './SunSkyNode/sunSkyNode.utils';
 import type { LightPreviewData } from '../types/lightPreview.types';
+import type { RelightPreset, RelightSettings } from '../types/relight.types';
 import {
   mockRelightPreview,
   mockRelightGenerate,
@@ -16,6 +14,10 @@ import {
 import { CANVAS_NODE_CONTROL_SCALE, IMAGE_NODE_CONTROL_WIDTH } from '../constants/canvasConstants';
 import { resolveImageNodeSize } from '../utils/imageNodeSizing';
 import { getCurrentImage, getNodeHeight, getNodeWidth } from '../types/imageNodeData.types';
+import { useHistory } from '../contexts/HistoryContext';
+import { DEFAULT_RELIGHT_SETTINGS } from '../constants/relightPresets';
+import { createRelightLightPreview } from '../utils/relightSettings';
+import { RelightAdvancedSettings } from '../components/RelightAdvancedSettings';
 
 export type RelightStatus = 'empty' | 'previewing' | 'previewResult' | 'generating' | 'result' | 'error';
 
@@ -30,6 +32,7 @@ export interface RelightNodeData {
   width?: number;
   height?: number;
   lightPreview?: LightPreviewData;
+  relightSettings?: RelightSettings;
   relightTask?: RelightTaskState;
   error?: string;
 }
@@ -37,31 +40,29 @@ export interface RelightNodeData {
 const DEFAULT_SUN = { elevation: 33, azimuth: 55 };
 const RELIGHT_COST = 14;
 const RELIGHT_CONTROL_PANEL_HEIGHT = 360;
-
-function createLightPreview(sun: { elevation: number; azimuth: number }): LightPreviewData {
-  const elevation = snapToStep(clamp(sun.elevation, 0, 90), 3);
-  const azimuth = snapToStep(clamp(sun.azimuth, 0, 360), 5);
-  return {
-    enabled: true,
-    sun: { elevation, azimuth },
-    derived: resolveSunSkyDerived({ elevation, azimuth }),
-  };
-}
+const RELIGHT_ADVANCED_PANEL_WIDTH = 300;
 
 export function RelightNode({ data, selected, id }: NodeProps) {
   const { t } = useTranslation();
   const { setNodes } = useReactFlow();
+  const { addBatch } = useHistory();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
 
   const nodeData = data as unknown as RelightNodeData;
-  const initialLightPreview = nodeData.lightPreview ?? createLightPreview(DEFAULT_SUN);
+  const status = nodeData.status ?? 'empty';
+  const initialSettings = nodeData.relightSettings ?? DEFAULT_RELIGHT_SETTINGS;
+  const initialLightPreview = nodeData.lightPreview ?? createRelightLightPreview(DEFAULT_SUN, initialSettings);
 
   const [elevation, setElevation] = useState(initialLightPreview.sun.elevation);
   const [azimuth, setAzimuth] = useState(initialLightPreview.sun.azimuth);
+  const [relightSettings, setRelightSettings] = useState<RelightSettings>(initialSettings);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [isRealtimePreviewEnabled, setIsRealtimePreviewEnabled] = useState(status === 'previewing');
 
   // Refs for task cancellation and debounce
   const taskCancelRef = useRef<(() => void) | null>(null);
+  const taskRef = useRef<RelightTaskState | null>(nodeData.relightTask ?? null);
   const debounceRef = useRef<number | null>(null);
 
   const connectedInput = useStore((state) => {
@@ -79,13 +80,12 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     };
   });
 
-  const lightPreview = useMemo(() => createLightPreview({ elevation, azimuth }), [elevation, azimuth]);
+  const lightPreview = useMemo(
+    () => createRelightLightPreview({ elevation, azimuth }, relightSettings),
+    [azimuth, elevation, relightSettings],
+  );
 
-  const status = nodeData.status ?? 'empty';
-  const displayImage =
-    status === 'result'
-      ? nodeData.resultImageUrl || nodeData.currentImage
-      : nodeData.previewImageUrl;
+  const displayImage = nodeData.resultImageUrl || nodeData.previewImageUrl;
 
   const sizeSourceWidth = connectedInput?.width || nodeData.width || 1;
   const sizeSourceHeight = connectedInput?.height || nodeData.height || 1;
@@ -98,11 +98,12 @@ export function RelightNode({ data, selected, id }: NodeProps) {
 
   const cardWidth = previewSize.cardWidth;
   const previewHeight = previewSize.cardHeight;
-  const controlPanelWidth = IMAGE_NODE_CONTROL_WIDTH;
+  const controlPanelWidth = IMAGE_NODE_CONTROL_WIDTH + (showAdvancedSettings ? RELIGHT_ADVANCED_PANEL_WIDTH : 0);
   const controlPanelHeight = RELIGHT_CONTROL_PANEL_HEIGHT;
 
   const isPreviewing = status === 'previewing';
   const isGenerating = status === 'generating';
+  const isRealtimePreviewActive = isRealtimePreviewEnabled || isPreviewing;
   const hasPreviewResult = Boolean(nodeData.previewImageUrl);
   const connectedInputNodeId = connectedInput?.nodeId;
 
@@ -144,10 +145,16 @@ export function RelightNode({ data, selected, id }: NodeProps) {
           currentLight?.enabled === lightPreview.enabled &&
           currentLight?.sun.elevation === lightPreview.sun.elevation &&
           currentLight?.sun.azimuth === lightPreview.sun.azimuth &&
-          currentLight?.derived.previewImagePath === lightPreview.derived.previewImagePath;
+          currentLight?.derived.previewImagePath === lightPreview.derived.previewImagePath &&
+          currentLight?.derived.summary === lightPreview.derived.summary &&
+          currentLight?.derived.promptText === lightPreview.derived.promptText;
+        const settingsUnchanged =
+          currentData.relightSettings?.cloudAmount === relightSettings.cloudAmount &&
+          currentData.relightSettings?.fogLevel === relightSettings.fogLevel &&
+          currentData.relightSettings?.lightingPresetId === relightSettings.lightingPresetId;
         const sourceUnchanged =
           (currentData.sourceImageNodeIds?.[0] || '') === (nextSourceIds?.[0] || '');
-        if (lightUnchanged && sourceUnchanged) {
+        if (lightUnchanged && settingsUnchanged && sourceUnchanged) {
           return node;
         }
         didChange = true;
@@ -158,12 +165,13 @@ export function RelightNode({ data, selected, id }: NodeProps) {
             generationMode: 'relight',
             sourceImageNodeIds: nextSourceIds,
             lightPreview,
+            relightSettings,
           },
         };
       });
       return didChange ? nextNodes : nds;
     });
-  }, [connectedInputNodeId, id, lightPreview, setNodes]);
+  }, [connectedInputNodeId, id, lightPreview, relightSettings, setNodes]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -174,24 +182,24 @@ export function RelightNode({ data, selected, id }: NodeProps) {
       }
       cancelRelightTask(taskCancelRef.current);
       taskCancelRef.current = null;
+      taskRef.current = null;
     };
   }, []);
 
   const startPreviewTask = useCallback(
-    (sunParams?: { elevation: number; azimuth: number }) => {
+    (previewData: LightPreviewData = lightPreview) => {
       if (!connectedInput) return;
 
       // Cancel any existing task
       cancelRelightTask(taskCancelRef.current);
       taskCancelRef.current = null;
+      taskRef.current = null;
 
       const sourceIds = nodeData.sourceImageNodeIds?.length
         ? nodeData.sourceImageNodeIds
         : connectedInput
           ? [connectedInput.nodeId]
           : [];
-
-      const previewData = sunParams ? createLightPreview(sunParams) : lightPreview;
 
       updateData({
         status: 'previewing',
@@ -205,6 +213,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
         previewData,
         (t, url) => {
           taskCancelRef.current = null;
+          taskRef.current = null;
           updateData({
             status: 'previewResult',
             previewImageUrl: url,
@@ -214,32 +223,63 @@ export function RelightNode({ data, selected, id }: NodeProps) {
         },
       );
       taskCancelRef.current = cancel;
+      taskRef.current = task;
       updateData({ relightTask: task });
     },
     [connectedInput, id, lightPreview, nodeData.sourceImageNodeIds, updateData],
   );
 
+  const schedulePreviewTask = useCallback(
+    (previewData: LightPreviewData) => {
+      if (!isRealtimePreviewActive) return;
+
+      cancelRelightTask(taskCancelRef.current);
+      taskCancelRef.current = null;
+      taskRef.current = null;
+
+      if (debounceRef.current !== null) {
+        window.clearTimeout(debounceRef.current);
+      }
+
+      const delay = 300 + Math.floor(Math.random() * 301);
+      debounceRef.current = window.setTimeout(() => {
+        debounceRef.current = null;
+        startPreviewTask(previewData);
+      }, delay);
+    },
+    [isRealtimePreviewActive, startPreviewTask],
+  );
+
   const stopPreview = useCallback(() => {
     cancelRelightTask(taskCancelRef.current);
+    const cancelledTask = taskRef.current
+      ? {
+          ...taskRef.current,
+          status: 'cancelled' as const,
+        }
+      : undefined;
     taskCancelRef.current = null;
+    taskRef.current = null;
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
+    setIsRealtimePreviewEnabled(false);
     updateData({
       status: hasPreviewResult ? 'previewResult' : 'empty',
-      relightTask: undefined,
+      relightTask: cancelledTask,
       error: undefined,
     });
   }, [hasPreviewResult, updateData]);
 
   const handlePreviewToggle = useCallback(() => {
-    if (isPreviewing) {
+    if (isRealtimePreviewActive) {
       stopPreview();
     } else {
-      startPreviewTask();
+      setIsRealtimePreviewEnabled(true);
+      startPreviewTask(lightPreview);
     }
-  }, [isPreviewing, startPreviewTask, stopPreview]);
+  }, [isRealtimePreviewActive, lightPreview, startPreviewTask, stopPreview]);
 
   const handleGenerate = useCallback(() => {
     if (!connectedInput || isGenerating) return;
@@ -247,6 +287,8 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     // Cancel any running preview or debounce
     cancelRelightTask(taskCancelRef.current);
     taskCancelRef.current = null;
+    taskRef.current = null;
+    setIsRealtimePreviewEnabled(false);
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
@@ -270,6 +312,39 @@ export function RelightNode({ data, selected, id }: NodeProps) {
       lightPreview,
         (t, url) => {
           taskCancelRef.current = null;
+          taskRef.current = null;
+          const resultId = t.id;
+          const createdAt = Date.now();
+          addBatch({
+            batchId: resultId,
+            nodeId: id,
+            assetType: 'relight',
+            sourceNodeId: id,
+            sourceImageNodeIds: sourceIds,
+            images: [
+              {
+                resultId,
+                imageUrl: url,
+                width: connectedInput.width,
+                height: connectedInput.height,
+                seed: createdAt,
+              },
+            ],
+            prompt: lightPreview.derived.promptText,
+            userPrompt: '',
+            inputRefs: [],
+            presetIds: relightSettings.lightingPresetId ? [relightSettings.lightingPresetId] : [],
+            styleId: null,
+            lightPreview,
+            modelParams: {
+              model: 'mock-relight',
+              ratio: `${connectedInput.width}:${connectedInput.height}`,
+              resolution: `${connectedInput.width}x${connectedInput.height}`,
+              lens: '',
+              count: '1',
+            },
+            createdAt,
+          });
           updateData({
             status: 'result',
             resultImageUrl: url,
@@ -280,34 +355,21 @@ export function RelightNode({ data, selected, id }: NodeProps) {
         },
       );
     taskCancelRef.current = cancel;
+    taskRef.current = task;
     updateData({ relightTask: task });
-  }, [connectedInput, isGenerating, lightPreview, nodeData.sourceImageNodeIds, id, updateData]);
+  }, [addBatch, connectedInput, isGenerating, lightPreview, nodeData.sourceImageNodeIds, id, relightSettings.lightingPresetId, updateData]);
 
   const handleSliderChange = useCallback(
     (newElevation: number, newAzimuth: number) => {
       setElevation(newElevation);
       setAzimuth(newAzimuth);
-
-      if (!isPreviewing) return;
-
-      // Cancel current preview task
-      cancelRelightTask(taskCancelRef.current);
-      taskCancelRef.current = null;
-
-      // Cancel pending debounce
-      if (debounceRef.current !== null) {
-        window.clearTimeout(debounceRef.current);
-        debounceRef.current = null;
-      }
-
-      // Debounce and restart preview
-      const delay = 300 + Math.floor(Math.random() * 300);
-      debounceRef.current = window.setTimeout(() => {
-        debounceRef.current = null;
-        startPreviewTask({ elevation: newElevation, azimuth: newAzimuth });
-      }, delay);
+      schedulePreviewTask(createRelightLightPreview(
+        { elevation: newElevation, azimuth: newAzimuth },
+        { ...relightSettings, lightingPresetId: undefined },
+      ));
+      setRelightSettings((current) => ({ ...current, lightingPresetId: undefined }));
     },
-    [isPreviewing, startPreviewTask],
+    [relightSettings, schedulePreviewTask],
   );
 
   const handleElevationChange = useCallback(
@@ -322,6 +384,32 @@ export function RelightNode({ data, selected, id }: NodeProps) {
       handleSliderChange(elevation, value);
     },
     [handleSliderChange, elevation],
+  );
+
+  const handleAdvancedSettingsChange = useCallback(
+    (nextSettings: RelightSettings) => {
+      setRelightSettings(nextSettings);
+      schedulePreviewTask(createRelightLightPreview({ elevation, azimuth }, nextSettings));
+    },
+    [azimuth, elevation, schedulePreviewTask],
+  );
+
+  const handlePresetSelect = useCallback(
+    (preset: RelightPreset) => {
+      const nextSettings: RelightSettings = {
+        cloudAmount: preset.cloudAmount,
+        fogLevel: preset.fogLevel,
+        lightingPresetId: preset.id,
+      };
+      setElevation(preset.elevation);
+      setAzimuth(preset.azimuth);
+      setRelightSettings(nextSettings);
+      schedulePreviewTask(createRelightLightPreview(
+        { elevation: preset.elevation, azimuth: preset.azimuth },
+        nextSettings,
+      ));
+    },
+    [schedulePreviewTask],
   );
 
   const renderPreviewContent = () => {
@@ -482,78 +570,128 @@ export function RelightNode({ data, selected, id }: NodeProps) {
           onTouchStart={stopNodeEvent}
           onTouchMove={stopNodeEvent}
         >
-          {/* Header */}
-          <div className="border-b border-white/[0.06] px-5 py-4">
-            <div className="min-w-0">
-              <div className="truncate text-[16px] font-semibold text-white/90">光影预览 / Light Preview</div>
-              <div className="mt-1.5 truncate text-[13px] text-white/42">
-                {lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}
+          <div className="flex">
+            <div className="flex-shrink-0" style={{ width: IMAGE_NODE_CONTROL_WIDTH }}>
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+                <div className="min-w-0">
+                  <div className="truncate text-[16px] font-semibold text-white/90">光影预览 / Light Preview</div>
+                  <div className="mt-1.5 truncate text-[13px] text-white/42">
+                    {lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedSettings((current) => !current)}
+                  className="ml-4 inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] text-white/48 transition hover:bg-white/[0.05] hover:text-white/72"
+                >
+                  高级设置
+                  <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAdvancedSettings ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {/* Controls body */}
+              <div className="grid gap-4 px-5 py-4" style={{ gridTemplateColumns: '205px minmax(0, 1fr)' }}>
+                <div className="relative flex h-[205px] items-center justify-center overflow-hidden rounded-xl bg-[#0f1219]">
+                  <img
+                    src={lightPreview.derived.previewImagePath}
+                    alt="光影预览"
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </div>
+                <div className="min-w-0 space-y-3">
+                  <SunSkyNodeControls
+                    elevation={elevation}
+                    azimuth={azimuth}
+                    onElevationChange={handleElevationChange}
+                    onAzimuthChange={handleAzimuthChange}
+                  />
+                </div>
+              </div>
+
+              {/* Footer buttons */}
+              <div
+                className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3"
+                onWheel={stopNodeEvent}
+                onPointerDown={stopNodeEvent}
+                onPointerMove={stopNodeEvent}
+                onMouseDown={stopNodeEvent}
+                onClick={stopNodeEvent}
+                onTouchStart={stopNodeEvent}
+                onTouchMove={stopNodeEvent}
+              >
+                <button
+                  type="button"
+                  onClick={handlePreviewToggle}
+                  disabled={!connectedInput || isGenerating}
+                  className="nodrag nowheel inline-flex h-[34px] items-center gap-2 rounded-lg border px-3.5 text-[13px] font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35"
+                  style={{
+                    color: isRealtimePreviewActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
+                    background: isRealtimePreviewActive ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.045)',
+                    borderColor: 'rgba(255,255,255,0.075)',
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {isRealtimePreviewActive ? (
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                  )}
+                  {isRealtimePreviewActive ? '停止预览' : '实时预览'}
+                </button>
+                <div
+                  className="relative flex items-center rounded-xl"
+                  style={{
+                    height: 46,
+                    padding: '5px 6px',
+                    gap: 8,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <div
+                    className="flex h-[34px] min-w-[52px] items-center justify-center gap-1 rounded-lg px-2 text-[13px] font-medium"
+                    style={{
+                      color: 'rgba(255,255,255,0.48)',
+                      background: 'rgba(255,255,255,0.018)',
+                      border: '1px solid rgba(255,255,255,0.035)',
+                    }}
+                    title={`消耗 ${RELIGHT_COST} 积分`}
+                  >
+                    <Zap className="h-3 w-3 fill-current text-[#b8a36d]" />
+                    <span>{RELIGHT_COST}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={!connectedInput || isGenerating}
+                    className="nodrag nowheel flex h-[34px] w-[34px] items-center justify-center rounded-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{
+                      color: '#111',
+                      background: connectedInput && !isGenerating ? '#ffffff' : 'rgba(255,255,255,0.14)',
+                    }}
+                    title={isGenerating ? '改光生成中...' : '生成'}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-black/70" />
+                    ) : (
+                      <span className="text-[18px] font-semibold leading-none">↑</span>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Controls body */}
-          <div className="grid gap-4 px-5 py-4" style={{ gridTemplateColumns: '205px minmax(0, 1fr)' }}>
-            <div className="relative flex h-[205px] items-center justify-center overflow-hidden rounded-xl bg-[#0f1219]">
-              <img
-                src={lightPreview.derived.previewImagePath}
-                alt="光影预览"
-                className="h-full w-full object-cover"
-                draggable={false}
-              />
-            </div>
-            <div className="min-w-0 space-y-3">
-              <SunSkyNodeControls
-                elevation={elevation}
-                azimuth={azimuth}
-                directionLabel={lightPreview.derived.directionLabel}
-                onElevationChange={handleElevationChange}
-                onAzimuthChange={handleAzimuthChange}
-              />
-              <SunSkyNodeInfo elevation={elevation} azimuth={azimuth} derived={lightPreview.derived} compact />
-            </div>
-          </div>
-
-          {/* Footer buttons */}
-          <div
-            className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3"
-            onWheel={stopNodeEvent}
-            onPointerDown={stopNodeEvent}
-            onPointerMove={stopNodeEvent}
-            onMouseDown={stopNodeEvent}
-            onClick={stopNodeEvent}
-            onTouchStart={stopNodeEvent}
-            onTouchMove={stopNodeEvent}
-          >
-            <button
-              type="button"
-              onClick={handlePreviewToggle}
-              disabled={!connectedInput || isGenerating}
-              className="nodrag nowheel inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35"
-              style={{
-                color: isPreviewing ? '#ffcf66' : 'rgba(255,255,255,0.78)',
-                background: 'rgba(255,255,255,0.05)',
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              {isPreviewing ? (
-                <Square className="h-3.5 w-3.5 fill-current" />
-              ) : (
-                <Play className="h-3.5 w-3.5 fill-current" />
-              )}
-              {isPreviewing ? '停止预览' : '实时预览'}
-            </button>
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={!connectedInput || isGenerating}
-              className="nodrag nowheel inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-[13px] font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35"
-              style={{ color: '#fff', background: '#208cff' }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              生成 · {RELIGHT_COST}
-              <Zap className="h-3.5 w-3.5 fill-current" />
-            </button>
+            {showAdvancedSettings && (
+              <div className="flex-shrink-0" style={{ width: RELIGHT_ADVANCED_PANEL_WIDTH }}>
+                <RelightAdvancedSettings
+                  settings={relightSettings}
+                  onSettingsChange={handleAdvancedSettingsChange}
+                  onPresetSelect={handlePresetSelect}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

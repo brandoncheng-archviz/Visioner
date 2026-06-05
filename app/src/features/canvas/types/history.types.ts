@@ -13,7 +13,9 @@ export interface GeneratedImage {
 export interface ResultSetBatch {
   batchId: string;
   nodeId: string;
-  mode: 'preview' | 'final';
+  assetType?: 'image' | 'relight';
+  sourceNodeId?: string;
+  sourceImageNodeIds?: string[];
   images: GeneratedImage[];
   prompt: string;
   userPrompt: string;
@@ -27,7 +29,6 @@ export interface ResultSetBatch {
 
 export interface CurrentResultSet {
   batchId: string;
-  mode: 'preview' | 'final';
   images: GeneratedImage[];
   selectedIndex: number;
   isExpanded: boolean;

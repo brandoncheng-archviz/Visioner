@@ -1,8 +1,28 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import CanvasPage from './pages/CanvasPage';
 
 function App() {
+  useEffect(() => {
+    const preventBrowserWheelZoom = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('wheel', preventBrowserWheelZoom, {
+      capture: true,
+      passive: false,
+    });
+
+    return () => {
+      document.removeEventListener('wheel', preventBrowserWheelZoom, {
+        capture: true,
+      });
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

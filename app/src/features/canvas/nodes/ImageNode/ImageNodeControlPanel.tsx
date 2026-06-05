@@ -11,6 +11,7 @@ import {
   ArrowUp,
   Maximize2,
   Pencil,
+  Zap,
 } from 'lucide-react';
 import type {
   PromptContent,
@@ -55,6 +56,7 @@ const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
 const GENERATION_CONTROL_BUTTON_SELECTED_CLASS =
   'border-[#94A3B8] bg-[rgba(148,163,184,0.12)] text-[#E2E8F0] shadow-none';
+const GENERATION_CREDIT_COST = 14;
 
 export function ImageNodeControlPanel({
   promptText,
@@ -70,8 +72,6 @@ export function ImageNodeControlPanel({
   modelParams,
   onModelParamsChange,
   onGenerate,
-  onPreviewGenerate,
-  isResultMode,
   canGenerate,
   isGenerating,
   generationTask,
@@ -97,8 +97,6 @@ export function ImageNodeControlPanel({
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void | Promise<void>;
-  onPreviewGenerate?: () => void | Promise<void>;
-  isResultMode?: boolean;
   canGenerate: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
@@ -112,6 +110,16 @@ export function ImageNodeControlPanel({
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
+  const formatGenerationCount = useCallback(
+    (count: string) => {
+      const countValue = Number.parseInt(count, 10);
+      return t(`imageNode.countValue.${countValue}`, {
+        count: countValue,
+        defaultValue: count,
+      });
+    },
+    [t],
+  );
   const [showLightPreview, setShowLightPreview] = useState(false);
 
   useEffect(() => {
@@ -983,7 +991,7 @@ export function ImageNodeControlPanel({
               }}
             >
               <Bookmark className="w-4 h-4" />
-              <span style={{ fontSize: 12 }}>{t('imageNode.preset')}</span>
+              <span style={{ fontSize: 14 }}>{t('imageNode.preset')}</span>
             </button>
             {showPresetModal && (
               <PresetPickerModal
@@ -1007,15 +1015,15 @@ export function ImageNodeControlPanel({
                 </span>
                 {/* Hover tooltip */}
                 <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[220px] rounded-xl p-2.5 text-left group-hover/light-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
-                  <div className="text-[12px] font-medium text-white/90">光影</div>
-                  <div className="mt-1 text-[11px] text-white/55">{lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}</div>
-                  <div className="mt-1.5 space-y-0.5 text-[11px] text-white/48">
+                  <div className="text-[14px] font-medium text-white/90">光影</div>
+                  <div className="mt-1 text-[13px] text-white/55">{lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}</div>
+                  <div className="mt-1.5 space-y-0.5 text-[13px] text-white/48">
                     <div>太阳高度：{lightPreview.sun.elevation}°</div>
                     <div>太阳方位：{lightPreview.sun.azimuth}°</div>
                     <div>天空：{lightPreview.derived.skyLabel}</div>
                     <div>阴影：{lightPreview.derived.shadowLengthLabel} · {lightPreview.derived.shadowBlurLabel}</div>
                   </div>
-                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.72)' }}>点击可重新设置</div>
+                  <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.72)' }}>点击可重新设置</div>
                 </div>
               </button>
             ) : (
@@ -1025,7 +1033,7 @@ export function ImageNodeControlPanel({
                 style={{ width: 54, height: 50, padding: '4px' }}
               >
                 <Sun className="w-4 h-4" />
-                <span style={{ fontSize: 12 }}>光影</span>
+                <span style={{ fontSize: 14 }}>光影</span>
               </button>
             )}
             {showLightPreview && (
@@ -1078,14 +1086,14 @@ export function ImageNodeControlPanel({
               ) : (
                 <>
                   <Palette className="w-4 h-4" />
-                  <span style={{ fontSize: 12 }}>{t('imageNode.style')}</span>
+                  <span style={{ fontSize: 14 }}>{t('imageNode.style')}</span>
                 </>
               )}
               {selectedStyle && (
                 <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-xl p-2.5 text-left group-hover/style-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
-                  <div className="text-[12px] font-medium text-white/90">{selectedStyle.title}</div>
-                  <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.56)' }}>{selectedStyle.shortDescription}</div>
-                  <div className="mt-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.72)' }}>{t('imageNode.clickToChangeStyle')}</div>
+                  <div className="text-[14px] font-medium text-white/90">{selectedStyle.title}</div>
+                  <div className="mt-1 text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.56)' }}>{selectedStyle.shortDescription}</div>
+                  <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.72)' }}>{t('imageNode.clickToChangeStyle')}</div>
                 </div>
               )}
             </button>
@@ -1270,7 +1278,7 @@ export function ImageNodeControlPanel({
             onKeyDown={handlePromptKeyDown}
             placeholder={t('imageNode.promptPlaceholder')}
             className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
-            style={{ color: 'rgba(255,255,255,0.94)', fontSize: 14, lineHeight: 1.58, minHeight: promptExpanded ? 176 : 104 }}
+            style={{ color: 'rgba(255,255,255,0.94)', fontSize: 16, lineHeight: 1.58, minHeight: promptExpanded ? 176 : 104 }}
             rows={promptExpanded ? 7 : 4}
             onPointerDown={stopControlEvent}
             onMouseDown={stopControlEvent}
@@ -1350,8 +1358,8 @@ export function ImageNodeControlPanel({
               <div className="absolute bottom-full left-0 mb-1 py-1 rounded-lg z-30 overflow-hidden" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 190 }}>
                 {MODEL_OPTIONS.map((m) => (
                   <button key={m.name} onClick={() => { onModelParamsChange({ ...modelParams, model: m.name }); setShowModelMenu(false); }} className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left transition-colors ${modelParams.model === m.name ? 'bg-white/10' : 'hover:bg-white/5'}`}>
-                    <span className="flex-shrink-0 flex items-center justify-center rounded text-[8px] font-bold text-white" style={{ width: 18, height: 18, background: m.iconBg }}>{m.icon}</span>
-                    <span className="text-[13px] text-white/85">{m.name}</span>
+                    <span className="flex-shrink-0 flex items-center justify-center rounded text-[10px] font-bold text-white" style={{ width: 20, height: 20, background: m.iconBg }}>{m.icon}</span>
+                    <span className="text-[15px] text-white/85">{m.name}</span>
                   </button>
                 ))}
               </div>
@@ -1413,40 +1421,31 @@ export function ImageNodeControlPanel({
         <div className="relative flex items-center rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: FLOATING_PANEL_BORDER, padding: '5px 6px 5px 12px', gap: 8 }}>
           <button
             onClick={() => { setShowCountMenu(!showCountMenu); setShowModelMenu(false); setShowRatioMenu(false); }}
-            className="flex items-center gap-1 transition-colors hover:text-white"
+            className="flex h-[34px] min-w-[82px] items-center justify-center gap-1 transition-colors hover:text-white"
             style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}
           >
-            {t(`imageNode.countValue.${modelParams.count}`, { defaultValue: modelParams.count })}
+            {formatGenerationCount(modelParams.count)}
             <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
           </button>
           {showCountMenu && (
-            <div className="absolute bottom-full right-10 mb-2 py-1 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', minWidth: 80 }}>
+            <div className="absolute bottom-full left-0 mb-2 py-1 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 82 }}>
               {COUNT_OPTIONS.map((c) => (
-                <button key={c} onClick={() => { onModelParamsChange({ ...modelParams, count: c }); setShowCountMenu(false); }} className={`w-full px-3 py-2 text-left text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}>{t(`imageNode.countValue.${c}`, { defaultValue: c })}</button>
+                <button key={c} onClick={() => { onModelParamsChange({ ...modelParams, count: c }); setShowCountMenu(false); }} className={`w-full px-3 py-2 text-center text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}>{formatGenerationCount(c)}</button>
               ))}
             </div>
           )}
-          {!isResultMode && (
-            <button
-              type="button"
-              onClick={() => onPreviewGenerate?.()}
-              disabled={!canGenerate || !onPreviewGenerate}
-              className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/[0.08] hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                width: 92,
-                height: 34,
-                fontSize: 13,
-                fontWeight: 500,
-                color: 'rgba(255,255,255,0.72)',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.10)',
-              }}
-              title={isGenerating ? t('imageNode.generating') : '低成本生成小图，用于确认方向'}
-              aria-label="快速生成"
-            >
-              快速生成
-            </button>
-          )}
+          <div
+            className="flex h-[34px] min-w-[52px] items-center justify-center gap-1 rounded-lg px-2 text-[13px] font-medium"
+            style={{
+              color: 'rgba(255,255,255,0.48)',
+              background: 'rgba(255,255,255,0.018)',
+              border: '1px solid rgba(255,255,255,0.035)',
+            }}
+            title={t('imageNode.creditCost', { count: GENERATION_CREDIT_COST })}
+          >
+            <Zap className="h-3 w-3 fill-current text-[#b8a36d]" />
+            <span>{GENERATION_CREDIT_COST}</span>
+          </div>
           {generationTask?.status === 'failed' && generationTask.errorMessage ? (
             <button
               onClick={handleGenerateClick}
@@ -1458,7 +1457,7 @@ export function ImageNodeControlPanel({
                 background: 'rgba(239,68,68,0.16)',
                 border: '1px solid rgba(239,68,68,0.35)',
                 color: '#fca5a5',
-                fontSize: 12,
+                fontSize: 14,
                 opacity: isGenerating ? 0.5 : 1,
                 cursor: isGenerating ? 'not-allowed' : 'pointer',
               }}
@@ -1479,7 +1478,7 @@ export function ImageNodeControlPanel({
                 background: canGenerate ? '#ffffff' : 'rgba(255,255,255,0.14)',
                 opacity: canGenerate ? 1 : 0.45,
               }}
-              title={isGenerating ? t('imageNode.generating') : '生成'}
+              title={isGenerating ? t('imageNode.generating') : t('imageNode.generate')}
             >
               {isGenerating ? (
                 <div className="relative flex items-center justify-center">

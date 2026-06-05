@@ -137,6 +137,12 @@ const zhCN = {
     originalImage: "原图",
     model: "模型",
     count: "数量",
+    countValue: {
+      "1": "1张",
+      "2": "2张",
+      "4": "4张",
+    },
+    creditCost: "消耗 {{count}} 积分",
     usageConflictTitle: "已有一张「{{role}}」，该用途同一目标节点最多 1 张。",
     changeUsage: "改用途",
     customSuggestions: {

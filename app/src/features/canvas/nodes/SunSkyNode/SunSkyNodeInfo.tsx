@@ -16,13 +16,13 @@ export function SunSkyNodeInfo({ elevation, azimuth, derived, compact = false }:
   return (
     <div className="rounded-xl border border-white/[0.07] bg-white/[0.025]">
       <div className={compact ? 'px-3 py-2' : 'px-3 py-2.5'}>
-        <div className={compact ? 'mb-1 text-[11px] font-medium text-white/45' : 'mb-1.5 text-[12px] font-medium text-white/45'}>当前光影</div>
-        <p className={compact ? 'truncate text-[12px] font-medium text-white/76' : 'truncate text-[13px] font-medium text-white/76'}>{summary}</p>
+        <div className={compact ? 'mb-1 text-[13px] font-medium text-white/45' : 'mb-1.5 text-[14px] font-medium text-white/45'}>当前光影</div>
+        <p className={compact ? 'truncate text-[14px] font-medium text-white/76' : 'truncate text-[15px] font-medium text-white/76'}>{summary}</p>
       </div>
 
       <button
         type="button"
-        className={`nodrag nowheel flex w-full items-center justify-between border-t border-white/[0.06] px-3 text-[12px] text-white/48 transition hover:bg-white/[0.035] hover:text-white/72 ${compact ? 'py-1.5' : 'py-2'}`}
+        className={`nodrag nowheel flex w-full items-center justify-between border-t border-white/[0.06] px-3 text-[14px] text-white/48 transition hover:bg-white/[0.035] hover:text-white/72 ${compact ? 'py-1.5' : 'py-2'}`}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
@@ -49,7 +49,7 @@ export function SunSkyNodeInfo({ elevation, azimuth, derived, compact = false }:
             <InfoRow icon={<Droplets />} label="阴影虚化" value={derived.shadowBlurLabel} />
           </div>
 
-          <p className="col-span-2 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-[12px] leading-relaxed text-white/58">{derived.summary}</p>
+          <p className="col-span-2 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-[14px] leading-relaxed text-white/58">{derived.summary}</p>
         </div>
       )}
     </div>
@@ -59,9 +59,9 @@ export function SunSkyNodeInfo({ elevation, azimuth, derived, compact = false }:
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="grid items-center border-b border-white/[0.055] py-1.5 last:border-b-0" style={{ gridTemplateColumns: '20px 62px minmax(0, 1fr)' }}>
-      <span className="text-white/42 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>
-      <span className="text-[12px] text-white/48">{label}</span>
-      <span className="truncate text-right text-[12px] font-medium text-white/76">{value}</span>
+      <span className="text-white/42 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
+      <span className="text-[14px] text-white/48">{label}</span>
+      <span className="truncate text-right text-[14px] font-medium text-white/76">{value}</span>
     </div>
   );
 }

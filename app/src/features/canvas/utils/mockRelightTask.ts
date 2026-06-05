@@ -89,7 +89,7 @@ export function mockRelightGenerate(
   const task = createBaseTask(nodeId, sourceImageNodeIds, 'generate', lightPreview);
   const controller = new AbortController();
 
-  const delay = 800 + Math.floor(Math.random() * 400);
+  const delay = 900 + Math.floor(Math.random() * 301);
 
   const timer = window.setTimeout(() => {
     if (controller.signal.aborted) return;

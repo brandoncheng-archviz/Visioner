@@ -4,7 +4,7 @@ import type { SyntheticEvent } from 'react';
 export interface SunSkyNodeControlsProps {
   elevation: number;
   azimuth: number;
-  directionLabel: string;
+  directionLabel?: string;
   onElevationChange: (value: number) => void;
   onAzimuthChange: (value: number) => void;
 }
@@ -19,7 +19,7 @@ export function SunSkyNodeControls({
   return (
     <div className="space-y-3">
       <SunSlider
-        icon={<Sun className="h-3.5 w-3.5" />}
+        icon={<Sun className="h-4 w-4" />}
         label="太阳高度"
         value={elevation}
         min={0}
@@ -32,7 +32,7 @@ export function SunSkyNodeControls({
       />
       <div className="h-px bg-white/[0.06]" />
       <SunSlider
-        icon={<Compass className="h-3.5 w-3.5" />}
+        icon={<Compass className="h-4 w-4" />}
         label="太阳方位"
         value={azimuth}
         min={0}
@@ -90,8 +90,8 @@ function SunSlider({
       onTouchMove={stopSliderEvent}
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-[13px] font-semibold text-white/78">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</span>
+        <div className="flex items-center gap-2 text-[15px] font-semibold text-white/78">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
           <span className="truncate leading-none">{label}</span>
         </div>
       </div>
@@ -114,17 +114,17 @@ function SunSlider({
             background: `linear-gradient(to right, #208cff 0%, #208cff ${percent}%, rgba(255,255,255,0.12) ${percent}%, rgba(255,255,255,0.12) 100%)`,
           }}
         />
-        <div className="mt-1.5 grid grid-cols-3 text-[11px] text-white/32">
+        <div className="mt-1.5 grid grid-cols-3 text-[13px] text-white/32">
           <span>{minLabel}</span>
           <span className="text-center">{midLabel}</span>
           <span className="text-right">{maxLabel}</span>
         </div>
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <span className="min-w-[62px] rounded-lg border border-white/[0.08] bg-[#111722] px-2 py-1.5 text-center text-[13px] font-medium text-white/82">
+        <span className="min-w-[62px] rounded-lg border border-white/[0.08] bg-[#111722] px-2 py-1.5 text-center text-[15px] font-medium text-white/82">
           {value}°
         </span>
-        {extraValue && <span className="max-w-[70px] truncate rounded-md border border-white/[0.06] bg-white/[0.025] px-1.5 py-0.5 text-[11px] text-white/48">{extraValue}</span>}
+        {extraValue && <span className="max-w-[70px] truncate rounded-md border border-white/[0.06] bg-white/[0.025] px-1.5 py-0.5 text-[13px] text-white/48">{extraValue}</span>}
       </div>
     </div>
   );

@@ -137,6 +137,12 @@ const enUS = {
     originalImage: "Original",
     model: "Model",
     count: "Count",
+    countValue: {
+      "1": "1 img",
+      "2": "2 imgs",
+      "4": "4 imgs",
+    },
+    creditCost: "Costs {{count}} credits",
     usageConflictTitle: "There is already a 「{{role}}」reference; this purpose allows at most 1 per target node.",
     changeUsage: "Change Purpose",
     customSuggestions: {

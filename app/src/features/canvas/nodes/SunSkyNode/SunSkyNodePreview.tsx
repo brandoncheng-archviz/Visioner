@@ -25,8 +25,8 @@ export function SunSkyNodePreview({ imagePath, elevation, azimuth, height = 210 
         className="flex flex-col items-center justify-center rounded-lg"
         style={{ height, background: '#1a1d24' }}
       >
-        <span className="text-xs text-[#6a6a7a]">预览图占位</span>
-        <span className="mt-1 text-[10px] text-[#4a4a5a]">{imagePath.split('/').pop()}</span>
+        <span className="text-[14px] text-[#6a6a7a]">预览图占位</span>
+        <span className="mt-1 text-[12px] text-[#4a4a5a]">{imagePath.split('/').pop()}</span>
       </div>
     );
   }

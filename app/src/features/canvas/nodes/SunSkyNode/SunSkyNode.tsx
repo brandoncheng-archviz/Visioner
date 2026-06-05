@@ -196,7 +196,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
               </div>
               <div className="min-w-0">
                 <div className="truncate text-[17px] font-semibold leading-none text-white/90">光影预览 / Light Preview</div>
-                <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] text-white/42">
+                <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[13px] text-white/42">
                   <span className="truncate">{derived.timeLabel}</span>
                   <span className="h-1 w-1 rounded-full bg-white/20" />
                   <span className="truncate">{derived.directionLabel}</span>
@@ -243,7 +243,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
 
             {/* Linked images */}
             <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
-              <div className="flex items-center gap-2 text-[13px] text-white/55">
+              <div className="flex items-center gap-2 text-[15px] text-white/55">
                 <Link2 className="h-4 w-4" />
                 <span>{linkedImageNodeIds.length > 0 ? `已连接 ${linkedImageNodeIds.length} 张图` : '未连接图片'}</span>
               </div>
