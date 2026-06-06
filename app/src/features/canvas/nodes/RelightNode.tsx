@@ -691,6 +691,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
                       <SunSkyNodeControls
                         elevation={elevation}
                         azimuth={azimuth}
+                        layout="stacked"
                         onElevationChange={handleElevationChange}
                         onAzimuthChange={handleAzimuthChange}
                       />

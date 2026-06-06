@@ -5,6 +5,7 @@ export interface SunSkyNodeControlsProps {
   elevation: number;
   azimuth: number;
   directionLabel?: string;
+  layout?: 'inline' | 'stacked';
   onElevationChange: (value: number) => void;
   onAzimuthChange: (value: number) => void;
 }
@@ -13,11 +14,14 @@ export function SunSkyNodeControls({
   elevation,
   azimuth,
   directionLabel,
+  layout = 'inline',
   onElevationChange,
   onAzimuthChange,
 }: SunSkyNodeControlsProps) {
+  const stacked = layout === 'stacked';
+
   return (
-    <div className="space-y-3">
+    <div className={stacked ? '' : 'space-y-3'}>
       <SunSlider
         icon={<Sun className="h-4 w-4" />}
         label="太阳高度"
@@ -28,9 +32,10 @@ export function SunSkyNodeControls({
         minLabel="0°"
         midLabel="45°"
         maxLabel="90°"
+        stacked={stacked}
         onChange={onElevationChange}
       />
-      <div className="h-px bg-white/[0.06]" />
+      <div className={stacked ? 'my-3 h-px bg-white/[0.045]' : 'h-px bg-white/[0.06]'} />
       <SunSlider
         icon={<Compass className="h-4 w-4" />}
         label="太阳方位"
@@ -41,7 +46,8 @@ export function SunSkyNodeControls({
         minLabel="0°"
         midLabel="180°"
         maxLabel="360°"
-        extraValue={directionLabel}
+        extraValue={stacked ? undefined : directionLabel}
+        stacked={stacked}
         onChange={onAzimuthChange}
       />
     </div>
@@ -59,6 +65,7 @@ function SunSlider({
   midLabel,
   maxLabel,
   extraValue,
+  stacked = false,
   onChange,
 }: {
   icon: React.ReactNode;
@@ -71,6 +78,7 @@ function SunSlider({
   midLabel: string;
   maxLabel: string;
   extraValue?: string;
+  stacked?: boolean;
   onChange: (value: number) => void;
 }) {
   const percent = ((value - min) / (max - min)) * 100;
@@ -78,10 +86,60 @@ function SunSlider({
     event.stopPropagation();
   };
 
+  const slider = (
+    <>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        onWheel={stopSliderEvent}
+        onPointerDown={stopSliderEvent}
+        onPointerMove={stopSliderEvent}
+        onMouseDown={stopSliderEvent}
+        onTouchStart={stopSliderEvent}
+        onTouchMove={stopSliderEvent}
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full"
+        style={{
+          background: `linear-gradient(to right, #208cff 0%, #208cff ${percent}%, rgba(255,255,255,0.12) ${percent}%, rgba(255,255,255,0.12) 100%)`,
+        }}
+      />
+      <div className={`${stacked ? 'mt-2' : 'mt-1.5'} grid grid-cols-3 text-[13px] text-white/32`}>
+        <span>{minLabel}</span>
+        <span className="text-center">{midLabel}</span>
+        <span className="text-right">{maxLabel}</span>
+      </div>
+    </>
+  );
+
+  const title = (
+    <div className={`flex items-center ${stacked ? 'gap-2.5 text-[16px] font-medium' : 'gap-2 text-[15px] font-semibold'} text-white/78`}>
+      <span className={`${stacked ? 'h-8 w-8' : 'h-7 w-7'} flex shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 [&_svg]:h-4 [&_svg]:w-4`}>
+        {icon}
+      </span>
+      <span className="truncate leading-none">{label}</span>
+    </div>
+  );
+
+  const valueDisplay = (
+    <span
+      className={`${stacked ? 'h-10 min-w-[72px] rounded-[10px] px-3 text-[19px]' : 'min-w-[62px] rounded-lg px-2 py-1.5 text-[15px]'} inline-flex items-center justify-center border font-medium transition-colors hover:bg-white/[0.06]`}
+      style={{
+        color: 'rgba(255,255,255,0.92)',
+        background: 'rgba(255,255,255,0.04)',
+        borderColor: 'rgba(255,255,255,0.10)',
+      }}
+    >
+      {value}°
+    </span>
+  );
+
   return (
     <div
-      className="nodrag nopan nowheel grid items-center gap-3"
-      style={{ gridTemplateColumns: '96px minmax(0, 1fr) 70px' }}
+      className={`nodrag nopan nowheel ${stacked ? '' : 'grid items-center gap-3'}`}
+      style={stacked ? undefined : { gridTemplateColumns: '96px minmax(0, 1fr) 70px' }}
       onWheel={stopSliderEvent}
       onPointerDown={stopSliderEvent}
       onPointerMove={stopSliderEvent}
@@ -89,43 +147,30 @@ function SunSlider({
       onTouchStart={stopSliderEvent}
       onTouchMove={stopSliderEvent}
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 text-[15px] font-semibold text-white/78">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 [&_svg]:h-4 [&_svg]:w-4">{icon}</span>
-          <span className="truncate leading-none">{label}</span>
-        </div>
-      </div>
-      <div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          onWheel={stopSliderEvent}
-          onPointerDown={stopSliderEvent}
-          onPointerMove={stopSliderEvent}
-          onMouseDown={stopSliderEvent}
-          onTouchStart={stopSliderEvent}
-          onTouchMove={stopSliderEvent}
-          className="h-1.5 w-full cursor-pointer appearance-none rounded-full"
-          style={{
-            background: `linear-gradient(to right, #208cff 0%, #208cff ${percent}%, rgba(255,255,255,0.12) ${percent}%, rgba(255,255,255,0.12) 100%)`,
-          }}
-        />
-        <div className="mt-1.5 grid grid-cols-3 text-[13px] text-white/32">
-          <span>{minLabel}</span>
-          <span className="text-center">{midLabel}</span>
-          <span className="text-right">{maxLabel}</span>
-        </div>
-      </div>
-      <div className="flex flex-col items-end gap-0.5">
-        <span className="min-w-[62px] rounded-lg border border-white/[0.08] bg-[#111722] px-2 py-1.5 text-center text-[15px] font-medium text-white/82">
-          {value}°
-        </span>
-        {extraValue && <span className="max-w-[70px] truncate rounded-md border border-white/[0.06] bg-white/[0.025] px-1.5 py-0.5 text-[13px] text-white/48">{extraValue}</span>}
-      </div>
+      {stacked ? (
+        <>
+          <div className="flex items-center justify-between gap-4">
+            {title}
+            {valueDisplay}
+          </div>
+          <div className="mt-3">
+            {slider}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="min-w-0">
+            {title}
+          </div>
+          <div>
+            {slider}
+          </div>
+          <div className="flex flex-col items-end gap-0.5">
+            {valueDisplay}
+            {extraValue && <span className="max-w-[70px] truncate rounded-md border border-white/[0.06] bg-white/[0.025] px-1.5 py-0.5 text-[13px] text-white/48">{extraValue}</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
