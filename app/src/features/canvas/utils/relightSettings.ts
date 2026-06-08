@@ -72,6 +72,7 @@ export function createRelightLightPreview(
   return {
     enabled: true,
     sun: { elevation, azimuth },
+    settings: { ...settings },
     derived: {
       ...baseDerived,
       summary: `${baseDerived.timeLabel} · ${baseDerived.directionLabel}，${atmosphereLabel}，${baseDerived.shadowLengthLabel}、${baseDerived.shadowBlurLabel}阴影，适合建筑可视化。`,

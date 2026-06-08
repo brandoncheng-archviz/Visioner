@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
-import { ChevronRight, Loader2, Play, Plus, Square, Sun, Zap } from 'lucide-react';
+import { Loader2, Play, Plus, Square, Sun, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { SunSkyNodeControls } from './SunSkyNode/SunSkyNodeControls';
 import type { LightPreviewData } from '../types/lightPreview.types';
 import type { RelightCreationOptions, RelightPreset, RelightSettings } from '../types/relight.types';
 import type { CurrentResultSet } from '../types/history.types';
@@ -17,9 +16,14 @@ import { CANVAS_NODE_CONTROL_SCALE, IMAGE_NODE_CONTROL_WIDTH } from '../constant
 import { resolveImageNodeSize } from '../utils/imageNodeSizing';
 import { getCurrentImage, getNodeHeight, getNodeWidth } from '../types/imageNodeData.types';
 import { useHistory } from '../contexts/HistoryContext';
-import { DEFAULT_RELIGHT_SETTINGS } from '../constants/relightPresets';
+import { DEFAULT_RELIGHT_SETTINGS, DEFAULT_RELIGHT_SUN } from '../constants/relightPresets';
 import { createRelightLightPreview } from '../utils/relightSettings';
-import { RelightAdvancedSettings } from '../components/RelightAdvancedSettings';
+import {
+  RelightControlBody,
+  RELIGHT_ADVANCED_PANEL_WIDTH,
+  RELIGHT_CONTROL_PANEL_EXPANDED_HEIGHT,
+  RELIGHT_CONTROL_PANEL_HEIGHT,
+} from '../components/RelightControlBody';
 import { ImageToolbar } from '../components/ImageToolbar';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 
@@ -53,10 +57,7 @@ export interface RelightNodeData {
   ) => void;
 }
 
-const DEFAULT_SUN = { elevation: 33, azimuth: 55 };
 const RELIGHT_COST = 14;
-const RELIGHT_CONTROL_PANEL_HEIGHT = 360;
-const RELIGHT_ADVANCED_PANEL_WIDTH = 340;
 
 export function RelightNode({ data, selected, id }: NodeProps) {
   const { t } = useTranslation();
@@ -68,7 +69,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const nodeData = data as unknown as RelightNodeData;
   const status = nodeData.status ?? 'empty';
   const initialSettings = nodeData.relightSettings ?? DEFAULT_RELIGHT_SETTINGS;
-  const initialLightPreview = nodeData.lightPreview ?? createRelightLightPreview(DEFAULT_SUN, initialSettings);
+  const initialLightPreview = nodeData.lightPreview ?? createRelightLightPreview(DEFAULT_RELIGHT_SUN, initialSettings);
 
   const [elevation, setElevation] = useState(initialLightPreview.sun.elevation);
   const [azimuth, setAzimuth] = useState(initialLightPreview.sun.azimuth);
@@ -124,7 +125,9 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const cardWidth = previewSize.cardWidth;
   const previewHeight = previewSize.cardHeight;
   const controlPanelWidth = IMAGE_NODE_CONTROL_WIDTH + (showAdvancedSettings ? RELIGHT_ADVANCED_PANEL_WIDTH : 0);
-  const controlPanelHeight = showAdvancedSettings ? 440 : RELIGHT_CONTROL_PANEL_HEIGHT;
+  const controlPanelHeight = showAdvancedSettings
+    ? RELIGHT_CONTROL_PANEL_EXPANDED_HEIGHT
+    : RELIGHT_CONTROL_PANEL_HEIGHT;
 
   const isPreviewing = status === 'previewing';
   const isGenerating = status === 'generating';
@@ -525,7 +528,19 @@ export function RelightNode({ data, selected, id }: NodeProps) {
       )}
 
       {/* Label */}
-      <div className="absolute z-20" style={{ top: -20, left: 0, width: cardWidth }}>
+      <div
+        className="absolute z-20 overflow-hidden nodrag"
+        onPointerDownCapture={stopNodeEvent}
+        onMouseDownCapture={stopNodeEvent}
+        onClick={stopNodeEvent}
+        style={{
+          top: -20 / zoom,
+          left: 0,
+          width: cardWidth * zoom,
+          transform: `scale(${inverseScale})`,
+          transformOrigin: 'top left',
+        }}
+      >
         <div className="flex items-center gap-1.5 overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
           <Sun className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13, color: '#00d4ff' }} />
           <span className="min-w-0 truncate transition-colors hover:text-white">{label}</span>
@@ -631,7 +646,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
         <>
           {/* Control panel */}
           <div
-            className="absolute z-30"
+            className="absolute z-30 transition-[width] duration-300 ease-out"
             style={{
               top: previewHeight + 12 / zoom,
               left: cardWidth / 2,
@@ -641,7 +656,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
             }}
           >
             <div
-              className="nodrag nopan nowheel overflow-hidden rounded-[18px] border"
+              className="nodrag nopan nowheel overflow-hidden rounded-[18px] border transition-[width,min-height] duration-300 ease-out"
               style={{
                 width: controlPanelWidth,
                 minHeight: controlPanelHeight,
@@ -657,127 +672,86 @@ export function RelightNode({ data, selected, id }: NodeProps) {
               onTouchStart={stopNodeEvent}
               onTouchMove={stopNodeEvent}
             >
-              <div className="flex">
-                <div className="flex-shrink-0" style={{ width: IMAGE_NODE_CONTROL_WIDTH }}>
-                  {/* Header */}
-                  <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
-                    <div className="min-w-0">
-                      <div className="truncate text-[16px] font-semibold text-white/90">光影预览 / Light Preview</div>
-                      <div className="mt-1.5 truncate text-[13px] text-white/42">
-                        {lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvancedSettings((current) => !current)}
-                      className="ml-4 inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white/58 transition hover:bg-white/[0.05] hover:text-white/78"
-                    >
-                      高级设置
-                      <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAdvancedSettings ? 'rotate-180' : ''}`} />
-                    </button>
-                  </div>
+              <RelightControlBody
+                lightPreview={lightPreview}
+                elevation={elevation}
+                azimuth={azimuth}
+                settings={relightSettings}
+                showAdvancedSettings={showAdvancedSettings}
+                onToggleAdvancedSettings={() => setShowAdvancedSettings((current) => !current)}
+                onElevationChange={handleElevationChange}
+                onAzimuthChange={handleAzimuthChange}
+                onSettingsChange={handleAdvancedSettingsChange}
+                onPresetSelect={handlePresetSelect}
+              />
 
-                  {/* Controls body */}
-                  <div className="grid gap-4 px-5 py-4" style={{ gridTemplateColumns: '205px minmax(0, 1fr)' }}>
-                    <div className="relative flex h-[205px] items-center justify-center overflow-hidden rounded-xl bg-[#0f1219]">
-                      <img
-                        src={lightPreview.derived.previewImagePath}
-                        alt="光影预览"
-                        className="h-full w-full object-cover"
-                        draggable={false}
-                      />
-                    </div>
-                    <div className="min-w-0 space-y-3">
-                      <SunSkyNodeControls
-                        elevation={elevation}
-                        azimuth={azimuth}
-                        layout="stacked"
-                        onElevationChange={handleElevationChange}
-                        onAzimuthChange={handleAzimuthChange}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Footer buttons */}
+              {/* Footer actions span the complete control panel. */}
+              <div
+                className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3"
+                onWheel={stopNodeEvent}
+                onPointerDown={stopNodeEvent}
+                onPointerMove={stopNodeEvent}
+                onMouseDown={stopNodeEvent}
+                onClick={stopNodeEvent}
+                onTouchStart={stopNodeEvent}
+                onTouchMove={stopNodeEvent}
+              >
+                <button
+                  type="button"
+                  onClick={handlePreviewToggle}
+                  disabled={!connectedInput || isGenerating}
+                  className="nodrag nowheel inline-flex h-[34px] items-center gap-2 rounded-lg border px-3.5 text-[13px] font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35"
+                  style={{
+                    color: isRealtimePreviewActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
+                    background: isRealtimePreviewActive ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.045)',
+                    borderColor: 'rgba(255,255,255,0.075)',
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {isRealtimePreviewActive ? (
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                  )}
+                  {isRealtimePreviewActive ? '停止预览' : '实时预览'}
+                </button>
+                <div
+                  className="flex h-12 items-center overflow-hidden rounded-[15px] border"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    borderColor: 'rgba(255,255,255,0.08)',
+                  }}
+                >
                   <div
-                    className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3"
-                    onWheel={stopNodeEvent}
-                    onPointerDown={stopNodeEvent}
-                    onPointerMove={stopNodeEvent}
-                    onMouseDown={stopNodeEvent}
-                    onClick={stopNodeEvent}
-                    onTouchStart={stopNodeEvent}
-                    onTouchMove={stopNodeEvent}
+                    className="flex h-full items-center gap-1.5 px-4 text-[13px] font-medium"
+                    style={{ color: 'rgba(255,255,255,0.58)' }}
+                    title={`消耗 ${RELIGHT_COST} 积分`}
                   >
-                    <button
-                      type="button"
-                      onClick={handlePreviewToggle}
-                      disabled={!connectedInput || isGenerating}
-                      className="nodrag nowheel inline-flex h-[34px] items-center gap-2 rounded-lg border px-3.5 text-[13px] font-medium transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35"
-                      style={{
-                        color: isRealtimePreviewActive ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
-                        background: isRealtimePreviewActive ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.045)',
-                        borderColor: 'rgba(255,255,255,0.075)',
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      {isRealtimePreviewActive ? (
-                        <Square className="h-3.5 w-3.5 fill-current" />
-                      ) : (
-                        <Play className="h-3.5 w-3.5 fill-current" />
-                      )}
-                      {isRealtimePreviewActive ? '停止预览' : '实时预览'}
-                    </button>
-                    <div
-                      className="relative flex items-center rounded-xl"
-                      style={{
-                        height: 40,
-                        padding: '4px 5px 4px 12px',
-                        gap: 10,
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                      }}
-                    >
-                      <div
-                        className="flex items-center gap-1 text-[13px] font-medium"
-                        style={{ color: 'rgba(255,255,255,0.55)' }}
-                        title={`消耗 ${RELIGHT_COST} 积分`}
-                      >
-                        <Zap className="h-3 w-3 fill-current text-[#b8a36d]" />
-                        <span>{RELIGHT_COST}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleGenerate}
-                        disabled={!connectedInput || isGenerating}
-                        className="nodrag nowheel flex items-center justify-center rounded-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-                        style={{
-                          width: 32,
-                          height: 32,
-                          color: '#111',
-                          background: connectedInput && !isGenerating ? '#ffffff' : 'rgba(255,255,255,0.14)',
-                        }}
-                        title={isGenerating ? '改光生成中...' : '生成'}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        {isGenerating ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-black/70" />
-                        ) : (
-                          <span className="text-[16px] font-semibold leading-none">↑</span>
-                        )}
-                      </button>
-                    </div>
+                    <Zap className="h-3.5 w-3.5 fill-current text-[#b8a36d]" />
+                    <span>{RELIGHT_COST}</span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={!connectedInput || isGenerating}
+                    className="nodrag nowheel flex h-10 w-10 items-center justify-center rounded-[11px] transition duration-200 hover:brightness-105 hover:shadow-[0_4px_14px_rgba(255,255,255,0.12)] disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{
+                      marginRight: 3,
+                      color: 'rgba(0,0,0,0.86)',
+                      background: connectedInput && !isGenerating
+                        ? 'rgba(255,255,255,0.92)'
+                        : 'rgba(255,255,255,0.34)',
+                    }}
+                    title={isGenerating ? '改光生成中...' : `生成，消耗 ${RELIGHT_COST} 积分`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <span className="text-[17px] font-semibold leading-none">↑</span>
+                    )}
+                  </button>
                 </div>
-                {showAdvancedSettings && (
-                  <div className="flex-shrink-0" style={{ width: RELIGHT_ADVANCED_PANEL_WIDTH }}>
-                    <RelightAdvancedSettings
-                      settings={relightSettings}
-                      onSettingsChange={handleAdvancedSettingsChange}
-                      onPresetSelect={handlePresetSelect}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           </div>

@@ -1,13 +1,18 @@
 import { useState, useMemo, useCallback, useEffect, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { X, RotateCcw, ChevronRight } from 'lucide-react';
-import { SunSkyNodeControls } from '../nodes/SunSkyNode/SunSkyNodeControls';
-import { RelightAdvancedSettings } from './RelightAdvancedSettings';
+import { RotateCcw } from 'lucide-react';
 import { createRelightLightPreview } from '../utils/relightSettings';
-import { DEFAULT_RELIGHT_SETTINGS } from '../constants/relightPresets';
+import { DEFAULT_RELIGHT_SETTINGS, DEFAULT_RELIGHT_SUN } from '../constants/relightPresets';
+import { CANVAS_NODE_CONTROL_SCALE, IMAGE_NODE_CONTROL_WIDTH } from '../constants/canvasConstants';
 import { clamp, snapToStep } from '../nodes/SunSkyNode/sunSkyNode.utils';
 import type { RelightSettings, RelightPreset } from '../types/relight.types';
 import type { LightPreviewData } from '../types/lightPreview.types';
+import {
+  RelightControlBody,
+  RELIGHT_ADVANCED_PANEL_WIDTH,
+  RELIGHT_CONTROL_PANEL_EXPANDED_HEIGHT,
+  RELIGHT_CONTROL_PANEL_HEIGHT,
+} from './RelightControlBody';
 
 interface LightPreviewPanelProps {
   initialSun?: { elevation: number; azimuth: number };
@@ -16,18 +21,14 @@ interface LightPreviewPanelProps {
   onClose: () => void;
 }
 
-const BASE_PANEL_WIDTH = 580;
-const ADVANCED_PANEL_WIDTH = 340;
-const PREVIEW_SIZE = 160;
-
 export function LightPreviewPanel({
   initialSun,
   initialSettings,
   onApply,
   onClose,
 }: LightPreviewPanelProps) {
-  const [elevation, setElevation] = useState(initialSun?.elevation ?? 12);
-  const [azimuth, setAzimuth] = useState(initialSun?.azimuth ?? 55);
+  const [elevation, setElevation] = useState(initialSun?.elevation ?? DEFAULT_RELIGHT_SUN.elevation);
+  const [azimuth, setAzimuth] = useState(initialSun?.azimuth ?? DEFAULT_RELIGHT_SUN.azimuth);
   const [settings, setSettings] = useState<RelightSettings>(initialSettings ?? DEFAULT_RELIGHT_SETTINGS);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
@@ -39,8 +40,6 @@ export function LightPreviewPanel({
       settings,
     );
   }, [elevation, azimuth, settings]);
-
-  const derived = lightPreview.derived;
 
   const handleElevationChange = useCallback((value: number) => {
     setElevation(value);
@@ -65,8 +64,8 @@ export function LightPreviewPanel({
   }, []);
 
   const handleReset = useCallback(() => {
-    setElevation(12);
-    setAzimuth(55);
+    setElevation(DEFAULT_RELIGHT_SUN.elevation);
+    setAzimuth(DEFAULT_RELIGHT_SUN.azimuth);
     setSettings(DEFAULT_RELIGHT_SETTINGS);
   }, []);
 
@@ -90,12 +89,15 @@ export function LightPreviewPanel({
     return () => document.removeEventListener('keydown', handler, true);
   }, [onClose]);
 
-  const panelWidth = BASE_PANEL_WIDTH + (showAdvancedSettings ? ADVANCED_PANEL_WIDTH : 0);
+  const panelWidth = IMAGE_NODE_CONTROL_WIDTH + (showAdvancedSettings ? RELIGHT_ADVANCED_PANEL_WIDTH : 0);
+  const panelHeight = showAdvancedSettings
+    ? RELIGHT_CONTROL_PANEL_EXPANDED_HEIGHT
+    : RELIGHT_CONTROL_PANEL_HEIGHT;
 
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center nodrag nopan nowheel"
-      style={{ background: 'rgba(0,0,0,0.65)' }}
+      style={{ background: 'rgba(0,0,0,0.85)' }}
       onClick={(e) => {
         e.stopPropagation();
         if (e.target === e.currentTarget) onClose();
@@ -109,14 +111,15 @@ export function LightPreviewPanel({
       onTouchMove={stopPanelEvent}
     >
       <div
-        className="relative flex flex-col overflow-hidden nodrag nopan nowheel"
+        className="relative flex flex-col overflow-hidden rounded-[18px] border transition-[width] duration-300 ease-out nodrag nopan nowheel"
         style={{
           width: panelWidth,
+          minHeight: panelHeight,
           maxHeight: 'calc(100vh - 64px)',
           background: '#252526',
-          borderRadius: 18,
-          border: '1px solid rgba(255,255,255,0.08)',
+          borderColor: 'rgba(255,255,255,0.08)',
           boxShadow: '0 18px 48px rgba(0,0,0,0.42)',
+          transform: `scale(${CANVAS_NODE_CONTROL_SCALE})`,
         }}
         onClick={stopPanelEvent}
         onWheel={stopPanelEvent}
@@ -127,80 +130,21 @@ export function LightPreviewPanel({
         onTouchStart={stopPanelEvent}
         onTouchMove={stopPanelEvent}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3 flex-shrink-0">
-          <div className="min-w-0">
-            <div className="truncate text-[15px] font-semibold text-white/90">
-              光影预览 / Light Preview
-            </div>
-            <div className="mt-1 truncate text-[12px] text-white/42">
-              {derived.timeLabel} · {derived.directionLabel}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-white/40 transition hover:bg-white/[0.06] hover:text-white/70"
-            title="关闭"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex">
-            <div className="flex-shrink-0" style={{ width: BASE_PANEL_WIDTH }}>
-              <div className="grid gap-3 px-5 py-3" style={{ gridTemplateColumns: `${PREVIEW_SIZE}px minmax(0, 1fr)` }}>
-                <div
-                  className="relative flex items-center justify-center overflow-hidden rounded-xl bg-[#0f1219]"
-                  style={{ height: PREVIEW_SIZE }}
-                >
-                  <img
-                    src={derived.previewImagePath}
-                    alt="光影预览"
-                    className="h-full w-full object-cover"
-                    draggable={false}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvancedSettings((current) => !current)}
-                      className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-medium text-white/55 transition hover:bg-white/[0.05] hover:text-white/78"
-                    >
-                      高级设置
-                      <ChevronRight
-                        className="h-3 w-3 transition-transform"
-                        style={{ transform: showAdvancedSettings ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                      />
-                    </button>
-                  </div>
-                  <SunSkyNodeControls
-                    elevation={elevation}
-                    azimuth={azimuth}
-                    layout="stacked"
-                    onElevationChange={handleElevationChange}
-                    onAzimuthChange={handleAzimuthChange}
-                  />
-                </div>
-              </div>
-            </div>
-            {showAdvancedSettings && (
-              <div className="flex-shrink-0" style={{ width: ADVANCED_PANEL_WIDTH }}>
-                <RelightAdvancedSettings
-                  settings={settings}
-                  onSettingsChange={handleSettingsChange}
-                  onPresetSelect={handlePresetSelect}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+        <RelightControlBody
+          lightPreview={lightPreview}
+          elevation={elevation}
+          azimuth={azimuth}
+          settings={settings}
+          showAdvancedSettings={showAdvancedSettings}
+          onToggleAdvancedSettings={() => setShowAdvancedSettings((current) => !current)}
+          onElevationChange={handleElevationChange}
+          onAzimuthChange={handleAzimuthChange}
+          onSettingsChange={handleSettingsChange}
+          onPresetSelect={handlePresetSelect}
+        />
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-white/[0.035] px-5 py-2 flex-shrink-0">
+        <div className="flex min-h-[72px] flex-shrink-0 items-center justify-between border-t border-white/[0.06] px-5 py-3">
           <button
             type="button"
             onClick={handleReset}

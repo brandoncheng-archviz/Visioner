@@ -5,7 +5,9 @@ import {
   MessageCircle,
   History,
   Wand2,
+  Type,
   Image,
+  Video,
   Headphones,
   X,
 } from 'lucide-react';
@@ -14,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { GeneratedImage, ResultSetBatch } from '../types/history.types';
+import { BASIC_NODE_DEFINITIONS, type BasicNodeType } from '../constants/basicNodes';
 
 export interface CanvasSidebarProps {
   activePanel: string | null;
@@ -25,6 +28,11 @@ export interface CanvasSidebarProps {
 export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseHistoryImages }: CanvasSidebarProps) {
   const { t } = useTranslation();
   const isHistoryOpen = activePanel === 'history';
+  const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
+    text: Type,
+    image: Image,
+    video: Video,
+  };
 
   useEffect(() => {
     if (!isHistoryOpen) return;
@@ -159,20 +167,21 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
             {activePanel === 'add' && (
               <div className="space-y-2">
                 <p className="text-xs text-[#6a6a7a] mb-2">{t('sidebar.addNode')}</p>
-                {[
-                  { type: 'image', label: t('sidebar.imageNode'), icon: Image, color: '#22d3ee' },
-                ].map((item) =>(
-                  <button
-                    key={item.type}
-                    onClick={() => onAddNode(item.type)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#1e1e28] transition-colors text-left"
-                  >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${item.color}15` }}>
-                      <item.icon className="w-4 h-4" style={{ color: item.color }} />
-                    </div>
-                    <span className="text-sm text-white">{item.label}</span>
-                  </button>
-                ))}
+                {BASIC_NODE_DEFINITIONS.map((item) => {
+                  const ItemIcon = basicNodeIcons[item.type];
+                  return (
+                    <button
+                      key={item.type}
+                      onClick={() => onAddNode(item.type)}
+                      className="w-full flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left transition-colors hover:border-white/[0.06] hover:bg-[#1e1e28]"
+                    >
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${item.color}15` }}>
+                        <ItemIcon className="w-4 h-4" style={{ color: item.color }} />
+                      </div>
+                      <span className="text-sm text-white">{t(item.labelKey)}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
             {activePanel === 'skills' && (

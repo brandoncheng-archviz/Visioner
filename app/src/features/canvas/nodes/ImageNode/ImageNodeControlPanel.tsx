@@ -1005,14 +1005,38 @@ export function ImageNodeControlPanel({
           {/* Light Preview */}
           <div className="relative">
             {lightPreview?.enabled ? (
-              <button
-                onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
-                className={`group/light-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${GENERATION_CONTROL_BUTTON_SELECTED_CLASS}`}
-                style={{ width: 54, height: 50, padding: 0 }}
-              >
-                <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
-                  <img src={lightPreview.derived.previewImagePath} alt="" className="h-full w-full object-cover" draggable={false} />
-                </span>
+              <div className="group/light-btn relative" style={{ width: 54, height: 50 }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
+                  className={`relative flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border p-0 transition-colors ${GENERATION_CONTROL_BUTTON_SELECTED_CLASS}`}
+                >
+                  <img
+                    src={lightPreview.derived.previewImagePath}
+                    alt=""
+                    className="pointer-events-none h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onPointerDownCapture={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClickCapture={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onLightPreviewChange(null);
+                    setShowLightPreview(false);
+                  }}
+                  className="nodrag nowheel absolute right-0 top-0 z-30 hidden items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/light-btn:flex"
+                  style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
+                  title="清除光影设置"
+                  aria-label="清除光影设置"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
                 {/* Hover tooltip */}
                 <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[220px] rounded-xl p-2.5 text-left group-hover/light-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
                   <div className="text-[14px] font-medium text-white/90">光影</div>
@@ -1025,7 +1049,7 @@ export function ImageNodeControlPanel({
                   </div>
                   <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.72)' }}>点击可重新设置</div>
                 </div>
-              </button>
+              </div>
             ) : (
               <button
                 onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}

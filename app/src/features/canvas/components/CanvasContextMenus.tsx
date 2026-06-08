@@ -1,5 +1,6 @@
-import { Image, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
+import { Type, Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { BASIC_NODE_DEFINITIONS, type BasicNodeType } from '../constants/basicNodes';
 
 /* ─── Canvas Context Menu (right-click on empty canvas) ─── */
 
@@ -20,9 +21,11 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
   const { t } = useTranslation();
   if (!menu) return null;
 
-  const items = [
-    { type: 'image', label: t('canvas.addImageNode'), icon: Image, color: '#22d3ee' },
-  ];
+  const icons: Record<BasicNodeType, typeof Image> = {
+    text: Type,
+    image: Image,
+    video: Video,
+  };
 
   return (
     <>
@@ -42,16 +45,20 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
         }}
       >
         <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
-        {items.map((item, index) => (
-          <button
-            key={`${item.type}-${index}`}
-            onClick={() => onAddNode(item.type, item.label)}
-            className="w-full flex items-center gap-4 px-5 py-3.5 text-left text-[16px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
-          >
-            <item.icon className="w-5 h-5" style={{ color: item.color }} />
-            {item.label}
-          </button>
-        ))}
+        {BASIC_NODE_DEFINITIONS.map((item) => {
+          const ItemIcon = icons[item.type];
+          const label = t(item.labelKey);
+          return (
+            <button
+              key={item.type}
+              onClick={() => onAddNode(item.type, label)}
+              className="w-full flex items-center gap-4 px-5 py-3.5 text-left text-[16px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+            >
+              <ItemIcon className="w-5 h-5" style={{ color: item.color }} />
+              {label}
+            </button>
+          );
+        })}
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
     </>

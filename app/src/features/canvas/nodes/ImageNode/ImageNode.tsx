@@ -1729,13 +1729,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             </div>
           ) : (
             <div className="flex items-center justify-center">
-              {/* Clean placeholder icon */}
-              <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-                <rect x="4" y="4" width="48" height="48" rx="12" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
-                <path d="M16 38L24 26L30 34L36 28L40 32" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="38" cy="20" r="4" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
-                <path d="M12 42C18 36 26 36 32 40C38 44 44 40 48 36" stroke="rgba(255,255,255,0.1)" strokeWidth="1" strokeLinecap="round" />
-              </svg>
+              <Image
+                className="h-12 w-12"
+                strokeWidth={1.35}
+                style={{ color: 'rgba(255,255,255,0.22)' }}
+              />
             </div>
           )}
         </div>

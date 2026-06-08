@@ -1,5 +1,10 @@
 import type { RelightPreset, RelightSettings } from '../types/relight.types';
 
+export const DEFAULT_RELIGHT_SUN = {
+  elevation: 33,
+  azimuth: 55,
+} as const;
+
 export const DEFAULT_RELIGHT_SETTINGS: RelightSettings = {
   cloudAmount: 'clear',
   fogLevel: 'none',
