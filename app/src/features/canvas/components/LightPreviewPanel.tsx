@@ -1,33 +1,46 @@
 import { useState, useMemo, useCallback, useEffect, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { X, RotateCcw } from 'lucide-react';
+import { X, RotateCcw, ChevronRight } from 'lucide-react';
 import { SunSkyNodeControls } from '../nodes/SunSkyNode/SunSkyNodeControls';
-import { SunSkyNodeInfo } from '../nodes/SunSkyNode/SunSkyNodeInfo';
-import { resolveSunSkyDerived } from '../nodes/SunSkyNode/resolveSunSkyDerived';
+import { RelightAdvancedSettings } from './RelightAdvancedSettings';
+import { createRelightLightPreview } from '../utils/relightSettings';
+import { DEFAULT_RELIGHT_SETTINGS } from '../constants/relightPresets';
 import { clamp, snapToStep } from '../nodes/SunSkyNode/sunSkyNode.utils';
-import type { SunSkyNodeDerived } from '../nodes/SunSkyNode/sunSkyNode.types';
+import type { RelightSettings, RelightPreset } from '../types/relight.types';
+import type { LightPreviewData } from '../types/lightPreview.types';
 
 interface LightPreviewPanelProps {
   initialSun?: { elevation: number; azimuth: number };
-  onApply: (sun: { elevation: number; azimuth: number }, derived: SunSkyNodeDerived) => void;
-  onClear: () => void;
+  initialSettings?: RelightSettings;
+  onApply: (data: LightPreviewData) => void;
   onClose: () => void;
 }
 
+const BASE_PANEL_WIDTH = 580;
+const ADVANCED_PANEL_WIDTH = 340;
+const PREVIEW_SIZE = 160;
+
 export function LightPreviewPanel({
   initialSun,
+  initialSettings,
   onApply,
-  onClear,
   onClose,
 }: LightPreviewPanelProps) {
   const [elevation, setElevation] = useState(initialSun?.elevation ?? 12);
   const [azimuth, setAzimuth] = useState(initialSun?.azimuth ?? 55);
+  const [settings, setSettings] = useState<RelightSettings>(initialSettings ?? DEFAULT_RELIGHT_SETTINGS);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
-  const derived = useMemo(() => {
+  const lightPreview = useMemo(() => {
     const normalizedElevation = snapToStep(clamp(elevation, 0, 90), 3);
     const normalizedAzimuth = snapToStep(clamp(azimuth, 0, 360), 5);
-    return resolveSunSkyDerived({ elevation: normalizedElevation, azimuth: normalizedAzimuth });
-  }, [elevation, azimuth]);
+    return createRelightLightPreview(
+      { elevation: normalizedElevation, azimuth: normalizedAzimuth },
+      settings,
+    );
+  }, [elevation, azimuth, settings]);
+
+  const derived = lightPreview.derived;
 
   const handleElevationChange = useCallback((value: number) => {
     setElevation(value);
@@ -37,17 +50,29 @@ export function LightPreviewPanel({
     setAzimuth(value);
   }, []);
 
+  const handleSettingsChange = useCallback((nextSettings: RelightSettings) => {
+    setSettings(nextSettings);
+  }, []);
+
+  const handlePresetSelect = useCallback((preset: RelightPreset) => {
+    setElevation(preset.elevation);
+    setAzimuth(preset.azimuth);
+    setSettings({
+      cloudAmount: preset.cloudAmount,
+      fogLevel: preset.fogLevel,
+      lightingPresetId: preset.id,
+    });
+  }, []);
+
   const handleReset = useCallback(() => {
     setElevation(12);
     setAzimuth(55);
+    setSettings(DEFAULT_RELIGHT_SETTINGS);
   }, []);
 
   const handleApply = useCallback(() => {
-    const normalizedElevation = snapToStep(clamp(elevation, 0, 90), 3);
-    const normalizedAzimuth = snapToStep(clamp(azimuth, 0, 360), 5);
-    const finalDerived = resolveSunSkyDerived({ elevation: normalizedElevation, azimuth: normalizedAzimuth });
-    onApply({ elevation: normalizedElevation, azimuth: normalizedAzimuth }, finalDerived);
-  }, [elevation, azimuth, onApply]);
+    onApply(lightPreview);
+  }, [lightPreview, onApply]);
 
   const stopPanelEvent = useCallback((event: SyntheticEvent) => {
     event.stopPropagation();
@@ -64,6 +89,8 @@ export function LightPreviewPanel({
     document.addEventListener('keydown', handler, true);
     return () => document.removeEventListener('keydown', handler, true);
   }, [onClose]);
+
+  const panelWidth = BASE_PANEL_WIDTH + (showAdvancedSettings ? ADVANCED_PANEL_WIDTH : 0);
 
   return createPortal(
     <div
@@ -82,13 +109,14 @@ export function LightPreviewPanel({
       onTouchMove={stopPanelEvent}
     >
       <div
-        className="relative flex flex-col rounded-2xl overflow-hidden nodrag nopan nowheel"
+        className="relative flex flex-col overflow-hidden nodrag nopan nowheel"
         style={{
-          width: 560,
+          width: panelWidth,
           maxHeight: 'calc(100vh - 64px)',
-          background: '#14141a',
-          border: '1px solid #2a2a35',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.55)',
+          background: '#252526',
+          borderRadius: 18,
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 18px 48px rgba(0,0,0,0.42)',
         }}
         onClick={stopPanelEvent}
         onWheel={stopPanelEvent}
@@ -100,84 +128,101 @@ export function LightPreviewPanel({
         onTouchMove={stopPanelEvent}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] flex-shrink-0">
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3 flex-shrink-0">
           <div className="min-w-0">
-            <div className="text-[16px] font-semibold text-white/90 truncate">光影预览 / Light Preview</div>
-            <div className="mt-1 text-[12px] text-white/45 truncate">
+            <div className="truncate text-[15px] font-semibold text-white/90">
+              光影预览 / Light Preview
+            </div>
+            <div className="mt-1 truncate text-[12px] text-white/42">
               {derived.timeLabel} · {derived.directionLabel}
             </div>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-white/[0.07] hover:text-white/78"
-              style={{ color: 'rgba(255,255,255,0.45)' }}
-              title="重置"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-white/[0.07] hover:text-white/78"
-              style={{ color: 'rgba(255,255,255,0.45)' }}
-              title="关闭"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-white/40 transition hover:bg-white/[0.06] hover:text-white/70"
+            title="关闭"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Preview */}
-          <div className="relative overflow-hidden rounded-xl bg-[#0f1219]" style={{ height: 210 }}>
-            <img
-              src={derived.previewImagePath}
-              alt="光影预览"
-              className="h-full w-full object-cover"
-              draggable={false}
-            />
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex">
+            <div className="flex-shrink-0" style={{ width: BASE_PANEL_WIDTH }}>
+              <div className="grid gap-3 px-5 py-3" style={{ gridTemplateColumns: `${PREVIEW_SIZE}px minmax(0, 1fr)` }}>
+                <div
+                  className="relative flex items-center justify-center overflow-hidden rounded-xl bg-[#0f1219]"
+                  style={{ height: PREVIEW_SIZE }}
+                >
+                  <img
+                    src={derived.previewImagePath}
+                    alt="光影预览"
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedSettings((current) => !current)}
+                      className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-medium text-white/55 transition hover:bg-white/[0.05] hover:text-white/78"
+                    >
+                      高级设置
+                      <ChevronRight
+                        className="h-3 w-3 transition-transform"
+                        style={{ transform: showAdvancedSettings ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                      />
+                    </button>
+                  </div>
+                  <SunSkyNodeControls
+                    elevation={elevation}
+                    azimuth={azimuth}
+                    layout="stacked"
+                    onElevationChange={handleElevationChange}
+                    onAzimuthChange={handleAzimuthChange}
+                  />
+                </div>
+              </div>
+            </div>
+            {showAdvancedSettings && (
+              <div className="flex-shrink-0" style={{ width: ADVANCED_PANEL_WIDTH }}>
+                <RelightAdvancedSettings
+                  settings={settings}
+                  onSettingsChange={handleSettingsChange}
+                  onPresetSelect={handlePresetSelect}
+                />
+              </div>
+            )}
           </div>
-
-          {/* Controls */}
-          <SunSkyNodeControls
-            elevation={elevation}
-            azimuth={azimuth}
-            directionLabel={derived.directionLabel}
-            onElevationChange={handleElevationChange}
-            onAzimuthChange={handleAzimuthChange}
-          />
-
-          {/* Info */}
-          <SunSkyNodeInfo elevation={elevation} azimuth={azimuth} derived={derived} />
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-4 border-t border-white/[0.06] flex-shrink-0">
+        <div className="flex items-center justify-between border-t border-white/[0.035] px-5 py-2 flex-shrink-0">
           <button
             type="button"
-            onClick={() => { onClear(); onClose(); }}
-            className="text-[13px] font-medium transition hover:text-white/80"
-            style={{ color: 'rgba(255,255,255,0.45)' }}
+            onClick={handleReset}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-white/45 transition hover:bg-white/[0.04] hover:text-white/75"
           >
-            清除
+            <RotateCcw className="h-3 w-3" />
+            重置
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-[13px] font-medium transition hover:bg-white/[0.07]"
-              style={{ color: 'rgba(255,255,255,0.65)', background: 'rgba(255,255,255,0.04)' }}
+              className="h-8 rounded-lg px-3.5 text-[12px] font-medium text-white/65 transition hover:bg-white/[0.07]"
+              style={{ background: 'rgba(255,255,255,0.04)' }}
             >
               取消
             </button>
             <button
               type="button"
               onClick={handleApply}
-              className="rounded-lg px-5 py-2 text-[13px] font-medium transition hover:brightness-110"
-              style={{ color: '#fff', background: '#208cff' }}
+              className="h-8 rounded-lg px-4 text-[12px] font-medium text-white transition hover:brightness-110"
+              style={{ background: '#208cff' }}
             >
               应用
             </button>

@@ -129,7 +129,7 @@ app/
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,678 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,692 lines)
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -151,18 +151,19 @@ app/
 
 **Source file counts (verified):**
 - `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 76 files (components, nodes, sunSky, types, constants, utils, hooks, services, contexts)
-- `src/` total: 155 TypeScript / TSX source files; 158 total files under `src/`
+- `src/features/canvas/`: 82 files (components, nodes, sunSky, types, constants, utils, hooks, services, contexts)
+- `src/` total: 161 TypeScript / TSX source files; 164 total files under `src/`
 
 **Key file sizes (verified line counts):**
-- `CanvasPage.tsx`: ~1,678 lines (page entry + core state container)
-- `ImageNode.tsx`: ~1,859 lines
-- `ImageNodeControlPanel.tsx`: ~1,507 lines
+- `CanvasPage.tsx`: ~1,692 lines (page entry + core state container)
+- `ImageNode.tsx`: ~1,867 lines
+- `ImageNodeControlPanel.tsx`: ~1,506 lines
 - `NodeEditorCanvas.tsx`: ~894 lines
 - `PresetPickerModal.tsx`: ~551 lines
 - `presets.ts`: ~979 lines
 - `CompareNode.tsx`: ~565 lines
 - `UpscaleNode.tsx`: ~642 lines
+- `RelightNode.tsx`: ~809 lines
 - `UpscaleParamPanel.tsx`: ~309 lines
 - `nodeSystem.ts`: ~319 lines
 
@@ -239,7 +240,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,678 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,692 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
 
 **`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
 - Canvas page entry and React Flow provider wrapper
@@ -259,7 +260,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
 - `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
 - `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
-- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `LightPreviewPanel.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`, `HistoryPanel.tsx`
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `LightPreviewPanel.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`, `HistoryPanel.tsx`, `RelightAdvancedSettings.tsx`
 
 **Node components (`src/features/canvas/nodes/`):**
 - `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
@@ -271,6 +272,7 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `VideoMergeNode.tsx`
 - `UpscaleNode.tsx`
 - `CompareNode.tsx` — Side-by-side image comparison with draggable slider
+- `RelightNode.tsx` — AI relighting node with advanced lighting controls
 - `SunSkyNode/` — SunSky lighting analysis node (preview, controls, derived info)
   - `SunSkyNode.tsx`, `SunSkyNodeControls.tsx`, `SunSkyNodeInfo.tsx`, `SunSkyNodePreview.tsx`, `getSunSkyPreviewImage.ts`, `index.ts`, `resolveSunSkyDerived.ts`, `sunSkyNode.types.ts`, `sunSkyNode.utils.ts`
 
@@ -282,9 +284,9 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`, `history.types.ts`
-- `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`
-- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`, `nodeNaming.ts`, `referenceLimits.ts`, `contentSafety.ts`
+- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`, `history.types.ts`, `relight.types.ts`
+- `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`, `relightPresets.ts`
+- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `mockRelightTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`, `nodeNaming.ts`, `referenceLimits.ts`, `contentSafety.ts`, `relightSettings.ts`
 - `hooks/` — `useToast.ts`
 - `services/` — `identifyElement.ts`
 - `contexts/` — `HistoryContext.tsx`

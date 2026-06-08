@@ -1039,12 +1039,9 @@ export function ImageNodeControlPanel({
             {showLightPreview && (
               <LightPreviewPanel
                 initialSun={lightPreview?.sun}
-                onApply={(sun, derived) => {
-                  onLightPreviewChange({ enabled: true, sun, derived });
-                  setShowLightPreview(false);
-                }}
-                onClear={() => {
-                  onLightPreviewChange(null);
+                initialSettings={lightPreview?.settings}
+                onApply={(data) => {
+                  onLightPreviewChange(data);
                   setShowLightPreview(false);
                 }}
                 onClose={() => setShowLightPreview(false)}

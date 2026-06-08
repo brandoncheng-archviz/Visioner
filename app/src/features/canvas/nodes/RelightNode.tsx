@@ -526,9 +526,9 @@ export function RelightNode({ data, selected, id }: NodeProps) {
 
       {/* Label */}
       <div className="absolute z-20" style={{ top: -20, left: 0, width: cardWidth }}>
-        <div className="flex items-center gap-1 text-[11px] text-white/50">
-          <Sun className="h-3.5 w-3.5 text-[#00d4ff]" />
-          <span className="truncate">{label}</span>
+        <div className="flex items-center gap-1.5 overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
+          <Sun className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13, color: '#00d4ff' }} />
+          <span className="min-w-0 truncate transition-colors hover:text-white">{label}</span>
         </div>
       </div>
 
@@ -731,20 +731,16 @@ export function RelightNode({ data, selected, id }: NodeProps) {
                     <div
                       className="relative flex items-center rounded-xl"
                       style={{
-                        height: 46,
-                        padding: '5px 6px',
-                        gap: 8,
+                        height: 40,
+                        padding: '4px 5px 4px 12px',
+                        gap: 10,
                         background: 'rgba(255,255,255,0.06)',
                         border: '1px solid rgba(255,255,255,0.08)',
                       }}
                     >
                       <div
-                        className="flex h-[34px] min-w-[52px] items-center justify-center gap-1 rounded-lg px-2 text-[13px] font-medium"
-                        style={{
-                          color: 'rgba(255,255,255,0.48)',
-                          background: 'rgba(255,255,255,0.018)',
-                          border: '1px solid rgba(255,255,255,0.035)',
-                        }}
+                        className="flex items-center gap-1 text-[13px] font-medium"
+                        style={{ color: 'rgba(255,255,255,0.55)' }}
                         title={`消耗 ${RELIGHT_COST} 积分`}
                       >
                         <Zap className="h-3 w-3 fill-current text-[#b8a36d]" />
@@ -754,8 +750,10 @@ export function RelightNode({ data, selected, id }: NodeProps) {
                         type="button"
                         onClick={handleGenerate}
                         disabled={!connectedInput || isGenerating}
-                        className="nodrag nowheel flex h-[34px] w-[34px] items-center justify-center rounded-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="nodrag nowheel flex items-center justify-center rounded-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                         style={{
+                          width: 32,
+                          height: 32,
                           color: '#111',
                           background: connectedInput && !isGenerating ? '#ffffff' : 'rgba(255,255,255,0.14)',
                         }}
@@ -765,7 +763,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
                         {isGenerating ? (
                           <Loader2 className="h-4 w-4 animate-spin text-black/70" />
                         ) : (
-                          <span className="text-[18px] font-semibold leading-none">↑</span>
+                          <span className="text-[16px] font-semibold leading-none">↑</span>
                         )}
                       </button>
                     </div>
