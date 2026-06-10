@@ -23,15 +23,28 @@ import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
 import type { GenerationHistoryItem, GenerationTask } from '../features/canvas/types/generation.types';
 import type { RelightCreationOptions } from '../features/canvas/types/relight.types';
+import type { TextNodeActionType, TextNodeData, TextNodeModel } from '../features/canvas/types/basicNode.types';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
 import { CanvasContextMenus } from '../features/canvas/components/CanvasContextMenus';
 import { CanvasToolbar } from '../features/canvas/components/CanvasToolbar';
+import { TextNodeInputPanel } from '../features/canvas/components/TextNodeInputPanel';
+import {
+  DEFAULT_TEXT_NODE_MODEL,
+  TEXT_NODE_IMAGE_EXTRACTION_PROMPT,
+  TEXT_NODE_MIN_HEIGHT,
+  TEXT_NODE_WIDTH,
+} from '../features/canvas/constants/textNode';
+import {
+  getTextContent,
+  isTextWorkflowConnection,
+  simulateTextNodeResult,
+} from '../features/canvas/utils/textNodeUtils';
 
 const NODE_BASE_TITLES: Record<string, string> = {
   image: '图片',
-  text: '文本',
+  text: '文本节点',
   video: '视频',
   audio: '音频',
   script: '脚本',
@@ -68,6 +81,8 @@ const UPSCALE_NODE_DEFAULTS: Record<string, unknown> = {
   mpGrain: 7,
   mpUltra: 30,
 };
+
+const CANVAS_NODE_CONTROL_SCALE = 1;
 
 type ImageFileRejectReason = 'unsupported-type' | 'too-large' | 'decode-failed';
 
@@ -216,6 +231,9 @@ function FlowCanvas() {
   const [historyPanelNodeId, setHistoryPanelNodeId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number } } | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+  const [textFocusRequestId, setTextFocusRequestId] = useState(0);
+  const [textNodePanelSize, setTextNodePanelSize] = useState({ width: TEXT_NODE_WIDTH, height: TEXT_NODE_MIN_HEIGHT });
+  const [textNodePanelPosition, setTextNodePanelPosition] = useState<{ left: number; top: number } | null>(null);
 
   // ─── Line Drawing State ───
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -275,9 +293,16 @@ function FlowCanvas() {
       const targetPortType = effectiveInputHandle?.getAttribute('data-port-type');
       if (targetPortType !== 'input') return t('error.wrongPortDirection');
 
+      const sourceNode = nodes.find((n) => n.id === nodeId);
+      const targetNode = nodes.find((n) => n.id === targetId);
       const sourceDataType = (document.querySelector(`.react-flow__node[data-id="${nodeId}"] .output-port`) as HTMLElement | null)?.getAttribute('data-data-type');
       const targetDataType = (effectiveInputHandle as HTMLElement | null)?.getAttribute('data-data-type');
-      if (sourceDataType !== targetDataType) return t('error.portTypeMismatch');
+      if (
+        sourceDataType !== targetDataType &&
+        !isTextWorkflowConnection(sourceNode?.type, targetNode?.type)
+      ) {
+        return t('error.portTypeMismatch');
+      }
 
       if (wouldCreateCycle(nodeId, targetId, edges)) return t('error.cycleDetected');
 
@@ -285,7 +310,6 @@ function FlowCanvas() {
       if (alreadyConnected) return t('error.alreadyConnected');
 
       // Compare node max 2 images
-      const targetNode = nodes.find((n) => n.id === targetId);
       if (targetNode?.type === 'compare') {
         const targetInputEdges = edges.filter((e) => e.target === targetId);
         if (targetInputEdges.length >= 2) {
@@ -293,11 +317,13 @@ function FlowCanvas() {
         }
       }
 
-      const sourceNode = nodes.find((n) => n.id === nodeId);
       const sourceRole = (sourceNode?.data?.role as ImageRole | null | undefined) ?? null;
 
-      if (targetNode?.type === 'image') {
-        const targetInputEdges = edges.filter((e) => e.target === targetId);
+      if (targetNode?.type === 'image' && sourceNode?.type === 'image') {
+        const targetInputEdges = edges.filter((e) => {
+          if (e.target !== targetId) return false;
+          return nodes.find((node) => node.id === e.source)?.type === 'image';
+        });
         const targetReferences = targetInputEdges.map((edge) => {
           const refNode = nodes.find((n) => n.id === edge.source);
           return {
@@ -719,6 +745,157 @@ function FlowCanvas() {
     }, 50);
   }, [nodes, edges, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
 
+  const focusCanvasNode = useCallback((nodeId: string) => {
+    setNodes((currentNodes) =>
+      currentNodes.map((node) => ({ ...node, selected: node.id === nodeId })),
+    );
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: nodeId }],
+        duration: 280,
+        padding: 0.4,
+        maxZoom: Math.min(getViewport().zoom, 1.15),
+      });
+    }, 0);
+  }, [fitView, getViewport, setNodes]);
+
+  const handleTextAction = useCallback((nodeId: string, action: TextNodeActionType) => {
+    const textNode = nodes.find((node) => node.id === nodeId && node.type === 'text');
+    if (!textNode) return;
+    setActivePanel(null);
+
+    if (action === 'text_to_image') {
+      const newNodeId = `image-${Date.now()}`;
+      const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.image);
+      const newNode: Node = {
+        id: newNodeId,
+        type: 'image',
+        position: {
+          x: textNode.position.x + TEXT_NODE_WIDTH + 100,
+          y: textNode.position.y,
+        },
+        data: {
+          label,
+          ...getRoleData(null),
+        },
+        selected: true,
+      };
+      setNodes((currentNodes) => [
+        ...currentNodes.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                selected: false,
+                data: {
+                  ...node.data,
+                  lastActionType: action,
+                  outputTargetImageNodeIds: [
+                    ...new Set([
+                      ...(((node.data.outputTargetImageNodeIds as string[]) || [])),
+                      newNodeId,
+                    ]),
+                  ],
+                },
+              }
+            : { ...node, selected: false },
+        ),
+        newNode,
+      ]);
+      setEdges((currentEdges) => [
+        ...currentEdges,
+        {
+          id: `e-text-image-${Date.now()}`,
+          source: nodeId,
+          target: newNodeId,
+          sourceHandle: 'right-source',
+          targetHandle: 'left-target',
+          style: { stroke: '#555', strokeWidth: 1 },
+        },
+      ]);
+      return;
+    }
+
+    let sourceImageNodeId: string | null = null;
+    let sourceImageNode: Node | null = null;
+    if (action === 'image_to_text') {
+      const existingEdge = edges.find((edge) => {
+        if (edge.target !== nodeId) return false;
+        return nodes.find((node) => node.id === edge.source)?.type === 'image';
+      });
+      sourceImageNodeId = existingEdge?.source || null;
+
+      if (!sourceImageNodeId) {
+        sourceImageNodeId = `image-${Date.now()}`;
+        const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.image);
+        sourceImageNode = {
+          id: sourceImageNodeId,
+          type: 'image',
+          position: {
+            x: textNode.position.x - 540,
+            y: textNode.position.y,
+          },
+          data: {
+            label,
+            isTextSourceAsset: true,
+            ...getRoleData(null),
+          },
+        };
+      }
+    }
+
+    const editorInput = action === 'image_to_text' ? TEXT_NODE_IMAGE_EXTRACTION_PROMPT : '';
+    setNodes((currentNodes) => {
+      const updatedNodes = currentNodes.map((node) => ({
+        ...node,
+        selected: node.id === nodeId,
+        data: node.id === nodeId
+          ? {
+              ...node.data,
+              status: 'editing',
+              lastActionType: action,
+              editorInput,
+              activeModel: (node.data.activeModel as TextNodeModel | undefined) || DEFAULT_TEXT_NODE_MODEL,
+              ...(sourceImageNodeId
+                ? {
+                    referencedImageNodeIds: [
+                      ...new Set([
+                        ...(((node.data.referencedImageNodeIds as string[]) || [])),
+                        sourceImageNodeId,
+                      ]),
+                    ],
+                  }
+                : {}),
+            }
+          : node.data,
+      }));
+      return sourceImageNode ? [...updatedNodes, sourceImageNode] : updatedNodes;
+    });
+
+    if (sourceImageNodeId && sourceImageNode) {
+      setEdges((currentEdges) => [
+        ...currentEdges,
+        {
+          id: `e-image-text-${Date.now()}`,
+          source: sourceImageNodeId,
+          target: nodeId,
+          sourceHandle: 'right-source',
+          targetHandle: 'left-target',
+          style: { stroke: '#555', strokeWidth: 1 },
+        },
+      ]);
+      const createdSourceNodeId = sourceImageNodeId;
+      setTimeout(() => {
+        fitView({
+          nodes: [{ id: createdSourceNodeId }, { id: nodeId }],
+          duration: 300,
+          padding: 0.2,
+          maxZoom: Math.min(getViewport().zoom, 1),
+        });
+      }, 0);
+    }
+    setTextFocusRequestId((value) => value + 1);
+  }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setEdges, setNodes]);
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
       ...n,
@@ -732,11 +909,13 @@ function FlowCanvas() {
         onCreateSunSkyNode: n.type === 'image' ? createSunSkyNode : undefined,
         onCreateCompareNode: n.type === 'image' || n.type === 'relight' ? createCompareNode : undefined,
         onCreateRelightNode: n.type === 'image' || n.type === 'relight' ? createRelightNode : undefined,
+        onTextAction: n.type === 'text' ? handleTextAction : undefined,
+        onFocusNode: n.type === 'image' ? focusCanvasNode : undefined,
         onOpenNodeHistory: n.type === 'image' ? (nodeId: string) => setHistoryPanelNodeId(nodeId) : undefined,
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode]);
+  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode]);
 
   // ─── Copy / Paste / Delete ───
   const clipboardRef = useRef<{ type: string; data: Record<string, unknown>; position: { x: number; y: number } }[]>([]);
@@ -1076,7 +1255,9 @@ function FlowCanvas() {
   const addNode = useCallback(
     (type: string, pos?: { x: number; y: number }, customLabel?: string) => {
       const position = pos || { x: 400 + Math.random() * 100, y: 200 + Math.random() * 100 };
-      const baseTitle = customLabel || NODE_BASE_TITLES[type] || type;
+      const baseTitle = type === 'text'
+        ? NODE_BASE_TITLES.text
+        : customLabel || NODE_BASE_TITLES[type] || type;
       const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
       const newNode: Node = {
         id: `${type}-${Date.now()}`,
@@ -1086,6 +1267,20 @@ function FlowCanvas() {
           label,
           ...(type === 'image' ? getRoleData(null) : {}),
           ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
+          ...(type === 'text'
+            ? {
+                title: label,
+                content: '',
+                text: '',
+                status: 'empty',
+                referencedImageNodeIds: [],
+                referencedTextNodeIds: [],
+                outputTargetImageNodeIds: [],
+                activeModel: DEFAULT_TEXT_NODE_MODEL,
+                lastActionType: null,
+                editorInput: '',
+              }
+            : {}),
         },
       };
       setNodes((nds) => [...nds, newNode]);
@@ -1093,6 +1288,89 @@ function FlowCanvas() {
     },
     [setNodes, getAllNodeLabels],
   );
+
+  const selectedTextNode = useMemo(() => {
+    const selectedNodes = nodes.filter((node) => node.selected);
+    if (selectedNodes.length !== 1 || selectedNodes[0].type !== 'text') return null;
+    return selectedNodes[0];
+  }, [nodes]);
+  const selectedTextNodePanelPosition = useMemo(() => {
+    if (!selectedTextNode) return null;
+    const viewport = getViewport();
+    const nodeX = selectedTextNode.position.x * viewport.zoom + viewport.x;
+    const nodeY = selectedTextNode.position.y * viewport.zoom + viewport.y;
+    const nodeHeight = selectedTextNode.height ?? selectedTextNode.measured?.height ?? TEXT_NODE_MIN_HEIGHT;
+    return {
+      left: nodeX + (TEXT_NODE_WIDTH * viewport.zoom) / 2,
+      top: nodeY + nodeHeight * viewport.zoom + 12,
+      scale: (1 / viewport.zoom) * CANVAS_NODE_CONTROL_SCALE,
+    };
+  }, [getViewport, selectedTextNode]);
+
+  const updateSelectedTextNode = useCallback((patch: Partial<TextNodeData>) => {
+    if (!selectedTextNode) return;
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === selectedTextNode.id
+          ? { ...node, data: { ...node.data, ...patch } }
+          : node,
+      ),
+    );
+  }, [selectedTextNode, setNodes]);
+
+  const submitSelectedTextNode = useCallback(async () => {
+    if (!selectedTextNode) return;
+    const nodeData = selectedTextNode.data as TextNodeData;
+    const instruction = nodeData.editorInput?.trim() || '';
+    if (!instruction) return;
+
+    const incomingEdges = edges.filter((edge) => edge.target === selectedTextNode.id);
+    const referencedTextNodes = incomingEdges
+      .map((edge) => nodes.find((node) => node.id === edge.source))
+      .filter((node): node is Node => node?.type === 'text');
+    const referencedImageNode = incomingEdges
+      .map((edge) => nodes.find((node) => node.id === edge.source))
+      .find((node) => node?.type === 'image');
+    const action = nodeData.lastActionType === 'image_to_text'
+      ? 'image_to_text'
+      : referencedTextNodes.length > 0
+        ? 'text_to_text'
+        : nodeData.lastActionType || 'draft';
+
+    updateSelectedTextNode({ isProcessing: true, status: 'editing', lastActionType: action });
+    try {
+      const result = await simulateTextNodeResult({
+        action,
+        instruction,
+        sourceText: referencedTextNodes
+          .map((node) => getTextContent(node.data))
+          .filter(Boolean)
+          .join('\n\n'),
+        sourceImageTitle: referencedImageNode
+          ? String(referencedImageNode.data.label || '图片节点')
+          : undefined,
+      });
+      setNodes((currentNodes) =>
+        currentNodes.map((node) =>
+          node.id === selectedTextNode.id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  content: result,
+                  text: result,
+                  status: 'result',
+                  isProcessing: false,
+                  editorInput: '',
+                },
+              }
+            : node,
+        ),
+      );
+    } catch {
+      updateSelectedTextNode({ isProcessing: false });
+    }
+  }, [edges, nodes, selectedTextNode, setNodes, updateSelectedTextNode]);
 
   function isEditablePasteTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -1437,6 +1715,49 @@ function FlowCanvas() {
     setViewport({ x: current.x, y: current.y, zoom: nextZoom }, { duration: 0 });
   }, [getViewport, setViewport]);
 
+  useEffect(() => {
+    const selectedTextNode = nodes.find((node) => node.selected && node.type === 'text');
+    if (!selectedTextNode) {
+      setTextNodePanelPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNode.id}"] .node-preview-card`) as HTMLElement | null;
+      if (!nodeEl) return;
+      const rect = nodeEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const left = rect.left + rect.width / 2;
+      const top = rect.bottom + 12;
+      setTextNodePanelSize((prev) =>
+        prev.width === rect.width && prev.height === rect.height
+          ? prev
+          : { width: rect.width, height: rect.height },
+      );
+      setTextNodePanelPosition((prev) =>
+        prev?.left === left && prev?.top === top ? prev : { left, top },
+      );
+    };
+
+    updatePosition();
+    let frameId = window.requestAnimationFrame(function tick() {
+      updatePosition();
+      frameId = window.requestAnimationFrame(tick);
+    });
+
+    const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNode.id}"] .node-preview-card`) as HTMLElement | null;
+    const observer = nodeEl ? new ResizeObserver(updatePosition) : null;
+    if (nodeEl && observer) observer.observe(nodeEl);
+
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer?.disconnect();
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [nodes, viewport.x, viewport.y, viewport.zoom]);
+
   const handleUseNodeHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch) => {
     if (!historyPanelNodeId || images.length === 0) return;
 
@@ -1599,6 +1920,28 @@ function FlowCanvas() {
         onAddNode={addNode}
         onUseHistoryImages={handleUseGlobalHistoryImages}
       />
+
+      {selectedTextNode && (
+        <div
+          className="absolute z-[90]"
+          style={{
+            top: textNodePanelPosition?.top ?? 0,
+            left: textNodePanelPosition?.left ?? 0,
+            width: 640,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <TextNodeInputPanel
+            value={String(selectedTextNode.data.editorInput || '')}
+            model={(selectedTextNode.data.activeModel as TextNodeModel | undefined) || DEFAULT_TEXT_NODE_MODEL}
+            isProcessing={Boolean(selectedTextNode.data.isProcessing)}
+            focusRequestId={textFocusRequestId}
+            onChange={(value) => updateSelectedTextNode({ editorInput: value, status: 'editing' })}
+            onModelChange={(model) => updateSelectedTextNode({ activeModel: model })}
+            onSubmit={submitSelectedTextNode}
+          />
+        </div>
+      )}
 
       {/* Node history floating panel */}
       {historyPanelNodeId && (

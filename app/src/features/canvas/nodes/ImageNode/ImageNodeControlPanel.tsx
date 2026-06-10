@@ -11,6 +11,7 @@ import {
   ArrowUp,
   Maximize2,
   Pencil,
+  Type,
   Zap,
 } from 'lucide-react';
 import type {
@@ -22,6 +23,7 @@ import type {
   PresetItem,
 } from '../../types/imageNode.types';
 import type { ModelParams } from '../../types/canvas.types';
+import type { TextReferenceInfo } from '../../types/basicNode.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
 import {
   FLOATING_PANEL_BACKGROUND,
@@ -75,6 +77,8 @@ export function ImageNodeControlPanel({
   canGenerate,
   isGenerating,
   generationTask,
+  textReferences,
+  onFocusTextReference,
   references,
   onRemoveReference,
   onReorderReferences,
@@ -100,6 +104,8 @@ export function ImageNodeControlPanel({
   canGenerate: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
+  textReferences: TextReferenceInfo[];
+  onFocusTextReference: (nodeId: string) => void;
   autoOpenLightPanel?: boolean;
   onAcknowledgeAutoOpen?: () => void;
   references: ReferenceInfo[];
@@ -442,6 +448,63 @@ export function ImageNodeControlPanel({
       </div>
     </div>
   );
+
+  const renderTextReference = (reference: TextReferenceInfo) => {
+    const summary = reference.content.trim() || '当前无内容';
+    return (
+      <div
+        key={reference.nodeId}
+        role="button"
+        tabIndex={0}
+        onClick={() => onFocusTextReference(reference.nodeId)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') onFocusTextReference(reference.nodeId);
+        }}
+        className="nodrag nowheel group/text-ref relative flex h-[50px] w-[86px] flex-shrink-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-2 text-left outline-none transition-colors hover:bg-white/[0.07]"
+        style={{
+          background: 'rgba(168,85,247,0.08)',
+          border: '1px solid rgba(192,132,252,0.35)',
+        }}
+      >
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-[#a855f7]/18 text-[#d8b4fe]">
+          <Type className="h-3.5 w-3.5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[11px] font-medium text-white/82">{reference.title}</span>
+          <span className="block truncate text-[10px] text-white/38">{summary}</span>
+        </span>
+
+        <div
+          className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[260px] rounded-xl p-3 group-hover/text-ref:block"
+          style={{
+            background: FLOATING_PANEL_BACKGROUND,
+            border: FLOATING_PANEL_BORDER,
+            boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
+          }}
+        >
+          <div className="text-[13px] font-medium text-white/90">{reference.title}</div>
+          <div className="mt-1 text-[11px] text-white/42">
+            {reference.content ? '已有内容' : '待填写'}
+          </div>
+          <div className="mt-2 line-clamp-4 whitespace-pre-wrap text-[12px] leading-5 text-white/62">
+            {summary}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemoveReference(reference.nodeId);
+          }}
+          className="absolute right-0.5 top-0.5 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white/70 hover:text-white group-hover/text-ref:flex"
+          title="断开文本引用"
+        >
+          <X className="h-2.5 w-2.5" />
+        </button>
+      </div>
+    );
+  };
 
   const imageReferenceBlocks = promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference');
 
@@ -1119,7 +1182,7 @@ export function ImageNodeControlPanel({
               )}
             </button>
           </div>
-          {orderedRefs.length > 0 && (
+          {(textReferences.length > 0 || orderedRefs.length > 0) && (
             <div
               aria-hidden="true"
               className="mx-1 h-6 w-px flex-shrink-0"
@@ -1128,6 +1191,7 @@ export function ImageNodeControlPanel({
           )}
           {/* Reference thumbnails — supports drag sorting */}
           <div className="relative flex items-center gap-2">
+            {textReferences.map(renderTextReference)}
             {orderedRefs.map((ref, idx) => renderReferenceThumbnail(ref, idx, true))}
           </div>
         </div>

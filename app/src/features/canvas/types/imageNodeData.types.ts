@@ -53,6 +53,7 @@ export interface ImageNodeData {
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateRelightNode?: (sourceNodeId: string, inputImage: string, width: number, height: number, options?: RelightCreationOptions) => void;
   onOpenNodeHistory?: (nodeId: string) => void;
+  onFocusNode?: (nodeId: string) => void;
   lightPreview?: LightPreviewData;
 }
 

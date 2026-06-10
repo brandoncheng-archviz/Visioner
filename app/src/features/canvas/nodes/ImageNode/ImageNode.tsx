@@ -9,6 +9,7 @@ import type { MarkItem, ModelParams } from '../../types/canvas.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
 import type { CurrentResultSet, ResultSetBatch, GeneratedImage } from '../../types/history.types';
+import type { TextReferenceInfo, TextNodeData } from '../../types/basicNode.types';
 import {
   normalizeGeneratedImages,
   getCurrentImage,
@@ -32,6 +33,7 @@ import { getRoleData } from '../../utils/referenceUtils';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
 import { resolveImageNodeSize } from '../../utils/imageNodeSizing';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
+import { getTextContent } from '../../utils/textNodeUtils';
 import { identifyImageElement } from '../../services/identifyElement';
 import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
@@ -307,6 +309,22 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       })
       .map((ref, idx) => ({ ...ref, index: idx + 1 }));
   }, [allEdges, allNodes, id, referenceOrder, i18n.language]);
+  const textReferences: TextReferenceInfo[] = useMemo(() => {
+    return allEdges
+      .filter((edge) => edge.target === id)
+      .flatMap((edge) => {
+        const sourceNode = allNodes.find((node) => node.id === edge.source);
+        if (sourceNode?.type !== 'text') return [];
+        const sourceData = sourceNode.data as TextNodeData;
+        const content = getTextContent(sourceData);
+        return [{
+          nodeId: sourceNode.id,
+          title: sourceData.label || sourceData.title || '文本节点',
+          content,
+          status: content ? 'result' : (sourceData.status || 'empty'),
+        }];
+      });
+  }, [allEdges, allNodes, id]);
   const referencesSignature = JSON.stringify(
     references.map((reference) => ({
       nodeId: reference.nodeId,
@@ -351,7 +369,19 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const selectedStyle = getStylePresetById(selectedStyleId);
   const isGenerating = generationTask?.status === 'running';
-  const canGenerate = !isGenerating && (references.length > 0 || role !== null || marks.length > 0 || selectedStyle !== null || promptText.trim().length > 0 || promptContent.length > 0);
+  const textReferencePrompt = textReferences
+    .map((reference) => reference.content.trim())
+    .filter(Boolean)
+    .join('\n\n');
+  const canGenerate = !isGenerating && (
+    references.length > 0 ||
+    textReferencePrompt.length > 0 ||
+    role !== null ||
+    marks.length > 0 ||
+    selectedStyle !== null ||
+    promptText.trim().length > 0 ||
+    promptContent.length > 0
+  );
 
   const selectResultImage = useCallback((index: number) => {
     setCurrentResultSet((prev) => {
@@ -402,7 +432,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       return;
     }
 
-    const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptText, promptContent, selectedPresets, selectedStyle, references, lightPreview);
+    const promptWithTextReferences = [textReferencePrompt, promptText]
+      .filter((value) => value.trim().length > 0)
+      .join('\n\n');
+    const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview);
 
     const safetyResult = await checkGenerationRequestSafety({
       prompt: textPrompt,
@@ -610,7 +643,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
+  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
 
   const handleGenerate = useCallback(() => runGeneration(), [runGeneration]);
 
@@ -1837,6 +1870,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canGenerate={canGenerate}
               isGenerating={isGenerating}
               generationTask={generationTask}
+              textReferences={textReferences}
+              onFocusTextReference={(nodeId) => {
+                const onFocusNode = data.onFocusNode as ((targetNodeId: string) => void) | undefined;
+                onFocusNode?.(nodeId);
+              }}
               references={references}
               onRemoveReference={handleRemoveReference}
               onReorderReferences={handleReorderReferences}

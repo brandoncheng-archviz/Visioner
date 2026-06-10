@@ -90,14 +90,13 @@ export function CanvasStage({
   const { getViewport, setViewport } = useReactFlow();
 
   const handleWheel = useCallback(
-    (event: React.WheelEvent) => {
+    (event: WheelEvent) => {
       // Ignore wheel events from MiniMap and Controls
       const target = event.target as HTMLElement;
       if (target.closest('.react-flow__minimap') || target.closest('.react-flow__controls')) {
         return;
       }
 
-      event.preventDefault();
       const { deltaX, deltaY, ctrlKey, metaKey, shiftKey, clientX, clientY } = event;
       const current = getViewport();
 
@@ -123,11 +122,20 @@ export function CanvasStage({
     [getViewport, setViewport],
   );
 
+  const handleWheelCapture = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      handleWheel(event.nativeEvent);
+    },
+    [handleWheel],
+  );
+
   return (
     <div
       className="absolute inset-0"
       style={{ cursor: tempLine ? 'crosshair' : 'default' }}
       onContextMenu={onContextMenu}
+      onWheelCapture={handleWheelCapture}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -188,7 +196,6 @@ export function CanvasStage({
         zoomOnPinch
         zoomOnScroll={false}
         panOnScroll={false}
-        onWheel={handleWheel}
         fitView
         fitViewOptions={{ maxZoom: 1 }}
         minZoom={CANVAS_MIN_ZOOM}
