@@ -101,8 +101,10 @@ export function CanvasStage({
       const current = getViewport();
 
       if (ctrlKey || metaKey) {
-        // Zoom centered on mouse pointer
-        const factor = deltaY > 0 ? 0.9 : 1.1;
+        const normalizedDeltaY =
+          event.deltaMode === 1 ? deltaY * 16 : event.deltaMode === 2 ? deltaY * 800 : deltaY;
+        const rawFactor = Math.exp(-normalizedDeltaY * 0.01);
+        const factor = Math.min(1.08, Math.max(0.92, rawFactor));
         const newZoom = Math.min(Math.max(current.zoom * factor, CANVAS_MIN_ZOOM), CANVAS_MAX_ZOOM);
         const zoomRatio = newZoom / current.zoom;
         const newX = clientX - (clientX - current.x) * zoomRatio;
@@ -193,7 +195,7 @@ export function CanvasStage({
         selectionOnDrag
         selectionMode={SelectionMode.Partial}
         panOnDrag={[1, 2]}
-        zoomOnPinch
+        zoomOnPinch={false}
         zoomOnScroll={false}
         panOnScroll={false}
         fitView
