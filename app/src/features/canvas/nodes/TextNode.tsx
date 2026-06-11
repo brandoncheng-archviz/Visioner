@@ -97,7 +97,7 @@ export function TextNode({ data, selected, id }: NodeProps) {
     event.preventDefault();
     event.nativeEvent.stopImmediatePropagation();
     const rect = event.currentTarget.getBoundingClientRect();
-    nodeData.onStartLineDraw?.(id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    nodeData.onStartLineDraw?.(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'right-source');
   };
 
   const sourceTitles = [
@@ -139,10 +139,10 @@ export function TextNode({ data, selected, id }: NodeProps) {
         >
           <div className="flex items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
             <svg className="flex-shrink-0" style={{ width: 13, height: 13 }} viewBox="0 0 13 13" fill="none">
-              <rect x="1.5" y="0.5" width="10" height="12" rx="1.5" stroke="rgba(255,255,255,0.5)" strokeWidth="1" fill="none" />
-              <rect x="3.5" y="3.5" width="6" height="0.8" rx="0.4" fill="rgba(255,255,255,0.4)" />
-              <rect x="3.5" y="5.5" width="5" height="0.8" rx="0.4" fill="rgba(255,255,255,0.3)" />
-              <rect x="3.5" y="7.5" width="3.5" height="0.8" rx="0.4" fill="rgba(255,255,255,0.2)" />
+              <rect x="1" y="1.2" width="9" height="1" rx="0.5" fill="rgba(255,255,255,0.5)" />
+              <rect x="1" y="3.8" width="5.5" height="1" rx="0.5" fill="rgba(255,255,255,0.42)" />
+              <rect x="1" y="6.4" width="9" height="1" rx="0.5" fill="rgba(255,255,255,0.5)" />
+              <rect x="1" y="9" width="5.5" height="1" rx="0.5" fill="rgba(255,255,255,0.42)" />
             </svg>
             <span className="truncate">{title}</span>
           </div>
@@ -157,8 +157,8 @@ export function TextNode({ data, selected, id }: NodeProps) {
             minHeight: TEXT_NODE_MIN_HEIGHT,
             maxHeight: TEXT_NODE_MAX_HEIGHT,
             background: '#252526',
-            border: `1px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.06)'}`,
-            boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+            border: `2.5px solid ${selected ? '#2f6bff' : 'rgba(42,42,53,0.98)'}`,
+            boxShadow: 'none',
           }}
         >
           {sourceTitles.length > 0 && (
@@ -183,14 +183,14 @@ export function TextNode({ data, selected, id }: NodeProps) {
               {content}
             </div>
           ) : (
-            <div className="flex min-h-[210px] flex-col items-center justify-center px-6 pb-5 pt-5">
-              <svg width="40" height="32" viewBox="0 0 40 32" fill="none" className="mb-5">
-                <rect x="4" y="2" width="32" height="3" rx="1.5" fill="rgba(255,255,255,0.14)" />
-                <rect x="4" y="10" width="26" height="3" rx="1.5" fill="rgba(255,255,255,0.10)" />
-                <rect x="4" y="18" width="20" height="3" rx="1.5" fill="rgba(255,255,255,0.07)" />
-                <rect x="4" y="26" width="14" height="3" rx="1.5" fill="rgba(255,255,255,0.04)" />
+            <div className="flex min-h-[300px] flex-col items-center justify-center px-6 py-6">
+              <svg width="48" height="36" viewBox="0 0 48 36" fill="none" className="mb-6">
+                <rect x="4" y="2" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
+                <rect x="4" y="11" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
+                <rect x="4" y="20" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
+                <rect x="4" y="29" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
               </svg>
-              <div className="mb-3 w-full text-[11px] text-white/28">尝试：</div>
+              <div className="mb-2.5 w-full text-[11px] text-white/22">尝试：</div>
               <div className="w-full space-y-0.5">
                 {EMPTY_ACTIONS.map(({ action, label, icon: Icon }) => (
                   <button
@@ -200,9 +200,9 @@ export function TextNode({ data, selected, id }: NodeProps) {
                       event.stopPropagation();
                       triggerAction(action);
                     }}
-                    className="nodrag flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/48 transition-colors hover:bg-white/[0.04] hover:text-white/72"
+                    className="nodrag flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/38 transition-colors hover:bg-white/[0.04] hover:text-white/60"
                   >
-                    <Icon className="h-3.5 w-3.5 text-white/28" />
+                    <Icon className="h-3.5 w-3.5 text-white/20" />
                     <span>{label}</span>
                   </button>
                 ))}

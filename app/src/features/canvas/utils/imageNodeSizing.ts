@@ -1,10 +1,10 @@
 import {
   IMAGE_NODE_EMPTY_HEIGHT,
+  IMAGE_NODE_EMPTY_WIDTH,
   IMAGE_NODE_MAX_IMAGE_HEIGHT,
   IMAGE_NODE_MAX_IMAGE_WIDTH,
   IMAGE_NODE_MIN_IMAGE_HEIGHT,
   IMAGE_NODE_MIN_IMAGE_WIDTH,
-  IMAGE_NODE_PREVIEW_WIDTH,
 } from '../constants/canvasConstants';
 
 export interface ImageNodeSizeInput {
@@ -26,7 +26,7 @@ export function resolveImageNodeSize({
 }: ImageNodeSizeInput): ImageNodeSizeResult {
   if (!hasImage) {
     return {
-      cardWidth: IMAGE_NODE_PREVIEW_WIDTH,
+      cardWidth: IMAGE_NODE_EMPTY_WIDTH,
       cardHeight: IMAGE_NODE_EMPTY_HEIGHT,
       imageDisplayScale: 1,
     };

@@ -1,7 +1,7 @@
 import type { TextNodeModel } from '../types/basicNode.types';
 
 export const TEXT_NODE_WIDTH = 300;
-export const TEXT_NODE_MIN_HEIGHT = 240;
+export const TEXT_NODE_MIN_HEIGHT = 300;
 export const TEXT_NODE_MAX_HEIGHT = 420;
 
 export const TEXT_NODE_PLACEHOLDER = '描述你想要的画面、氛围或修改方向...';

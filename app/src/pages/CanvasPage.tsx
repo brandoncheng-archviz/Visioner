@@ -14,7 +14,7 @@ import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
-import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, DEFAULT_MODEL_PARAMS, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd } from '../features/canvas/utils/referenceLimits';
@@ -237,8 +237,8 @@ function FlowCanvas() {
 
   // ─── Line Drawing State ───
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [tempLine, setTempLine] = useState<{ sourceNodeId: string; currentX: number; currentY: number } | null>(null);
-  const [createMenu, setCreateMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number }; sourceNodeId: string } | null>(null);
+  const [tempLine, setTempLine] = useState<{ sourceNodeId: string; sourceHandleId: string; currentX: number; currentY: number } | null>(null);
+  const [createMenu, setCreateMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number }; sourceNodeId: string; sourceHandleId: string } | null>(null);
   const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number; message: string } | null>(null);
   const isDrawingRef = useRef(false);
 
@@ -271,13 +271,13 @@ function FlowCanvas() {
     return false;
   }, []);
 
-  const startLineDraw = useCallback((nodeId: string, screenX: number, screenY: number) => {
+  const startLineDraw = useCallback((nodeId: string, screenX: number, screenY: number, sourceHandleId: string) => {
     if (isDrawingRef.current) return;
     isDrawingRef.current = true;
     const posMap = new Map<string, { x: number; y: number }>();
     nodes.forEach((n) => posMap.set(n.id, { ...n.position }));
     nodePositionsRef.current = posMap;
-    setTempLine({ sourceNodeId: nodeId, currentX: screenX, currentY: screenY });
+    setTempLine({ sourceNodeId: nodeId, sourceHandleId, currentX: screenX, currentY: screenY });
 
     const clearHoverClasses = () => {
       document.querySelectorAll('.react-flow__node').forEach((n) => {
@@ -295,7 +295,8 @@ function FlowCanvas() {
 
       const sourceNode = nodes.find((n) => n.id === nodeId);
       const targetNode = nodes.find((n) => n.id === targetId);
-      const sourceDataType = (document.querySelector(`.react-flow__node[data-id="${nodeId}"] .output-port`) as HTMLElement | null)?.getAttribute('data-data-type');
+      const sourceHandleEl = document.querySelector(`.react-flow__node[data-id="${nodeId}"] [data-source-handle="${sourceHandleId}"]`);
+      const sourceDataType = (sourceHandleEl as HTMLElement | null)?.getAttribute('data-data-type');
       const targetDataType = (effectiveInputHandle as HTMLElement | null)?.getAttribute('data-data-type');
       if (
         sourceDataType !== targetDataType &&
@@ -405,7 +406,7 @@ function FlowCanvas() {
       };
 
       if (!targetId) {
-        setCreateMenu({ x: e.clientX, y: e.clientY, flowPos: screenToFlowPosition({ x: e.clientX, y: e.clientY }), sourceNodeId: nodeId });
+        setCreateMenu({ x: e.clientX, y: e.clientY, flowPos: screenToFlowPosition({ x: e.clientX, y: e.clientY }), sourceNodeId: nodeId, sourceHandleId });
         setTempLine(null);
         return;
       }
@@ -422,7 +423,7 @@ function FlowCanvas() {
       }
 
       // All checks passed — create edge
-      setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: nodeId, target: targetId, sourceHandle: 'right-source', targetHandle: 'left-target', style: { stroke: '#555', strokeWidth: 1 } }]);
+      setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: nodeId, target: targetId, sourceHandle: sourceHandleId, targetHandle: 'left-target', style: { stroke: '#555', strokeWidth: 1 } }]);
       setTempLine(null);
     };
 
@@ -1700,7 +1701,7 @@ function FlowCanvas() {
       },
     };
     setNodes((nds) => [...nds, newNode]);
-    setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId }]);
+    setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId, sourceHandle: createMenu.sourceHandleId, targetHandle: 'left-target' }]);
     setCreateMenu(null);
   }, [createMenu, getAllNodeLabels, setNodes, setEdges]);
 
@@ -1850,6 +1851,19 @@ function FlowCanvas() {
         .image-node-handle:hover {
           opacity: 1;
         }
+        .node-preview-card {
+          box-sizing: border-box;
+          border-style: solid !important;
+          border-width: 2.5px !important;
+          border-color: rgba(42, 42, 53, 0.98) !important;
+          box-shadow: none !important;
+          filter: none !important;
+        }
+        .react-flow__node.selected .node-preview-card {
+          border-color: #2f6bff !important;
+          box-shadow: none !important;
+          filter: none !important;
+        }
         .image-role-tag-button:hover {
           border-color: rgba(0,212,255,0.62) !important;
           color: #ffffff !important;
@@ -1878,15 +1892,15 @@ function FlowCanvas() {
           box-shadow: none !important;
         }
         .react-flow__node.can-connect .node-preview-card {
-          border-color: #00d4ff !important;
-          box-shadow: 0 0 0 2px #00d4ff, 0 0 16px rgba(0, 212, 255, 0.5) !important;
+          border-color: #2f6bff !important;
+          box-shadow: none !important;
         }
         .react-flow__node.cannot-connect {
           box-shadow: none !important;
         }
         .react-flow__node.cannot-connect .node-preview-card {
           border-color: #ff4444 !important;
-          box-shadow: 0 0 0 2px #ff4444, 0 0 20px rgba(255, 68, 68, 0.6) !important;
+          box-shadow: none !important;
         }
       `}</style>
 
@@ -1927,8 +1941,9 @@ function FlowCanvas() {
           style={{
             top: textNodePanelPosition?.top ?? 0,
             left: textNodePanelPosition?.left ?? 0,
-            width: 640,
-            transform: 'translateX(-50%)',
+            width: IMAGE_NODE_CONTROL_WIDTH,
+            transform: `translateX(-50%) scale(${IMAGE_NODE_CONTROL_SCALE})`,
+            transformOrigin: 'top center',
           }}
         >
           <TextNodeInputPanel

@@ -5,7 +5,6 @@ import {
   MessageCircle,
   History,
   Wand2,
-  Type,
   Image,
   Video,
   Headphones,
@@ -18,6 +17,17 @@ import type { ReactNode } from 'react';
 import type { GeneratedImage, ResultSetBatch } from '../types/history.types';
 import { BASIC_NODE_DEFINITIONS, type BasicNodeType } from '../constants/basicNodes';
 
+function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="2" width="12" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="2" y="5.5" width="7" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="2" y="9" width="12" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="2" y="12.5" width="7" height="1.5" rx="0.75" fill="currentColor" />
+    </svg>
+  );
+}
+
 export interface CanvasSidebarProps {
   activePanel: string | null;
   onSetActivePanel: (panel: string | null) => void;
@@ -29,7 +39,7 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
   const { t } = useTranslation();
   const isHistoryOpen = activePanel === 'history';
   const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
-    text: Type,
+    text: TextNodeIcon as unknown as typeof Image,
     image: Image,
     video: Video,
   };

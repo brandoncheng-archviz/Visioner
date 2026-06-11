@@ -45,7 +45,7 @@ export interface ImageNodeData {
   referenceOrder?: string[];
   referencesSignature?: string;
   // Edge-related callbacks injected by CanvasPage
-  onStartLineDraw?: (nodeId: string, x: number, y: number) => void;
+  onStartLineDraw?: (nodeId: string, x: number, y: number, sourceHandleId: string) => void;
   onRemoveReferenceEdge?: (targetNodeId: string, sourceNodeId: string) => void;
   onAssignReferenceEdgeRole?: (targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: import('./imageNode.types').LocalReferenceType) => void;
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;

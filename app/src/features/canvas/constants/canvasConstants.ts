@@ -3,7 +3,8 @@ import type { MarkAction, ModelParams } from '../types/canvas.types';
 export const CANVAS_MIN_ZOOM = 0.1;
 export const CANVAS_MAX_ZOOM = 1.8;
 export const IMAGE_NODE_PREVIEW_WIDTH = 440;
-export const IMAGE_NODE_EMPTY_HEIGHT = 260;
+export const IMAGE_NODE_EMPTY_WIDTH = 300;
+export const IMAGE_NODE_EMPTY_HEIGHT = 300;
 export const IMAGE_NODE_MIN_IMAGE_SIZE = 180; // Kept for backward compatibility
 export const IMAGE_NODE_MIN_IMAGE_WIDTH = 180;
 export const IMAGE_NODE_MIN_IMAGE_HEIGHT = 140;

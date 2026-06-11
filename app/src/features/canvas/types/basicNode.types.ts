@@ -32,7 +32,7 @@ export interface TextNodeData {
   lastActionType?: TextNodeActionType | null;
   editorInput?: string;
   isProcessing?: boolean;
-  onStartLineDraw?: (nodeId: string, x: number, y: number) => void;
+  onStartLineDraw?: (nodeId: string, x: number, y: number, sourceHandleId: string) => void;
   onTextAction?: (nodeId: string, action: TextNodeActionType) => void;
 }
 

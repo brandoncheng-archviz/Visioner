@@ -62,6 +62,6 @@ export interface UpscaleNodeData {
   history: UpscaleHistoryItem[];
 
   // Callback injected by CanvasPage
-  onStartLineDraw?: (nodeId: string, x: number, y: number) => void;
+  onStartLineDraw?: (nodeId: string, x: number, y: number, sourceHandleId: string) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
 }

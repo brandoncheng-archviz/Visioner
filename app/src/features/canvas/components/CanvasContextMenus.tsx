@@ -1,6 +1,17 @@
-import { Type, Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
+import { Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { BASIC_NODE_DEFINITIONS, type BasicNodeType } from '../constants/basicNodes';
+
+function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="2" width="12" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="2" y="5.5" width="7" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="2" y="9" width="12" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="2" y="12.5" width="7" height="1.5" rx="0.75" fill="currentColor" />
+    </svg>
+  );
+}
 
 /* ─── Canvas Context Menu (right-click on empty canvas) ─── */
 
@@ -22,7 +33,7 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
   if (!menu) return null;
 
   const icons: Record<BasicNodeType, typeof Image> = {
-    text: Type,
+    text: TextNodeIcon as unknown as typeof Image,
     image: Image,
     video: Video,
   };

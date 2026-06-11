@@ -1771,16 +1771,26 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           )}
         </div>
 
-        {/* Left visual handle — Input (hidden when image exists) */}
-        {!displayImage && (
-          <div
+        {/* Left visual handle — Input/Output (hidden when image exists) */}
+        <div
             className="image-node-handle input-port"
             data-port-type="input"
             data-data-type="image"
+            data-source-handle="left-source"
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.stopPropagation();
+              e.preventDefault();
+              e.nativeEvent.stopImmediatePropagation();
+              const onStart = data.onStartLineDraw as ((nodeId: string, x: number, y: number, sourceHandleId: string) => void) | undefined;
+              if (!onStart) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'left-source');
+            }}
             style={{
               position: 'absolute',
               left: 0,
-              top: '50%',
+              top: resultHandleTop,
               transform: 'translate(-50%, -50%)',
               width: 28,
               height: 28,
@@ -1796,23 +1806,23 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             }}
           >
             <Plus style={{ width: 14, height: 14, color: 'white' }} />
-          </div>
-        )}
+        </div>
 
         {/* Right visual handle — Output */}
         <div
           className="image-node-handle output-port"
           data-port-type="output"
           data-data-type="image"
+          data-source-handle="right-source"
           onPointerDown={(e) => {
             if (e.button !== 0) return;
             e.stopPropagation();
             e.preventDefault();
             e.nativeEvent.stopImmediatePropagation();
-            const onStart = data.onStartLineDraw as ((nodeId: string, x: number, y: number) => void) | undefined;
+            const onStart = data.onStartLineDraw as ((nodeId: string, x: number, y: number, sourceHandleId: string) => void) | undefined;
             if (!onStart) return;
             const rect = e.currentTarget.getBoundingClientRect();
-            onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+            onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'right-source');
           }}
           style={{
             position: 'absolute',
@@ -1836,7 +1846,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         </div>
 
         {/* React Flow handles — positioned to overlap visual handles exactly */}
-        <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop }} />
+        <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
+        <Handle type="source" position={Position.Left} id="left-source" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
         <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop }} />
       </div>
 

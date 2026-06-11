@@ -618,11 +618,11 @@ export function RelightNode({ data, selected, id }: NodeProps) {
           e.preventDefault();
           e.nativeEvent.stopImmediatePropagation();
           const onStart = data.onStartLineDraw as
-            | ((nodeId: string, x: number, y: number) => void)
+            | ((nodeId: string, x: number, y: number, sourceHandleId: string) => void)
             | undefined;
           if (!onStart) return;
           const rect = e.currentTarget.getBoundingClientRect();
-          onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+          onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'right-source');
         }}
       >
         <Plus style={{ width: 14, height: 14, color: 'white' }} />
