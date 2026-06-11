@@ -11,7 +11,6 @@ import {
   ArrowUp,
   Maximize2,
   Pencil,
-  Type,
   Zap,
 } from 'lucide-react';
 import type {
@@ -59,6 +58,17 @@ const GENERATION_CONTROL_BUTTON_CLASS =
 const GENERATION_CONTROL_BUTTON_SELECTED_CLASS =
   'border-[#94A3B8] bg-[rgba(148,163,184,0.12)] text-[#E2E8F0] shadow-none';
 const GENERATION_CREDIT_COST = 14;
+
+function TextReferenceIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="3" y="4" width="14" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="3" y="7.5" width="8.5" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="3" y="11" width="14" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="3" y="14.5" width="8.5" height="1.5" rx="0.75" fill="currentColor" />
+    </svg>
+  );
+}
 
 export function ImageNodeControlPanel({
   promptText,
@@ -449,8 +459,8 @@ export function ImageNodeControlPanel({
     </div>
   );
 
-  const renderTextReference = (reference: TextReferenceInfo) => {
-    const summary = reference.content.trim() || '当前无内容';
+  const renderTextReference = (reference: TextReferenceInfo, index: number) => {
+    const summary = reference.content.trim() || '当前文本节点暂无内容';
     return (
       <div
         key={reference.nodeId}
@@ -460,48 +470,55 @@ export function ImageNodeControlPanel({
         onKeyDown={(event) => {
           if (event.key === 'Enter') onFocusTextReference(reference.nodeId);
         }}
-        className="nodrag nowheel group/text-ref relative flex h-[50px] w-[86px] flex-shrink-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-2 text-left outline-none transition-colors hover:bg-white/[0.07]"
-        style={{
-          background: 'rgba(168,85,247,0.08)',
-          border: '1px solid rgba(192,132,252,0.35)',
-        }}
+        className="nodrag nowheel group/text-ref relative h-[50px] w-[54px] flex-shrink-0 cursor-pointer rounded-lg text-left outline-none"
       >
-        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-[#a855f7]/18 text-[#d8b4fe]">
-          <Type className="h-3.5 w-3.5" />
-        </span>
-        <span className="min-w-0">
-          <span className="block truncate text-[11px] font-medium text-white/82">{reference.title}</span>
-          <span className="block truncate text-[10px] text-white/38">{summary}</span>
-        </span>
-
         <div
-          className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[260px] rounded-xl p-3 group-hover/text-ref:block"
+          className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-[260px] max-w-[320px] -translate-x-1/2 rounded-xl p-3 text-left group-hover/text-ref:block group-focus-visible/text-ref:block"
           style={{
-            background: FLOATING_PANEL_BACKGROUND,
-            border: FLOATING_PANEL_BORDER,
-            boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
+            background: 'rgba(8,8,10,0.98)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            boxShadow: '0 14px 34px rgba(0,0,0,0.58)',
           }}
         >
-          <div className="text-[13px] font-medium text-white/90">{reference.title}</div>
-          <div className="mt-1 text-[11px] text-white/42">
-            {reference.content ? '已有内容' : '待填写'}
-          </div>
-          <div className="mt-2 line-clamp-4 whitespace-pre-wrap text-[12px] leading-5 text-white/62">
+          <div className="truncate text-[12px] font-medium text-white/78">{reference.title}</div>
+          <div className="mt-2 line-clamp-6 whitespace-pre-wrap break-words text-[12px] leading-5 text-white/58">
             {summary}
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onRemoveReference(reference.nodeId);
+        <div
+          className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg text-white/38 transition-colors group-hover/text-ref:bg-white/[0.07] group-hover/text-ref:text-white/52 group-focus-visible/text-ref:text-white/58"
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.14)',
           }}
-          className="absolute right-0.5 top-0.5 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white/70 hover:text-white group-hover/text-ref:flex"
-          title="断开文本引用"
         >
-          <X className="h-2.5 w-2.5" />
-        </button>
+          <TextReferenceIcon />
+          <span
+            className="absolute right-0 top-0 z-20 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[9px] font-medium text-white/72 group-hover/text-ref:hidden"
+            style={{ background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.16)' }}
+          >
+            {index + 1}
+          </span>
+          <button
+            type="button"
+            onPointerDownCapture={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onClickCapture={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onRemoveReference(reference.nodeId);
+            }}
+            className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition-colors hover:bg-black hover:text-white group-hover/text-ref:flex"
+            style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
+            title="断开文本引用"
+            aria-label="断开文本引用"
+          >
+            <X className="h-2.5 w-2.5" />
+          </button>
+        </div>
       </div>
     );
   };

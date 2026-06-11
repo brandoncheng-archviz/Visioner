@@ -7,13 +7,16 @@ export function TempConnectionLine({ tempLine }: { tempLine: { sourceNodeId: str
 
   if (!tempLine) return null;
 
-  const sNode = document.querySelector(`.react-flow__node[data-id="${tempLine.sourceNodeId}"] [data-source-handle="${tempLine.sourceHandleId}"]`);
+  const sourceNode = document.querySelector(`.react-flow__node[data-id="${tempLine.sourceNodeId}"]`);
+  const sNode = sourceNode?.querySelector(
+    `[data-source-handle="${tempLine.sourceHandleId}"], [data-target-handle="${tempLine.sourceHandleId}"], .react-flow__handle[data-handleid="${tempLine.sourceHandleId}"]`,
+  );
   if (!sNode) return null;
   const sRect = sNode.getBoundingClientRect();
   const sx = sRect.left + sRect.width / 2;
   const sy = sRect.top + sRect.height / 2;
 
-  const isLeftSource = tempLine.sourceHandleId === 'left-source';
+  const isLeftSource = tempLine.sourceHandleId.startsWith('left-');
   const offset = Math.max(Math.abs(tempLine.currentX - sx) * 0.4, 40);
   const dx = isLeftSource ? -offset : offset;
 
@@ -21,8 +24,8 @@ export function TempConnectionLine({ tempLine }: { tempLine: { sourceNodeId: str
     <svg className="absolute inset-0 z-50 pointer-events-none" style={{ width: '100%', height: '100%' }}>
       <path
         d={`M ${sx} ${sy} C ${sx + dx} ${sy}, ${tempLine.currentX - dx} ${tempLine.currentY}, ${tempLine.currentX} ${tempLine.currentY}`}
-        stroke="rgba(255,255,255,0.6)"
-        strokeWidth="1.5"
+        stroke="rgba(190,194,204,0.52)"
+        strokeWidth="1.25"
         fill="none"
       />
     </svg>

@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { Film, Play, Upload } from 'lucide-react';
-import { useReactFlow, type NodeProps } from '@xyflow/react';
+import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { NodeShell } from '../components/NodeShell';
 import type { VideoNodeData } from '../types/basicNode.types';
@@ -52,73 +52,87 @@ export function VideoNode({ data, selected, id }: NodeProps) {
   );
 
   return (
-    <NodeShell label={label} selected={selected}>
-      <div className="w-[260px] px-4 py-3.5">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#60a5fa]/10 text-[#7dd3fc]">
-            <Film className="h-3.5 w-3.5" />
-          </span>
-          <input
-            value={label}
-            onChange={(event) => updateData({ label: event.target.value })}
-            onKeyDown={(event) => event.stopPropagation()}
-            className="nodrag nowheel min-w-0 flex-1 bg-transparent text-[13px] font-medium text-white/90 outline-none placeholder:text-white/30"
-            aria-label={t('common.rename')}
-          />
-        </div>
-
-        <div className="nodrag nowheel relative flex h-[128px] w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f1219] text-white/45">
-          {nodeData.videoUrl ? (
-            <video
-              src={nodeData.videoUrl}
-              controls
-              preload="metadata"
-              onLoadedMetadata={(event) => updateData({ duration: event.currentTarget.duration })}
-              className="nodrag nowheel h-full w-full object-cover"
-              onClick={(event) => event.stopPropagation()}
-              onPointerDown={(event) => event.stopPropagation()}
+    <div className="relative">
+      <NodeShell label={label} selected={selected}>
+        <div className="w-[260px] px-4 py-3.5">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#60a5fa]/10 text-[#7dd3fc]">
+              <Film className="h-3.5 w-3.5" />
+            </span>
+            <input
+              value={label}
+              onChange={(event) => updateData({ label: event.target.value })}
+              onKeyDown={(event) => event.stopPropagation()}
+              className="nodrag nowheel min-w-0 flex-1 bg-transparent text-[13px] font-medium text-white/90 outline-none placeholder:text-white/30"
+              aria-label={t('common.rename')}
             />
-          ) : (
+          </div>
+
+          <div className="nodrag nowheel relative flex h-[128px] w-full items-center justify-center overflow-hidden rounded-xl border border-white/[0.08] bg-[#0f1219] text-white/45">
+            {nodeData.videoUrl ? (
+              <video
+                src={nodeData.videoUrl}
+                controls
+                preload="metadata"
+                onLoadedMetadata={(event) => updateData({ duration: event.currentTarget.duration })}
+                className="nodrag nowheel h-full w-full object-cover"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="flex h-full w-full flex-col items-center justify-center gap-2 transition hover:bg-white/[0.025] hover:text-white/70"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.04]">
+                  <Play className="h-4 w-4 fill-current" />
+                </span>
+                <span className="text-[12px]">上传视频或预览素材</span>
+              </button>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-[11px] text-white/62">
+                {nodeData.fileName || '暂无视频文件'}
+              </div>
+              <div className="mt-0.5 text-[10px] text-white/32">
+                {formatFileSize(nodeData.fileSize)}
+                {nodeData.duration ? ` · ${nodeData.duration.toFixed(1)}s` : ''}
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="flex h-full w-full flex-col items-center justify-center gap-2 transition hover:bg-white/[0.025] hover:text-white/70"
+              className="nodrag nowheel inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 text-[11px] text-white/62 transition hover:bg-white/[0.08] hover:text-white/85"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.09] bg-white/[0.04]">
-                <Play className="h-4 w-4 fill-current" />
-              </span>
-              <span className="text-[12px]">上传视频或预览素材</span>
+              <Upload className="h-3 w-3" />
+              上传
             </button>
-          )}
-        </div>
-
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="truncate text-[11px] text-white/62">
-              {nodeData.fileName || '暂无视频文件'}
-            </div>
-            <div className="mt-0.5 text-[10px] text-white/32">
-              {formatFileSize(nodeData.fileSize)}
-              {nodeData.duration ? ` · ${nodeData.duration.toFixed(1)}s` : ''}
-            </div>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="video/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="nodrag nowheel inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 text-[11px] text-white/62 transition hover:bg-white/[0.08] hover:text-white/85"
-          >
-            <Upload className="h-3 w-3" />
-            上传
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="video/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
         </div>
-      </div>
-    </NodeShell>
+      </NodeShell>
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left-target"
+        style={{ opacity: 0, left: 0, top: '50%', pointerEvents: 'none' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right-source"
+        style={{ opacity: 0, right: 0, top: '50%', pointerEvents: 'none' }}
+      />
+    </div>
   );
 }

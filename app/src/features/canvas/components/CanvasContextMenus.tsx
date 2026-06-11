@@ -83,6 +83,8 @@ export interface CreateNodeMenuData {
   y: number;
   flowPos: { x: number; y: number };
   sourceNodeId: string;
+  sourceHandleId: string;
+  direction: 'outgoing' | 'incoming';
 }
 
 export interface CreateNodeMenuProps {
@@ -95,6 +97,12 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
   const { t } = useTranslation();
   if (!menu) return null;
 
+  const icons: Record<BasicNodeType, typeof Image> = {
+    text: TextNodeIcon as unknown as typeof Image,
+    image: Image,
+    video: Video,
+  };
+
   return (
     <>
       <div
@@ -105,16 +113,23 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
           background: '#252526',
           border: '1px solid #2a2a35',
           boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-          minWidth: 200,
+          minWidth: 280,
         }}
       >
-        <div className="px-4 py-2 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.createNodeAndConnect')}</div>
-        <button
-          onClick={() => onCreateAndConnect('image')}
-          className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
-        >
-          <Image className="w-4 h-4" style={{ color: '#22d3ee' }} /> {t('canvas.createMenuImageNode')}
-        </button>
+        <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
+        {BASIC_NODE_DEFINITIONS.map((item) => {
+          const ItemIcon = icons[item.type];
+          return (
+            <button
+              key={item.type}
+              onClick={() => onCreateAndConnect(item.type)}
+              className="w-full flex items-center gap-4 px-5 py-3.5 text-left text-[16px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+            >
+              <ItemIcon className="w-5 h-5" style={{ color: item.color }} />
+              {t(item.labelKey)}
+            </button>
+          );
+        })}
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
     </>

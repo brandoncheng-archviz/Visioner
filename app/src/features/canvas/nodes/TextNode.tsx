@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { FileText, ImagePlus, PenLine, Plus } from 'lucide-react';
 import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
 import {
@@ -15,7 +15,7 @@ const EMPTY_ACTIONS: Array<{
   label: string;
   icon: typeof PenLine;
 }> = [
-  { action: 'draft', label: '写提示词草稿', icon: PenLine },
+  { action: 'draft', label: '编写内容', icon: PenLine },
   { action: 'image_to_text', label: '从图片提取描述', icon: FileText },
   { action: 'text_to_image', label: '生成图片', icon: ImagePlus },
 ];
@@ -27,6 +27,11 @@ export function TextNode({ data, selected, id }: NodeProps) {
   const nodeData = data as TextNodeData;
   const title = nodeData.label || nodeData.title || '文本节点';
   const content = getTextContent(nodeData);
+  const inlineContent = nodeData.content ?? nodeData.text ?? '';
+  const [isInlineEditing, setIsInlineEditing] = useState(false);
+  const [inlineEditorHeight, setInlineEditorHeight] = useState(TEXT_NODE_MIN_HEIGHT);
+  const previewCardRef = useRef<HTMLDivElement>(null);
+  const inlineTextareaRef = useRef<HTMLTextAreaElement>(null);
   const allEdges = useStore((state) => state.edges);
   const allNodes = useStore((state) => state.nodes);
 
@@ -87,17 +92,62 @@ export function TextNode({ data, selected, id }: NodeProps) {
     title,
   ]);
 
+  useEffect(() => {
+    if (!isInlineEditing) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      inlineTextareaRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isInlineEditing]);
+
+  const startInlineEditing = () => {
+    setInlineEditorHeight(previewCardRef.current?.offsetHeight || TEXT_NODE_MIN_HEIGHT);
+    setIsInlineEditing(true);
+  };
+
   const triggerAction = (action: TextNodeActionType) => {
+    if (action === 'draft') {
+      startInlineEditing();
+      return;
+    }
     nodeData.onTextAction?.(id, action);
   };
 
-  const startLineDraw = (event: PointerEvent<HTMLDivElement>) => {
+  const handleInlineContentChange = (value: string) => {
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                content: value,
+                text: value,
+              },
+            }
+          : node,
+      ),
+    );
+  };
+
+  const handleInlineEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    event.stopPropagation();
+
+    if (event.key === 'Escape' || ((event.ctrlKey || event.metaKey) && event.key === 'Enter')) {
+      event.preventDefault();
+      setIsInlineEditing(false);
+    }
+  };
+
+  const startLineDraw = (event: PointerEvent<HTMLDivElement>, sourceHandleId: 'left-source' | 'right-source') => {
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
     event.nativeEvent.stopImmediatePropagation();
     const rect = event.currentTarget.getBoundingClientRect();
-    nodeData.onStartLineDraw?.(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'right-source');
+    nodeData.onStartLineDraw?.(id, rect.left + rect.width / 2, rect.top + rect.height / 2, sourceHandleId);
   };
 
   const sourceTitles = [
@@ -110,9 +160,6 @@ export function TextNode({ data, selected, id }: NodeProps) {
       return `已引用图片：${String(source?.data?.label || '图片节点')}`;
     }),
   ];
-
-  const sourceMeta = sourceTitles.slice(0, 2).join(' · ');
-  const wordCount = content.trim().length;
 
   return (
     <div style={{ width: TEXT_NODE_WIDTH }}>
@@ -149,19 +196,21 @@ export function TextNode({ data, selected, id }: NodeProps) {
         </div>
       </div>
 
-      <div className="relative">
+      <div className="relative overflow-visible">
         <div
-          className="node-preview-card relative overflow-hidden rounded-xl transition-all"
+          ref={previewCardRef}
+          className="node-preview-card relative rounded-xl transition-all"
           style={{
             width: TEXT_NODE_WIDTH,
             minHeight: TEXT_NODE_MIN_HEIGHT,
             maxHeight: TEXT_NODE_MAX_HEIGHT,
+            height: isInlineEditing ? inlineEditorHeight : undefined,
             background: '#252526',
             border: `2.5px solid ${selected ? '#2f6bff' : 'rgba(42,42,53,0.98)'}`,
             boxShadow: 'none',
           }}
         >
-          {sourceTitles.length > 0 && (
+          {!content && !isInlineEditing && sourceTitles.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-4 pb-1 pt-4">
               {sourceTitles.map((item) => (
                 <span
@@ -174,23 +223,47 @@ export function TextNode({ data, selected, id }: NodeProps) {
             </div>
           )}
 
-          {content ? (
-            <div
-              className="nodrag nowheel overflow-y-auto whitespace-pre-wrap px-4 pb-4 pt-3 text-[13px] leading-6 text-white/72"
-              style={{ maxHeight: TEXT_NODE_MAX_HEIGHT - 94 }}
+          {isInlineEditing ? (
+            <textarea
+              ref={inlineTextareaRef}
+              autoFocus
+              value={inlineContent}
+              placeholder="输入文本内容..."
+              onChange={(event) => handleInlineContentChange(event.target.value)}
+              onBlur={() => setIsInlineEditing(false)}
+              onPointerDown={(event) => event.stopPropagation()}
+              onKeyDown={handleInlineEditorKeyDown}
               onWheel={(event) => event.stopPropagation()}
+              className="nodrag nowheel block h-full min-h-0 w-full resize-none bg-transparent px-4 py-4 text-[13px] leading-6 text-white/72 outline-none placeholder:text-white/24"
+              aria-label="编写文本内容"
+            />
+          ) : content ? (
+            <div
+              className="select-none overflow-y-auto whitespace-pre-wrap px-4 py-4 text-[13px] leading-6 text-white/68"
+              style={{ maxHeight: TEXT_NODE_MAX_HEIGHT }}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                startInlineEditing();
+              }}
             >
               {content}
             </div>
           ) : (
-            <div className="flex min-h-[300px] flex-col items-center justify-center px-6 py-6">
-              <svg width="48" height="36" viewBox="0 0 48 36" fill="none" className="mb-6">
+            <div
+              className="flex min-h-[300px] flex-col items-center justify-center px-6 py-6"
+              onDoubleClick={(event) => {
+                if ((event.target as HTMLElement).closest('button')) return;
+                event.stopPropagation();
+                startInlineEditing();
+              }}
+            >
+              <svg width="48" height="36" viewBox="0 0 48 36" fill="none" className="-mt-3 mb-7">
                 <rect x="4" y="2" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
                 <rect x="4" y="11" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
                 <rect x="4" y="20" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
                 <rect x="4" y="29" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
               </svg>
-              <div className="mb-2.5 w-full text-[11px] text-white/22">尝试：</div>
+              <div className="mb-1 w-full px-2 text-[11px] text-white/18">尝试：</div>
               <div className="w-full space-y-0.5">
                 {EMPTY_ACTIONS.map(({ action, label, icon: Icon }) => (
                   <button
@@ -200,23 +273,13 @@ export function TextNode({ data, selected, id }: NodeProps) {
                       event.stopPropagation();
                       triggerAction(action);
                     }}
-                    className="nodrag flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/38 transition-colors hover:bg-white/[0.04] hover:text-white/60"
+                    className="nodrag flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/30 transition-colors hover:bg-white/[0.035] hover:text-white/50"
                   >
-                    <Icon className="h-3.5 w-3.5 text-white/20" />
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-white/15" />
                     <span>{label}</span>
                   </button>
                 ))}
               </div>
-            </div>
-          )}
-
-          {(content || sourceMeta) && (
-            <div
-              className="flex items-center justify-between border-t border-white/[0.05] px-4 py-2 text-[11px]"
-              style={{ color: 'rgba(255,255,255,0.36)' }}
-            >
-              <span className="min-w-0 truncate">{sourceMeta || '文本结果'}</span>
-              {content && <span className="ml-3 flex-shrink-0">{wordCount} 字</span>}
             </div>
           )}
         </div>
@@ -225,6 +288,8 @@ export function TextNode({ data, selected, id }: NodeProps) {
           className="image-node-handle input-port"
           data-port-type="input"
           data-data-type="text"
+          data-source-handle="left-source"
+          onPointerDown={(event) => startLineDraw(event, 'left-source')}
           style={{
             position: 'absolute',
             left: 0,
@@ -237,6 +302,7 @@ export function TextNode({ data, selected, id }: NodeProps) {
             border: '1.5px solid rgba(255,255,255,0.25)',
             backdropFilter: 'blur(12px)',
             zIndex: 10,
+            pointerEvents: 'auto',
           }}
         >
           <Plus className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white" />
@@ -245,7 +311,8 @@ export function TextNode({ data, selected, id }: NodeProps) {
           className="image-node-handle output-port"
           data-port-type="output"
           data-data-type="text"
-          onPointerDown={startLineDraw}
+          data-source-handle="right-source"
+          onPointerDown={(event) => startLineDraw(event, 'right-source')}
           style={{
             position: 'absolute',
             right: 0,
@@ -258,13 +325,30 @@ export function TextNode({ data, selected, id }: NodeProps) {
             border: '1.5px solid rgba(255,255,255,0.25)',
             backdropFilter: 'blur(12px)',
             zIndex: 10,
+            pointerEvents: 'auto',
           }}
         >
           <Plus className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white" />
         </div>
 
-        <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28 }} />
-        <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28 }} />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left-target"
+          style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
+        />
+        <Handle
+          type="source"
+          position={Position.Left}
+          id="left-source"
+          style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right-source"
+          style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
+        />
       </div>
     </div>
   );

@@ -238,7 +238,14 @@ function FlowCanvas() {
   // ─── Line Drawing State ───
   const [edges, setEdges] = useState<Edge[]>([]);
   const [tempLine, setTempLine] = useState<{ sourceNodeId: string; sourceHandleId: string; currentX: number; currentY: number } | null>(null);
-  const [createMenu, setCreateMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number }; sourceNodeId: string; sourceHandleId: string } | null>(null);
+  const [createMenu, setCreateMenu] = useState<{
+    x: number;
+    y: number;
+    flowPos: { x: number; y: number };
+    sourceNodeId: string;
+    sourceHandleId: string;
+    direction: 'outgoing' | 'incoming';
+  } | null>(null);
   const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number; message: string } | null>(null);
   const isDrawingRef = useRef(false);
 
@@ -406,8 +413,23 @@ function FlowCanvas() {
       };
 
       if (!targetId) {
-        setCreateMenu({ x: e.clientX, y: e.clientY, flowPos: screenToFlowPosition({ x: e.clientX, y: e.clientY }), sourceNodeId: nodeId, sourceHandleId });
-        setTempLine(null);
+        const menuX = e.clientX + 18;
+        const menuY = Math.max(12, e.clientY - 24);
+        const originHandle = document.querySelector(
+          `.react-flow__node[data-id="${nodeId}"] [data-source-handle="${sourceHandleId}"]`,
+        );
+        const direction =
+          originHandle?.getAttribute('data-port-type') === 'input' || sourceHandleId.includes('target')
+            ? 'incoming'
+            : 'outgoing';
+        setCreateMenu({
+          x: menuX,
+          y: menuY,
+          flowPos: screenToFlowPosition({ x: e.clientX, y: e.clientY }),
+          sourceNodeId: nodeId,
+          sourceHandleId,
+          direction,
+        });
         return;
       }
 
@@ -1153,6 +1175,12 @@ function FlowCanvas() {
 
       // Esc closes help panel first, then deselects
       if (e.key === 'Escape') {
+        if (createMenu) {
+          e.preventDefault();
+          setCreateMenu(null);
+          setTempLine(null);
+          return;
+        }
         if (showHelp) {
           e.preventDefault();
           setShowHelp(false);
@@ -1230,7 +1258,7 @@ function FlowCanvas() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [getViewport, setViewport, fitView, showHelp]);
+  }, [createMenu, getViewport, setViewport, fitView, showHelp]);
 
   // ─── Drag & Drop State ───
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1633,6 +1661,8 @@ function FlowCanvas() {
   }, [setEdges, setNodes]);
 
   const handlePaneClick = useCallback(() => {
+    setCreateMenu(null);
+    setTempLine(null);
     setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
   }, [setEdges, setNodes]);
@@ -1660,6 +1690,7 @@ function FlowCanvas() {
     setContextMenu(null);
     setNodeContextMenu(null);
     setCreateMenu(null);
+    setTempLine(null);
   }, []);
 
   const handleCloseNodeContextMenu = useCallback(() => {
@@ -1684,25 +1715,52 @@ function FlowCanvas() {
 
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
-    if (type !== 'image') {
+    if (!['text', 'image', 'video'].includes(type)) {
       setCreateMenu(null);
+      setTempLine(null);
       return;
     }
-    const newNodeId = `image-${Date.now()}`;
-    const baseTitle = NODE_BASE_TITLES.image;
+    const timestamp = Date.now();
+    const newNodeId = `${type}-${timestamp}`;
+    const baseTitle = NODE_BASE_TITLES[type] || type;
     const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
     const newNode: Node = {
       id: newNodeId,
-      type: 'image',
+      type,
       position: createMenu.flowPos,
       data: {
         label,
-        ...getRoleData(null),
+        ...(type === 'image' ? getRoleData(null) : {}),
+        ...(type === 'text'
+          ? {
+              title: label,
+              content: '',
+              text: '',
+              status: 'empty',
+              referencedImageNodeIds: [],
+              referencedTextNodeIds: [],
+              outputTargetImageNodeIds: [],
+              activeModel: DEFAULT_TEXT_NODE_MODEL,
+              lastActionType: null,
+              editorInput: '',
+            }
+          : {}),
       },
     };
+    const isIncoming = createMenu.direction === 'incoming';
+    const targetHandleId = createMenu.sourceHandleId.replace(/source$/, 'target');
+    const newEdge: Edge = {
+      id: `e-${timestamp}`,
+      source: isIncoming ? newNodeId : createMenu.sourceNodeId,
+      target: isIncoming ? createMenu.sourceNodeId : newNodeId,
+      sourceHandle: isIncoming ? 'right-source' : createMenu.sourceHandleId,
+      targetHandle: isIncoming ? targetHandleId : 'left-target',
+      style: { stroke: '#555', strokeWidth: 1 },
+    };
     setNodes((nds) => [...nds, newNode]);
-    setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: createMenu.sourceNodeId, target: newNodeId, sourceHandle: createMenu.sourceHandleId, targetHandle: 'left-target' }]);
+    setEdges((eds) => [...eds, newEdge]);
     setCreateMenu(null);
+    setTempLine(null);
   }, [createMenu, getAllNodeLabels, setNodes, setEdges]);
 
   const handleNodeDelete = useCallback((nodeId: string) => {
