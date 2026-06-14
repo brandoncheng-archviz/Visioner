@@ -164,10 +164,6 @@ export function TextNode({ data, selected, id }: NodeProps) {
       const source = allNodes.find((node) => node.id === nodeId);
       return `已引用文本：${String(source?.data?.label || '文本节点')}`;
     }),
-    ...references.imageIds.map((nodeId) => {
-      const source = allNodes.find((node) => node.id === nodeId);
-      return `已引用图片：${String(source?.data?.label || '图片节点')}`;
-    }),
   ];
 
   return (
@@ -243,7 +239,8 @@ export function TextNode({ data, selected, id }: NodeProps) {
               onPointerDown={(event) => event.stopPropagation()}
               onKeyDown={handleInlineEditorKeyDown}
               onWheel={(event) => event.stopPropagation()}
-              className="nodrag nowheel block h-full min-h-0 w-full resize-none bg-transparent px-4 py-4 text-[13px] leading-6 text-white/72 outline-none placeholder:text-white/24"
+              onWheelCapture={(event) => event.stopPropagation()}
+              className="text-node-editor-scrollbar nodrag nowheel block h-full min-h-0 w-full resize-none overflow-y-auto overscroll-contain bg-transparent px-4 py-4 text-[13px] leading-6 text-white/72 outline-none placeholder:text-white/24"
               aria-label="编写文本内容"
             />
           ) : content ? (

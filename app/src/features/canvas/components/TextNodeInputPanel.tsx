@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, ChevronDown, Zap } from 'lucide-react';
+import { ArrowUp, ChevronDown, Image, X, Zap } from 'lucide-react';
 import {
   FLOATING_PANEL_BACKGROUND,
   FLOATING_PANEL_BORDER,
@@ -13,14 +13,23 @@ import {
 } from '../constants/textNode';
 import type { TextNodeModel } from '../types/basicNode.types';
 
+export interface TextNodeImageReference {
+  nodeId: string;
+  title: string;
+  imageUrl: string;
+}
+
 interface TextNodeInputPanelProps {
   value: string;
   model?: TextNodeModel;
   isProcessing?: boolean;
   focusRequestId: number;
+  imageReferences: TextNodeImageReference[];
   onChange: (value: string) => void;
   onModelChange: (model: TextNodeModel) => void;
   onSubmit: () => void;
+  onFocusImageReference: (nodeId: string) => void;
+  onRemoveImageReference: (nodeId: string) => void;
 }
 
 export function TextNodeInputPanel({
@@ -28,9 +37,12 @@ export function TextNodeInputPanel({
   model = DEFAULT_TEXT_NODE_MODEL,
   isProcessing = false,
   focusRequestId,
+  imageReferences,
   onChange,
   onModelChange,
   onSubmit,
+  onFocusImageReference,
+  onRemoveImageReference,
 }: TextNodeInputPanelProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [showModels, setShowModels] = useState(false);
@@ -47,7 +59,7 @@ export function TextNodeInputPanel({
 
   return (
     <div
-      className="flex flex-col overflow-hidden rounded-xl"
+      className="nodrag nowheel flex flex-col rounded-xl"
       style={{
         width: IMAGE_NODE_CONTROL_WIDTH,
         height: IMAGE_NODE_CONTROL_HEIGHT,
@@ -56,7 +68,85 @@ export function TextNodeInputPanel({
         boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
       }}
     >
-      <div className="min-h-0 flex-1" style={{ padding: '14px 14px 0' }}>
+      {imageReferences.length > 0 && (
+        <div className="flex items-center gap-2 px-[14px] pb-2 pt-[14px]">
+          {imageReferences.map((reference, index) => (
+            <div
+              key={reference.nodeId}
+              role="button"
+              tabIndex={0}
+              onClick={() => onFocusImageReference(reference.nodeId)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onFocusImageReference(reference.nodeId);
+              }}
+              className="nodrag nowheel group/reference relative h-[50px] w-[54px] flex-shrink-0 cursor-pointer rounded-lg outline-none"
+            >
+              {reference.imageUrl && (
+                <div
+                  className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/reference:block group-focus-visible/reference:block"
+                  style={{
+                    background: FLOATING_PANEL_BACKGROUND,
+                    border: FLOATING_PANEL_BORDER,
+                    boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
+                  }}
+                >
+                  <img
+                    src={reference.imageUrl}
+                    alt=""
+                    className="block rounded-t-xl"
+                    style={{ width: 'auto', height: 'auto', maxWidth: 220, maxHeight: 200 }}
+                  />
+                  <div className="px-2 py-1.5 text-center text-[12px] text-white/75">
+                    {reference.title}
+                  </div>
+                </div>
+              )}
+
+              <div
+                className="relative h-full w-full overflow-hidden rounded-lg"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(156,163,175,0.20)',
+                }}
+              >
+                {reference.imageUrl ? (
+                  <img src={reference.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-white/[0.05]">
+                    <Image className="h-4 w-4 text-white/25" />
+                  </div>
+                )}
+                <span
+                  className="absolute right-0 top-0 z-20 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-black/70 px-1 text-[9px] font-medium text-white/72 group-hover/reference:hidden"
+                  style={{ border: '1px solid rgba(255,255,255,0.18)' }}
+                >
+                  {index + 1}
+                </span>
+                <button
+                  type="button"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onRemoveImageReference(reference.nodeId);
+                  }}
+                  className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/reference:flex"
+                  style={{ border: '1px solid rgba(255,255,255,0.18)' }}
+                  title="断开图片引用"
+                  aria-label="断开图片引用"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        className="min-h-0 flex-1"
+        style={{ padding: imageReferences.length > 0 ? '0 14px' : '14px 14px 0' }}
+      >
         <textarea
           ref={inputRef}
           value={value}

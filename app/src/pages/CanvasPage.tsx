@@ -34,7 +34,10 @@ import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
 import { CanvasContextMenus } from '../features/canvas/components/CanvasContextMenus';
 import { CanvasToolbar } from '../features/canvas/components/CanvasToolbar';
-import { TextNodeInputPanel } from '../features/canvas/components/TextNodeInputPanel';
+import {
+  TextNodeInputPanel,
+  type TextNodeImageReference,
+} from '../features/canvas/components/TextNodeInputPanel';
 import {
   DEFAULT_TEXT_NODE_MODEL,
   TEXT_NODE_IMAGE_EXTRACTION_PROMPT,
@@ -46,6 +49,7 @@ import {
   isTextWorkflowConnection,
   simulateTextNodeResult,
 } from '../features/canvas/utils/textNodeUtils';
+import { getCurrentImage } from '../features/canvas/types/imageNodeData.types';
 import {
   CREATE_NODE_MENU_TOP_OFFSET,
   CREATE_NODE_MENU_VIEWPORT_PADDING,
@@ -1431,6 +1435,22 @@ function FlowCanvas() {
     if (selectedNodes.length !== 1 || selectedNodes[0].type !== 'text') return null;
     return selectedNodes[0];
   }, [nodes]);
+  const selectedTextNodeImageReferences = useMemo<TextNodeImageReference[]>(() => {
+    if (!selectedTextNode) return [];
+
+    return edges
+      .filter((edge) => edge.target === selectedTextNode.id)
+      .flatMap((edge) => {
+        const sourceNode = nodes.find((node) => node.id === edge.source);
+        if (sourceNode?.type !== 'image') return [];
+
+        return [{
+          nodeId: sourceNode.id,
+          title: String(sourceNode.data.label || '图片节点'),
+          imageUrl: getCurrentImage(sourceNode.data),
+        }];
+      });
+  }, [edges, nodes, selectedTextNode]);
   const selectedTextNodePanelPosition = useMemo(() => {
     if (!selectedTextNode) return null;
     const viewport = getViewport();
@@ -2116,9 +2136,14 @@ function FlowCanvas() {
             model={(selectedTextNode.data.activeModel as TextNodeModel | undefined) || DEFAULT_TEXT_NODE_MODEL}
             isProcessing={Boolean(selectedTextNode.data.isProcessing)}
             focusRequestId={textFocusRequestId}
+            imageReferences={selectedTextNodeImageReferences}
             onChange={(value) => updateSelectedTextNode({ editorInput: value, status: 'editing' })}
             onModelChange={(model) => updateSelectedTextNode({ activeModel: model })}
             onSubmit={submitSelectedTextNode}
+            onFocusImageReference={focusCanvasNode}
+            onRemoveImageReference={(sourceNodeId) => {
+              removeReferenceEdge(selectedTextNode.id, sourceNodeId);
+            }}
           />
         </div>
       )}
