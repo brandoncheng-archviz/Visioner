@@ -24,6 +24,11 @@ import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/hi
 import type { GenerationHistoryItem, GenerationTask } from '../features/canvas/types/generation.types';
 import type { RelightCreationOptions } from '../features/canvas/types/relight.types';
 import type { TextNodeActionType, TextNodeData, TextNodeModel } from '../features/canvas/types/basicNode.types';
+import type {
+  ConnectionHandleType,
+  CreateConnectionMenuState,
+  TempConnectionState,
+} from '../features/canvas/types/canvas.types';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
@@ -41,6 +46,11 @@ import {
   isTextWorkflowConnection,
   simulateTextNodeResult,
 } from '../features/canvas/utils/textNodeUtils';
+import {
+  CREATE_NODE_MENU_TOP_OFFSET,
+  CREATE_NODE_MENU_VIEWPORT_PADDING,
+  CREATE_NODE_MENU_WIDTH,
+} from '../features/canvas/constants/basicNodes';
 
 const NODE_BASE_TITLES: Record<string, string> = {
   image: '图片',
@@ -237,15 +247,8 @@ function FlowCanvas() {
 
   // ─── Line Drawing State ───
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [tempLine, setTempLine] = useState<{ sourceNodeId: string; sourceHandleId: string; currentX: number; currentY: number } | null>(null);
-  const [createMenu, setCreateMenu] = useState<{
-    x: number;
-    y: number;
-    flowPos: { x: number; y: number };
-    sourceNodeId: string;
-    sourceHandleId: string;
-    direction: 'outgoing' | 'incoming';
-  } | null>(null);
+  const [tempLine, setTempLine] = useState<TempConnectionState | null>(null);
+  const [createMenu, setCreateMenu] = useState<CreateConnectionMenuState | null>(null);
   const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number; message: string } | null>(null);
   const isDrawingRef = useRef(false);
 
@@ -278,13 +281,25 @@ function FlowCanvas() {
     return false;
   }, []);
 
-  const startLineDraw = useCallback((nodeId: string, screenX: number, screenY: number, sourceHandleId: string) => {
+  const startLineDraw = useCallback((
+    nodeId: string,
+    screenX: number,
+    screenY: number,
+    sourceHandleId = 'right-source',
+    sourceHandleType: ConnectionHandleType = 'source',
+  ) => {
     if (isDrawingRef.current) return;
     isDrawingRef.current = true;
     const posMap = new Map<string, { x: number; y: number }>();
     nodes.forEach((n) => posMap.set(n.id, { ...n.position }));
     nodePositionsRef.current = posMap;
-    setTempLine({ sourceNodeId: nodeId, sourceHandleId, currentX: screenX, currentY: screenY });
+    setTempLine({
+      sourceNodeId: nodeId,
+      sourceHandleId,
+      sourceHandleType,
+      currentX: screenX,
+      currentY: screenY,
+    });
 
     const clearHoverClasses = () => {
       document.querySelectorAll('.react-flow__node').forEach((n) => {
@@ -292,19 +307,85 @@ function FlowCanvas() {
       });
     };
 
-    const validateTarget = (targetId: string | null | undefined, inputHandle: Element | null | undefined): string | null => {
-      if (!targetId) return t('error.targetNotFound');
-      if (targetId === nodeId) return t('error.selfConnect');
+    const getNodeHandle = (targetId: string, handleType: ConnectionHandleType) =>
+      document.querySelector(
+        `.react-flow__node[data-id="${targetId}"] .image-node-handle[data-handle-type="${handleType}"], ` +
+        `.react-flow__node[data-id="${targetId}"] .image-node-handle.${handleType === 'source' ? 'output-port' : 'input-port'}`,
+      );
 
-      const effectiveInputHandle = inputHandle ?? document.querySelector(`.react-flow__node[data-id="${targetId}"] .image-node-handle.input-port`);
-      const targetPortType = effectiveInputHandle?.getAttribute('data-port-type');
-      if (targetPortType !== 'input') return t('error.wrongPortDirection');
+    const getHandleType = (handle: Element): ConnectionHandleType | null => {
+      const explicitType = handle.getAttribute('data-handle-type');
+      if (explicitType === 'source' || explicitType === 'target') return explicitType;
+      if (handle.getAttribute('data-port-type') === 'output') return 'source';
+      if (handle.getAttribute('data-port-type') === 'input') return 'target';
+      return null;
+    };
 
-      const sourceNode = nodes.find((n) => n.id === nodeId);
+    const resolveConnection = (
+      otherNodeId: string,
+      dropHandle: Element | null | undefined,
+    ): {
+      sourceId: string;
+      targetId: string;
+      sourceHandleId: string;
+      targetHandleId: string;
+      sourceHandle: Element;
+      targetHandle: Element;
+    } | null => {
+      const requiredDropType: ConnectionHandleType = sourceHandleType === 'source' ? 'target' : 'source';
+      const effectiveDropHandle = dropHandle ?? getNodeHandle(otherNodeId, requiredDropType);
+      if (!effectiveDropHandle || getHandleType(effectiveDropHandle) !== requiredDropType) {
+        return null;
+      }
+
+      const originNode = document.querySelector(`.react-flow__node[data-id="${nodeId}"]`);
+      const originHandle = originNode?.querySelector(
+        `[data-handle-id="${sourceHandleId}"], ${
+          sourceHandleType === 'source' ? '.image-node-handle.output-port' : '.image-node-handle.input-port'
+        }`,
+      );
+      const dropHandleId = effectiveDropHandle.getAttribute('data-handle-id')
+        || (requiredDropType === 'source' ? 'right-source' : 'left-target');
+      if (!originHandle || !dropHandleId) return null;
+
+      if (sourceHandleType === 'source') {
+        return {
+          sourceId: nodeId,
+          targetId: otherNodeId,
+          sourceHandleId,
+          targetHandleId: dropHandleId,
+          sourceHandle: originHandle,
+          targetHandle: effectiveDropHandle,
+        };
+      }
+
+      return {
+        sourceId: otherNodeId,
+        targetId: nodeId,
+        sourceHandleId: dropHandleId,
+        targetHandleId: sourceHandleId,
+        sourceHandle: effectiveDropHandle,
+        targetHandle: originHandle,
+      };
+    };
+
+    const validateConnection = (
+      connection: ReturnType<typeof resolveConnection>,
+    ): string | null => {
+      if (!connection) return t('error.wrongPortDirection');
+
+      const {
+        sourceId,
+        targetId,
+        sourceHandle,
+        targetHandle,
+      } = connection;
+      if (sourceId === targetId) return t('error.selfConnect');
+
+      const sourceNode = nodes.find((n) => n.id === sourceId);
       const targetNode = nodes.find((n) => n.id === targetId);
-      const sourceHandleEl = document.querySelector(`.react-flow__node[data-id="${nodeId}"] [data-source-handle="${sourceHandleId}"]`);
-      const sourceDataType = (sourceHandleEl as HTMLElement | null)?.getAttribute('data-data-type');
-      const targetDataType = (effectiveInputHandle as HTMLElement | null)?.getAttribute('data-data-type');
+      const sourceDataType = sourceHandle.getAttribute('data-data-type');
+      const targetDataType = targetHandle.getAttribute('data-data-type');
       if (
         sourceDataType !== targetDataType &&
         !isTextWorkflowConnection(sourceNode?.type, targetNode?.type)
@@ -312,9 +393,9 @@ function FlowCanvas() {
         return t('error.portTypeMismatch');
       }
 
-      if (wouldCreateCycle(nodeId, targetId, edges)) return t('error.cycleDetected');
+      if (wouldCreateCycle(sourceId, targetId, edges)) return t('error.cycleDetected');
 
-      const alreadyConnected = edges.some((e) => e.source === nodeId && e.target === targetId);
+      const alreadyConnected = edges.some((e) => e.source === sourceId && e.target === targetId);
       if (alreadyConnected) return t('error.alreadyConnected');
 
       // Compare node max 2 images
@@ -378,7 +459,10 @@ function FlowCanvas() {
       const nodeEl = el?.closest('.react-flow__node');
       const targetId = nodeEl?.getAttribute('data-id');
       if (targetId && nodeEl) {
-        const error = validateTarget(targetId, null);
+        const hoveredHandle = el?.closest('.image-node-handle');
+        const error = targetId === nodeId
+          ? t('error.selfConnect')
+          : validateConnection(resolveConnection(targetId, hoveredHandle));
         if (error) {
           nodeEl.classList.add('cannot-connect');
           setRejectTooltip({ x: e.clientX, y: e.clientY, message: error });
@@ -401,8 +485,8 @@ function FlowCanvas() {
 
       // 检测落点是否落在某个节点上（不限于 input port）
       const el = document.elementFromPoint(e.clientX, e.clientY);
-      const inputHandle = el?.closest('.image-node-handle');
-      const nodeEl = inputHandle?.closest('.react-flow__node') ?? el?.closest('.react-flow__node');
+      const dropHandle = el?.closest('.image-node-handle');
+      const nodeEl = dropHandle?.closest('.react-flow__node') ?? el?.closest('.react-flow__node');
       const targetId = nodeEl?.getAttribute('data-id');
 
       // ─── Connection validation ───
@@ -413,30 +497,43 @@ function FlowCanvas() {
       };
 
       if (!targetId) {
-        const menuX = e.clientX + 18;
-        const menuY = Math.max(12, e.clientY - 24);
-        const originHandle = document.querySelector(
-          `.react-flow__node[data-id="${nodeId}"] [data-source-handle="${sourceHandleId}"]`,
+        const startsOnLeft = sourceHandleId.startsWith('left-');
+        const unclampedMenuX = startsOnLeft
+          ? e.clientX - CREATE_NODE_MENU_WIDTH
+          : e.clientX;
+        const maxMenuX = Math.max(
+          CREATE_NODE_MENU_VIEWPORT_PADDING,
+          window.innerWidth - CREATE_NODE_MENU_WIDTH - CREATE_NODE_MENU_VIEWPORT_PADDING,
         );
-        const direction =
-          originHandle?.getAttribute('data-port-type') === 'input' || sourceHandleId.includes('target')
-            ? 'incoming'
-            : 'outgoing';
+        const menuX = Math.min(
+          Math.max(CREATE_NODE_MENU_VIEWPORT_PADDING, unclampedMenuX),
+          maxMenuX,
+        );
+        const menuY = Math.max(
+          CREATE_NODE_MENU_VIEWPORT_PADDING,
+          e.clientY - CREATE_NODE_MENU_TOP_OFFSET,
+        );
+        const lineEndX = startsOnLeft ? menuX + CREATE_NODE_MENU_WIDTH : menuX;
+
+        setTempLine((prev) => prev ? {
+          ...prev,
+          currentX: lineEndX,
+          currentY: e.clientY,
+        } : null);
         setCreateMenu({
           x: menuX,
           y: menuY,
-          flowPos: screenToFlowPosition({ x: e.clientX, y: e.clientY }),
+          flowPos: screenToFlowPosition({ x: menuX, y: menuY }),
           sourceNodeId: nodeId,
           sourceHandleId,
-          direction,
+          sourceHandleType,
         });
         return;
       }
 
-      // 如果没有直接落在 input port 上，从目标节点中自动查找 input port
       if (!nodeEl) { fail(); return; }
-      const effectiveInputHandle = inputHandle ?? nodeEl.querySelector('.image-node-handle.input-port');
-      const error = validateTarget(targetId, effectiveInputHandle);
+      const connection = resolveConnection(targetId, dropHandle);
+      const error = validateConnection(connection);
       if (error) {
         setRejectTooltip({ x: e.clientX, y: e.clientY, message: error });
         setTimeout(() => setRejectTooltip((prev) => (prev ? null : prev)), 1200);
@@ -445,7 +542,18 @@ function FlowCanvas() {
       }
 
       // All checks passed — create edge
-      setEdges((eds) => [...eds, { id: `e-${Date.now()}`, source: nodeId, target: targetId, sourceHandle: sourceHandleId, targetHandle: 'left-target', style: { stroke: '#555', strokeWidth: 1 } }]);
+      if (!connection) {
+        fail();
+        return;
+      }
+      setEdges((eds) => [...eds, {
+        id: `e-${Date.now()}`,
+        source: connection.sourceId,
+        target: connection.targetId,
+        sourceHandle: connection.sourceHandleId,
+        targetHandle: connection.targetHandleId,
+        style: { stroke: '#555', strokeWidth: 1 },
+      }]);
       setTempLine(null);
     };
 
@@ -1747,14 +1855,13 @@ function FlowCanvas() {
           : {}),
       },
     };
-    const isIncoming = createMenu.direction === 'incoming';
-    const targetHandleId = createMenu.sourceHandleId.replace(/source$/, 'target');
+    const startsFromSource = createMenu.sourceHandleType === 'source';
     const newEdge: Edge = {
       id: `e-${timestamp}`,
-      source: isIncoming ? newNodeId : createMenu.sourceNodeId,
-      target: isIncoming ? createMenu.sourceNodeId : newNodeId,
-      sourceHandle: isIncoming ? 'right-source' : createMenu.sourceHandleId,
-      targetHandle: isIncoming ? targetHandleId : 'left-target',
+      source: startsFromSource ? createMenu.sourceNodeId : newNodeId,
+      target: startsFromSource ? newNodeId : createMenu.sourceNodeId,
+      sourceHandle: startsFromSource ? createMenu.sourceHandleId : 'right-source',
+      targetHandle: startsFromSource ? 'left-target' : createMenu.sourceHandleId,
       style: { stroke: '#555', strokeWidth: 1 },
     };
     setNodes((nds) => [...nds, newNode]);

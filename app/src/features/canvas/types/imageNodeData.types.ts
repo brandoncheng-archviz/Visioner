@@ -1,6 +1,6 @@
 import type { GenerationHistoryItem, GenerationTask } from './generation.types';
 import type { ImageRole, PromptContent } from './imageNode.types';
-import type { MarkItem, ModelParams } from './canvas.types';
+import type { ConnectionHandleType, MarkItem, ModelParams } from './canvas.types';
 import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
 import type { RelightCreationOptions } from './relight.types';
@@ -45,7 +45,13 @@ export interface ImageNodeData {
   referenceOrder?: string[];
   referencesSignature?: string;
   // Edge-related callbacks injected by CanvasPage
-  onStartLineDraw?: (nodeId: string, x: number, y: number, sourceHandleId: string) => void;
+  onStartLineDraw?: (
+    nodeId: string,
+    x: number,
+    y: number,
+    sourceHandleId?: string,
+    sourceHandleType?: ConnectionHandleType,
+  ) => void;
   onRemoveReferenceEdge?: (targetNodeId: string, sourceNodeId: string) => void;
   onAssignReferenceEdgeRole?: (targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: import('./imageNode.types').LocalReferenceType) => void;
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;

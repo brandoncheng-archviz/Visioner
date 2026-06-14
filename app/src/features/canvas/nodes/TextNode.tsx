@@ -141,13 +141,22 @@ export function TextNode({ data, selected, id }: NodeProps) {
     }
   };
 
-  const startLineDraw = (event: PointerEvent<HTMLDivElement>, sourceHandleId: 'left-source' | 'right-source') => {
+  const startLineDraw = (
+    event: PointerEvent<HTMLDivElement>,
+    sourceHandleId: 'left-target' | 'right-source',
+  ) => {
     if (event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
     event.nativeEvent.stopImmediatePropagation();
     const rect = event.currentTarget.getBoundingClientRect();
-    nodeData.onStartLineDraw?.(id, rect.left + rect.width / 2, rect.top + rect.height / 2, sourceHandleId);
+    nodeData.onStartLineDraw?.(
+      id,
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+      sourceHandleId,
+      sourceHandleId === 'left-target' ? 'target' : 'source',
+    );
   };
 
   const sourceTitles = [
@@ -288,8 +297,9 @@ export function TextNode({ data, selected, id }: NodeProps) {
           className="image-node-handle input-port"
           data-port-type="input"
           data-data-type="text"
-          data-source-handle="left-source"
-          onPointerDown={(event) => startLineDraw(event, 'left-source')}
+          data-handle-id="left-target"
+          data-handle-type="target"
+          onPointerDown={(event) => startLineDraw(event, 'left-target')}
           style={{
             position: 'absolute',
             left: 0,
@@ -311,7 +321,8 @@ export function TextNode({ data, selected, id }: NodeProps) {
           className="image-node-handle output-port"
           data-port-type="output"
           data-data-type="text"
-          data-source-handle="right-source"
+          data-handle-id="right-source"
+          data-handle-type="source"
           onPointerDown={(event) => startLineDraw(event, 'right-source')}
           style={{
             position: 'absolute',
@@ -347,6 +358,12 @@ export function TextNode({ data, selected, id }: NodeProps) {
           type="source"
           position={Position.Right}
           id="right-source"
+          style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
+        />
+        <Handle
+          type="target"
+          position={Position.Right}
+          id="right-target"
           style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
         />
       </div>

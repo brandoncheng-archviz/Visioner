@@ -1776,16 +1776,23 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             className="image-node-handle input-port"
             data-port-type="input"
             data-data-type="image"
-            data-source-handle="left-source"
+            data-handle-id="left-target"
+            data-handle-type="target"
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               e.stopPropagation();
               e.preventDefault();
               e.nativeEvent.stopImmediatePropagation();
-              const onStart = data.onStartLineDraw as ((nodeId: string, x: number, y: number, sourceHandleId: string) => void) | undefined;
+              const onStart = data.onStartLineDraw as ((
+                nodeId: string,
+                x: number,
+                y: number,
+                sourceHandleId: string,
+                sourceHandleType: 'source' | 'target',
+              ) => void) | undefined;
               if (!onStart) return;
               const rect = e.currentTarget.getBoundingClientRect();
-              onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'left-source');
+              onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'left-target', 'target');
             }}
             style={{
               position: 'absolute',
@@ -1813,16 +1820,23 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           className="image-node-handle output-port"
           data-port-type="output"
           data-data-type="image"
-          data-source-handle="right-source"
+          data-handle-id="right-source"
+          data-handle-type="source"
           onPointerDown={(e) => {
             if (e.button !== 0) return;
             e.stopPropagation();
             e.preventDefault();
             e.nativeEvent.stopImmediatePropagation();
-            const onStart = data.onStartLineDraw as ((nodeId: string, x: number, y: number, sourceHandleId: string) => void) | undefined;
+            const onStart = data.onStartLineDraw as ((
+              nodeId: string,
+              x: number,
+              y: number,
+              sourceHandleId: string,
+              sourceHandleType: 'source' | 'target',
+            ) => void) | undefined;
             if (!onStart) return;
             const rect = e.currentTarget.getBoundingClientRect();
-            onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'right-source');
+            onStart(id, rect.left + rect.width / 2, rect.top + rect.height / 2, 'right-source', 'source');
           }}
           style={{
             position: 'absolute',
@@ -1848,7 +1862,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         {/* React Flow handles — positioned to overlap visual handles exactly */}
         <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
         <Handle type="source" position={Position.Left} id="left-source" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
-        <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop }} />
+        <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />
+        <Handle type="target" position={Position.Right} id="right-target" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />
       </div>
 
       {/* Control panel — below the preview area */}

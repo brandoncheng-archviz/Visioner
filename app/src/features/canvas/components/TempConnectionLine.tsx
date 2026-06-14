@@ -1,6 +1,7 @@
 import { useStore } from '@xyflow/react';
+import type { TempConnectionState } from '../types/canvas.types';
 
-export function TempConnectionLine({ tempLine }: { tempLine: { sourceNodeId: string; sourceHandleId: string; currentX: number; currentY: number } | null }) {
+export function TempConnectionLine({ tempLine }: { tempLine: TempConnectionState | null }) {
   // Subscribe to viewport changes so the temp line re-queries DOM positions on pan/zoom.
   // This is isolated to this tiny component so it does NOT cause the whole FlowCanvas to re-render.
   useStore((state) => state.transform);
@@ -9,7 +10,9 @@ export function TempConnectionLine({ tempLine }: { tempLine: { sourceNodeId: str
 
   const sourceNode = document.querySelector(`.react-flow__node[data-id="${tempLine.sourceNodeId}"]`);
   const sNode = sourceNode?.querySelector(
-    `[data-source-handle="${tempLine.sourceHandleId}"], [data-target-handle="${tempLine.sourceHandleId}"], .react-flow__handle[data-handleid="${tempLine.sourceHandleId}"]`,
+    `[data-handle-id="${tempLine.sourceHandleId}"], .react-flow__handle[data-handleid="${tempLine.sourceHandleId}"], ${
+      tempLine.sourceHandleType === 'source' ? '.image-node-handle.output-port' : '.image-node-handle.input-port'
+    }`,
   );
   if (!sNode) return null;
   const sRect = sNode.getBoundingClientRect();

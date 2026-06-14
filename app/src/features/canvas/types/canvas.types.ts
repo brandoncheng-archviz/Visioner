@@ -34,3 +34,22 @@ export interface CompareNodeData {
   rightImage?: CompareImageRef;
   sliderPosition: number;
 }
+
+export type ConnectionHandleType = 'source' | 'target';
+
+export interface TempConnectionState {
+  sourceNodeId: string;
+  sourceHandleId: string;
+  sourceHandleType: ConnectionHandleType;
+  currentX: number;
+  currentY: number;
+}
+
+export interface CreateConnectionMenuState {
+  x: number;
+  y: number;
+  flowPos: { x: number; y: number };
+  sourceNodeId: string;
+  sourceHandleId: string;
+  sourceHandleType: ConnectionHandleType;
+}

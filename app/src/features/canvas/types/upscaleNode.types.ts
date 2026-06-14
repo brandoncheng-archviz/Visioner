@@ -1,3 +1,5 @@
+import type { ConnectionHandleType } from './canvas.types';
+
 export type UpscaleEngine = 'magnific_precision_v2' | 'magnific_creative' | 'topazlabs';
 
 export type UpscaleStatus = 'idle' | 'running' | 'success' | 'failed';
@@ -62,6 +64,12 @@ export interface UpscaleNodeData {
   history: UpscaleHistoryItem[];
 
   // Callback injected by CanvasPage
-  onStartLineDraw?: (nodeId: string, x: number, y: number, sourceHandleId: string) => void;
+  onStartLineDraw?: (
+    nodeId: string,
+    x: number,
+    y: number,
+    sourceHandleId?: string,
+    sourceHandleType?: ConnectionHandleType,
+  ) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
 }

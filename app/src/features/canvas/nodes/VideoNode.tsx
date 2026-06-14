@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { Film, Play, Upload } from 'lucide-react';
+import { Film, Play, Plus, Upload } from 'lucide-react';
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { NodeShell } from '../components/NodeShell';
@@ -121,17 +121,101 @@ export function VideoNode({ data, selected, id }: NodeProps) {
           </div>
         </div>
       </NodeShell>
+      <div
+        className="image-node-handle input-port"
+        data-port-type="input"
+        data-data-type="video"
+        data-handle-id="left-target"
+        data-handle-type="target"
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          event.stopPropagation();
+          event.preventDefault();
+          event.nativeEvent.stopImmediatePropagation();
+          const rect = event.currentTarget.getBoundingClientRect();
+          nodeData.onStartLineDraw?.(
+            id,
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2,
+            'left-target',
+            'target',
+          );
+        }}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          background: 'rgba(20,20,26,0.55)',
+          border: '1.5px solid rgba(255,255,255,0.25)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 10,
+        }}
+      >
+        <Plus className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white" />
+      </div>
+      <div
+        className="image-node-handle output-port"
+        data-port-type="output"
+        data-data-type="video"
+        data-handle-id="right-source"
+        data-handle-type="source"
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          event.stopPropagation();
+          event.preventDefault();
+          event.nativeEvent.stopImmediatePropagation();
+          const rect = event.currentTarget.getBoundingClientRect();
+          nodeData.onStartLineDraw?.(
+            id,
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2,
+            'right-source',
+            'source',
+          );
+        }}
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: '50%',
+          transform: 'translate(50%, -50%)',
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          background: 'rgba(20,20,26,0.55)',
+          border: '1.5px solid rgba(255,255,255,0.25)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 10,
+        }}
+      >
+        <Plus className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white" />
+      </div>
       <Handle
         type="target"
         position={Position.Left}
         id="left-target"
-        style={{ opacity: 0, left: 0, top: '50%', pointerEvents: 'none' }}
+        style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%', pointerEvents: 'none' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="left-source"
+        style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%', pointerEvents: 'none' }}
       />
       <Handle
         type="source"
         position={Position.Right}
         id="right-source"
-        style={{ opacity: 0, right: 0, top: '50%', pointerEvents: 'none' }}
+        style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%', pointerEvents: 'none' }}
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right-target"
+        style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%', pointerEvents: 'none' }}
       />
     </div>
   );

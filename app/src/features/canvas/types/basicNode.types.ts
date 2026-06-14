@@ -1,3 +1,5 @@
+import type { ConnectionHandleType } from './canvas.types';
+
 export type TextNodeStatus = 'empty' | 'editing' | 'result';
 
 export type TextNodeActionType =
@@ -32,7 +34,13 @@ export interface TextNodeData {
   lastActionType?: TextNodeActionType | null;
   editorInput?: string;
   isProcessing?: boolean;
-  onStartLineDraw?: (nodeId: string, x: number, y: number, sourceHandleId: string) => void;
+  onStartLineDraw?: (
+    nodeId: string,
+    x: number,
+    y: number,
+    sourceHandleId: string,
+    sourceHandleType?: ConnectionHandleType,
+  ) => void;
   onTextAction?: (nodeId: string, action: TextNodeActionType) => void;
 }
 
@@ -42,4 +50,11 @@ export interface VideoNodeData {
   fileName?: string;
   fileSize?: number;
   duration?: number;
+  onStartLineDraw?: (
+    nodeId: string,
+    x: number,
+    y: number,
+    sourceHandleId: string,
+    sourceHandleType?: ConnectionHandleType,
+  ) => void;
 }

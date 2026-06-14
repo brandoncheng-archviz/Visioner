@@ -1,6 +1,11 @@
 import { Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { BASIC_NODE_DEFINITIONS, type BasicNodeType } from '../constants/basicNodes';
+import {
+  BASIC_NODE_DEFINITIONS,
+  CREATE_NODE_MENU_WIDTH,
+  type BasicNodeType,
+} from '../constants/basicNodes';
+import type { CreateConnectionMenuState } from '../types/canvas.types';
 
 function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
@@ -48,7 +53,7 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
           background: '#252526',
           border: '1px solid #2a2a35',
           boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-          minWidth: 280,
+          width: CREATE_NODE_MENU_WIDTH,
         }}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -78,17 +83,8 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
 
 /* ─── Create Node Menu (drop on empty canvas during connection) ─── */
 
-export interface CreateNodeMenuData {
-  x: number;
-  y: number;
-  flowPos: { x: number; y: number };
-  sourceNodeId: string;
-  sourceHandleId: string;
-  direction: 'outgoing' | 'incoming';
-}
-
 export interface CreateNodeMenuProps {
-  menu: CreateNodeMenuData | null;
+  menu: CreateConnectionMenuState | null;
   onClose: () => void;
   onCreateAndConnect: (type: string) => void;
 }
@@ -113,7 +109,7 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
           background: '#252526',
           border: '1px solid #2a2a35',
           boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-          minWidth: 280,
+          width: CREATE_NODE_MENU_WIDTH,
         }}
       >
         <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
@@ -244,7 +240,7 @@ export interface CanvasContextMenusProps {
   onContextMenuAddNode: (type: string, label: string) => void;
   onContextMenuReopen: (clientX: number, clientY: number) => void;
 
-  createMenu: CreateNodeMenuData | null;
+  createMenu: CreateConnectionMenuState | null;
   onCloseCreateMenu: () => void;
   onCreateAndConnect: (type: string) => void;
 

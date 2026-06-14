@@ -25,6 +25,7 @@ import { SunSkyNode } from '../nodes/SunSkyNode';
 import { RelightNode } from '../nodes/RelightNode';
 import { TempConnectionLine } from './TempConnectionLine';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from '../constants/canvasConstants';
+import type { TempConnectionState } from '../types/canvas.types';
 
 const nodeTypes = {
   text: TextNode,
@@ -40,7 +41,7 @@ const nodeTypes = {
 };
 
 export interface CanvasStageProps {
-  tempLine: { sourceNodeId: string; sourceHandleId: string; currentX: number; currentY: number } | null;
+  tempLine: TempConnectionState | null;
   isDragOver: boolean;
   rejectTooltip: { x: number; y: number; message: string } | null;
   uploadToast: { msg: string; type: 'loading' | 'success' } | null;
