@@ -2,6 +2,14 @@ import type { ConnectionHandleType } from './canvas.types';
 
 export type TextNodeStatus = 'empty' | 'editing' | 'result';
 export type TextNodeMode = 'unset' | 'compose';
+export type TextNodeSource = 'manual' | 'image_extract' | 'mock_result';
+
+export interface TextNodeMockTask {
+  taskId: string;
+  status: 'running' | 'success' | 'failed';
+  createdAt: number;
+  updatedAt: number;
+}
 
 export type TextNodeActionType =
   | 'draft'
@@ -36,6 +44,8 @@ export interface TextNodeData {
   editorInput?: string;
   isProcessing?: boolean;
   textMode?: TextNodeMode;
+  textSource?: TextNodeSource;
+  generationTask?: TextNodeMockTask | null;
   onStartLineDraw?: (
     nodeId: string,
     x: number,

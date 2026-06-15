@@ -18,6 +18,7 @@ import type { TextNodeActionType, TextNodeData } from '../types/basicNode.types'
 import {
   getTextContent,
   getTextNodeSubmitState,
+  isComposeTextNode,
   type TextNodeVisualState,
 } from '../utils/textNodeUtils';
 
@@ -32,6 +33,10 @@ const EMPTY_ACTIONS: Array<{
   { action: 'image_to_text', label: '从图片提取描述', icon: FileText },
   { action: 'text_to_image', label: '生成图片', icon: ImagePlus },
 ];
+
+const TEXT_NODE_RESIZE_MIN_HEIGHT = 240;
+const TEXT_NODE_RESIZE_MAX_WIDTH = 960;
+const TEXT_NODE_RESIZE_MAX_HEIGHT = 800;
 
 function TextNodeGlyph({ className }: { className?: string }) {
   return (
@@ -56,11 +61,17 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
   const nodeData = data as TextNodeData;
-  const isComposeMode = nodeData.textMode === 'compose';
-  const nodeWidth = isComposeMode ? (width ?? TEXT_NODE_WIDTH) : TEXT_NODE_WIDTH;
-  const nodeHeight = isComposeMode ? (height ?? TEXT_NODE_MIN_HEIGHT) : undefined;
+  const isComposeMode = isComposeTextNode(nodeData);
   const title = nodeData.label || nodeData.title || '文本节点';
   const content = getTextContent(nodeData);
+  const usesTextResourceLayout = isComposeMode || (nodeData.status === 'result' && content.length > 0);
+  const [resizeDimensions, setResizeDimensions] = useState<{ width: number; height: number } | null>(null);
+  const nodeWidth = usesTextResourceLayout
+    ? (resizeDimensions?.width ?? width ?? TEXT_NODE_WIDTH)
+    : TEXT_NODE_WIDTH;
+  const nodeHeight = usesTextResourceLayout
+    ? (resizeDimensions?.height ?? height ?? TEXT_NODE_MIN_HEIGHT)
+    : undefined;
   const inlineContent = nodeData.content ?? nodeData.text ?? '';
   const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [inlineEditorHeight, setInlineEditorHeight] = useState(TEXT_NODE_MIN_HEIGHT);
@@ -70,16 +81,16 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
   const allNodes = useStore((state) => state.nodes);
   const incomingSourceNodes = useMemo(
     () =>
-      allEdges
+      (isComposeMode ? [] : allEdges)
         .filter((edge) => edge.target === id)
         .map((edge) => allNodes.find((node) => node.id === edge.source))
         .filter((node) => node !== undefined),
-    [allEdges, allNodes, id],
+    [allEdges, allNodes, id, isComposeMode],
   );
   const { isProcessing, nodeState } = getTextNodeSubmitState(nodeData, incomingSourceNodes);
 
   const references = useMemo(() => {
-    const incoming = allEdges.filter((edge) => edge.target === id);
+    const incoming = isComposeMode ? [] : allEdges.filter((edge) => edge.target === id);
     return {
       imageIds: incoming
         .filter((edge) => allNodes.find((node) => node.id === edge.source)?.type === 'image')
@@ -91,7 +102,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
         .filter((edge) => edge.source === id && allNodes.find((node) => node.id === edge.target)?.type === 'image')
         .map((edge) => edge.target),
     };
-  }, [allEdges, allNodes, id]);
+  }, [allEdges, allNodes, id, isComposeMode]);
 
   useEffect(() => {
     const nextStatus = content ? 'result' : (nodeData.status || 'empty');
@@ -173,6 +184,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                 data: {
                   ...node.data,
                   textMode: 'compose',
+                  textSource: 'manual',
                 },
               }
             : node,
@@ -231,12 +243,12 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
 
   return (
     <div
-      className={isComposeMode ? 'group/text-node flex min-h-0 flex-col' : undefined}
+      className={usesTextResourceLayout ? 'group/text-node flex min-h-0 flex-col' : undefined}
       style={{
         width: nodeWidth,
         height: nodeHeight,
-        minWidth: isComposeMode ? TEXT_NODE_WIDTH : undefined,
-        minHeight: isComposeMode ? 240 : undefined,
+        minWidth: usesTextResourceLayout ? TEXT_NODE_WIDTH : undefined,
+        minHeight: usesTextResourceLayout ? 240 : undefined,
       }}
     >
       <div
@@ -272,16 +284,16 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
         </div>
       </div>
 
-      <div className={`relative overflow-visible ${isComposeMode ? 'min-h-0 flex-1' : ''}`}>
+      <div className={`relative overflow-visible ${usesTextResourceLayout ? 'min-h-0 flex-1' : ''}`}>
         <div
           ref={previewCardRef}
           className="node-preview-card relative rounded-xl transition-all"
           style={{
             width: '100%',
-            minHeight: isComposeMode ? 0 : TEXT_NODE_MIN_HEIGHT,
-            maxHeight: isComposeMode ? undefined : TEXT_NODE_MAX_HEIGHT,
-            height: isComposeMode ? '100%' : isInlineEditing ? inlineEditorHeight : undefined,
-            overflow: isComposeMode || isInlineEditing ? 'hidden' : undefined,
+            minHeight: usesTextResourceLayout ? 0 : TEXT_NODE_MIN_HEIGHT,
+            maxHeight: usesTextResourceLayout ? undefined : TEXT_NODE_MAX_HEIGHT,
+            height: usesTextResourceLayout ? '100%' : isInlineEditing ? inlineEditorHeight : undefined,
+            overflow: usesTextResourceLayout || isInlineEditing ? 'hidden' : undefined,
             background: '#252526',
             border: `2.5px solid ${selected ? '#2f6bff' : 'rgba(42,42,53,0.98)'}`,
             boxShadow: 'none',
@@ -301,10 +313,10 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
               onWheel={(event) => event.stopPropagation()}
               onWheelCapture={(event) => event.stopPropagation()}
               className={`text-node-editor-scrollbar nodrag nowheel block h-full min-h-0 w-full resize-none overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent px-4 py-4 text-[13px] leading-6 text-white/72 outline-none placeholder:text-white/24 ${
-                isComposeMode ? 'pb-9 pr-8' : ''
+                usesTextResourceLayout ? 'pb-9 pr-8' : ''
               }`}
               style={{
-                maxHeight: isComposeMode ? '100%' : TEXT_NODE_MAX_HEIGHT,
+                maxHeight: usesTextResourceLayout ? '100%' : TEXT_NODE_MAX_HEIGHT,
                 boxSizing: 'border-box',
               }}
               aria-label="编写文本内容"
@@ -312,9 +324,9 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
           ) : content ? (
             <div
               className={`text-node-editor-scrollbar nowheel h-full min-h-0 w-full select-none overflow-x-hidden overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-4 py-4 text-[13px] leading-6 text-white/68 [overflow-wrap:anywhere] ${
-                isComposeMode ? 'pb-9 pr-8' : 'pr-3'
+                usesTextResourceLayout ? 'pb-9 pr-8' : 'pr-3'
               }`}
-              style={{ maxHeight: isComposeMode ? '100%' : TEXT_NODE_MAX_HEIGHT }}
+              style={{ maxHeight: usesTextResourceLayout ? '100%' : TEXT_NODE_MAX_HEIGHT }}
               onDoubleClick={(event) => {
                 event.stopPropagation();
                 startInlineEditing();
@@ -347,7 +359,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
               onDoubleClick={(event) => {
                 if ((event.target as HTMLElement).closest('button')) return;
                 event.stopPropagation();
-                startInlineEditing();
+                triggerAction('draft');
               }}
             >
               <TextNodeGlyph className="-mt-3 mb-7 text-white/15" />
@@ -372,16 +384,38 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
           )}
         </div>
 
-        {isComposeMode && selected && !isProcessing && (
+        {usesTextResourceLayout && selected && !isProcessing && (
           <NodeResizeControl
             nodeId={id}
             position="bottom-right"
             minWidth={TEXT_NODE_WIDTH}
-            minHeight={240}
-            className="nodrag opacity-0 transition-opacity duration-150 group-hover/text-node:opacity-70 hover:!opacity-100"
+            minHeight={TEXT_NODE_RESIZE_MIN_HEIGHT}
+            maxWidth={TEXT_NODE_RESIZE_MAX_WIDTH}
+            maxHeight={TEXT_NODE_RESIZE_MAX_HEIGHT}
+            onResize={(_event, params) => {
+              setResizeDimensions({
+                width: params.width,
+                height: params.height,
+              });
+            }}
+            onResizeEnd={(_event, params) => {
+              setNodes((nodes) =>
+                nodes.map((node) =>
+                  node.id === id
+                    ? {
+                        ...node,
+                        width: params.width,
+                        height: params.height,
+                      }
+                    : node,
+                ),
+              );
+              setResizeDimensions(null);
+            }}
+            className="nodrag nopan opacity-0 transition-opacity duration-150 group-hover/text-node:opacity-70 hover:!opacity-100"
             style={{
-              right: 14,
-              bottom: 10,
+              right: 12,
+              bottom: 12,
               width: 18,
               height: 18,
               transform: 'none',
@@ -407,30 +441,32 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
           </NodeResizeControl>
         )}
 
-        <div
-          className="image-node-handle input-port"
-          data-port-type="input"
-          data-data-type="text"
-          data-handle-id="left-target"
-          data-handle-type="target"
-          onPointerDown={(event) => startLineDraw(event, 'left-target')}
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            background: 'rgba(20,20,26,0.55)',
-            border: '1.5px solid rgba(255,255,255,0.25)',
-            backdropFilter: 'blur(12px)',
-            zIndex: 10,
-            pointerEvents: 'auto',
-          }}
-        >
-          <Plus className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white" />
-        </div>
+        {!isComposeMode && (
+          <div
+            className="image-node-handle input-port"
+            data-port-type="input"
+            data-data-type="text"
+            data-handle-id="left-target"
+            data-handle-type="target"
+            onPointerDown={(event) => startLineDraw(event, 'left-target')}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: 'rgba(20,20,26,0.55)',
+              border: '1.5px solid rgba(255,255,255,0.25)',
+              backdropFilter: 'blur(12px)',
+              zIndex: 10,
+              pointerEvents: 'auto',
+            }}
+          >
+            <Plus className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white" />
+          </div>
+        )}
         <div
           className="image-node-handle output-port"
           data-port-type="output"
@@ -456,12 +492,14 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
           <Plus className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white" />
         </div>
 
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="left-target"
-          style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
-        />
+        {!isComposeMode && (
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="left-target"
+            style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
+          />
+        )}
         <Handle
           type="source"
           position={Position.Left}

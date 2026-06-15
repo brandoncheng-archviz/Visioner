@@ -52,10 +52,14 @@ import {
   getTextContent,
   getTextNodeInstruction,
   getTextNodeSubmitState,
+  isComposeTextNode,
+  isComposeTextOutputTarget,
   isTextWorkflowConnection,
+  removeComposeTextInputEdges,
   simulateTextNodeResult,
 } from '../features/canvas/utils/textNodeUtils';
 import { getCurrentImage } from '../features/canvas/types/imageNodeData.types';
+import { resolveNodeImage } from '../features/canvas/utils/resolveNodeImage';
 import {
   CREATE_NODE_MENU_TOP_OFFSET,
   CREATE_NODE_MENU_VIEWPORT_PADDING,
@@ -251,6 +255,11 @@ function FlowCanvas() {
   const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [textFocusRequestId, setTextFocusRequestId] = useState(0);
   const [textNodePanelPosition, setTextNodePanelPosition] = useState<{ left: number; top: number } | null>(null);
+  const runningTextTaskIdsRef = useRef<Set<string>>(new Set());
+  const submitTextNodeRef = useRef<(
+    nodeId: string,
+    dataOverride?: Partial<TextNodeData>,
+  ) => void>(() => undefined);
 
   // ─── Line Drawing State ───
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -260,6 +269,13 @@ function FlowCanvas() {
   const isDrawingRef = useRef(false);
 
   const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+
+  useEffect(() => {
+    setEdges((currentEdges) => {
+      const nextEdges = removeComposeTextInputEdges(currentEdges, nodes);
+      return nextEdges.length === currentEdges.length ? currentEdges : nextEdges;
+    });
+  }, [nodes]);
 
   // Detect if adding an edge from source → target would create a cycle
   const wouldCreateCycle = useCallback((sourceId: string, targetId: string, currentEdges: Edge[]): boolean => {
@@ -391,11 +407,26 @@ function FlowCanvas() {
 
       const sourceNode = nodes.find((n) => n.id === sourceId);
       const targetNode = nodes.find((n) => n.id === targetId);
+      if (targetNode?.type === 'text' && isComposeTextNode(targetNode.data)) {
+        return t('canvas.cannotConnect');
+      }
+      if (
+        sourceNode?.type === 'text' &&
+        isComposeTextNode(sourceNode.data) &&
+        !isComposeTextOutputTarget(targetNode?.type)
+      ) {
+        return t('canvas.cannotConnect');
+      }
       const sourceDataType = sourceHandle.getAttribute('data-data-type');
       const targetDataType = targetHandle.getAttribute('data-data-type');
       if (
         sourceDataType !== targetDataType &&
-        !isTextWorkflowConnection(sourceNode?.type, targetNode?.type)
+        !isTextWorkflowConnection(sourceNode?.type, targetNode?.type) &&
+        !(
+          sourceNode?.type === 'text' &&
+          isComposeTextNode(sourceNode.data) &&
+          isComposeTextOutputTarget(targetNode?.type)
+        )
       ) {
         return t('error.portTypeMismatch');
       }
@@ -955,12 +986,17 @@ function FlowCanvas() {
 
     let sourceImageNodeId: string | null = null;
     let sourceImageNode: Node | null = null;
+    let hasValidSourceImage = false;
     if (action === 'image_to_text') {
-      const existingEdge = edges.find((edge) => {
-        if (edge.target !== nodeId) return false;
-        return nodes.find((node) => node.id === edge.source)?.type === 'image';
-      });
-      sourceImageNodeId = existingEdge?.source || null;
+      const existingImageNodes = edges
+        .filter((edge) => edge.target === nodeId)
+        .map((edge) => nodes.find((node) => node.id === edge.source && node.type === 'image'))
+        .filter((node): node is Node => Boolean(node));
+      const existingImageNode = existingImageNodes.find(
+        (node) => Boolean(resolveNodeImage(node.data)?.imageUrl),
+      ) || existingImageNodes[0] || null;
+      sourceImageNodeId = existingImageNode?.id || null;
+      hasValidSourceImage = Boolean(resolveNodeImage(existingImageNode?.data)?.imageUrl);
 
       if (!sourceImageNodeId) {
         sourceImageNodeId = `image-${Date.now()}`;
@@ -1032,6 +1068,12 @@ function FlowCanvas() {
       }, 0);
     }
     setTextFocusRequestId((value) => value + 1);
+    if (action === 'image_to_text' && hasValidSourceImage) {
+      submitTextNodeRef.current(nodeId, {
+        lastActionType: action,
+        editorInput,
+      });
+    }
   }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setEdges, setNodes]);
 
   const nodesWithCallbacks = useMemo(() => {
@@ -1123,7 +1165,10 @@ function FlowCanvas() {
     }
     historyIndexRef.current += 1;
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current);
-    historyRef.current.push({ nodes: [...nodes], edges: [...edges] });
+    historyRef.current.push({
+      nodes: [...nodes],
+      edges: removeComposeTextInputEdges(edges, nodes),
+    });
     if (historyRef.current.length > 50) {
       historyRef.current.shift();
       historyIndexRef.current -= 1;
@@ -1136,7 +1181,7 @@ function FlowCanvas() {
       const state = historyRef.current[historyIndexRef.current];
       skipHistoryRef.current = true;
       setNodes(state.nodes);
-      setEdges(state.edges);
+      setEdges(removeComposeTextInputEdges(state.edges, state.nodes));
     }
   }, [setNodes, setEdges]);
 
@@ -1146,7 +1191,7 @@ function FlowCanvas() {
       const state = historyRef.current[historyIndexRef.current];
       skipHistoryRef.current = true;
       setNodes(state.nodes);
-      setEdges(state.edges);
+      setEdges(removeComposeTextInputEdges(state.edges, state.nodes));
     }
   }, [setNodes, setEdges]);
 
@@ -1492,23 +1537,33 @@ function FlowCanvas() {
     );
   }, [selectedTextNode, setNodes]);
 
-  const submitSelectedTextNode = useCallback(async () => {
-    if (!selectedTextNode) return;
-    const nodeData = selectedTextNode.data as TextNodeData;
-    const incomingEdges = edges.filter((edge) => edge.target === selectedTextNode.id);
+  const submitTextNode = useCallback(async (
+    nodeId: string,
+    dataOverride?: Partial<TextNodeData>,
+  ) => {
+    if (runningTextTaskIdsRef.current.has(nodeId)) return;
+
+    const textNode = nodes.find((node) => node.id === nodeId && node.type === 'text');
+    if (!textNode) return;
+    const nodeData = {
+      ...(textNode.data as TextNodeData),
+      ...dataOverride,
+    };
+    const incomingEdges = edges.filter((edge) => edge.target === nodeId);
     const inputSources = incomingEdges
       .map((edge) => nodes.find((node) => node.id === edge.source))
       .filter((node): node is Node => Boolean(node));
     const submitState = getTextNodeSubmitState(nodeData, inputSources);
     if (!submitState.canSubmit) return;
+    runningTextTaskIdsRef.current.add(nodeId);
 
     const instruction = getTextNodeInstruction(nodeData);
     const referencedTextNodes = inputSources
       .filter((node) => node.type === 'text');
     const referencedImageNode = inputSources
-      .find((node) => node?.type === 'image' && Boolean(getCurrentImage(node.data)));
+      .find((node) => node?.type === 'image' && Boolean(resolveNodeImage(node.data)?.imageUrl));
     const sourceText = referencedTextNodes
-      .map((node) => getTextNodeInstruction(node.data))
+      .map((node) => getTextContent(node.data))
       .filter(Boolean)
       .join('\n\n');
     const effectiveInstruction = instruction || (
@@ -1522,7 +1577,29 @@ function FlowCanvas() {
         ? 'text_to_text'
         : nodeData.lastActionType || 'draft';
 
-    updateSelectedTextNode({ isProcessing: true, status: 'editing', lastActionType: action });
+    const taskId = `text-task-${Date.now()}`;
+    const createdAt = Date.now();
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                isProcessing: true,
+                status: 'editing',
+                lastActionType: action,
+                generationTask: {
+                  taskId,
+                  status: 'running',
+                  createdAt,
+                  updatedAt: createdAt,
+                },
+              },
+            }
+          : node,
+      ),
+    );
     try {
       const result = await simulateTextNodeResult({
         action,
@@ -1534,7 +1611,7 @@ function FlowCanvas() {
       });
       setNodes((currentNodes) =>
         currentNodes.map((node) =>
-          node.id === selectedTextNode.id
+          node.id === nodeId
             ? {
                 ...node,
                 data: {
@@ -1543,16 +1620,53 @@ function FlowCanvas() {
                   text: result,
                   status: 'result',
                   isProcessing: false,
-                  editorInput: '',
+                  editorInput: action === 'image_to_text' ? result : '',
+                  ...(action === 'image_to_text'
+                    ? {
+                        textMode: 'compose',
+                        textSource: 'image_extract',
+                        lastActionType: 'text_to_text',
+                      }
+                    : {}),
+                  generationTask: {
+                    taskId,
+                    status: 'success',
+                    createdAt,
+                    updatedAt: Date.now(),
+                  },
                 },
               }
             : node,
         ),
       );
     } catch {
-      updateSelectedTextNode({ isProcessing: false });
+      setNodes((currentNodes) =>
+        currentNodes.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  isProcessing: false,
+                  generationTask: {
+                    taskId,
+                    status: 'failed',
+                    createdAt,
+                    updatedAt: Date.now(),
+                  },
+                },
+              }
+            : node,
+        ),
+      );
+    } finally {
+      runningTextTaskIdsRef.current.delete(nodeId);
     }
-  }, [edges, nodes, selectedTextNode, setNodes, updateSelectedTextNode]);
+  }, [edges, nodes, setNodes]);
+
+  useEffect(() => {
+    submitTextNodeRef.current = submitTextNode;
+  }, [submitTextNode]);
 
   function isEditablePasteTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -1873,6 +1987,17 @@ function FlowCanvas() {
       setTempLine(null);
       return;
     }
+    const existingTargetNode = createMenu.sourceHandleType === 'target'
+      ? nodes.find((node) => node.id === createMenu.sourceNodeId)
+      : null;
+    if (
+      existingTargetNode?.type === 'text' &&
+      isComposeTextNode(existingTargetNode.data)
+    ) {
+      setCreateMenu(null);
+      setTempLine(null);
+      return;
+    }
     const timestamp = Date.now();
     const newNodeId = `${type}-${timestamp}`;
     const baseTitle = NODE_BASE_TITLES[type] || type;
@@ -1914,7 +2039,7 @@ function FlowCanvas() {
     setEdges((eds) => [...eds, newEdge]);
     setCreateMenu(null);
     setTempLine(null);
-  }, [createMenu, getAllNodeLabels, setNodes, setEdges]);
+  }, [createMenu, getAllNodeLabels, nodes, setNodes, setEdges]);
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
@@ -1927,21 +2052,21 @@ function FlowCanvas() {
     setViewport({ x: current.x, y: current.y, zoom: nextZoom }, { duration: 0 });
   }, [getViewport, setViewport]);
 
+  const selectedTextNodeId = selectedTextNode?.id;
   useEffect(() => {
-    const selectedTextNode = nodes.find((node) => node.selected && node.type === 'text');
-    if (!selectedTextNode) {
+    if (!selectedTextNodeId) {
       setTextNodePanelPosition(null);
       return;
     }
 
     const updatePosition = () => {
-      const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNode.id}"] .node-preview-card`) as HTMLElement | null;
+      const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNodeId}"] .node-preview-card`) as HTMLElement | null;
       if (!nodeEl) return;
       const rect = nodeEl.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
 
       const left = rect.left + rect.width / 2;
-      const top = rect.bottom + 12;
+      const top = rect.bottom + 24;
       setTextNodePanelPosition((prev) =>
         prev?.left === left && prev?.top === top ? prev : { left, top },
       );
@@ -1953,7 +2078,7 @@ function FlowCanvas() {
       frameId = window.requestAnimationFrame(tick);
     });
 
-    const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNode.id}"] .node-preview-card`) as HTMLElement | null;
+    const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNodeId}"] .node-preview-card`) as HTMLElement | null;
     const observer = nodeEl ? new ResizeObserver(updatePosition) : null;
     if (nodeEl && observer) observer.observe(nodeEl);
 
@@ -1963,7 +2088,7 @@ function FlowCanvas() {
       observer?.disconnect();
       window.removeEventListener('resize', updatePosition);
     };
-  }, [nodes]);
+  }, [selectedTextNodeId]);
 
   const handleUseNodeHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch) => {
     if (!historyPanelNodeId || images.length === 0) return;
@@ -2141,7 +2266,10 @@ function FlowCanvas() {
         onUseHistoryImages={handleUseGlobalHistoryImages}
       />
 
-      {selectedTextNode && (selectedTextNode.data as TextNodeData).textMode !== 'compose' && (
+      {selectedTextNode && (
+        (selectedTextNode.data as TextNodeData).textMode !== 'compose' ||
+        (selectedTextNode.data as TextNodeData).textSource === 'image_extract'
+      ) && (
         <div
           className="absolute z-[90]"
           style={{
@@ -2162,7 +2290,7 @@ function FlowCanvas() {
             imageReferences={selectedTextNodeImageReferences}
             onChange={(value) => updateSelectedTextNode({ editorInput: value, status: 'editing' })}
             onModelChange={(model) => updateSelectedTextNode({ activeModel: model })}
-            onSubmit={submitSelectedTextNode}
+            onSubmit={() => submitTextNode(selectedTextNode.id)}
             onFocusTextReference={focusCanvasNode}
             onFocusImageReference={focusCanvasNode}
             onRemoveTextReference={(sourceNodeId) => {
