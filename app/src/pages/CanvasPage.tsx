@@ -23,7 +23,12 @@ import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
 import type { GenerationHistoryItem, GenerationTask } from '../features/canvas/types/generation.types';
 import type { RelightCreationOptions } from '../features/canvas/types/relight.types';
-import type { TextNodeActionType, TextNodeData, TextNodeModel } from '../features/canvas/types/basicNode.types';
+import type {
+  TextNodeActionType,
+  TextNodeData,
+  TextNodeModel,
+  TextReferenceInfo,
+} from '../features/canvas/types/basicNode.types';
 import type {
   ConnectionHandleType,
   CreateConnectionMenuState,
@@ -41,11 +46,12 @@ import {
 import {
   DEFAULT_TEXT_NODE_MODEL,
   TEXT_NODE_IMAGE_EXTRACTION_PROMPT,
-  TEXT_NODE_MIN_HEIGHT,
   TEXT_NODE_WIDTH,
 } from '../features/canvas/constants/textNode';
 import {
   getTextContent,
+  getTextNodeInstruction,
+  getTextNodeSubmitState,
   isTextWorkflowConnection,
   simulateTextNodeResult,
 } from '../features/canvas/utils/textNodeUtils';
@@ -95,8 +101,6 @@ const UPSCALE_NODE_DEFAULTS: Record<string, unknown> = {
   mpGrain: 7,
   mpUltra: 30,
 };
-
-const CANVAS_NODE_CONTROL_SCALE = 1;
 
 type ImageFileRejectReason = 'unsupported-type' | 'too-large' | 'decode-failed';
 
@@ -246,7 +250,6 @@ function FlowCanvas() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number } } | null>(null);
   const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [textFocusRequestId, setTextFocusRequestId] = useState(0);
-  const [textNodePanelSize, setTextNodePanelSize] = useState({ width: TEXT_NODE_WIDTH, height: TEXT_NODE_MIN_HEIGHT });
   const [textNodePanelPosition, setTextNodePanelPosition] = useState<{ left: number; top: number } | null>(null);
 
   // ─── Line Drawing State ───
@@ -1420,6 +1423,7 @@ function FlowCanvas() {
                 activeModel: DEFAULT_TEXT_NODE_MODEL,
                 lastActionType: null,
                 editorInput: '',
+                textMode: 'unset',
               }
             : {}),
         },
@@ -1451,19 +1455,32 @@ function FlowCanvas() {
         }];
       });
   }, [edges, nodes, selectedTextNode]);
-  const selectedTextNodePanelPosition = useMemo(() => {
-    if (!selectedTextNode) return null;
-    const viewport = getViewport();
-    const nodeX = selectedTextNode.position.x * viewport.zoom + viewport.x;
-    const nodeY = selectedTextNode.position.y * viewport.zoom + viewport.y;
-    const nodeHeight = selectedTextNode.height ?? selectedTextNode.measured?.height ?? TEXT_NODE_MIN_HEIGHT;
-    return {
-      left: nodeX + (TEXT_NODE_WIDTH * viewport.zoom) / 2,
-      top: nodeY + nodeHeight * viewport.zoom + 12,
-      scale: (1 / viewport.zoom) * CANVAS_NODE_CONTROL_SCALE,
-    };
-  }, [getViewport, selectedTextNode]);
+  const selectedTextNodeTextReferences = useMemo<TextReferenceInfo[]>(() => {
+    if (!selectedTextNode) return [];
 
+    return edges
+      .filter((edge) => edge.target === selectedTextNode.id)
+      .flatMap((edge) => {
+        const sourceNode = nodes.find((node) => node.id === edge.source);
+        if (sourceNode?.type !== 'text') return [];
+
+        const sourceData = sourceNode.data as TextNodeData;
+        return [{
+          nodeId: sourceNode.id,
+          title: String(sourceData.label || sourceData.title || '文本节点'),
+          content: getTextContent(sourceData),
+          status: sourceData.status || 'empty',
+        }];
+      });
+  }, [edges, nodes, selectedTextNode]);
+  const selectedTextNodeSubmitState = useMemo(() => {
+    if (!selectedTextNode) return null;
+    const inputSources = edges
+      .filter((edge) => edge.target === selectedTextNode.id)
+      .map((edge) => nodes.find((node) => node.id === edge.source))
+      .filter((node): node is Node => Boolean(node));
+    return getTextNodeSubmitState(selectedTextNode.data, inputSources);
+  }, [edges, nodes, selectedTextNode]);
   const updateSelectedTextNode = useCallback((patch: Partial<TextNodeData>) => {
     if (!selectedTextNode) return;
     setNodes((currentNodes) =>
@@ -1478,19 +1495,30 @@ function FlowCanvas() {
   const submitSelectedTextNode = useCallback(async () => {
     if (!selectedTextNode) return;
     const nodeData = selectedTextNode.data as TextNodeData;
-    const instruction = nodeData.editorInput?.trim() || '';
-    if (!instruction) return;
-
     const incomingEdges = edges.filter((edge) => edge.target === selectedTextNode.id);
-    const referencedTextNodes = incomingEdges
+    const inputSources = incomingEdges
       .map((edge) => nodes.find((node) => node.id === edge.source))
-      .filter((node): node is Node => node?.type === 'text');
-    const referencedImageNode = incomingEdges
-      .map((edge) => nodes.find((node) => node.id === edge.source))
-      .find((node) => node?.type === 'image');
+      .filter((node): node is Node => Boolean(node));
+    const submitState = getTextNodeSubmitState(nodeData, inputSources);
+    if (!submitState.canSubmit) return;
+
+    const instruction = getTextNodeInstruction(nodeData);
+    const referencedTextNodes = inputSources
+      .filter((node) => node.type === 'text');
+    const referencedImageNode = inputSources
+      .find((node) => node?.type === 'image' && Boolean(getCurrentImage(node.data)));
+    const sourceText = referencedTextNodes
+      .map((node) => getTextNodeInstruction(node.data))
+      .filter(Boolean)
+      .join('\n\n');
+    const effectiveInstruction = instruction || (
+      submitState.hasInputContent
+        ? '基于左侧输入内容生成建筑可视化图像'
+        : ''
+    );
     const action = nodeData.lastActionType === 'image_to_text'
       ? 'image_to_text'
-      : referencedTextNodes.length > 0
+      : sourceText
         ? 'text_to_text'
         : nodeData.lastActionType || 'draft';
 
@@ -1498,11 +1526,8 @@ function FlowCanvas() {
     try {
       const result = await simulateTextNodeResult({
         action,
-        instruction,
-        sourceText: referencedTextNodes
-          .map((node) => getTextContent(node.data))
-          .filter(Boolean)
-          .join('\n\n'),
+        instruction: effectiveInstruction,
+        sourceText,
         sourceImageTitle: referencedImageNode
           ? String(referencedImageNode.data.label || '图片节点')
           : undefined,
@@ -1871,6 +1896,7 @@ function FlowCanvas() {
               activeModel: DEFAULT_TEXT_NODE_MODEL,
               lastActionType: null,
               editorInput: '',
+              textMode: 'unset',
             }
           : {}),
       },
@@ -1916,11 +1942,6 @@ function FlowCanvas() {
 
       const left = rect.left + rect.width / 2;
       const top = rect.bottom + 12;
-      setTextNodePanelSize((prev) =>
-        prev.width === rect.width && prev.height === rect.height
-          ? prev
-          : { width: rect.width, height: rect.height },
-      );
       setTextNodePanelPosition((prev) =>
         prev?.left === left && prev?.top === top ? prev : { left, top },
       );
@@ -1942,7 +1963,7 @@ function FlowCanvas() {
       observer?.disconnect();
       window.removeEventListener('resize', updatePosition);
     };
-  }, [nodes, viewport.x, viewport.y, viewport.zoom]);
+  }, [nodes]);
 
   const handleUseNodeHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch) => {
     if (!historyPanelNodeId || images.length === 0) return;
@@ -2012,7 +2033,7 @@ function FlowCanvas() {
   }, [getAllNodeLabels, getViewport, screenToFlowPosition, setNodes]);
 
   return (
-    <div className="h-screen relative" style={{ background: '#000' }}>
+    <div className="fixed inset-0 h-screen w-screen overflow-hidden" style={{ background: '#000' }}>
       <GlobalDropForwarder />
       <Navbar variant="canvas" projectName={projectName} />
 
@@ -2120,7 +2141,7 @@ function FlowCanvas() {
         onUseHistoryImages={handleUseGlobalHistoryImages}
       />
 
-      {selectedTextNode && (
+      {selectedTextNode && (selectedTextNode.data as TextNodeData).textMode !== 'compose' && (
         <div
           className="absolute z-[90]"
           style={{
@@ -2134,13 +2155,19 @@ function FlowCanvas() {
           <TextNodeInputPanel
             value={String(selectedTextNode.data.editorInput || '')}
             model={(selectedTextNode.data.activeModel as TextNodeModel | undefined) || DEFAULT_TEXT_NODE_MODEL}
-            isProcessing={Boolean(selectedTextNode.data.isProcessing)}
+            isProcessing={selectedTextNodeSubmitState?.isProcessing ?? false}
+            canSubmit={selectedTextNodeSubmitState?.canSubmit ?? false}
             focusRequestId={textFocusRequestId}
+            textReferences={selectedTextNodeTextReferences}
             imageReferences={selectedTextNodeImageReferences}
             onChange={(value) => updateSelectedTextNode({ editorInput: value, status: 'editing' })}
             onModelChange={(model) => updateSelectedTextNode({ activeModel: model })}
             onSubmit={submitSelectedTextNode}
+            onFocusTextReference={focusCanvasNode}
             onFocusImageReference={focusCanvasNode}
+            onRemoveTextReference={(sourceNodeId) => {
+              removeReferenceEdge(selectedTextNode.id, sourceNodeId);
+            }}
             onRemoveImageReference={(sourceNodeId) => {
               removeReferenceEdge(selectedTextNode.id, sourceNodeId);
             }}

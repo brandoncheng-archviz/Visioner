@@ -11,7 +11,7 @@ import {
   TEXT_NODE_MODELS,
   TEXT_NODE_PLACEHOLDER,
 } from '../constants/textNode';
-import type { TextNodeModel } from '../types/basicNode.types';
+import type { TextNodeModel, TextReferenceInfo } from '../types/basicNode.types';
 
 export interface TextNodeImageReference {
   nodeId: string;
@@ -23,25 +23,44 @@ interface TextNodeInputPanelProps {
   value: string;
   model?: TextNodeModel;
   isProcessing?: boolean;
+  canSubmit: boolean;
   focusRequestId: number;
+  textReferences: TextReferenceInfo[];
   imageReferences: TextNodeImageReference[];
   onChange: (value: string) => void;
   onModelChange: (model: TextNodeModel) => void;
   onSubmit: () => void;
+  onFocusTextReference: (nodeId: string) => void;
   onFocusImageReference: (nodeId: string) => void;
+  onRemoveTextReference: (nodeId: string) => void;
   onRemoveImageReference: (nodeId: string) => void;
+}
+
+function TextReferenceIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="3" y="4" width="14" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="3" y="7.5" width="8.5" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="3" y="11" width="14" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="3" y="14.5" width="8.5" height="1.5" rx="0.75" fill="currentColor" />
+    </svg>
+  );
 }
 
 export function TextNodeInputPanel({
   value,
   model = DEFAULT_TEXT_NODE_MODEL,
   isProcessing = false,
+  canSubmit,
   focusRequestId,
+  textReferences,
   imageReferences,
   onChange,
   onModelChange,
   onSubmit,
+  onFocusTextReference,
   onFocusImageReference,
+  onRemoveTextReference,
   onRemoveImageReference,
 }: TextNodeInputPanelProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -50,12 +69,21 @@ export function TextNodeInputPanel({
     () => TEXT_NODE_MODELS.find((item) => item.name === model) || TEXT_NODE_MODELS[1],
     [model],
   );
-  const canSubmit = value.trim().length > 0 && !isProcessing;
-
   useEffect(() => {
     if (focusRequestId <= 0) return;
+    if (isProcessing) return;
     inputRef.current?.focus();
-  }, [focusRequestId]);
+  }, [focusRequestId, isProcessing]);
+
+  useEffect(() => {
+    if (!isProcessing) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      setShowModels(false);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isProcessing]);
 
   return (
     <div
@@ -68,22 +96,90 @@ export function TextNodeInputPanel({
         boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
       }}
     >
-      {imageReferences.length > 0 && (
+      {(textReferences.length > 0 || imageReferences.length > 0) && (
         <div className="flex items-center gap-2 px-[14px] pb-2 pt-[14px]">
+          {textReferences.map((reference, index) => {
+            const summary = reference.content.trim() || '当前文本节点暂无内容';
+            return (
+              <div
+                key={reference.nodeId}
+                role="button"
+                tabIndex={0}
+                onClick={() => onFocusTextReference(reference.nodeId)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') onFocusTextReference(reference.nodeId);
+                }}
+                className="nodrag nowheel group/text-ref relative h-[50px] w-[54px] flex-shrink-0 cursor-pointer rounded-lg text-left outline-none"
+              >
+                <div
+                  className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-[260px] max-w-[320px] -translate-x-1/2 rounded-xl p-3 text-left group-hover/text-ref:block group-focus-visible/text-ref:block"
+                  style={{
+                    background: 'rgba(8,8,10,0.98)',
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    boxShadow: '0 14px 34px rgba(0,0,0,0.58)',
+                  }}
+                >
+                  <div className="truncate text-[12px] font-medium text-white/78">{reference.title}</div>
+                  <div className="mt-2 line-clamp-6 whitespace-pre-wrap break-words text-[12px] leading-5 text-white/58">
+                    {summary}
+                  </div>
+                </div>
+
+                <div
+                  className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg text-white/38 transition-colors group-hover/text-ref:bg-white/[0.07] group-hover/text-ref:text-white/52 group-focus-visible/text-ref:text-white/58"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                  }}
+                >
+                  <TextReferenceIcon />
+                  <span
+                    className="absolute right-0 top-0 z-20 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[9px] font-medium text-white/72 group-hover/text-ref:hidden"
+                    style={{ background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.16)' }}
+                  >
+                    {index + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onPointerDownCapture={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClickCapture={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onRemoveTextReference(reference.nodeId);
+                    }}
+                    className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition-colors hover:bg-black hover:text-white group-hover/text-ref:flex"
+                    style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
+                    title="断开文本引用"
+                    aria-label="断开文本引用"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
           {imageReferences.map((reference, index) => (
             <div
               key={reference.nodeId}
               role="button"
               tabIndex={0}
+              draggable={false}
               onClick={() => onFocusImageReference(reference.nodeId)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') onFocusImageReference(reference.nodeId);
               }}
-              className="nodrag nowheel group/reference relative h-[50px] w-[54px] flex-shrink-0 cursor-pointer rounded-lg outline-none"
+              onPointerDown={(event) => event.stopPropagation()}
+              className="nodrag nowheel group/ref relative h-[50px] w-[54px] flex-shrink-0 cursor-pointer rounded-lg outline-none"
+              style={{
+                touchAction: 'none',
+              }}
             >
               {reference.imageUrl && (
                 <div
-                  className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/reference:block group-focus-visible/reference:block"
+                  className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/ref:block group-focus-visible/ref:block"
                   style={{
                     background: FLOATING_PANEL_BACKGROUND,
                     border: FLOATING_PANEL_BORDER,
@@ -96,7 +192,7 @@ export function TextNodeInputPanel({
                     className="block rounded-t-xl"
                     style={{ width: 'auto', height: 'auto', maxWidth: 220, maxHeight: 200 }}
                   />
-                  <div className="px-2 py-1.5 text-center text-[12px] text-white/75">
+                  <div className="px-2 py-1.5 text-center text-[12px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
                     {reference.title}
                   </div>
                 </div>
@@ -113,25 +209,39 @@ export function TextNodeInputPanel({
                   <img src={reference.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-white/[0.05]">
-                    <Image className="h-4 w-4 text-white/25" />
+                    <Image className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
                   </div>
                 )}
                 <span
-                  className="absolute right-0 top-0 z-20 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-black/70 px-1 text-[9px] font-medium text-white/72 group-hover/reference:hidden"
-                  style={{ border: '1px solid rgba(255,255,255,0.18)' }}
+                  className="absolute right-0 top-0 z-20 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[9px] font-medium text-white/72 group-hover/ref:hidden"
+                  style={{
+                    background: 'rgba(0,0,0,0.78)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                  }}
                 >
                   {index + 1}
                 </span>
                 <button
+                  draggable={false}
                   type="button"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
+                  onPointerDownCapture={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClickCapture={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
                     onRemoveImageReference(reference.nodeId);
                   }}
-                  className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/reference:flex"
-                  style={{ border: '1px solid rgba(255,255,255,0.18)' }}
+                  onDragStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full text-white transition-colors hover:bg-black group-hover/ref:flex"
+                  style={{
+                    background: 'rgba(0,0,0,0.78)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                  }}
                   title="断开图片引用"
                   aria-label="断开图片引用"
                 >
@@ -145,17 +255,18 @@ export function TextNodeInputPanel({
 
       <div
         className="min-h-0 flex-1"
-        style={{ padding: imageReferences.length > 0 ? '0 14px' : '14px 14px 0' }}
+        style={{ padding: textReferences.length > 0 || imageReferences.length > 0 ? '0 14px' : '14px 14px 0' }}
       >
         <textarea
           ref={inputRef}
           value={value}
+          disabled={isProcessing}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
             event.stopPropagation();
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
               event.preventDefault();
-              onSubmit();
+              if (canSubmit) onSubmit();
             }
           }}
           placeholder={TEXT_NODE_PLACEHOLDER}
@@ -174,7 +285,8 @@ export function TextNodeInputPanel({
           <button
             type="button"
             onClick={() => setShowModels((current) => !current)}
-            className="flex items-center gap-1.5 transition-colors hover:text-white"
+            disabled={isProcessing}
+            className="flex items-center gap-1.5 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)' }}
           >
             <span style={{ color: 'rgba(255,255,255,0.72)' }}>脳</span>
@@ -237,7 +349,9 @@ export function TextNodeInputPanel({
 
           <button
             type="button"
-            onClick={onSubmit}
+            onClick={() => {
+              if (canSubmit) onSubmit();
+            }}
             disabled={!canSubmit}
             className="flex items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed"
             style={{

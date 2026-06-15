@@ -1,5 +1,20 @@
 import type { TextNodeActionType } from '../types/basicNode.types';
 
+export type TextNodeVisualState = 'empty' | 'ready' | 'processing';
+
+interface TextNodeInputSource {
+  type?: string;
+  data: unknown;
+}
+
+interface TextNodeSubmitState {
+  hasEditorInstruction: boolean;
+  hasInputContent: boolean;
+  isProcessing: boolean;
+  canSubmit: boolean;
+  nodeState: TextNodeVisualState;
+}
+
 const ALLOWED_TEXT_CONNECTIONS = new Set([
   'image:text',
   'text:text',
@@ -16,6 +31,50 @@ export function isTextWorkflowConnection(
 export function getTextContent(data: unknown): string {
   const record = (data || {}) as Record<string, unknown>;
   return ((record.content as string) || (record.text as string) || '').trim();
+}
+
+export function getTextNodeInstruction(data: unknown): string {
+  const record = (data || {}) as Record<string, unknown>;
+  const editorInput = typeof record.editorInput === 'string' ? record.editorInput.trim() : '';
+  const prompt = typeof record.prompt === 'string' ? record.prompt.trim() : '';
+  return editorInput || prompt || getTextContent(record);
+}
+
+export function getTextNodeSubmitState(
+  data: unknown,
+  inputSources: TextNodeInputSource[],
+): TextNodeSubmitState {
+  const record = (data || {}) as Record<string, unknown>;
+  const generationTask = record.generationTask;
+  const generationTaskStatus =
+    generationTask && typeof generationTask === 'object' && 'status' in generationTask
+      ? generationTask.status
+      : undefined;
+  const isProcessing = Boolean(
+    record.isProcessing ||
+    record.isGenerating ||
+    record.loading ||
+    record.isLoading ||
+    generationTaskStatus === 'running' ||
+    generationTaskStatus === 'processing' ||
+    generationTaskStatus === 'pending',
+  );
+  const hasEditorInstruction = getTextNodeInstruction(record).length > 0;
+  const hasInputContent = inputSources.some((source) => {
+    if (source.type === 'text') {
+      return getTextNodeInstruction(source.data).length > 0;
+    }
+    return false;
+  });
+  const hasReadyContent = hasEditorInstruction || hasInputContent;
+
+  return {
+    hasEditorInstruction,
+    hasInputContent,
+    isProcessing,
+    canSubmit: !isProcessing && hasReadyContent,
+    nodeState: isProcessing ? 'processing' : hasReadyContent ? 'ready' : 'empty',
+  };
 }
 
 export async function simulateTextNodeResult({

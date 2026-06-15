@@ -361,25 +361,27 @@ input[type="range"]::-moz-range-thumb {
 @layer utilities {
   .text-node-editor-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.16) rgba(255, 255, 255, 0.025);
     scrollbar-gutter: stable;
   }
 
   .text-node-editor-scrollbar::-webkit-scrollbar {
-    width: 5px;
+    width: 6px;
   }
 
   .text-node-editor-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.025);
+    border-radius: 999px;
   }
 
   .text-node-editor-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid #252526;
     border-radius: 999px;
   }
 
   .text-node-editor-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.26);
+    background: rgba(255, 255, 255, 0.28);
   }
 
   .glow-cyan {

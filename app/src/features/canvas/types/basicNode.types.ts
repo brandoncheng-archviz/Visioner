@@ -1,6 +1,7 @@
 import type { ConnectionHandleType } from './canvas.types';
 
 export type TextNodeStatus = 'empty' | 'editing' | 'result';
+export type TextNodeMode = 'unset' | 'compose';
 
 export type TextNodeActionType =
   | 'draft'
@@ -34,6 +35,7 @@ export interface TextNodeData {
   lastActionType?: TextNodeActionType | null;
   editorInput?: string;
   isProcessing?: boolean;
+  textMode?: TextNodeMode;
   onStartLineDraw?: (
     nodeId: string,
     x: number,

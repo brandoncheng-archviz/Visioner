@@ -129,6 +129,9 @@ export function CanvasStage({
 
   const handleWheelCapture = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('.nowheel')) return;
+
       event.preventDefault();
       handleWheel(event.nativeEvent);
     },
@@ -137,7 +140,7 @@ export function CanvasStage({
 
   return (
     <div
-      className="absolute inset-0"
+      className="absolute inset-0 h-full min-h-0 w-full overflow-hidden"
       style={{ cursor: tempLine ? 'crosshair' : 'default' }}
       onContextMenu={onContextMenu}
       onWheelCapture={handleWheelCapture}
@@ -181,6 +184,7 @@ export function CanvasStage({
       )}
 
       <ReactFlow
+        className="h-full w-full"
         nodes={nodesWithCallbacks}
         edges={edges}
         onNodesChange={onNodesChange}

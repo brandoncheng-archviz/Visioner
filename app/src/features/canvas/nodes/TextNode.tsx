@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { FileText, ImagePlus, PenLine, Plus } from 'lucide-react';
-import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
+import {
+  Handle,
+  NodeResizeControl,
+  Position,
+  useReactFlow,
+  useStore,
+  type NodeProps,
+} from '@xyflow/react';
 import {
   DEFAULT_TEXT_NODE_MODEL,
   TEXT_NODE_MAX_HEIGHT,
@@ -8,7 +15,13 @@ import {
   TEXT_NODE_WIDTH,
 } from '../constants/textNode';
 import type { TextNodeActionType, TextNodeData } from '../types/basicNode.types';
-import { getTextContent } from '../utils/textNodeUtils';
+import {
+  getTextContent,
+  getTextNodeSubmitState,
+  type TextNodeVisualState,
+} from '../utils/textNodeUtils';
+
+export type { TextNodeVisualState };
 
 const EMPTY_ACTIONS: Array<{
   action: TextNodeActionType;
@@ -20,11 +33,32 @@ const EMPTY_ACTIONS: Array<{
   { action: 'text_to_image', label: '生成图片', icon: ImagePlus },
 ];
 
-export function TextNode({ data, selected, id }: NodeProps) {
+function TextNodeGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="48"
+      height="36"
+      viewBox="0 0 48 36"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect x="4" y="2" width="40" height="3" rx="1.5" fill="currentColor" />
+      <rect x="4" y="11" width="24" height="3" rx="1.5" fill="currentColor" opacity="0.75" />
+      <rect x="4" y="20" width="40" height="3" rx="1.5" fill="currentColor" />
+      <rect x="4" y="29" width="24" height="3" rx="1.5" fill="currentColor" opacity="0.75" />
+    </svg>
+  );
+}
+
+export function TextNode({ data, selected, id, width, height }: NodeProps) {
   const { setNodes } = useReactFlow();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
   const nodeData = data as TextNodeData;
+  const isComposeMode = nodeData.textMode === 'compose';
+  const nodeWidth = isComposeMode ? (width ?? TEXT_NODE_WIDTH) : TEXT_NODE_WIDTH;
+  const nodeHeight = isComposeMode ? (height ?? TEXT_NODE_MIN_HEIGHT) : undefined;
   const title = nodeData.label || nodeData.title || '文本节点';
   const content = getTextContent(nodeData);
   const inlineContent = nodeData.content ?? nodeData.text ?? '';
@@ -34,6 +68,15 @@ export function TextNode({ data, selected, id }: NodeProps) {
   const inlineTextareaRef = useRef<HTMLTextAreaElement>(null);
   const allEdges = useStore((state) => state.edges);
   const allNodes = useStore((state) => state.nodes);
+  const incomingSourceNodes = useMemo(
+    () =>
+      allEdges
+        .filter((edge) => edge.target === id)
+        .map((edge) => allNodes.find((node) => node.id === edge.source))
+        .filter((node) => node !== undefined),
+    [allEdges, allNodes, id],
+  );
+  const { isProcessing, nodeState } = getTextNodeSubmitState(nodeData, incomingSourceNodes);
 
   const references = useMemo(() => {
     const incoming = allEdges.filter((edge) => edge.target === id);
@@ -102,13 +145,39 @@ export function TextNode({ data, selected, id }: NodeProps) {
     return () => window.cancelAnimationFrame(frame);
   }, [isInlineEditing]);
 
+  useEffect(() => {
+    if (!isProcessing) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      setIsInlineEditing(false);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isProcessing]);
+
   const startInlineEditing = () => {
-    setInlineEditorHeight(previewCardRef.current?.offsetHeight || TEXT_NODE_MIN_HEIGHT);
+    if (isProcessing) return;
+    const currentHeight = previewCardRef.current?.offsetHeight || TEXT_NODE_MIN_HEIGHT;
+    setInlineEditorHeight(Math.min(Math.max(currentHeight, TEXT_NODE_MIN_HEIGHT), TEXT_NODE_MAX_HEIGHT));
     setIsInlineEditing(true);
   };
 
   const triggerAction = (action: TextNodeActionType) => {
+    if (isProcessing) return;
     if (action === 'draft') {
+      setNodes((nodes) =>
+        nodes.map((node) =>
+          node.id === id
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  textMode: 'compose',
+                },
+              }
+            : node,
+        ),
+      );
       startInlineEditing();
       return;
     }
@@ -116,6 +185,7 @@ export function TextNode({ data, selected, id }: NodeProps) {
   };
 
   const handleInlineContentChange = (value: string) => {
+    if (isProcessing) return;
     setNodes((nodes) =>
       nodes.map((node) =>
         node.id === id
@@ -159,15 +229,16 @@ export function TextNode({ data, selected, id }: NodeProps) {
     );
   };
 
-  const sourceTitles = [
-    ...references.textIds.map((nodeId) => {
-      const source = allNodes.find((node) => node.id === nodeId);
-      return `已引用文本：${String(source?.data?.label || '文本节点')}`;
-    }),
-  ];
-
   return (
-    <div style={{ width: TEXT_NODE_WIDTH }}>
+    <div
+      className={isComposeMode ? 'group/text-node flex min-h-0 flex-col' : undefined}
+      style={{
+        width: nodeWidth,
+        height: nodeHeight,
+        minWidth: isComposeMode ? TEXT_NODE_WIDTH : undefined,
+        minHeight: isComposeMode ? 240 : undefined,
+      }}
+    >
       <div
         className="pointer-events-none"
         style={{
@@ -184,7 +255,7 @@ export function TextNode({ data, selected, id }: NodeProps) {
             left: 0,
             transform: `scale(${inverseScale})`,
             transformOrigin: 'top left',
-            width: TEXT_NODE_WIDTH * zoom,
+            width: nodeWidth * zoom,
             color: 'rgba(255,255,255,0.5)',
             fontSize: 11,
           }}
@@ -201,38 +272,27 @@ export function TextNode({ data, selected, id }: NodeProps) {
         </div>
       </div>
 
-      <div className="relative overflow-visible">
+      <div className={`relative overflow-visible ${isComposeMode ? 'min-h-0 flex-1' : ''}`}>
         <div
           ref={previewCardRef}
           className="node-preview-card relative rounded-xl transition-all"
           style={{
-            width: TEXT_NODE_WIDTH,
-            minHeight: TEXT_NODE_MIN_HEIGHT,
-            maxHeight: TEXT_NODE_MAX_HEIGHT,
-            height: isInlineEditing ? inlineEditorHeight : undefined,
+            width: '100%',
+            minHeight: isComposeMode ? 0 : TEXT_NODE_MIN_HEIGHT,
+            maxHeight: isComposeMode ? undefined : TEXT_NODE_MAX_HEIGHT,
+            height: isComposeMode ? '100%' : isInlineEditing ? inlineEditorHeight : undefined,
+            overflow: isComposeMode || isInlineEditing ? 'hidden' : undefined,
             background: '#252526',
             border: `2.5px solid ${selected ? '#2f6bff' : 'rgba(42,42,53,0.98)'}`,
             boxShadow: 'none',
           }}
         >
-          {!content && !isInlineEditing && sourceTitles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-4 pb-1 pt-4">
-              {sourceTitles.map((item) => (
-                <span
-                  key={item}
-                  className="max-w-full truncate rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] text-white/44"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
-          )}
-
           {isInlineEditing ? (
             <textarea
               ref={inlineTextareaRef}
               autoFocus
               value={inlineContent}
+              disabled={isProcessing}
               placeholder="输入文本内容..."
               onChange={(event) => handleInlineContentChange(event.target.value)}
               onBlur={() => setIsInlineEditing(false)}
@@ -240,19 +300,46 @@ export function TextNode({ data, selected, id }: NodeProps) {
               onKeyDown={handleInlineEditorKeyDown}
               onWheel={(event) => event.stopPropagation()}
               onWheelCapture={(event) => event.stopPropagation()}
-              className="text-node-editor-scrollbar nodrag nowheel block h-full min-h-0 w-full resize-none overflow-y-auto overscroll-contain bg-transparent px-4 py-4 text-[13px] leading-6 text-white/72 outline-none placeholder:text-white/24"
+              className={`text-node-editor-scrollbar nodrag nowheel block h-full min-h-0 w-full resize-none overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent px-4 py-4 text-[13px] leading-6 text-white/72 outline-none placeholder:text-white/24 ${
+                isComposeMode ? 'pb-9 pr-8' : ''
+              }`}
+              style={{
+                maxHeight: isComposeMode ? '100%' : TEXT_NODE_MAX_HEIGHT,
+                boxSizing: 'border-box',
+              }}
               aria-label="编写文本内容"
             />
           ) : content ? (
             <div
-              className="select-none overflow-y-auto whitespace-pre-wrap px-4 py-4 text-[13px] leading-6 text-white/68"
-              style={{ maxHeight: TEXT_NODE_MAX_HEIGHT }}
+              className={`text-node-editor-scrollbar nowheel h-full min-h-0 w-full select-none overflow-x-hidden overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-4 py-4 text-[13px] leading-6 text-white/68 [overflow-wrap:anywhere] ${
+                isComposeMode ? 'pb-9 pr-8' : 'pr-3'
+              }`}
+              style={{ maxHeight: isComposeMode ? '100%' : TEXT_NODE_MAX_HEIGHT }}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                startInlineEditing();
+              }}
+              onWheel={(event) => event.stopPropagation()}
+              onWheelCapture={(event) => event.stopPropagation()}
+            >
+              {content}
+            </div>
+          ) : isComposeMode ? (
+            <div
+              className="flex h-full min-h-0 flex-col items-center justify-center px-6 py-6 text-center"
               onDoubleClick={(event) => {
                 event.stopPropagation();
                 startInlineEditing();
               }}
             >
-              {content}
+              <TextNodeGlyph className="mb-7 text-white/20" />
+              <div className="text-[13px] leading-6 text-white/32">
+                双击编写内容，开始你的创作。
+              </div>
+            </div>
+          ) : nodeState !== 'empty' || incomingSourceNodes.length > 0 ? (
+            <div className="flex min-h-[300px] items-center justify-center">
+              <TextNodeGlyph className="text-white/20" />
             </div>
           ) : (
             <div
@@ -263,12 +350,7 @@ export function TextNode({ data, selected, id }: NodeProps) {
                 startInlineEditing();
               }}
             >
-              <svg width="48" height="36" viewBox="0 0 48 36" fill="none" className="-mt-3 mb-7">
-                <rect x="4" y="2" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
-                <rect x="4" y="11" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
-                <rect x="4" y="20" width="40" height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
-                <rect x="4" y="29" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
-              </svg>
+              <TextNodeGlyph className="-mt-3 mb-7 text-white/15" />
               <div className="mb-1 w-full px-2 text-[11px] text-white/18">尝试：</div>
               <div className="w-full space-y-0.5">
                 {EMPTY_ACTIONS.map(({ action, label, icon: Icon }) => (
@@ -289,6 +371,41 @@ export function TextNode({ data, selected, id }: NodeProps) {
             </div>
           )}
         </div>
+
+        {isComposeMode && selected && !isProcessing && (
+          <NodeResizeControl
+            nodeId={id}
+            position="bottom-right"
+            minWidth={TEXT_NODE_WIDTH}
+            minHeight={240}
+            className="nodrag opacity-0 transition-opacity duration-150 group-hover/text-node:opacity-70 hover:!opacity-100"
+            style={{
+              right: 14,
+              bottom: 10,
+              width: 18,
+              height: 18,
+              transform: 'none',
+              border: 0,
+              background: 'transparent',
+              cursor: 'nwse-resize',
+              zIndex: 20,
+            }}
+          >
+            <svg
+              className="pointer-events-none h-full w-full text-white/90"
+              viewBox="0 0 18 18"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M5 14C10 14 14 10 14 5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </NodeResizeControl>
+        )}
 
         <div
           className="image-node-handle input-port"
