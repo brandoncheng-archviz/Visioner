@@ -14,7 +14,7 @@ import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
-import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE, ACCEPTED_IMAGE_UPLOAD_TYPES } from '../features/canvas/constants/canvasConstants';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd } from '../features/canvas/utils/referenceLimits';
@@ -39,6 +39,8 @@ import { CanvasStage } from '../features/canvas/components/CanvasStage';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
 import { CanvasContextMenus } from '../features/canvas/components/CanvasContextMenus';
 import { CanvasToolbar } from '../features/canvas/components/CanvasToolbar';
+import { CanvasFlowStyles } from '../features/canvas/components/CanvasFlowStyles';
+import { CanvasToast } from '../features/canvas/components/CanvasToast';
 import {
   TextNodeInputPanel,
   type TextNodeImageReference,
@@ -65,80 +67,22 @@ import {
   CREATE_NODE_MENU_VIEWPORT_PADDING,
   CREATE_NODE_MENU_WIDTH,
 } from '../features/canvas/constants/basicNodes';
-
-const NODE_BASE_TITLES: Record<string, string> = {
-  image: '图片',
-  text: '文本节点',
-  video: '视频',
-  audio: '音频',
-  script: '脚本',
-  'video-merge': '视频合成',
-  upscale: '高清细节',
-  compare: '对比',
-  sunSky: '光影',
-  relight: '改光',
-};
-
-const UPSCALE_NODE_DEFAULTS: Record<string, unknown> = {
-  engine: 'magnific_precision_v2',
-  scale: 2,
-  mode: 'preserve',
-  fidelity: 0,
-  sharpness: 7,
-  denoise: 0,
-  detail: 30,
-  materialDetail: 7,
-  compressionRepair: 0,
-  status: 'idle',
-  progress: 0,
-  history: [],
-  tlModel: 'general',
-  tlScale: 4,
-  mcUpscale: '2x',
-  mcOptimized: 'standard',
-  mcCreativity: 0,
-  mcDetail: 0,
-  mcSimilarity: 0,
-  mcPromptStr: 0,
-  mpUpscale: '2x',
-  mpSharpen: 7,
-  mpGrain: 7,
-  mpUltra: 30,
-};
-
-type ImageFileRejectReason = 'unsupported-type' | 'too-large' | 'decode-failed';
-
-type ImageFileReject = {
-  file: File;
-  reason: ImageFileRejectReason;
-};
-
-function getImageRejectMessage(rejectedFiles: ImageFileReject[], successCount: number): string {
-  if (rejectedFiles.length === 0) return '';
-
-  if (successCount > 0) {
-    return '部分图片未添加，可能是格式不支持、超过 10MB 或图片无法读取。';
-  }
-
-  const reasons = new Set(rejectedFiles.map((item) => item.reason));
-  const hasTooLarge = reasons.has('too-large');
-  const hasUnsupported = reasons.has('unsupported-type');
-  const hasDecodeFailed = reasons.has('decode-failed');
-
-  if (hasTooLarge && !hasUnsupported && !hasDecodeFailed) {
-    return '图片太大，已跳过。单张图片不能超过 10MB。';
-  }
-
-  if (hasUnsupported && !hasTooLarge && !hasDecodeFailed) {
-    return '图片格式不支持。请使用 PNG、JPG、WEBP 或 GIF。';
-  }
-
-  if (hasDecodeFailed && !hasTooLarge && !hasUnsupported) {
-    return '图片无法读取，已跳过。';
-  }
-
-  return '没有可添加的图片。请检查图片格式或文件大小。';
-}
+import { NODE_BASE_TITLES } from '../features/canvas/constants/canvasNodeTitles';
+import {
+  formatPastedImageLabel,
+  getFilesFromClipboard,
+  getImageRejectMessage,
+  isAcceptedImageFile,
+  type ImageFileReject,
+} from '../features/canvas/utils/canvasFileUtils';
+import { wouldCreateCycle } from '../features/canvas/utils/canvasGraphUtils';
+import {
+  createBasicCanvasNode,
+  createCompareCanvasNode,
+  createRelightCanvasNode,
+  createSunSkyCanvasNode,
+  createUpscaleCanvasNode,
+} from '../features/canvas/utils/canvasNodeFactories';
 
 function getHistoryBatchForImage(image: GeneratedImage, batches: ResultSetBatch[]): ResultSetBatch | undefined {
   return batches.find((batch) =>
@@ -276,33 +220,6 @@ function FlowCanvas() {
       return nextEdges.length === currentEdges.length ? currentEdges : nextEdges;
     });
   }, [nodes]);
-
-  // Detect if adding an edge from source → target would create a cycle
-  const wouldCreateCycle = useCallback((sourceId: string, targetId: string, currentEdges: Edge[]): boolean => {
-    // Build adjacency list
-    const adj = new Map<string, string[]>();
-    currentEdges.forEach((e) => {
-      if (!adj.has(e.source)) adj.set(e.source, []);
-      adj.get(e.source)!.push(e.target);
-    });
-    // Add the hypothetical new edge
-    if (!adj.has(sourceId)) adj.set(sourceId, []);
-    adj.get(sourceId)!.push(targetId);
-
-    // BFS from target: can we reach source?
-    const visited = new Set<string>();
-    const queue = [targetId];
-    while (queue.length > 0) {
-      const curr = queue.shift()!;
-      if (curr === sourceId) return true;
-      if (visited.has(curr)) continue;
-      visited.add(curr);
-      (adj.get(curr) || []).forEach((next) => {
-        if (!visited.has(next)) queue.push(next);
-      });
-    }
-    return false;
-  }, []);
 
   const startLineDraw = useCallback((
     nodeId: string,
@@ -597,7 +514,7 @@ function FlowCanvas() {
 
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('pointerup', handleMouseUp);
-  }, [screenToFlowPosition, nodes, edges, wouldCreateCycle]);
+  }, [screenToFlowPosition, nodes, edges]);
 
   // Update edge styles when node selection changes (connected edges turn cyan)
   const selectedIdsRef = useRef('');
@@ -662,26 +579,16 @@ function FlowCanvas() {
 
     const newNodeId = `upscale-${Date.now()}`;
     const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.upscale);
-    const spacing = 80;
     const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
-
-    const newNode: Node = {
+    const newNode = createUpscaleCanvasNode({
       id: newNodeId,
-      type: 'upscale',
-      position: {
-        x: sourceNode.position.x + estimatedWidth + spacing,
-        y: sourceNode.position.y,
-      },
-      data: {
-        label,
-        inputImage,
-        image: inputImage,
-        width,
-        height,
-        ...UPSCALE_NODE_DEFAULTS,
-      },
-      selected: true,
-    };
+      sourceNode,
+      estimatedWidth,
+      label,
+      inputImage,
+      width,
+      height,
+    });
 
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
     setEdges((eds) => [
@@ -712,25 +619,16 @@ function FlowCanvas() {
 
     const newNodeId = `sunSky-${Date.now()}`;
     const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.sunSky);
-    const spacing = 80;
     const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
-
-    const newNode: Node = {
+    const newNode = createSunSkyCanvasNode({
       id: newNodeId,
-      type: 'sunSky',
-      position: {
-        x: sourceNode.position.x + estimatedWidth + spacing,
-        y: sourceNode.position.y,
-      },
-      data: {
-        label,
-        inputImage,
-        image: inputImage,
-        width,
-        height,
-      },
-      selected: true,
-    };
+      sourceNode,
+      estimatedWidth,
+      label,
+      inputImage,
+      width,
+      height,
+    });
 
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
     setEdges((eds) => [
@@ -767,36 +665,18 @@ function FlowCanvas() {
 
     const newNodeId = `relight-${Date.now()}`;
     const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.relight);
-    const spacing = 80;
     const estimatedWidth = sourceNode.measured?.width || sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
-
-    const newNode: Node = {
+    const newNode = createRelightCanvasNode({
       id: newNodeId,
-      type: 'relight',
-      position: {
-        x: sourceNode.position.x + estimatedWidth + spacing,
-        y: sourceNode.position.y,
-      },
-      data: {
-        generationMode: 'relight',
-        label,
-        sourceImageNodeIds: [sourceNodeId],
-        status: 'empty',
-        viewMode: 'edit',
-        inputImage,
-        width,
-        height,
-        lightPreview: options?.lightPreview
-          ? {
-              ...options.lightPreview,
-              sun: { ...options.lightPreview.sun },
-              derived: { ...options.lightPreview.derived },
-            }
-          : undefined,
-        relightSettings: options?.relightSettings ? { ...options.relightSettings } : undefined,
-      },
-      selected: true,
-    };
+      sourceNode,
+      estimatedWidth,
+      sourceNodeId,
+      label,
+      inputImage,
+      width,
+      height,
+      options,
+    });
 
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
     setEdges((eds) => [
@@ -874,22 +754,13 @@ function FlowCanvas() {
     // ── Fallback: create a brand-new CompareNode ──
     const newNodeId = `compare-${Date.now()}`;
     const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.compare);
-    const spacing = 80;
     const estimatedWidth = sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
-
-    const newNode: Node = {
+    const newNode = createCompareCanvasNode({
       id: newNodeId,
-      type: 'compare',
-      position: {
-        x: sourceNode.position.x + estimatedWidth + spacing,
-        y: sourceNode.position.y,
-      },
-      data: {
-        label,
-        sliderPosition: 50,
-      },
-      selected: true,
-    };
+      sourceNode,
+      estimatedWidth,
+      label,
+    });
 
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
     setEdges((eds) => [
@@ -1448,31 +1319,12 @@ function FlowCanvas() {
         ? NODE_BASE_TITLES.text
         : customLabel || NODE_BASE_TITLES[type] || type;
       const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
-      const newNode: Node = {
+      const newNode = createBasicCanvasNode({
         id: `${type}-${Date.now()}`,
         type,
         position,
-        data: {
-          label,
-          ...(type === 'image' ? getRoleData(null) : {}),
-          ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
-          ...(type === 'text'
-            ? {
-                title: label,
-                content: '',
-                text: '',
-                status: 'empty',
-                referencedImageNodeIds: [],
-                referencedTextNodeIds: [],
-                outputTargetImageNodeIds: [],
-                activeModel: DEFAULT_TEXT_NODE_MODEL,
-                lastActionType: null,
-                editorInput: '',
-                textMode: 'unset',
-              }
-            : {}),
-        },
-      };
+        label,
+      });
       setNodes((nds) => [...nds, newNode]);
       setContextMenu(null);
     },
@@ -1678,46 +1530,6 @@ function FlowCanvas() {
       Boolean(target.closest('[contenteditable="true"]')) ||
       Boolean(target.closest('[data-paste-ignore="true"]'))
     );
-  }
-
-  function formatPastedImageLabel(file: File): string {
-    if (file.name && file.name !== 'image.png') {
-      return file.name.replace(/\.[^/.]+$/, '');
-    }
-    return 'pasted-image';
-  }
-
-  function isAcceptedImageFile(file: File): boolean {
-    if (ACCEPTED_IMAGE_UPLOAD_TYPES.has(file.type)) return true;
-    const name = file.name.toLowerCase();
-    return (
-      name.endsWith('.png') ||
-      name.endsWith('.jpg') ||
-      name.endsWith('.jpeg') ||
-      name.endsWith('.webp') ||
-      name.endsWith('.gif')
-    );
-  }
-
-  function getFilesFromClipboard(clipboardData: DataTransfer): File[] {
-    const filesFromItems = Array.from(clipboardData.items ?? [])
-      .filter((item) => item.kind === 'file')
-      .map((item) => item.getAsFile())
-      .filter((file): file is File => file !== null);
-
-    const filesFromFiles = Array.from(clipboardData.files ?? []);
-
-    const seen = new Set<string>();
-    const files: File[] = [];
-    for (const file of [...filesFromItems, ...filesFromFiles]) {
-      const key = `${file.name}-${file.size}-${file.type}-${file.lastModified}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        files.push(file);
-      }
-    }
-
-    return files;
   }
 
   const createImageNodesFromFiles = useCallback(
@@ -2002,30 +1814,12 @@ function FlowCanvas() {
     const newNodeId = `${type}-${timestamp}`;
     const baseTitle = NODE_BASE_TITLES[type] || type;
     const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
-    const newNode: Node = {
+    const newNode = createBasicCanvasNode({
       id: newNodeId,
       type,
       position: createMenu.flowPos,
-      data: {
-        label,
-        ...(type === 'image' ? getRoleData(null) : {}),
-        ...(type === 'text'
-          ? {
-              title: label,
-              content: '',
-              text: '',
-              status: 'empty',
-              referencedImageNodeIds: [],
-              referencedTextNodeIds: [],
-              outputTargetImageNodeIds: [],
-              activeModel: DEFAULT_TEXT_NODE_MODEL,
-              lastActionType: null,
-              editorInput: '',
-              textMode: 'unset',
-            }
-          : {}),
-      },
-    };
+      label,
+    });
     const startsFromSource = createMenu.sourceHandleType === 'source';
     const newEdge: Edge = {
       id: `e-${timestamp}`,
@@ -2162,78 +1956,7 @@ function FlowCanvas() {
       <GlobalDropForwarder />
       <Navbar variant="canvas" projectName={projectName} />
 
-      {/* Global style overrides */}
-      <style>{`
-        .react-flow__node {
-          transition: box-shadow 200ms ease;
-        }
-        .react-flow__attribution {
-          display: none !important;
-        }
-        /* Image node handles — hidden by default, shown on hover or when selected */
-        .image-node-handle {
-          opacity: 0;
-          transition: opacity 200ms ease;
-          pointer-events: auto;
-          cursor: crosshair;
-        }
-        .react-flow__node:hover .image-node-handle,
-        .react-flow__node.selected .image-node-handle,
-        .image-node-handle:hover {
-          opacity: 1;
-        }
-        .node-preview-card {
-          box-sizing: border-box;
-          border-style: solid !important;
-          border-width: 2.5px !important;
-          border-color: rgba(42, 42, 53, 0.98) !important;
-          box-shadow: none !important;
-          filter: none !important;
-        }
-        .react-flow__node.selected .node-preview-card {
-          border-color: #2f6bff !important;
-          box-shadow: none !important;
-          filter: none !important;
-        }
-        .image-role-tag-button:hover {
-          border-color: rgba(0,212,255,0.62) !important;
-          color: #ffffff !important;
-        }
-        /* Edge colors — gray by default, cyan when selected */
-        .react-flow__edge-path {
-          stroke: #555;
-          stroke-width: 1;
-        }
-        .react-flow__edge.selected .react-flow__edge-path {
-          stroke: #00d4ff !important;
-          stroke-width: 2px !important;
-          filter: drop-shadow(0 0 6px rgba(0,212,255,0.6));
-        }
-        /* Hide default edge markers if any */
-        .react-flow__edge .react-flow__edge-interaction {
-          stroke: transparent;
-        }
-        /* Hide the persistent selection rect around selected nodes after box selection */
-        .react-flow__nodesselection-rect {
-          border: none !important;
-          background: transparent !important;
-        }
-        /* Connection hover feedback on nodes */
-        .react-flow__node.can-connect {
-          box-shadow: none !important;
-        }
-        .react-flow__node.can-connect .node-preview-card {
-          border-color: #2f6bff !important;
-          box-shadow: none !important;
-        }
-        .react-flow__node.cannot-connect {
-          box-shadow: none !important;
-        }
-        .react-flow__node.cannot-connect .node-preview-card {
-          border-color: #ff4444 !important;
-          box-shadow: none !important;
-        }
-      `}</style>
+      <CanvasFlowStyles />
 
       <CanvasStage
         tempLine={tempLine}
@@ -2342,13 +2065,7 @@ function FlowCanvas() {
         onNodeCopy={copyNodes}
       />
 
-      {/* Toast */}
-      {toastMsg && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-xs font-medium animate-in fade-in slide-in-from-top-2"
-          style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
-          {toastMsg}
-        </div>
-      )}
+      <CanvasToast message={toastMsg} />
 
       <CanvasToolbar
         showMinimap={showMinimap}
