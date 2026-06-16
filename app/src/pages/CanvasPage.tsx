@@ -83,6 +83,7 @@ import {
   createSunSkyCanvasNode,
   createUpscaleCanvasNode,
 } from '../features/canvas/utils/canvasNodeFactories';
+import { ConnectionEngine } from '../features/canvas/connection/ConnectionEngine';
 
 function getHistoryBatchForImage(image: GeneratedImage, batches: ResultSetBatch[]): ResultSetBatch | undefined {
   return batches.find((batch) =>
@@ -211,6 +212,7 @@ function FlowCanvas() {
   const [createMenu, setCreateMenu] = useState<CreateConnectionMenuState | null>(null);
   const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number; message: string } | null>(null);
   const isDrawingRef = useRef(false);
+  const engine = useMemo(() => new ConnectionEngine(), []);
 
   const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
@@ -230,6 +232,14 @@ function FlowCanvas() {
   ) => {
     if (isDrawingRef.current) return;
     isDrawingRef.current = true;
+    engine.dispatch({
+      type: 'START',
+      payload: {
+        sourceNodeId: nodeId,
+        sourceHandle: sourceHandleId,
+        sourceType: sourceHandleType,
+      },
+    });
     const posMap = new Map<string, { x: number; y: number }>();
     nodes.forEach((n) => posMap.set(n.id, { ...n.position }));
     nodePositionsRef.current = posMap;
@@ -399,6 +409,7 @@ function FlowCanvas() {
 
     const handleMouseMove = (e: PointerEvent) => {
       if (!isDrawingRef.current) return;
+      engine.dispatch({ type: 'MOVE', payload: { x: e.clientX, y: e.clientY } });
       setTempLine((prev) => prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null);
       // 恢复所有节点位置，阻止 React Flow 移动它们
       setNodes((nds) => nds.map((n) => {
@@ -418,6 +429,16 @@ function FlowCanvas() {
         const error = targetId === nodeId
           ? t('error.selfConnect')
           : validateConnection(resolveConnection(targetId, hoveredHandle));
+        engine.dispatch({
+          type: 'HIT_NODE',
+          payload: {
+            targetNodeId: targetId,
+            targetHandle: hoveredHandle?.getAttribute('data-handle-id') ?? null,
+            targetType: hoveredHandle ? getHandleType(hoveredHandle) : null,
+            isValid: !error,
+            rejectReason: error,
+          },
+        });
         if (error) {
           nodeEl.classList.add('cannot-connect');
           setRejectTooltip({ x: e.clientX, y: e.clientY, message: error });
@@ -446,12 +467,30 @@ function FlowCanvas() {
 
       // ─── Connection validation ───
       const fail = () => {
+        engine.dispatch({
+          type: 'HIT_NODE',
+          payload: {
+            targetNodeId: targetId || '',
+            targetHandle: null,
+            targetType: null,
+            isValid: false,
+            rejectReason: t('canvas.cannotConnect'),
+          },
+        });
+        engine.dispatch({ type: 'END' });
+        engine.reset();
         setRejectTooltip({ x: e.clientX, y: e.clientY, message: t('canvas.cannotConnect') });
         setTimeout(() => setRejectTooltip((prev) => (prev ? null : prev)), 500);
         setTempLine(null);
       };
 
       if (!targetId) {
+        engine.dispatch({ type: 'HIT_EMPTY', payload: { x: e.clientX, y: e.clientY } });
+        const result = engine.dispatch({ type: 'END' });
+        if (result?.type !== 'OPEN_CREATE_MENU') {
+          fail();
+          return;
+        }
         const startsOnLeft = sourceHandleId.startsWith('left-');
         const unclampedMenuX = startsOnLeft
           ? e.clientX - CREATE_NODE_MENU_WIDTH
@@ -483,6 +522,7 @@ function FlowCanvas() {
           sourceHandleId,
           sourceHandleType,
         });
+        engine.reset();
         return;
       }
 
@@ -490,14 +530,42 @@ function FlowCanvas() {
       const connection = resolveConnection(targetId, dropHandle);
       const error = validateConnection(connection);
       if (error) {
+        engine.dispatch({
+          type: 'HIT_NODE',
+          payload: {
+            targetNodeId: targetId,
+            targetHandle: dropHandle?.getAttribute('data-handle-id') ?? null,
+            targetType: dropHandle ? getHandleType(dropHandle) : null,
+            isValid: false,
+            rejectReason: error,
+          },
+        });
+        const result = engine.dispatch({ type: 'END' });
         setRejectTooltip({ x: e.clientX, y: e.clientY, message: error });
         setTimeout(() => setRejectTooltip((prev) => (prev ? null : prev)), 1200);
         setTempLine(null);
+        if (result?.type === 'REJECT_CONNECTION') {
+          engine.reset();
+        }
         return;
       }
 
       // All checks passed — create edge
       if (!connection) {
+        fail();
+        return;
+      }
+      engine.dispatch({
+        type: 'HIT_NODE',
+        payload: {
+          targetNodeId: targetId,
+          targetHandle: connection.targetHandleId,
+          targetType: 'target',
+          isValid: true,
+        },
+      });
+      const result = engine.dispatch({ type: 'END' });
+      if (result?.type !== 'CREATE_EDGE') {
         fail();
         return;
       }
@@ -510,11 +578,12 @@ function FlowCanvas() {
         style: { stroke: '#555', strokeWidth: 1 },
       }]);
       setTempLine(null);
+      engine.reset();
     };
 
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('pointerup', handleMouseUp);
-  }, [screenToFlowPosition, nodes, edges]);
+  }, [screenToFlowPosition, nodes, edges, engine]);
 
   // Update edge styles when node selection changes (connected edges turn cyan)
   const selectedIdsRef = useRef('');
