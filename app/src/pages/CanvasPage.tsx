@@ -12,6 +12,10 @@ import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
 import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
+import { useCanvasKeyboardShortcuts } from '../features/canvas/hooks/useCanvasKeyboardShortcuts';
+import { useCanvasSelectionActions } from '../features/canvas/hooks/useCanvasSelectionActions';
+import { useCanvasViewport } from '../features/canvas/hooks/useCanvasViewport';
+import { useCanvasDragDrop } from '../features/canvas/hooks/useCanvasDragDrop';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE } from '../features/canvas/constants/canvasConstants';
@@ -189,9 +193,10 @@ function FlowCanvas() {
   }, [projectId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(defaultData.nodes as Node[]);
-  const { screenToFlowPosition, setViewport, getViewport, fitView } = useReactFlow();
+  const { screenToFlowPosition, setViewport, getViewport, getNodes, fitView } = useReactFlow();
   const { msg: toastMsg, show: showToast } = useToast();
   const objectUrlsRef = useRef<Set<string>>(new Set());
+  const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
   useRevokeObjectUrlsOnUnmount(objectUrlsRef);
 
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -1004,52 +1009,119 @@ function FlowCanvas() {
   }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode]);
 
   // ─── Copy / Paste / Delete ───
-  const clipboardRef = useRef<{ type: string; data: Record<string, unknown>; position: { x: number; y: number } }[]>([]);
+  const clipboardRef = useRef<Node[]>([]);
   const pasteOffsetRef = useRef(0);
 
+  const getKeyboardPasteAnchor = useCallback(() => {
+    const pastePoint = lastPointerPositionRef.current || {
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    };
+    return screenToFlowPosition(pastePoint);
+  }, [screenToFlowPosition]);
+
+  const hasCopiedNodes = useCallback(() => clipboardRef.current.length > 0, []);
+
+  const clearCopiedNodes = useCallback(() => {
+    clipboardRef.current = [];
+    pasteOffsetRef.current = 0;
+  }, []);
+
   const copyNodes = useCallback(() => {
-    const selected = nodes.filter((n) => n.selected);
-    if (selected.length === 0) return;
-    clipboardRef.current = selected.map((n) => ({
-      type: n.type!,
-      data: { ...n.data, generationTask: null },
-      position: { ...n.position },
+    const latestNodes = getNodes();
+    const selectedFlowNodes = latestNodes.filter((node) => node.selected);
+    const selected = selectedFlowNodes.length > 0
+      ? selectedFlowNodes.map((flowNode) => {
+          const sourceNode = nodes.find((node) => node.id === flowNode.id) || flowNode;
+          return {
+            ...sourceNode,
+            position: { ...flowNode.position },
+            measured: flowNode.measured || sourceNode.measured,
+            width: flowNode.width ?? sourceNode.width,
+            height: flowNode.height ?? sourceNode.height,
+            selected: true,
+          };
+        })
+      : nodes.filter((node) => node.selected);
+    if (selected.length === 0) return 0;
+    clipboardRef.current = selected.map((node) => ({
+      ...node,
+      position: { ...node.position },
+      data: { ...node.data },
+      style: node.style ? { ...node.style } : undefined,
+      measured: node.measured ? { ...node.measured } : undefined,
+      selected: false,
+      dragging: false,
     }));
     pasteOffsetRef.current = 0;
-  }, [nodes]);
+    if (import.meta.env.DEV) {
+      console.debug('[CanvasShortcuts] copy selected count', selected.length);
+    }
+    return selected.length;
+  }, [getNodes, nodes]);
 
-  const pasteNodes = useCallback(() => {
-    if (clipboardRef.current.length === 0) return;
+  useEffect(() => {
+    window.addEventListener('blur', clearCopiedNodes);
+    return () => window.removeEventListener('blur', clearCopiedNodes);
+  }, [clearCopiedNodes]);
+
+  const pasteNodes = useCallback((anchorPosition?: { x: number; y: number }) => {
+    const clipboardCount = clipboardRef.current.length;
+    if (clipboardCount === 0) return 0;
     pasteOffsetRef.current += 40;
     const offset = pasteOffsetRef.current;
     const existingLabels = getAllNodeLabels();
     const assignedLabels: string[] = [];
+    const sourceCenter = anchorPosition
+      ? clipboardRef.current.reduce(
+          (center, node) => ({
+            x: center.x + node.position.x / clipboardCount,
+            y: center.y + node.position.y / clipboardCount,
+          }),
+          { x: 0, y: 0 },
+        )
+      : null;
     const pasted = clipboardRef.current.map((n, i) => {
-      const fallbackBaseTitle = NODE_BASE_TITLES[n.type] || n.type;
+      const nodeType = n.type || '';
+      const fallbackBaseTitle = NODE_BASE_TITLES[nodeType] || nodeType;
       const nextLabel = getNextCopiedNodeTitle(
         [...existingLabels, ...assignedLabels],
         (n.data.label as string | undefined) || '',
         fallbackBaseTitle,
       );
       assignedLabels.push(nextLabel);
+      const nextData = {
+        ...n.data,
+        label: nextLabel,
+        title: typeof n.data.title === 'string' ? nextLabel : n.data.title,
+      };
       return {
+        ...n,
         id: `${n.type}-${Date.now()}-${i}`,
-        type: n.type,
-        position: { x: n.position.x + offset, y: n.position.y + offset },
-        data: { ...n.data, label: nextLabel },
+        position: anchorPosition && sourceCenter
+          ? {
+              x: anchorPosition.x + (n.position.x - sourceCenter.x) + offset,
+              y: anchorPosition.y + (n.position.y - sourceCenter.y) + offset,
+            }
+          : { x: n.position.x + offset, y: n.position.y + offset },
+        data: nextData,
         selected: true,
+        dragging: false,
       };
     });
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), ...pasted]);
+    if (import.meta.env.DEV) {
+      console.debug('[CanvasShortcuts] paste clipboard count', clipboardCount);
+      console.debug('[CanvasShortcuts] pasted created count', pasted.length);
+    }
+    return pasted.length;
   }, [getAllNodeLabels, setNodes]);
 
-  const deleteSelected = useCallback(() => {
-    const hasSelectedNodes = nodes.some((n) => n.selected);
-    const hasSelectedEdges = edges.some((e) => e.selected);
-    if (!hasSelectedNodes && !hasSelectedEdges) return;
-    setNodes((nds) => nds.filter((n) => !n.selected));
-    setEdges((eds) => eds.filter((e) => !e.selected));
-  }, [nodes, edges, setNodes, setEdges]);
+  const pasteNodesFromKeyboard = useCallback(() => {
+    if (!hasCopiedNodes()) return 0;
+    const anchorPosition = getKeyboardPasteAnchor();
+    return pasteNodes(anchorPosition);
+  }, [getKeyboardPasteAnchor, hasCopiedNodes, pasteNodes]);
 
   // ─── History (Undo / Redo) ───
   const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
@@ -1101,30 +1173,27 @@ function FlowCanvas() {
     }
   }, [setNodes, setEdges]);
 
-  const selectAll = useCallback(() => {
-    setNodes((nds) => nds.map((n) => ({ ...n, selected: true })));
-  }, [setNodes]);
-
-  const deselectAll = useCallback(() => {
-    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
-  }, [setNodes, setEdges]);
-
-  const duplicateNode = useCallback((id: string) => {
-    const node = nodes.find((n) => n.id === id);
-    if (!node) return;
-    const fallbackBaseTitle = NODE_BASE_TITLES[node.type || ''] || node.type || '节点';
-    const label = getNextCopiedNodeTitle(getAllNodeLabels(), (node.data?.label as string | undefined) || '', fallbackBaseTitle);
-    const newNode: Node = {
-      ...node,
-      id: `${node.type}-${Date.now()}`,
-      position: { x: node.position.x + 40, y: node.position.y + 40 },
-      data: { ...node.data, label },
-      selected: true,
-    };
-    setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
-    setNodeContextMenu(null);
-  }, [getAllNodeLabels, nodes, setNodes]);
+  const {
+    deleteSelected,
+    selectAll,
+    deselectAll,
+    duplicateNode,
+    handleEdgeClick,
+    handlePaneClick,
+  } = useCanvasSelectionActions({
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    getAllNodeLabels,
+    getCopiedNodeTitle: getNextCopiedNodeTitle,
+    getNodeBaseTitle: (type) => NODE_BASE_TITLES[type] || type || '节点',
+    onCloseNodeContextMenu: () => setNodeContextMenu(null),
+    onCloseCreateMenu: () => {
+      setCreateMenu(null);
+      setTempLine(null);
+    },
+  });
 
   const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
@@ -1195,22 +1264,55 @@ function FlowCanvas() {
 
   // ─── Toolbar State (showHelp used in keyboard shortcuts) ───
   const [showHelp, setShowHelp] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(false);
+  const [snapGrid, setSnapGrid] = useState(false);
+  const {
+    zoom,
+    onViewportChange,
+    handleReset,
+    handleZoomChange,
+    panViewport,
+    zoomIn,
+    zoomOut,
+    fitViewCanvas,
+  } = useCanvasViewport({
+    getViewport,
+    setViewport,
+    fitView,
+    defaultZoom: 1,
+    minZoom: CANVAS_MIN_ZOOM,
+    maxZoom: CANVAS_MAX_ZOOM,
+    panStep: 40,
+    zoomStep: 1.15,
+  });
 
   // ─── Keyboard Shortcuts ───
-  const copyRef = useRef(copyNodes);
-  const pasteRef = useRef(pasteNodes);
-  const deleteRef = useRef(deleteSelected);
-  const undoRef = useRef(undo);
-  const redoRef = useRef(redo);
-  const selectAllRef = useRef(selectAll);
-  const deselectAllRef = useRef(deselectAll);
-  useEffect(() => { copyRef.current = copyNodes; }, [copyNodes]);
-  useEffect(() => { pasteRef.current = pasteNodes; }, [pasteNodes]);
-  useEffect(() => { deleteRef.current = deleteSelected; }, [deleteSelected]);
-  useEffect(() => { undoRef.current = undo; }, [undo]);
-  useEffect(() => { redoRef.current = redo; }, [redo]);
-  useEffect(() => { selectAllRef.current = selectAll; }, [selectAll]);
-  useEffect(() => { deselectAllRef.current = deselectAll; }, [deselectAll]);
+  const closeCreateConnectionMenu = useCallback(() => {
+    setCreateMenu(null);
+    setTempLine(null);
+  }, []);
+
+  const closeHelpPanel = useCallback(() => {
+    setShowHelp(false);
+  }, []);
+
+  useCanvasKeyboardShortcuts({
+    isCreateMenuOpen: Boolean(createMenu),
+    isHelpOpen: showHelp,
+    copyNodes,
+    pasteNodes: pasteNodesFromKeyboard,
+    deleteSelected,
+    undo,
+    redo,
+    selectAll,
+    deselectAll,
+    closeCreateMenu: closeCreateConnectionMenu,
+    closeHelp: closeHelpPanel,
+    panViewport,
+    zoomIn,
+    zoomOut,
+    fitView: fitViewCanvas,
+  });
 
   // Prevent browser context menu on canvas area
   useEffect(() => {
@@ -1224,128 +1326,22 @@ function FlowCanvas() {
     return () => document.removeEventListener('contextmenu', handler, true);
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.isComposing) return;
-
-      const target = e.target as HTMLElement;
-      const tag = target.tagName.toLowerCase();
-      const isEditing = tag === 'input' || tag === 'textarea' || target.isContentEditable;
-
-      // Copy (global)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-        e.preventDefault();
-        copyRef.current();
-        return;
-      }
-
-      // Esc closes help panel first, then deselects
-      if (e.key === 'Escape') {
-        if (createMenu) {
-          e.preventDefault();
-          setCreateMenu(null);
-          setTempLine(null);
-          return;
-        }
-        if (showHelp) {
-          e.preventDefault();
-          setShowHelp(false);
-          return;
-        }
-      }
-
-      // Canvas shortcuts (skip when editing text)
-      if (isEditing) return;
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        deleteRef.current();
-        return;
-      }
-
-      // Undo / Redo
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          redoRef.current();
-        } else {
-          undoRef.current();
-        }
-        return;
-      }
-
-      // Select All
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        selectAllRef.current();
-        return;
-      }
-
-      // Escape deselects
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        deselectAllRef.current();
-        return;
-      }
-
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        e.preventDefault();
-        const step = 40 / zoomRef.current;
-        const current = getViewport();
-        let dx = 0;
-        let dy = 0;
-        if (e.key === 'ArrowUp') dy = step;
-        if (e.key === 'ArrowDown') dy = -step;
-        if (e.key === 'ArrowLeft') dx = step;
-        if (e.key === 'ArrowRight') dx = -step;
-        setViewport({ x: current.x + dx, y: current.y + dy, zoom: current.zoom }, { duration: 0 });
-        return;
-      }
-
-      if (e.key === '+' || e.key === '=') {
-        e.preventDefault();
-        const current = getViewport();
-        setViewport({ ...current, zoom: Math.min(current.zoom * 1.15, CANVAS_MAX_ZOOM) }, { duration: 0 });
-        return;
-      }
-
-      if (e.key === '-') {
-        e.preventDefault();
-        const current = getViewport();
-        setViewport({ ...current, zoom: Math.max(current.zoom / 1.15, CANVAS_MIN_ZOOM) }, { duration: 0 });
-        return;
-      }
-
-      if (e.key === '0' || e.key === 'f' || e.key === 'F' || e.key === '1') {
-        e.preventDefault();
-        fitView({ duration: 400 });
-        return;
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [createMenu, getViewport, setViewport, fitView, showHelp]);
-
   // ─── Drag & Drop State ───
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadToast, setUploadToast] = useState<{ msg: string; type: 'loading' | 'success' } | null>(null);
-  const dragLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
+  function handleDropFiles(files: FileList, screenX: number, screenY: number) {
+    const basePos = screenToFlowPosition({ x: screenX, y: screenY });
+    createImageNodesFromFiles(Array.from(files), basePos);
+  }
 
-  // ─── Toolbar State ───
-  const [showMinimap, setShowMinimap] = useState(false);
-  const [snapGrid, setSnapGrid] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const zoomRef = useRef(zoom);
-  zoomRef.current = zoom;
-
-  const onViewportChange = useCallback((v: { x: number; y: number; zoom: number }) => {
-    setZoom(v.zoom);
-  }, []);
-
-  const handleReset = useCallback(() => {
-    fitView({ duration: 400 });
-  }, [fitView]);
+  const {
+    isDragOver,
+    uploadToast,
+    setUploadToast,
+    handleCanvasDragOver,
+    handleCanvasDragLeave,
+    handleCanvasDrop,
+    handleDragOverCapture,
+    handleDropCapture,
+  } = useCanvasDragDrop({ handleDropFiles });
 
   const addNode = useCallback(
     (type: string, pos?: { x: number; y: number }, customLabel?: string) => {
@@ -1561,6 +1557,7 @@ function FlowCanvas() {
     return (
       tagName === 'input' ||
       tagName === 'textarea' ||
+      tagName === 'select' ||
       target.isContentEditable ||
       Boolean(target.closest('[contenteditable="true"]')) ||
       Boolean(target.closest('[data-paste-ignore="true"]'))
@@ -1672,15 +1669,7 @@ function FlowCanvas() {
         }
       });
     },
-    [setNodes, t, showToast],
-  );
-
-  const handleDropFiles = useCallback(
-    (files: FileList, screenX: number, screenY: number) => {
-      const basePos = screenToFlowPosition({ x: screenX, y: screenY });
-      createImageNodesFromFiles(Array.from(files), basePos);
-    },
-    [screenToFlowPosition, createImageNodesFromFiles],
+    [getAllNodeLabels, setNodes, setUploadToast, t, showToast],
   );
 
   const handlePaste = useCallback(
@@ -1693,6 +1682,10 @@ function FlowCanvas() {
       const clipboardFiles = getFilesFromClipboard(clipboardData);
 
       if (clipboardFiles.length > 0) {
+        if (hasCopiedNodes()) {
+          event.preventDefault();
+          return;
+        }
         event.preventDefault();
         const pastePoint = lastPointerPositionRef.current || {
           x: window.innerWidth / 2,
@@ -1705,13 +1698,8 @@ function FlowCanvas() {
         createImageNodesFromFiles(clipboardFiles, centerPos);
         return;
       }
-
-      if (clipboardRef.current.length > 0) {
-        event.preventDefault();
-        pasteNodes();
-      }
     },
-    [screenToFlowPosition, createImageNodesFromFiles, pasteNodes],
+    [hasCopiedNodes, screenToFlowPosition, createImageNodesFromFiles],
   );
 
   useEffect(() => {
@@ -1742,63 +1730,6 @@ function FlowCanvas() {
     const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     setContextMenu({ x: e.clientX, y: e.clientY, flowPos: pos });
   }, [screenToFlowPosition]);
-
-  const handleCanvasDragOver = useCallback((e: React.DragEvent) => {
-    if (
-      e.dataTransfer.types.includes('application/x-visioner-reference-reorder') ||
-      !e.dataTransfer.types.includes('Files')
-    ) {
-      return;
-    }
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    if (dragLeaveTimer.current) clearTimeout(dragLeaveTimer.current);
-    setIsDragOver(true);
-  }, []);
-
-  const handleCanvasDragLeave = useCallback(() => {
-    if (dragLeaveTimer.current) clearTimeout(dragLeaveTimer.current);
-    dragLeaveTimer.current = setTimeout(() => setIsDragOver(false), 50);
-  }, []);
-
-  const handleCanvasDrop = useCallback((e: React.DragEvent) => {
-    if (
-      e.dataTransfer.types.includes('application/x-visioner-reference-reorder') ||
-      !e.dataTransfer.types.includes('Files')
-    ) {
-      setIsDragOver(false);
-      return;
-    }
-    e.preventDefault();
-    setIsDragOver(false);
-    handleDropFiles(e.dataTransfer.files, e.clientX, e.clientY);
-  }, [handleDropFiles]);
-
-  const handleEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
-    setEdges((eds) => eds.map((e) => ({ ...e, selected: e.id === edge.id })));
-    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-  }, [setEdges, setNodes]);
-
-  const handlePaneClick = useCallback(() => {
-    setCreateMenu(null);
-    setTempLine(null);
-    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
-    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-  }, [setEdges, setNodes]);
-
-  const handleDragOverCapture = useCallback((event: React.DragEvent) => {
-    if (event.dataTransfer.types.includes('application/x-visioner-reference-reorder')) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  }, []);
-
-  const handleDropCapture = useCallback((event: React.DragEvent) => {
-    if (event.dataTransfer.types.includes('application/x-visioner-reference-reorder')) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  }, []);
 
   // ─── Context Menu Handlers ───
   const handleCloseContextMenu = useCallback(() => {
@@ -1878,13 +1809,6 @@ function FlowCanvas() {
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
   }, [setNodes]);
-
-  // ─── Toolbar Handlers ───
-  const handleZoomChange = useCallback((value: number) => {
-    const current = getViewport();
-    const nextZoom = Math.min(Math.max(value, CANVAS_MIN_ZOOM), CANVAS_MAX_ZOOM);
-    setViewport({ x: current.x, y: current.y, zoom: nextZoom }, { duration: 0 });
-  }, [getViewport, setViewport]);
 
   const selectedTextNodeId = selectedTextNode?.id;
   useEffect(() => {
