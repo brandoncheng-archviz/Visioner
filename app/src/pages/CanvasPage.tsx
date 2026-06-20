@@ -13,11 +13,10 @@ import Navbar from '../components/Navbar';
 import { getProjectCanvasData, recentProjects } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
-import { UNIQUE_USAGES, getImageRoleLabel } from '../features/canvas/constants/imageUsages';
+import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
-import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd } from '../features/canvas/utils/referenceLimits';
 import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
 import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
@@ -55,8 +54,6 @@ import {
   getTextNodeInstruction,
   getTextNodeSubmitState,
   isComposeTextNode,
-  isComposeTextOutputTarget,
-  isTextWorkflowConnection,
   removeComposeTextInputEdges,
   simulateTextNodeResult,
 } from '../features/canvas/utils/textNodeUtils';
@@ -75,7 +72,6 @@ import {
   isAcceptedImageFile,
   type ImageFileReject,
 } from '../features/canvas/utils/canvasFileUtils';
-import { wouldCreateCycle } from '../features/canvas/utils/canvasGraphUtils';
 import {
   createBasicCanvasNode,
   createCompareCanvasNode,
@@ -84,6 +80,9 @@ import {
   createUpscaleCanvasNode,
 } from '../features/canvas/utils/canvasNodeFactories';
 import { ConnectionEngine } from '../features/canvas/connection/ConnectionEngine';
+import { buildConnectionValidationInput } from '../features/canvas/connection/buildConnectionValidationInput';
+import { validateConnectionRules } from '../features/canvas/connection/connectionRules';
+import type { ConnectionValidationResult } from '../features/canvas/connection/connectionTypes';
 
 function getHistoryBatchForImage(image: GeneratedImage, batches: ResultSetBatch[]): ResultSetBatch | undefined {
   return batches.find((batch) =>
@@ -166,6 +165,7 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
     modelParams,
     lightPreview,
     currentResultSource: 'history',
+    assetSource: 'history',
     isGeneratedResult: true,
     generationStatus: 'completed',
     width: image.width,
@@ -321,8 +321,14 @@ function FlowCanvas() {
 
     const validateConnection = (
       connection: ReturnType<typeof resolveConnection>,
-    ): string | null => {
-      if (!connection) return t('error.wrongPortDirection');
+    ): ConnectionValidationResult => {
+      if (!connection) {
+        return {
+          valid: false,
+          code: 'same_handle_side',
+          reason: t('error.wrongPortDirection'),
+        };
+      }
 
       const {
         sourceId,
@@ -330,81 +336,33 @@ function FlowCanvas() {
         sourceHandle,
         targetHandle,
       } = connection;
-      if (sourceId === targetId) return t('error.selfConnect');
 
-      const sourceNode = nodes.find((n) => n.id === sourceId);
-      const targetNode = nodes.find((n) => n.id === targetId);
-      if (targetNode?.type === 'text' && isComposeTextNode(targetNode.data)) {
-        return t('canvas.cannotConnect');
-      }
-      if (
-        sourceNode?.type === 'text' &&
-        isComposeTextNode(sourceNode.data) &&
-        !isComposeTextOutputTarget(targetNode?.type)
-      ) {
-        return t('canvas.cannotConnect');
-      }
-      const sourceDataType = sourceHandle.getAttribute('data-data-type');
-      const targetDataType = targetHandle.getAttribute('data-data-type');
-      if (
-        sourceDataType !== targetDataType &&
-        !isTextWorkflowConnection(sourceNode?.type, targetNode?.type) &&
-        !(
-          sourceNode?.type === 'text' &&
-          isComposeTextNode(sourceNode.data) &&
-          isComposeTextOutputTarget(targetNode?.type)
-        )
-      ) {
-        return t('error.portTypeMismatch');
-      }
-
-      if (wouldCreateCycle(sourceId, targetId, edges)) return t('error.cycleDetected');
-
-      const alreadyConnected = edges.some((e) => e.source === sourceId && e.target === targetId);
-      if (alreadyConnected) return t('error.alreadyConnected');
-
-      // Compare node max 2 images
-      if (targetNode?.type === 'compare') {
-        const targetInputEdges = edges.filter((e) => e.target === targetId);
-        if (targetInputEdges.length >= 2) {
-          return t('error.compareMaxTwoImages');
-        }
-      }
-
-      const sourceRole = (sourceNode?.data?.role as ImageRole | null | undefined) ?? null;
-
-      if (targetNode?.type === 'image' && sourceNode?.type === 'image') {
-        const targetInputEdges = edges.filter((e) => {
-          if (e.target !== targetId) return false;
-          return nodes.find((node) => node.id === e.source)?.type === 'image';
-        });
-        const targetReferences = targetInputEdges.map((edge) => {
-          const refNode = nodes.find((n) => n.id === edge.source);
-          return {
-            nodeId: edge.source,
-            role: (edge.data?.role as ImageRole | null | undefined) ?? ((refNode?.data?.role as ImageRole | null | undefined) ?? null),
-          };
-        });
-        const limitIssue = getReferenceLimitIssueForAdd(targetReferences, sourceRole);
-        if (limitIssue) {
-          return formatReferenceLimitIssue(limitIssue);
-        }
-      }
-
-      // 唯一用途检查
-      if (sourceRole && UNIQUE_USAGES.includes(sourceRole)) {
-        const targetInputEdges = edges.filter((e) => e.target === targetId);
-        const hasSameRole = targetInputEdges.some((edge) => {
-          const refNode = nodes.find((n) => n.id === edge.source);
-          const effectiveRole = (edge.data?.role as ImageRole | null | undefined) ?? ((refNode?.data?.role as ImageRole | null | undefined) ?? null);
-          return effectiveRole === sourceRole;
-        });
-        if (hasSameRole) {
-          return t('reference.usageConflict', { role: getImageRoleLabel(sourceRole) });
-        }
-      }
-
-      return null;
+      return validateConnectionRules(buildConnectionValidationInput({
+        nodes,
+        edges,
+        sourceNodeId: sourceId,
+        targetNodeId: targetId,
+        sourceHandle: {
+          id: connection.sourceHandleId,
+          type: getHandleType(sourceHandle),
+          dataType: sourceHandle.getAttribute('data-data-type'),
+        },
+        targetHandle: {
+          id: connection.targetHandleId,
+          type: getHandleType(targetHandle),
+          dataType: targetHandle.getAttribute('data-data-type'),
+        },
+        messages: {
+          wrongPortDirection: t('error.wrongPortDirection'),
+          selfConnect: t('error.selfConnect'),
+          cannotConnect: t('canvas.cannotConnect'),
+          portTypeMismatch: t('error.portTypeMismatch'),
+          cycleDetected: t('error.cycleDetected'),
+          alreadyConnected: t('error.alreadyConnected'),
+          compareMaxTwoImages: t('error.compareMaxTwoImages'),
+          usageConflict: (role) => t('reference.usageConflict', { role: getImageRoleLabel(role) }),
+        },
+      }));
     };
 
     const handleMouseMove = (e: PointerEvent) => {
@@ -426,17 +384,17 @@ function FlowCanvas() {
       const targetId = nodeEl?.getAttribute('data-id');
       if (targetId && nodeEl) {
         const hoveredHandle = el?.closest('.image-node-handle');
-        const error = targetId === nodeId
-          ? t('error.selfConnect')
+        const validation: ConnectionValidationResult = targetId === nodeId
+          ? { valid: false, code: 'same_node', reason: t('error.selfConnect') }
           : validateConnection(resolveConnection(targetId, hoveredHandle));
+        const error = validation.valid ? null : validation.reason ?? t('canvas.cannotConnect');
         engine.dispatch({
           type: 'HIT_NODE',
           payload: {
             targetNodeId: targetId,
             targetHandle: hoveredHandle?.getAttribute('data-handle-id') ?? null,
             targetType: hoveredHandle ? getHandleType(hoveredHandle) : null,
-            isValid: !error,
-            rejectReason: error,
+            validation,
           },
         });
         if (error) {
@@ -528,7 +486,8 @@ function FlowCanvas() {
 
       if (!nodeEl) { fail(); return; }
       const connection = resolveConnection(targetId, dropHandle);
-      const error = validateConnection(connection);
+      const validation = validateConnection(connection);
+      const error = validation.valid ? null : validation.reason ?? t('canvas.cannotConnect');
       if (error) {
         engine.dispatch({
           type: 'HIT_NODE',
@@ -536,8 +495,7 @@ function FlowCanvas() {
             targetNodeId: targetId,
             targetHandle: dropHandle?.getAttribute('data-handle-id') ?? null,
             targetType: dropHandle ? getHandleType(dropHandle) : null,
-            isValid: false,
-            rejectReason: error,
+            validation,
           },
         });
         const result = engine.dispatch({ type: 'END' });
@@ -560,8 +518,16 @@ function FlowCanvas() {
         payload: {
           targetNodeId: targetId,
           targetHandle: connection.targetHandleId,
-          targetType: 'target',
-          isValid: true,
+          targetType: dropHandle ? getHandleType(dropHandle) : null,
+          validation,
+          edgePayload: {
+            source: connection.sourceId,
+            target: connection.targetId,
+            sourceHandle: connection.sourceHandleId,
+            targetHandle: connection.targetHandleId,
+            sourceNodeId: connection.sourceId,
+            targetNodeId: connection.targetId,
+          },
         },
       });
       const result = engine.dispatch({ type: 'END' });
@@ -1658,6 +1624,11 @@ function FlowCanvas() {
                   inputImage: url,
                   currentImage: url,
                   currentResultId: null,
+                  currentResultSet: null,
+                  generatedImages: [],
+                  generationTask: null,
+                  assetSource: 'upload',
+                  isGeneratedResult: false,
                   width: imgEl.naturalWidth,
                   height: imgEl.naturalHeight,
                   ...getRoleData(null),

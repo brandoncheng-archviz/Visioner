@@ -17,6 +17,7 @@ export interface ImageNodeData {
   currentImage?: string;
   currentResultId?: string | null;
   currentResultSet?: CurrentResultSet | null;
+  assetSource?: 'upload' | 'paste' | 'generated' | 'history' | string;
   isHistoryAsset?: boolean;
   isGeneratedResult?: boolean;
   generationStatus?: 'completed' | string;

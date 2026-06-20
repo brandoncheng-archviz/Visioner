@@ -1,3 +1,9 @@
+import type {
+  ConnectionDecision,
+  ConnectionEdgePayload,
+  ConnectionValidationResult,
+} from './connectionTypes';
+
 export type ConnectionState =
   | 'IDLE'
   | 'START'
@@ -18,6 +24,9 @@ export type ConnectionContext = {
   targetType: ConnectionHandleType | null;
   mousePosition: { x: number; y: number } | null;
   rejectReason: string | null;
+  rejectCode: ConnectionValidationResult['code'] | null;
+  validation: ConnectionValidationResult | null;
+  edgePayload: ConnectionEdgePayload | null;
 };
 
 type StartEvent = {
@@ -42,6 +51,8 @@ type HitNodeEvent = {
     targetType: ConnectionHandleType | null;
     isValid?: boolean;
     rejectReason?: string | null;
+    validation?: ConnectionValidationResult | null;
+    edgePayload?: ConnectionEdgePayload | null;
   };
 };
 
@@ -66,22 +77,7 @@ export type ConnectionEvent =
   | EndEvent
   | ResetEvent;
 
-export type ConnectionAction =
-  | {
-      type: 'CREATE_EDGE';
-      payload: ConnectionContext;
-    }
-  | {
-      type: 'OPEN_CREATE_MENU';
-      payload: ConnectionContext;
-    }
-  | {
-      type: 'REJECT_CONNECTION';
-      payload: ConnectionContext;
-    }
-  | {
-      type: 'RESET';
-    };
+export type ConnectionAction = ConnectionDecision;
 
 const EMPTY_CONTEXT: ConnectionContext = {
   sourceNodeId: null,
@@ -92,6 +88,9 @@ const EMPTY_CONTEXT: ConnectionContext = {
   targetType: null,
   mousePosition: null,
   rejectReason: null,
+  rejectCode: null,
+  validation: null,
+  edgePayload: null,
 };
 
 export class ConnectionEngine {
@@ -99,7 +98,7 @@ export class ConnectionEngine {
 
   private context: ConnectionContext = { ...EMPTY_CONTEXT };
 
-  dispatch(event: ConnectionEvent): ConnectionAction | null {
+  dispatch(event: ConnectionEvent): ConnectionDecision | null {
     switch (event.type) {
       case 'START': {
         this.state = 'START';
@@ -127,13 +126,21 @@ export class ConnectionEngine {
 
       case 'HIT_NODE': {
         if (this.state === 'IDLE' || this.state === 'COMPLETE') return null;
-        const isValid = event.payload.isValid !== false;
+        const validation = event.payload.validation ?? (
+          event.payload.isValid === false
+            ? { valid: false, reason: event.payload.rejectReason ?? undefined }
+            : { valid: true }
+        );
+        const isValid = validation.valid;
         this.context = {
           ...this.context,
           targetNodeId: event.payload.targetNodeId,
           targetHandle: event.payload.targetHandle,
           targetType: event.payload.targetType,
-          rejectReason: isValid ? null : event.payload.rejectReason ?? null,
+          rejectReason: isValid ? null : validation.reason ?? event.payload.rejectReason ?? null,
+          rejectCode: isValid ? null : validation.code ?? null,
+          validation,
+          edgePayload: event.payload.edgePayload ?? null,
         };
         this.state = isValid ? 'VALID_HIT' : 'INVALID_HIT';
         return null;
@@ -148,6 +155,9 @@ export class ConnectionEngine {
           targetType: null,
           mousePosition: event.payload,
           rejectReason: null,
+          rejectCode: null,
+          validation: null,
+          edgePayload: null,
         };
         this.state = 'EMPTY_SPACE';
         return null;
@@ -161,7 +171,7 @@ export class ConnectionEngine {
 
       case 'RESET': {
         this.reset();
-        return { type: 'RESET' };
+        return { type: 'RESET', valid: true };
       }
 
       default:
@@ -178,17 +188,62 @@ export class ConnectionEngine {
     this.context = { ...EMPTY_CONTEXT };
   }
 
-  private getEndAction(): ConnectionAction {
+  setValidationResult(validation: ConnectionValidationResult | null) {
+    this.context = {
+      ...this.context,
+      validation,
+      rejectReason: validation?.valid === false ? validation.reason ?? null : null,
+      rejectCode: validation?.valid === false ? validation.code ?? null : null,
+    };
+    if (validation?.valid === false && this.state !== 'IDLE' && this.state !== 'COMPLETE') {
+      this.state = 'INVALID_HIT';
+    }
+  }
+
+  private getEndAction(): ConnectionDecision {
     const context = this.getContext();
     if (this.state === 'VALID_HIT') {
-      return { type: 'CREATE_EDGE', payload: context };
+      return {
+        type: 'CREATE_EDGE',
+        valid: true,
+        payload: context.edgePayload ?? {
+          source: context.sourceNodeId ?? '',
+          target: context.targetNodeId ?? '',
+          sourceHandle: context.sourceHandle ?? undefined,
+          targetHandle: context.targetHandle ?? undefined,
+          sourceNodeId: context.sourceNodeId ?? undefined,
+          targetNodeId: context.targetNodeId ?? undefined,
+        },
+        meta: { context },
+      };
     }
     if (this.state === 'EMPTY_SPACE') {
-      return { type: 'OPEN_CREATE_MENU', payload: context };
+      return {
+        type: 'OPEN_CREATE_MENU',
+        valid: true,
+        payload: {
+          position: context.mousePosition ?? { x: 0, y: 0 },
+          sourceNodeId: context.sourceNodeId ?? undefined,
+          sourceHandle: context.sourceHandle ?? undefined,
+        },
+        meta: { context },
+      };
     }
     if (this.state === 'INVALID_HIT') {
-      return { type: 'REJECT_CONNECTION', payload: context };
+      return {
+        type: 'REJECT_CONNECTION',
+        valid: false,
+        reason: context.rejectReason ?? '',
+        code: context.rejectCode ?? undefined,
+        meta: { context },
+      };
     }
-    return { type: 'REJECT_CONNECTION', payload: context };
+    return {
+      type: 'REJECT_CONNECTION',
+      valid: false,
+      reason: context.rejectReason ?? '',
+      code: context.rejectCode ?? undefined,
+      meta: { context },
+    };
   }
 }

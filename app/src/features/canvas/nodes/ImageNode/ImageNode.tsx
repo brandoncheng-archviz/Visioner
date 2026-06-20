@@ -5,7 +5,7 @@ import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflo
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
 import type { ImageRole, PromptContent, ReferenceInfo, LocalReferenceType } from '../../types/imageNode.types';
-import type { MarkItem, ModelParams } from '../../types/canvas.types';
+import type { ModelParams } from '../../types/canvas.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
 import type { CurrentResultSet, ResultSetBatch, GeneratedImage } from '../../types/history.types';
@@ -39,6 +39,26 @@ import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
+
+const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或选择预设 / 风格 / 光影';
+
+function hasPromptContentIntent(promptContent: PromptContent[]) {
+  return promptContent.some((block) => {
+    if (block.type === 'image_reference') return false;
+    if (block.type === 'text') return block.text.trim().length > 0;
+    return block.promptText.trim().length > 0;
+  });
+}
+
+function hasModelParamIntent(modelParams: ModelParams) {
+  return (
+    modelParams.model !== DEFAULT_MODEL_PARAMS.model ||
+    modelParams.ratio !== DEFAULT_MODEL_PARAMS.ratio ||
+    modelParams.resolution !== DEFAULT_MODEL_PARAMS.resolution ||
+    modelParams.lens !== DEFAULT_MODEL_PARAMS.lens ||
+    modelParams.count !== DEFAULT_MODEL_PARAMS.count
+  );
+}
 
 export function ImageNode({ data, selected, id }: NodeProps) {
   const { t, i18n } = useTranslation();
@@ -81,7 +101,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   /* ─── Extended node state ─── */
   const [promptText, setPromptText] = useState((data.prompt as string) || '');
   const [promptContent, setPromptContent] = useState<PromptContent[]>((data.promptContent as PromptContent[]) || []);
-  const [marks] = useState<MarkItem[]>((data.marks as MarkItem[]) || []);
   const [lightPreview, setLightPreview] = useState<LightPreviewData | null>((data.lightPreview as LightPreviewData | null | undefined) ?? null);
   const [selectedPresets, setSelectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
@@ -131,6 +150,27 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const isResultResource = Boolean(currentResultSet && resultImageCount > 0 && generationTask?.status !== 'running');
   const isHistoryAsset = Boolean(data.isHistoryAsset);
   const isMultiResultExpanded = Boolean(isMultiResultSet && currentResultSet?.isExpanded);
+  const assetSource = data.assetSource as string | undefined;
+  const hasGeneratedResultState = Boolean(
+    currentResultSet ||
+    generatedImages.length > 0 ||
+    data.currentResultId ||
+    data.isGeneratedResult ||
+    data.generationStatus === 'completed' ||
+    data.currentResultSource === 'history' ||
+    assetSource === 'generated' ||
+    assetSource === 'history'
+  );
+  const isUploadedResource = Boolean(
+    displayImage &&
+    !hasGeneratedResultState &&
+    (
+      assetSource === 'upload' ||
+      assetSource === 'paste' ||
+      (!assetSource && (data.inputImage || data.currentImage || data.image))
+    )
+  );
+  const shouldShowInputHandle = !isUploadedResource;
 
   // Cleanup: abort running generation on unmount
   useEffect(() => {
@@ -373,15 +413,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     .map((reference) => reference.content.trim())
     .filter(Boolean)
     .join('\n\n');
-  const canGenerate = !isGenerating && (
-    references.length > 0 ||
-    textReferencePrompt.length > 0 ||
-    role !== null ||
-    marks.length > 0 ||
-    selectedStyle !== null ||
+  const hasGenerationIntent = (
     promptText.trim().length > 0 ||
-    promptContent.length > 0
+    hasPromptContentIntent(promptContent) ||
+    selectedPresets.length > 0 ||
+    selectedStyle !== null ||
+    Boolean(lightPreview?.enabled) ||
+    hasModelParamIntent(modelParams)
   );
+  const canGenerate = !isGenerating && hasGenerationIntent;
 
   const selectResultImage = useCallback((index: number) => {
     setCurrentResultSet((prev) => {
@@ -426,6 +466,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   );
 
   const runGeneration = useCallback(async () => {
+    if (!hasGenerationIntent) {
+      showToast(EMPTY_GENERATION_INTENT_MESSAGE);
+      return;
+    }
+
     const referenceLimitIssue = getReferenceLimitIssueForGenerate(references);
     if (referenceLimitIssue) {
       showToast(formatReferenceLimitIssue(referenceLimitIssue));
@@ -607,6 +652,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   image: generatedImageItems[0]?.imageUrl,
                   currentImage: generatedImageItems[0]?.imageUrl,
                   currentResultId: generatedImageItems[0]?.resultId,
+                  assetSource: 'generated',
+                  isGeneratedResult: true,
+                  generationStatus: 'completed',
                   finalPrompt: safePrompt,
                   textPrompt,
                   imageReferences,
@@ -643,9 +691,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
+  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
 
-  const handleGenerate = useCallback(() => runGeneration(), [runGeneration]);
+  const handleGenerate = useCallback(() => {
+    if (!hasGenerationIntent) {
+      showToast(EMPTY_GENERATION_INTENT_MESSAGE);
+      return;
+    }
+    void runGeneration();
+  }, [hasGenerationIntent, runGeneration, showToast]);
 
   const handlePromptChange = (value: string) => {
     setPromptText(value);
@@ -758,6 +812,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   inputImage: url,
                   currentImage: url,
                   currentResultId: null,
+                  currentResultSet: null,
+                  generatedImages: [],
+                  generationTask: null,
+                  assetSource: 'upload',
+                  isGeneratedResult: false,
                   label: name,
                   width: imgEl.width,
                   height: imgEl.height,
@@ -1771,8 +1830,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           )}
         </div>
 
-        {/* Left visual handle — Input/Output (hidden when image exists) */}
-        <div
+        {/* Left visual handle — Input */}
+        {shouldShowInputHandle && (
+          <div
             className="image-node-handle input-port"
             data-port-type="input"
             data-data-type="image"
@@ -1813,7 +1873,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             }}
           >
             <Plus style={{ width: 14, height: 14, color: 'white' }} />
-        </div>
+          </div>
+        )}
 
         {/* Right visual handle — Output */}
         <div
@@ -1860,8 +1921,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         </div>
 
         {/* React Flow handles — positioned to overlap visual handles exactly */}
-        <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
-        <Handle type="source" position={Position.Left} id="left-source" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
+        {shouldShowInputHandle && (
+          <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
+        )}
         <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />
         <Handle type="target" position={Position.Right} id="right-target" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />
       </div>

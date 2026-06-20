@@ -1,6 +1,9 @@
-import type { Edge } from '@xyflow/react';
+type GraphEdge = {
+  source: string;
+  target: string;
+};
 
-export function wouldCreateCycle(sourceId: string, targetId: string, currentEdges: Edge[]): boolean {
+export function wouldCreateCycle(sourceId: string, targetId: string, currentEdges: GraphEdge[]): boolean {
   const adj = new Map<string, string[]>();
   currentEdges.forEach((edge) => {
     if (!adj.has(edge.source)) adj.set(edge.source, []);

@@ -58,6 +58,7 @@ const GENERATION_CONTROL_BUTTON_CLASS =
 const GENERATION_CONTROL_BUTTON_SELECTED_CLASS =
   'border-[#94A3B8] bg-[rgba(148,163,184,0.12)] text-[#E2E8F0] shadow-none';
 const GENERATION_CREDIT_COST = 14;
+const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或选择预设 / 风格 / 光影';
 
 function TextReferenceIcon() {
   return (
@@ -608,6 +609,11 @@ export function ImageNodeControlPanel({
   };
 
   const handleGenerateClick = () => {
+    if (!canGenerate) {
+      showToast?.(EMPTY_GENERATION_INTENT_MESSAGE);
+      return;
+    }
+
     const limitIssue = getReferenceLimitIssueForGenerate(references);
     if (limitIssue) {
       showToast?.(formatReferenceLimitIssue(limitIssue));
@@ -1551,7 +1557,7 @@ export function ImageNodeControlPanel({
           {generationTask?.status === 'failed' && generationTask.errorMessage ? (
             <button
               onClick={handleGenerateClick}
-              disabled={isGenerating}
+              disabled={!canGenerate}
               className="flex items-center justify-center gap-1 rounded-lg transition-colors"
               style={{
                 height: 34,
@@ -1560,8 +1566,8 @@ export function ImageNodeControlPanel({
                 border: '1px solid rgba(239,68,68,0.35)',
                 color: '#fca5a5',
                 fontSize: 14,
-                opacity: isGenerating ? 0.5 : 1,
-                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                opacity: canGenerate ? 1 : 0.5,
+                cursor: canGenerate ? 'pointer' : 'not-allowed',
               }}
               title={generationTask.errorMessage}
             >
