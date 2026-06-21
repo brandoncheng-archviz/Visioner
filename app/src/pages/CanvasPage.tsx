@@ -21,6 +21,7 @@ import { useCanvasUiPanels } from '../features/canvas/hooks/useCanvasUiPanels';
 import { useTextNodeFloatingPanelPosition } from '../features/canvas/hooks/useTextNodeFloatingPanelPosition';
 import { useCanvasUndoRedo } from '../features/canvas/hooks/useCanvasUndoRedo';
 import { useCanvasImageImport } from '../features/canvas/hooks/useCanvasImageImport';
+import { useCanvasNodeClipboard } from '../features/canvas/hooks/useCanvasNodeClipboard';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
@@ -987,9 +988,21 @@ function FlowCanvas() {
     }
   }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setActivePanel, setEdges, setNodes]);
 
-  const clipboardRef = useRef<Node[]>([]);
-  const pasteOffsetRef = useRef(0);
-  const hasCopiedNodes = useCallback(() => clipboardRef.current.length > 0, []);
+  const {
+    copyNodes,
+    pasteNodes,
+    pasteNodesFromKeyboard,
+    hasCopiedNodes,
+  } = useCanvasNodeClipboard({
+    nodes,
+    setNodes,
+    getNodes,
+    getAllNodeLabels,
+    getCopiedNodeTitle: getNextCopiedNodeTitle,
+    getNodeBaseTitle: (type) => NODE_BASE_TITLES[type] || type,
+    lastPointerPositionRef,
+    screenToFlowPosition,
+  });
 
   const {
     uploadToast,
@@ -1025,116 +1038,6 @@ function FlowCanvas() {
       },
     }));
   }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
-
-  // ─── Copy / Paste / Delete ───
-  const getKeyboardPasteAnchor = useCallback(() => {
-    const pastePoint = lastPointerPositionRef.current || {
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    };
-    return screenToFlowPosition(pastePoint);
-  }, [screenToFlowPosition]);
-
-  const clearCopiedNodes = useCallback(() => {
-    clipboardRef.current = [];
-    pasteOffsetRef.current = 0;
-  }, []);
-
-  const copyNodes = useCallback(() => {
-    const latestNodes = getNodes();
-    const selectedFlowNodes = latestNodes.filter((node) => node.selected);
-    const selected = selectedFlowNodes.length > 0
-      ? selectedFlowNodes.map((flowNode) => {
-          const sourceNode = nodes.find((node) => node.id === flowNode.id) || flowNode;
-          return {
-            ...sourceNode,
-            position: { ...flowNode.position },
-            measured: flowNode.measured || sourceNode.measured,
-            width: flowNode.width ?? sourceNode.width,
-            height: flowNode.height ?? sourceNode.height,
-            selected: true,
-          };
-        })
-      : nodes.filter((node) => node.selected);
-    if (selected.length === 0) return 0;
-    clipboardRef.current = selected.map((node) => ({
-      ...node,
-      position: { ...node.position },
-      data: { ...node.data },
-      style: node.style ? { ...node.style } : undefined,
-      measured: node.measured ? { ...node.measured } : undefined,
-      selected: false,
-      dragging: false,
-    }));
-    pasteOffsetRef.current = 0;
-    if (import.meta.env.DEV) {
-      console.debug('[CanvasShortcuts] copy selected count', selected.length);
-    }
-    return selected.length;
-  }, [getNodes, nodes]);
-
-  useEffect(() => {
-    window.addEventListener('blur', clearCopiedNodes);
-    return () => window.removeEventListener('blur', clearCopiedNodes);
-  }, [clearCopiedNodes]);
-
-  const pasteNodes = useCallback((anchorPosition?: { x: number; y: number }) => {
-    const clipboardCount = clipboardRef.current.length;
-    if (clipboardCount === 0) return 0;
-    pasteOffsetRef.current += 40;
-    const offset = pasteOffsetRef.current;
-    const existingLabels = getAllNodeLabels();
-    const assignedLabels: string[] = [];
-    const sourceCenter = anchorPosition
-      ? clipboardRef.current.reduce(
-          (center, node) => ({
-            x: center.x + node.position.x / clipboardCount,
-            y: center.y + node.position.y / clipboardCount,
-          }),
-          { x: 0, y: 0 },
-        )
-      : null;
-    const pasted = clipboardRef.current.map((n, i) => {
-      const nodeType = n.type || '';
-      const fallbackBaseTitle = NODE_BASE_TITLES[nodeType] || nodeType;
-      const nextLabel = getNextCopiedNodeTitle(
-        [...existingLabels, ...assignedLabels],
-        (n.data.label as string | undefined) || '',
-        fallbackBaseTitle,
-      );
-      assignedLabels.push(nextLabel);
-      const nextData = {
-        ...n.data,
-        label: nextLabel,
-        title: typeof n.data.title === 'string' ? nextLabel : n.data.title,
-      };
-      return {
-        ...n,
-        id: `${n.type}-${Date.now()}-${i}`,
-        position: anchorPosition && sourceCenter
-          ? {
-              x: anchorPosition.x + (n.position.x - sourceCenter.x) + offset,
-              y: anchorPosition.y + (n.position.y - sourceCenter.y) + offset,
-            }
-          : { x: n.position.x + offset, y: n.position.y + offset },
-        data: nextData,
-        selected: true,
-        dragging: false,
-      };
-    });
-    setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), ...pasted]);
-    if (import.meta.env.DEV) {
-      console.debug('[CanvasShortcuts] paste clipboard count', clipboardCount);
-      console.debug('[CanvasShortcuts] pasted created count', pasted.length);
-    }
-    return pasted.length;
-  }, [getAllNodeLabels, setNodes]);
-
-  const pasteNodesFromKeyboard = useCallback(() => {
-    if (!hasCopiedNodes()) return 0;
-    const anchorPosition = getKeyboardPasteAnchor();
-    return pasteNodes(anchorPosition);
-  }, [getKeyboardPasteAnchor, hasCopiedNodes, pasteNodes]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {
