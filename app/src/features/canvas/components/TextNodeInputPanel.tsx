@@ -11,6 +11,7 @@ import {
   TEXT_NODE_MODELS,
   TEXT_NODE_PLACEHOLDER,
 } from '../constants/textNode';
+import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
 import type { TextNodeModel, TextReferenceInfo } from '../types/basicNode.types';
 
 export interface TextNodeImageReference {
@@ -63,6 +64,7 @@ export function TextNodeInputPanel({
   onRemoveTextReference,
   onRemoveImageReference,
 }: TextNodeInputPanelProps) {
+  const shortcuts = getPlatformShortcutLabels();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [showModels, setShowModels] = useState(false);
   const selectedModel = useMemo(
@@ -360,7 +362,7 @@ export function TextNodeInputPanel({
               background: canSubmit ? '#ffffff' : 'rgba(255,255,255,0.14)',
               opacity: canSubmit ? 1 : 0.45,
             }}
-            title="Send (Ctrl / Cmd + Enter)"
+            title={`Send (${formatShortcut(shortcuts.submit)})`}
           >
             {isProcessing ? (
               <div className="relative flex items-center justify-center">

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 
-export type CanvasUploadToast = { msg: string; type: 'loading' | 'success' } | null;
-
 type UseCanvasDragDropParams = {
   handleDropFiles: (files: FileList, screenX: number, screenY: number) => void;
 };
@@ -17,7 +15,6 @@ function hasDraggedFiles(event: DragEvent): boolean {
 
 export function useCanvasDragDrop({ handleDropFiles }: UseCanvasDragDropParams) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [uploadToast, setUploadToast] = useState<CanvasUploadToast>(null);
   const dragLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -67,8 +64,6 @@ export function useCanvasDragDrop({ handleDropFiles }: UseCanvasDragDropParams) 
 
   return {
     isDragOver,
-    uploadToast,
-    setUploadToast,
     handleCanvasDragOver,
     handleCanvasDragLeave,
     handleCanvasDrop,

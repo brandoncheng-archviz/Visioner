@@ -1427,7 +1427,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     document.body.removeChild(link);
   }, [data, id]);
 
-  // Global Ctrl+G / Cmd+G shortcut for generation
+  // Global modifier + G shortcut for generation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.isComposing) return;

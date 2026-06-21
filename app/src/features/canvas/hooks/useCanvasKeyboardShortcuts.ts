@@ -74,6 +74,7 @@ export function useCanvasKeyboardShortcuts({
 
       const key = event.key.toLowerCase();
       const isZKey = key === 'z' || event.code === 'KeyZ';
+      const isYKey = key === 'y' || event.code === 'KeyY';
       const isModifierPressed = event.ctrlKey || event.metaKey;
       const isEditing = isEditableTarget(event.target);
       const callbacks = callbacksRef.current;
@@ -124,6 +125,15 @@ export function useCanvasKeyboardShortcuts({
       }
 
       if (isModifierPressed && event.shiftKey && isZKey) {
+        event.preventDefault();
+        if (import.meta.env.DEV) {
+          console.debug('[keyboard] redo shortcut triggered');
+        }
+        callbacks.redo();
+        return;
+      }
+
+      if (isModifierPressed && !event.shiftKey && isYKey) {
         event.preventDefault();
         if (import.meta.env.DEV) {
           console.debug('[keyboard] redo shortcut triggered');

@@ -6,6 +6,7 @@ import {
   type BasicNodeType,
 } from '../constants/basicNodes';
 import type { CreateConnectionMenuState } from '../types/canvas.types';
+import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
 
 function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
@@ -160,6 +161,7 @@ export function NodeContextMenu({
   onCopy,
 }: NodeContextMenuProps) {
   const { t } = useTranslation();
+  const shortcuts = getPlatformShortcutLabels();
   if (!menu) return null;
 
   return (
@@ -190,14 +192,14 @@ export function NodeContextMenu({
           className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
           <span className="flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> {t('common.copy')}</span>
-          <span className="text-[11px] text-[#6a6a7a]">Ctrl+C</span>
+          <span className="text-[11px] text-[#6a6a7a]">{formatShortcut(shortcuts.copy)}</span>
         </button>
         <button
           onClick={() => { onPaste(); onClose(); }}
           className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
         >
           <span className="flex items-center gap-2"><ClipboardPaste className="w-3.5 h-3.5" /> {t('common.paste')}</span>
-          <span className="text-[11px] text-[#6a6a7a]">Ctrl+V</span>
+          <span className="text-[11px] text-[#6a6a7a]">{formatShortcut(shortcuts.paste)}</span>
         </button>
         <button
           onClick={() => { onDuplicate(menu.nodeId); onClose(); }}

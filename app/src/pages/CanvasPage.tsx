@@ -20,9 +20,10 @@ import { useCanvasDragDrop } from '../features/canvas/hooks/useCanvasDragDrop';
 import { useCanvasUiPanels } from '../features/canvas/hooks/useCanvasUiPanels';
 import { useTextNodeFloatingPanelPosition } from '../features/canvas/hooks/useTextNodeFloatingPanelPosition';
 import { useCanvasUndoRedo } from '../features/canvas/hooks/useCanvasUndoRedo';
+import { useCanvasImageImport } from '../features/canvas/hooks/useCanvasImageImport';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
-import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE } from '../features/canvas/constants/canvasConstants';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
@@ -73,13 +74,6 @@ import {
   CREATE_NODE_MENU_WIDTH,
 } from '../features/canvas/constants/basicNodes';
 import { NODE_BASE_TITLES } from '../features/canvas/constants/canvasNodeTitles';
-import {
-  formatPastedImageLabel,
-  getFilesFromClipboard,
-  getImageRejectMessage,
-  isAcceptedImageFile,
-  type ImageFileReject,
-} from '../features/canvas/utils/canvasFileUtils';
 import {
   createBasicCanvasNode,
   createCompareCanvasNode,
@@ -199,9 +193,7 @@ function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState(defaultData.nodes as Node[]);
   const { screenToFlowPosition, setViewport, getViewport, getNodes, fitView } = useReactFlow();
   const { msg: toastMsg, show: showToast } = useToast();
-  const objectUrlsRef = useRef<Set<string>>(new Set());
   const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
-  useRevokeObjectUrlsOnUnmount(objectUrlsRef);
 
   const {
     activePanel, setActivePanel,
@@ -995,6 +987,24 @@ function FlowCanvas() {
     }
   }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setActivePanel, setEdges, setNodes]);
 
+  const clipboardRef = useRef<Node[]>([]);
+  const pasteOffsetRef = useRef(0);
+  const hasCopiedNodes = useCallback(() => clipboardRef.current.length > 0, []);
+
+  const {
+    uploadToast,
+    handleDropFiles,
+    objectUrlsRef,
+  } = useCanvasImageImport({
+    setNodes,
+    screenToFlowPosition,
+    getAllNodeLabels,
+    showToast,
+    t,
+    hasCopiedNodes,
+    lastPointerPositionRef,
+  });
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
       ...n,
@@ -1014,12 +1024,9 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel]);
+  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── Copy / Paste / Delete ───
-  const clipboardRef = useRef<Node[]>([]);
-  const pasteOffsetRef = useRef(0);
-
   const getKeyboardPasteAnchor = useCallback(() => {
     const pastePoint = lastPointerPositionRef.current || {
       x: window.innerWidth / 2,
@@ -1027,8 +1034,6 @@ function FlowCanvas() {
     };
     return screenToFlowPosition(pastePoint);
   }, [screenToFlowPosition]);
-
-  const hasCopiedNodes = useCallback(() => clipboardRef.current.length > 0, []);
 
   const clearCopiedNodes = useCallback(() => {
     clipboardRef.current = [];
@@ -1301,16 +1306,8 @@ function FlowCanvas() {
     return () => document.removeEventListener('contextmenu', handler, true);
   }, []);
 
-  // ─── Drag & Drop State ───
-  function handleDropFiles(files: FileList, screenX: number, screenY: number) {
-    const basePos = screenToFlowPosition({ x: screenX, y: screenY });
-    createImageNodesFromFiles(Array.from(files), basePos);
-  }
-
   const {
     isDragOver,
-    uploadToast,
-    setUploadToast,
     handleCanvasDragOver,
     handleCanvasDragLeave,
     handleCanvasDrop,
@@ -1525,163 +1522,6 @@ function FlowCanvas() {
   useEffect(() => {
     submitTextNodeRef.current = submitTextNode;
   }, [submitTextNode]);
-
-  function isEditablePasteTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
-    const tagName = target.tagName.toLowerCase();
-    return (
-      tagName === 'input' ||
-      tagName === 'textarea' ||
-      tagName === 'select' ||
-      target.isContentEditable ||
-      Boolean(target.closest('[contenteditable="true"]')) ||
-      Boolean(target.closest('[data-paste-ignore="true"]'))
-    );
-  }
-
-  const createImageNodesFromFiles = useCallback(
-    (files: File[], basePosition: { x: number; y: number }) => {
-      const rejectedFiles: ImageFileReject[] = [];
-
-      const validFiles = files.filter((file) => {
-        if (!isAcceptedImageFile(file)) {
-          rejectedFiles.push({ file, reason: 'unsupported-type' });
-          console.warn(`[Canvas] Skipped unsupported image: ${file.name || 'unnamed'} (type: ${file.type || 'unknown'})`);
-          return false;
-        }
-        if (file.size > MAX_IMAGE_UPLOAD_SIZE) {
-          rejectedFiles.push({ file, reason: 'too-large' });
-          console.warn(
-            `[Canvas] Skipped oversized image: ${file.name || 'unnamed'} (${(file.size / 1024 / 1024).toFixed(1)}MB > 10MB)`,
-          );
-          return false;
-        }
-        return true;
-      });
-
-      const preCheckMessage = getImageRejectMessage(rejectedFiles, validFiles.length);
-      if (validFiles.length === 0) {
-        if (preCheckMessage) showToast(preCheckMessage);
-        return;
-      }
-
-      setUploadToast({ msg: t('canvas.uploading'), type: 'loading' });
-
-      const allLabels = getAllNodeLabels();
-      const assignedLabels: string[] = [];
-      const fileFinalLabels = validFiles.map((file) => {
-        const baseTitle = formatPastedImageLabel(file);
-        const label = getNextNodeTitle([...allLabels, ...assignedLabels], baseTitle);
-        assignedLabels.push(label);
-        return label;
-      });
-
-      Promise.all(
-        validFiles.map((file, index) => {
-          return new Promise<{ node: Node; index: number } | null>((resolve) => {
-            const url = URL.createObjectURL(file);
-            objectUrlsRef.current.add(url);
-            const imgEl = new window.Image();
-            imgEl.onload = () => {
-              const offsetX = index * 40;
-              const offsetY = index * 40;
-              const position = { x: basePosition.x + offsetX, y: basePosition.y + offsetY };
-              const newNode: Node = {
-                id: `image-${Date.now()}-${index}`,
-                type: 'image',
-                position,
-                data: {
-                  label: fileFinalLabels[index],
-                  image: url,
-                  inputImage: url,
-                  currentImage: url,
-                  currentResultId: null,
-                  currentResultSet: null,
-                  generatedImages: [],
-                  generationTask: null,
-                  assetSource: 'upload',
-                  isGeneratedResult: false,
-                  width: imgEl.naturalWidth,
-                  height: imgEl.naturalHeight,
-                  ...getRoleData(null),
-                },
-                selected: index === 0,
-              };
-              resolve({ node: newNode, index });
-            };
-            imgEl.onerror = () => {
-              URL.revokeObjectURL(url);
-              objectUrlsRef.current.delete(url);
-              rejectedFiles.push({ file, reason: 'decode-failed' });
-              console.warn(`[Canvas] Failed to decode image: ${file.name || 'unnamed'}`);
-              resolve(null);
-            };
-            imgEl.src = url;
-          });
-        }),
-      ).then((results) => {
-        const newNodes = results
-          .filter((result): result is { node: Node; index: number } => Boolean(result))
-          .map((r) => r.node);
-
-        if (newNodes.length === 0) {
-          setUploadToast(null);
-          const finalMessage = getImageRejectMessage(rejectedFiles, newNodes.length);
-          if (finalMessage) showToast(finalMessage);
-          return;
-        }
-
-        setNodes((nds) => [
-          ...nds.map((n) => ({ ...n, selected: false })),
-          ...newNodes,
-        ]);
-        setUploadToast({ msg: t('canvas.uploadSuccess'), type: 'success' });
-        setTimeout(() => setUploadToast(null), 2500);
-
-        if (rejectedFiles.length > 0) {
-          const partialMessage = getImageRejectMessage(rejectedFiles, newNodes.length);
-          if (partialMessage) showToast(partialMessage);
-        }
-      });
-    },
-    [getAllNodeLabels, setNodes, setUploadToast, t, showToast],
-  );
-
-  const handlePaste = useCallback(
-    (event: ClipboardEvent) => {
-      if (isEditablePasteTarget(event.target)) return;
-
-      const clipboardData = event.clipboardData;
-      if (!clipboardData) return;
-
-      const clipboardFiles = getFilesFromClipboard(clipboardData);
-
-      if (clipboardFiles.length > 0) {
-        if (hasCopiedNodes()) {
-          event.preventDefault();
-          return;
-        }
-        event.preventDefault();
-        const pastePoint = lastPointerPositionRef.current || {
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
-        };
-        const centerPos = screenToFlowPosition({
-          x: pastePoint.x,
-          y: pastePoint.y,
-        });
-        createImageNodesFromFiles(clipboardFiles, centerPos);
-        return;
-      }
-    },
-    [hasCopiedNodes, screenToFlowPosition, createImageNodesFromFiles],
-  );
-
-  useEffect(() => {
-    const handler = (e: ClipboardEvent) => handlePaste(e);
-    window.addEventListener('paste', handler);
-    return () => window.removeEventListener('paste', handler);
-  }, [handlePaste]);
 
   useEffect(() => {
     const updatePointerPosition = (event: PointerEvent) => {
@@ -1987,23 +1827,6 @@ function FlowCanvas() {
       />
     </div>
   );
-}
-
-/* ─── Page-level cleanup: revoke all registered objectURLs on unmount ─── */
-function useRevokeObjectUrlsOnUnmount(objectUrlsRef: React.RefObject<Set<string> | null>) {
-  useEffect(() => {
-    return () => {
-      if (!objectUrlsRef.current) return;
-      objectUrlsRef.current.forEach((url) => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {
-          // ignore already-revoked or invalid URLs
-        }
-      });
-      objectUrlsRef.current.clear();
-    };
-  }, [objectUrlsRef]);
 }
 
 /* ─── Wrapper ─── */

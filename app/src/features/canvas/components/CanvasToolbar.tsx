@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { ShortcutRow } from './ShortcutRow';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from '../constants/canvasConstants';
+import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
 
 export interface CanvasToolbarProps {
   showMinimap: boolean;
@@ -35,6 +36,8 @@ export function CanvasToolbar({
   onToggleHelp,
 }: CanvasToolbarProps) {
   const { t } = useTranslation();
+  const shortcuts = getPlatformShortcutLabels();
+
   return (
     <>
       <div
@@ -78,7 +81,10 @@ export function CanvasToolbar({
         <div className="w-px h-4 bg-white/10 mx-1" />
 
         {/* Zoom slider */}
-        <div className="flex items-center gap-1.5 px-1" title={t('toolbar.zoomInOut')}>
+        <div
+          className="flex items-center gap-1.5 px-1"
+          title={t('toolbar.zoomInOut', { shortcut: formatShortcut(shortcuts.zoomWheel(t('toolbar.scrollWheel'))) })}
+        >
           <Minus className="w-3 h-3 text-[#e0e0e0]" />
           <input
             type="range"
@@ -137,14 +143,14 @@ export function CanvasToolbar({
                 <div className="px-3 first:pl-0 last:pr-0">
                   <h4 className="mb-3 text-[13px] font-medium" style={{ color: '#00d4ff' }}>{t('toolbar.basics')}</h4>
                   <div className="space-y-0.5">
-                    <ShortcutRow label={t('toolbar.copy')} keys={['Ctrl', 'C']} />
-                    <ShortcutRow label={t('toolbar.paste')} keys={['Ctrl', 'V']} />
-                    <ShortcutRow label={t('toolbar.undo')} keys={['Ctrl', 'Z']} />
-                    <ShortcutRow label={t('toolbar.redo')} keys={['Ctrl', 'Shift', 'Z']} />
-                    <ShortcutRow label={t('toolbar.selectAll')} keys={['Ctrl', 'A']} />
-                    <ShortcutRow label={t('toolbar.delete')} keys={['Del']} />
+                    <ShortcutRow label={t('toolbar.copy')} keys={shortcuts.copy} />
+                    <ShortcutRow label={t('toolbar.paste')} keys={shortcuts.paste} />
+                    <ShortcutRow label={t('toolbar.undo')} keys={shortcuts.undo} />
+                    <ShortcutRow label={t('toolbar.redo')} keys={shortcuts.redo} />
+                    <ShortcutRow label={t('toolbar.selectAll')} keys={shortcuts.selectAll} />
+                    <ShortcutRow label={t('toolbar.delete')} keys={shortcuts.delete} />
                     <ShortcutRow label={t('toolbar.deselect')} keys={['Esc']} />
-                    <ShortcutRow label={t('toolbar.multiSelect')} keys={['Shift', t('toolbar.click')]} />
+                    <ShortcutRow label={t('toolbar.multiSelect')} keys={[shortcuts.shiftModifier, t('toolbar.click')]} />
                     <ShortcutRow label={t('toolbar.boxSelect')} keys={[t('toolbar.leftDragEmpty')]} />
                   </div>
                 </div>
@@ -153,7 +159,7 @@ export function CanvasToolbar({
                 <div className="px-3 first:pl-0 last:pr-0">
                   <h4 className="mb-3 text-[13px] font-medium" style={{ color: '#00d4ff' }}>{t('toolbar.zoom')}</h4>
                   <div className="space-y-0.5">
-                    <ShortcutRow label={t('toolbar.ctrlWheel')} keys={['Ctrl', t('toolbar.scrollWheel')]} />
+                    <ShortcutRow label={t('toolbar.ctrlWheel')} keys={shortcuts.zoomWheel(t('toolbar.scrollWheel'))} />
                     <ShortcutRow label={t('toolbar.pinch')} keys={[t('toolbar.pinchGesture')]} />
                     <ShortcutRow label={t('toolbar.zoomIn')} keys={['+']} />
                     <ShortcutRow label={t('toolbar.zoomOut')} keys={['-']} />
@@ -167,9 +173,10 @@ export function CanvasToolbar({
                   <h4 className="mb-3 text-[13px] font-medium" style={{ color: '#00d4ff' }}>{t('toolbar.moveCanvas')}</h4>
                   <div className="space-y-0.5">
                     <ShortcutRow label={t('toolbar.wheelPan')} keys={[t('toolbar.scrollWheel'), t('toolbar.twoFingerSwipe')]} />
-                    <ShortcutRow label={t('toolbar.shiftWheel')} keys={['Shift', t('toolbar.scrollWheel')]} />
+                    <ShortcutRow label={t('toolbar.shiftWheel')} keys={shortcuts.shiftWheel(t('toolbar.scrollWheel'))} />
                     <ShortcutRow label={t('toolbar.middleDrag')} keys={[t('toolbar.middleDragKeys')]} />
-                    <ShortcutRow label={t('toolbar.spaceDrag')} keys={[t('toolbar.spaceKey'), t('toolbar.drag')]} />
+                    <ShortcutRow label={t('toolbar.spaceDrag')} keys={shortcuts.spaceDrag(t('toolbar.drag'))} />
+                    <ShortcutRow label={t('toolbar.modifierDrag')} keys={shortcuts.alternateDrag(t('toolbar.drag'))} />
                     <ShortcutRow label={t('toolbar.arrowKeys')} keys={['↑', '↓', '←', '→']} />
                   </div>
                 </div>
@@ -180,8 +187,7 @@ export function CanvasToolbar({
                   <div className="space-y-0.5">
                     <ShortcutRow label={t('toolbar.referenceMaterial')} keys={['@']} />
                     <ShortcutRow label={t('toolbar.openPreset')} keys={['/']} />
-                    <ShortcutRow label={t('toolbar.lineBreak')} keys={['Enter', 'Shift+Enter', 'Ctrl+Enter']} />
-                    <ShortcutRow label={t('toolbar.generateImage')} keys={[t('toolbar.clickButton'), 'Ctrl+G']} />
+                    <ShortcutRow label={t('toolbar.lineBreak')} keys={shortcuts.lineBreak} />
                   </div>
                 </div>
               </div>
