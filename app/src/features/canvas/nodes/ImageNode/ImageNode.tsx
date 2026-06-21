@@ -261,6 +261,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   // Sync currentResultSet and selected result image back to node.data.
   useEffect(() => {
+    if (!currentResultSet) return;
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id !== id) return n;
@@ -382,6 +383,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   useEffect(() => {
     if (savedReferencesSignature === referencesSignature) return;
+    if (
+      references.length === 0 &&
+      !savedReferencesSignature &&
+      !data.references &&
+      !data.referenceImages
+    ) {
+      return;
+    }
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id !== id) return n;

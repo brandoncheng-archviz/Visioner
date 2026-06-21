@@ -1151,8 +1151,8 @@ function FlowCanvas() {
     beginNodeDrag();
   }, [beginNodeDrag]);
 
-  const handleNodeDragStop = useCallback<OnNodeDrag>(() => {
-    endNodeDrag();
+  const handleNodeDragStop = useCallback<OnNodeDrag>((_event, _node, draggedNodes) => {
+    endNodeDrag(draggedNodes);
   }, [endNodeDrag]);
 
   const {

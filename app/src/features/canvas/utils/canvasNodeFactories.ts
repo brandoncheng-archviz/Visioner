@@ -1,5 +1,6 @@
 import type { Node } from '@xyflow/react';
 
+import { DEFAULT_MODEL_PARAMS } from '../constants/canvasConstants';
 import { UPSCALE_NODE_DEFAULTS } from '../constants/upscaleNodeDefaults';
 import { DEFAULT_TEXT_NODE_MODEL } from '../constants/textNode';
 import type { RelightCreationOptions } from '../types/relight.types';
@@ -53,7 +54,25 @@ export function createBasicCanvasNode({
     position,
     data: {
       label,
-      ...(type === 'image' ? getRoleData(null) : {}),
+      ...(type === 'image'
+        ? {
+            ...getRoleData(null),
+            prompt: '',
+            promptContent: [],
+            lightPreview: null,
+            selectedPresets: [],
+            selectedStyleId: null,
+            modelParams: { ...DEFAULT_MODEL_PARAMS },
+            generatedImages: [],
+            generationTask: null,
+            currentResultSet: null,
+            currentResultId: null,
+            references: [],
+            referenceImages: [],
+            referencesSignature: '[]',
+            referenceOrder: [],
+          }
+        : {}),
       ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
       ...(type === 'text'
         ? {
