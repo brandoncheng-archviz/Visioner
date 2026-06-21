@@ -6,6 +6,7 @@ import {
   ReactFlowProvider,
   type Node,
   type Edge,
+  type OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +17,9 @@ import { useCanvasKeyboardShortcuts } from '../features/canvas/hooks/useCanvasKe
 import { useCanvasSelectionActions } from '../features/canvas/hooks/useCanvasSelectionActions';
 import { useCanvasViewport } from '../features/canvas/hooks/useCanvasViewport';
 import { useCanvasDragDrop } from '../features/canvas/hooks/useCanvasDragDrop';
+import { useCanvasUiPanels } from '../features/canvas/hooks/useCanvasUiPanels';
+import { useTextNodeFloatingPanelPosition } from '../features/canvas/hooks/useTextNodeFloatingPanelPosition';
+import { useCanvasUndoRedo } from '../features/canvas/hooks/useCanvasUndoRedo';
 import type { ImageRole } from '../features/canvas/types/imageNode.types';
 import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH, MAX_IMAGE_UPLOAD_SIZE } from '../features/canvas/constants/canvasConstants';
@@ -199,12 +203,16 @@ function FlowCanvas() {
   const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
   useRevokeObjectUrlsOnUnmount(objectUrlsRef);
 
-  const [activePanel, setActivePanel] = useState<string | null>(null);
-  const [historyPanelNodeId, setHistoryPanelNodeId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowPos: { x: number; y: number } } | null>(null);
-  const [nodeContextMenu, setNodeContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+  const {
+    activePanel, setActivePanel,
+    showHelp, closeHelp, toggleHelp,
+    showMinimap, toggleMinimap,
+    snapGrid, toggleSnapGrid,
+    contextMenu, openContextMenu, closeContextMenu,
+    nodeContextMenu, openNodeContextMenu, closeNodeContextMenu,
+    historyPanelNodeId, openHistoryPanel, closeHistoryPanel,
+  } = useCanvasUiPanels();
   const [textFocusRequestId, setTextFocusRequestId] = useState(0);
-  const [textNodePanelPosition, setTextNodePanelPosition] = useState<{ left: number; top: number } | null>(null);
   const runningTextTaskIdsRef = useRef<Set<string>>(new Set());
   const submitTextNodeRef = useRef<(
     nodeId: string,
@@ -985,7 +993,7 @@ function FlowCanvas() {
         editorInput,
       });
     }
-  }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setEdges, setNodes]);
+  }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setActivePanel, setEdges, setNodes]);
 
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
@@ -1002,11 +1010,11 @@ function FlowCanvas() {
         onCreateRelightNode: n.type === 'image' || n.type === 'relight' ? createRelightNode : undefined,
         onTextAction: n.type === 'text' ? handleTextAction : undefined,
         onFocusNode: n.type === 'image' ? focusCanvasNode : undefined,
-        onOpenNodeHistory: n.type === 'image' ? (nodeId: string) => setHistoryPanelNodeId(nodeId) : undefined,
+        onOpenNodeHistory: n.type === 'image' ? openHistoryPanel : undefined,
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode]);
+  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel]);
 
   // ─── Copy / Paste / Delete ───
   const clipboardRef = useRef<Node[]>([]);
@@ -1124,54 +1132,28 @@ function FlowCanvas() {
   }, [getKeyboardPasteAnchor, hasCopiedNodes, pasteNodes]);
 
   // ─── History (Undo / Redo) ───
-  const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
-  const historyIndexRef = useRef(-1);
-  const skipHistoryRef = useRef(false);
+  const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {
+    const nodeIds = new Set(currentNodes.map((node) => node.id));
+    const connectedEdges = currentEdges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
+    return removeComposeTextInputEdges(connectedEdges, currentNodes);
+  }, []);
+  const { undo, redo, beginNodeDrag, endNodeDrag } = useCanvasUndoRedo({
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    maxHistoryLength: 50,
+    resetKey: projectId || 'new',
+    normalizeEdges: normalizeHistoryEdges,
+  });
 
-  useEffect(() => {
-    if (skipHistoryRef.current) {
-      skipHistoryRef.current = false;
-      return;
-    }
-    const last = historyRef.current[historyIndexRef.current];
-    if (
-      last &&
-      JSON.stringify(last.nodes) === JSON.stringify(nodes) &&
-      JSON.stringify(last.edges) === JSON.stringify(edges)
-    ) {
-      return;
-    }
-    historyIndexRef.current += 1;
-    historyRef.current = historyRef.current.slice(0, historyIndexRef.current);
-    historyRef.current.push({
-      nodes: [...nodes],
-      edges: removeComposeTextInputEdges(edges, nodes),
-    });
-    if (historyRef.current.length > 50) {
-      historyRef.current.shift();
-      historyIndexRef.current -= 1;
-    }
-  }, [nodes, edges]);
+  const handleNodeDragStart = useCallback<OnNodeDrag>(() => {
+    beginNodeDrag();
+  }, [beginNodeDrag]);
 
-  const undo = useCallback(() => {
-    if (historyIndexRef.current > 0) {
-      historyIndexRef.current -= 1;
-      const state = historyRef.current[historyIndexRef.current];
-      skipHistoryRef.current = true;
-      setNodes(state.nodes);
-      setEdges(removeComposeTextInputEdges(state.edges, state.nodes));
-    }
-  }, [setNodes, setEdges]);
-
-  const redo = useCallback(() => {
-    if (historyIndexRef.current < historyRef.current.length - 1) {
-      historyIndexRef.current += 1;
-      const state = historyRef.current[historyIndexRef.current];
-      skipHistoryRef.current = true;
-      setNodes(state.nodes);
-      setEdges(removeComposeTextInputEdges(state.edges, state.nodes));
-    }
-  }, [setNodes, setEdges]);
+  const handleNodeDragStop = useCallback<OnNodeDrag>(() => {
+    endNodeDrag();
+  }, [endNodeDrag]);
 
   const {
     deleteSelected,
@@ -1188,7 +1170,7 @@ function FlowCanvas() {
     getAllNodeLabels,
     getCopiedNodeTitle: getNextCopiedNodeTitle,
     getNodeBaseTitle: (type) => NODE_BASE_TITLES[type] || type || '节点',
-    onCloseNodeContextMenu: () => setNodeContextMenu(null),
+    onCloseNodeContextMenu: closeNodeContextMenu,
     onCloseCreateMenu: () => {
       setCreateMenu(null);
       setTempLine(null);
@@ -1199,12 +1181,12 @@ function FlowCanvas() {
     event.preventDefault();
     const target = event.target as HTMLElement;
     if (!target.closest('.node-preview-card')) {
-      setNodeContextMenu(null);
+      closeNodeContextMenu();
       return;
     }
-    setContextMenu(null);
-    setNodeContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
-  }, []);
+    closeContextMenu();
+    openNodeContextMenu(event.clientX, event.clientY, node.id);
+  }, [closeContextMenu, closeNodeContextMenu, openNodeContextMenu]);
 
   // ─── Selection Marquee Pre-highlight ───
   const isSelectingRef = useRef(false);
@@ -1263,9 +1245,6 @@ function FlowCanvas() {
   }, [clearPreselection]);
 
   // ─── Toolbar State (showHelp used in keyboard shortcuts) ───
-  const [showHelp, setShowHelp] = useState(false);
-  const [showMinimap, setShowMinimap] = useState(false);
-  const [snapGrid, setSnapGrid] = useState(false);
   const {
     zoom,
     onViewportChange,
@@ -1292,10 +1271,6 @@ function FlowCanvas() {
     setTempLine(null);
   }, []);
 
-  const closeHelpPanel = useCallback(() => {
-    setShowHelp(false);
-  }, []);
-
   useCanvasKeyboardShortcuts({
     isCreateMenuOpen: Boolean(createMenu),
     isHelpOpen: showHelp,
@@ -1307,7 +1282,7 @@ function FlowCanvas() {
     selectAll,
     deselectAll,
     closeCreateMenu: closeCreateConnectionMenu,
-    closeHelp: closeHelpPanel,
+    closeHelp,
     panViewport,
     zoomIn,
     zoomOut,
@@ -1357,9 +1332,9 @@ function FlowCanvas() {
         label,
       });
       setNodes((nds) => [...nds, newNode]);
-      setContextMenu(null);
+      closeContextMenu();
     },
-    [setNodes, getAllNodeLabels],
+    [setNodes, getAllNodeLabels, closeContextMenu],
   );
 
   const selectedTextNode = useMemo(() => {
@@ -1726,37 +1701,35 @@ function FlowCanvas() {
     const target = e.target as HTMLElement;
     if (target.closest('.react-flow__node')) return;
     e.preventDefault();
-    setNodeContextMenu(null);
+    closeNodeContextMenu();
     const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    setContextMenu({ x: e.clientX, y: e.clientY, flowPos: pos });
-  }, [screenToFlowPosition]);
+    openContextMenu(e.clientX, e.clientY, pos);
+  }, [closeNodeContextMenu, openContextMenu, screenToFlowPosition]);
 
   // ─── Context Menu Handlers ───
-  const handleCloseContextMenu = useCallback(() => {
-    setContextMenu(null);
-  }, []);
+  const handleCloseContextMenu = closeContextMenu;
 
   const handleCloseCreateMenu = useCallback(() => {
-    setContextMenu(null);
-    setNodeContextMenu(null);
+    closeContextMenu();
+    closeNodeContextMenu();
     setCreateMenu(null);
     setTempLine(null);
-  }, []);
+  }, [closeContextMenu, closeNodeContextMenu]);
 
   const handleCloseNodeContextMenu = useCallback(() => {
-    setContextMenu(null);
-    setNodeContextMenu(null);
-  }, []);
+    closeContextMenu();
+    closeNodeContextMenu();
+  }, [closeContextMenu, closeNodeContextMenu]);
 
   const handleContextMenuReopen = useCallback((clientX: number, clientY: number) => {
     const pos = screenToFlowPosition({ x: clientX, y: clientY });
-    setContextMenu({ x: clientX, y: clientY, flowPos: pos });
-  }, [screenToFlowPosition]);
+    openContextMenu(clientX, clientY, pos);
+  }, [openContextMenu, screenToFlowPosition]);
 
   const handleNodeContextMenuReopen = useCallback((clientX: number, clientY: number) => {
     if (!nodeContextMenu) return;
-    setNodeContextMenu({ x: clientX, y: clientY, nodeId: nodeContextMenu.nodeId });
-  }, [nodeContextMenu]);
+    openNodeContextMenu(clientX, clientY, nodeContextMenu.nodeId);
+  }, [nodeContextMenu, openNodeContextMenu]);
 
   const handleContextMenuAddNode = useCallback((type: string, label: string) => {
     if (!contextMenu) return;
@@ -1811,42 +1784,10 @@ function FlowCanvas() {
   }, [setNodes]);
 
   const selectedTextNodeId = selectedTextNode?.id;
-  useEffect(() => {
-    if (!selectedTextNodeId) {
-      setTextNodePanelPosition(null);
-      return;
-    }
-
-    const updatePosition = () => {
-      const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNodeId}"] .node-preview-card`) as HTMLElement | null;
-      if (!nodeEl) return;
-      const rect = nodeEl.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-
-      const left = rect.left + rect.width / 2;
-      const top = rect.bottom + 24;
-      setTextNodePanelPosition((prev) =>
-        prev?.left === left && prev?.top === top ? prev : { left, top },
-      );
-    };
-
-    updatePosition();
-    let frameId = window.requestAnimationFrame(function tick() {
-      updatePosition();
-      frameId = window.requestAnimationFrame(tick);
-    });
-
-    const nodeEl = document.querySelector(`.react-flow__node[data-id="${selectedTextNodeId}"] .node-preview-card`) as HTMLElement | null;
-    const observer = nodeEl ? new ResizeObserver(updatePosition) : null;
-    if (nodeEl && observer) observer.observe(nodeEl);
-
-    window.addEventListener('resize', updatePosition);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      observer?.disconnect();
-      window.removeEventListener('resize', updatePosition);
-    };
-  }, [selectedTextNodeId]);
+  const { textNodePanelPosition } = useTextNodeFloatingPanelPosition({
+    selectedTextNodeId,
+    offset: 24,
+  });
 
   const handleUseNodeHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch) => {
     if (!historyPanelNodeId || images.length === 0) return;
@@ -1936,6 +1877,8 @@ function FlowCanvas() {
         onDragLeave={handleCanvasDragLeave}
         onDrop={handleCanvasDrop}
         onNodesChange={onNodesChange}
+        onNodeDragStart={handleNodeDragStart}
+        onNodeDragStop={handleNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
         onViewportChange={onViewportChange}
         onEdgeClick={handleEdgeClick}
@@ -2006,7 +1949,7 @@ function FlowCanvas() {
           <HistoryPanel
             scope="node"
             nodeId={historyPanelNodeId}
-            onClose={() => setHistoryPanelNodeId(null)}
+            onClose={closeHistoryPanel}
             onUseImages={handleUseNodeHistoryImages}
           />
         </div>
@@ -2033,14 +1976,14 @@ function FlowCanvas() {
 
       <CanvasToolbar
         showMinimap={showMinimap}
-        onToggleMinimap={() => setShowMinimap((v) => !v)}
+        onToggleMinimap={toggleMinimap}
         snapGrid={snapGrid}
-        onToggleSnapGrid={() => setSnapGrid((v) => !v)}
+        onToggleSnapGrid={toggleSnapGrid}
         zoom={zoom}
         onZoomChange={handleZoomChange}
         onReset={handleReset}
         showHelp={showHelp}
-        onToggleHelp={() => setShowHelp((v) => !v)}
+        onToggleHelp={toggleHelp}
       />
     </div>
   );

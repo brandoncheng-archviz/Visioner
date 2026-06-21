@@ -73,6 +73,8 @@ export function useCanvasKeyboardShortcuts({
       if (event.isComposing) return;
 
       const key = event.key.toLowerCase();
+      const isZKey = key === 'z' || event.code === 'KeyZ';
+      const isYKey = key === 'y' || event.code === 'KeyY';
       const isModifierPressed = event.ctrlKey || event.metaKey;
       const isEditing = isEditableTarget(event.target);
       const callbacks = callbacksRef.current;
@@ -122,19 +124,30 @@ export function useCanvasKeyboardShortcuts({
         return;
       }
 
-      if (isModifierPressed && key === 'z') {
+      if (isModifierPressed && event.shiftKey && isZKey) {
         event.preventDefault();
-        if (event.shiftKey) {
-          callbacks.redo();
-        } else {
-          callbacks.undo();
+        if (import.meta.env.DEV) {
+          console.debug('[keyboard] redo shortcut triggered');
         }
+        callbacks.redo();
         return;
       }
 
-      if (isModifierPressed && key === 'y') {
+      if (isModifierPressed && isYKey) {
         event.preventDefault();
+        if (import.meta.env.DEV) {
+          console.debug('[keyboard] redo shortcut triggered');
+        }
         callbacks.redo();
+        return;
+      }
+
+      if (isModifierPressed && !event.shiftKey && isZKey) {
+        event.preventDefault();
+        if (import.meta.env.DEV) {
+          console.debug('[keyboard] undo shortcut triggered');
+        }
+        callbacks.undo();
         return;
       }
 
@@ -189,7 +202,7 @@ export function useCanvasKeyboardShortcuts({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [callbacksRef, isCreateMenuOpen, isHelpOpen]);
 }

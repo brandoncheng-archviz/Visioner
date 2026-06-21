@@ -140,7 +140,6 @@ export function CanvasToolbar({
                     <ShortcutRow label={t('toolbar.copy')} keys={['Ctrl', 'C']} />
                     <ShortcutRow label={t('toolbar.paste')} keys={['Ctrl', 'V']} />
                     <ShortcutRow label={t('toolbar.undo')} keys={['Ctrl', 'Z']} />
-                    <ShortcutRow label={t('toolbar.redo')} keys={['Ctrl', 'Shift', 'Z']} />
                     <ShortcutRow label={t('toolbar.selectAll')} keys={['Ctrl', 'A']} />
                     <ShortcutRow label={t('toolbar.delete')} keys={['Del']} />
                     <ShortcutRow label={t('toolbar.deselect')} keys={['Esc']} />

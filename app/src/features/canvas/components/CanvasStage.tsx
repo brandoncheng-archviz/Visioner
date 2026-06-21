@@ -9,6 +9,7 @@ import {
   type Node,
   type Edge,
   type OnNodesChange,
+  type OnNodeDrag,
   type Viewport,
 } from '@xyflow/react';
 import { useCallback } from 'react';
@@ -54,6 +55,8 @@ export interface CanvasStageProps {
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent) => void;
   onNodesChange: OnNodesChange;
+  onNodeDragStart: OnNodeDrag;
+  onNodeDragStop: OnNodeDrag;
   onNodeContextMenu: (event: React.MouseEvent, node: Node) => void;
   onViewportChange: (viewport: Viewport) => void;
   onEdgeClick: (event: React.MouseEvent, edge: Edge) => void;
@@ -78,6 +81,8 @@ export function CanvasStage({
   onDragLeave,
   onDrop,
   onNodesChange,
+  onNodeDragStart,
+  onNodeDragStop,
   onNodeContextMenu,
   onViewportChange,
   onEdgeClick,
@@ -188,6 +193,8 @@ export function CanvasStage({
         nodes={nodesWithCallbacks}
         edges={edges}
         onNodesChange={onNodesChange}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
         onViewportChange={onViewportChange}
         onEdgeClick={onEdgeClick}
