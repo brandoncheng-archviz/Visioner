@@ -6,6 +6,7 @@ import {
   type BasicNodeType,
 } from '../constants/basicNodes';
 import type { CreateConnectionMenuState } from '../types/canvas.types';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
 
 function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -60,6 +61,7 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
           e.preventDefault();
           onReopen(e.clientX, e.clientY);
         }}
+        onWheelCapture={stopCanvasWheelPropagation}
       >
         <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
         {BASIC_NODE_DEFINITIONS.map((item) => {
@@ -112,6 +114,7 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
           boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
           width: CREATE_NODE_MENU_WIDTH,
         }}
+        onWheelCapture={stopCanvasWheelPropagation}
       >
         <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
         {BASIC_NODE_DEFINITIONS.map((item) => {
@@ -172,6 +175,7 @@ export function NodeContextMenu({
           e.preventDefault();
           onReopen(e.clientX, e.clientY);
         }}
+        onWheelCapture={stopCanvasWheelPropagation}
         style={{
           left: menu.x,
           top: menu.y,

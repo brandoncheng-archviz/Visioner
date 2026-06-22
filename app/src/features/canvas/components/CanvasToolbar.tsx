@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { ShortcutRow } from './ShortcutRow';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from '../constants/canvasConstants';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
 
 export interface CanvasToolbarProps {
@@ -42,6 +43,7 @@ export function CanvasToolbar({
     <>
       <div
         className="fixed z-20 flex items-center gap-1 px-2 py-1.5 rounded-xl"
+        onWheelCapture={stopCanvasWheelPropagation}
         style={{
           left: 16,
           bottom: 16,
@@ -117,6 +119,7 @@ export function CanvasToolbar({
           className="fixed inset-0 z-50 flex items-center justify-center px-4"
           style={{ background: 'rgba(10,10,15,0.62)', backdropFilter: 'blur(6px)' }}
           onClick={onToggleHelp}
+          onWheelCapture={stopCanvasWheelPropagation}
         >
           <div
             className="relative max-h-[calc(100vh-48px)] w-full max-w-[1200px] overflow-hidden rounded-xl"
@@ -126,6 +129,7 @@ export function CanvasToolbar({
               boxShadow: '0 28px 72px rgba(0,0,0,0.62)',
             }}
             onClick={(e) => e.stopPropagation()}
+            onWheelCapture={stopCanvasWheelPropagation}
           >
             {/* Close */}
             <button
@@ -137,7 +141,7 @@ export function CanvasToolbar({
               <X className="w-4 h-4" />
             </button>
 
-            <div className="max-h-[calc(100vh-80px)] overflow-y-auto p-6 pt-14">
+            <div className="max-h-[calc(100vh-80px)] overflow-y-auto p-6 pt-14 nowheel" onWheelCapture={stopCanvasWheelPropagation}>
               <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-[#3a3a3a]">
                 {/* Basics */}
                 <div className="px-3 first:pl-0 last:pr-0">

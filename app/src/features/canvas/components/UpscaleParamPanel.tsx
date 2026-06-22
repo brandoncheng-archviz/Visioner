@@ -2,6 +2,7 @@ import { memo, useState, useCallback, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Zap, ArrowUp, Loader2 } from 'lucide-react';
 import type { UpscaleSliderProps } from '../types/canvas.types';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 
 const UpscaleSlider = memo(function UpscaleSlider({ value, min, max, onChange }: UpscaleSliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
@@ -96,7 +97,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
   };
 
   return (
-    <div className="mt-3 rounded-[16px] nowheel nodrag" style={{ width: 320, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }} onWheel={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+    <div className="mt-3 rounded-[16px] nowheel nodrag" style={{ width: 320, background: '#1e1e1e', border: '1px solid rgba(255,255,255,0.08)' }} onWheel={stopCanvasWheelPropagation} onWheelCapture={stopCanvasWheelPropagation} onPointerDown={(e) => e.stopPropagation()}>
       {/* Title */}
       <div className="px-4 pt-3 pb-2">
         <div className="text-sm font-medium text-white">{t('upscale.title')}</div>
@@ -118,7 +119,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
             <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
           </button>
           {showEngineMenu && (
-            <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }} onWheelCapture={stopCanvasWheelPropagation}>
               {engineOptions.map((o) => (
                 <button key={o.key} onClick={() => { onChange({ engine: o.key }); setShowEngineMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors ${params.engine === o.key ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                   {o.label}
@@ -143,7 +144,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showTlModelMenu && (
-                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }} onWheelCapture={stopCanvasWheelPropagation}>
                   {tlModels.map((m) => (
                     <button key={m} onClick={() => { onChange({ tlModel: m }); setShowTlModelMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors ${params.tlModel === m ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                       {t(`upscale.tlModels.${m}`)}
@@ -186,7 +187,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showMcUpscaleMenu && (
-                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }} onWheelCapture={stopCanvasWheelPropagation}>
                   {(['2x', '4x'] as const).map((s) => (
                     <button key={s} onClick={() => { onChange({ mcUpscale: s }); setShowMcUpscaleMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${params.mcUpscale === s ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                       {params.mcUpscale === s && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
@@ -208,7 +209,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showMcOptimizedMenu && (
-                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', maxHeight: 200, overflowY: 'auto' }}>
+                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)', maxHeight: 200, overflowY: 'auto' }} onWheelCapture={stopCanvasWheelPropagation}>
                   {mcOptimizedOptions.map((o) => (
                     <button key={o} onClick={() => { onChange({ mcOptimized: o }); setShowMcOptimizedMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${params.mcOptimized === o ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                       {params.mcOptimized === o && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}
@@ -252,7 +253,7 @@ export function UpscaleParamPanel({ params, onChange, onGenerate, status, progre
                 <span className="ml-auto text-[10px] text-[#6a6a7a]">▼</span>
               </button>
               {showMpUpscaleMenu && (
-                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="absolute z-30 left-0 right-0 mt-1 py-1 rounded-lg overflow-hidden nowheel" style={{ background: '#252526', border: '1px solid rgba(255,255,255,0.08)' }} onWheelCapture={stopCanvasWheelPropagation}>
                   {(['2x', '4x'] as const).map((s) => (
                     <button key={s} onClick={() => { onChange({ mpUpscale: s }); setShowMpUpscaleMenu(false); }} className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2 ${params.mpUpscale === s ? 'bg-white/10 text-white' : 'text-[#a0a0b0] hover:bg-white/5'}`}>
                       {params.mpUpscale === s && <span className="w-0.5 h-3 rounded-full bg-[#00d4ff]" />}

@@ -3,6 +3,7 @@ import { X, Eye, Trash2, Check, Clock, Image as ImageIcon, Film, Music } from 'l
 import { useHistory } from '../contexts/HistoryContext';
 import { useToast } from '../hooks/useToast';
 import type { ResultSetBatch, GeneratedImage } from '../types/history.types';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 
 interface HistoryPanelProps {
   scope: 'global' | 'node';
@@ -115,7 +116,7 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
   const canUse = selectedImageCount > 0 && selectedImageCount <= 4;
 
   return (
-    <div className="flex flex-col h-full" style={{ background: '#252526' }}>
+    <div className="flex flex-col h-full nowheel" style={{ background: '#252526' }} onWheelCapture={stopCanvasWheelPropagation}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#2a2a35' }}>
         <span className="text-sm font-medium text-white">历史资产</span>
@@ -172,7 +173,7 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 nowheel">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 nowheel" onWheelCapture={stopCanvasWheelPropagation}>
         {activeTab === 'image' && sortedDates.length === 0 && (
           <div className="text-center py-12 text-[#6a6a7a] text-sm">暂无历史记录</div>
         )}
@@ -286,6 +287,7 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
           className="fixed inset-0 z-[200] flex items-center justify-center"
           style={{ background: 'rgba(0,0,0,0.78)' }}
           onClick={() => setPreviewImages(null)}
+          onWheelCapture={stopCanvasWheelPropagation}
         >
           <img src={previewImages[previewIndex].imageUrl} alt="" className="max-w-[85vw] max-h-[85vh] rounded-xl object-contain" onClick={(e) => e.stopPropagation()} />
           {previewImages.length > 1 && (

@@ -7,6 +7,7 @@ import { SunSkyDerivedInfo } from './SunSkyDerivedInfo';
 import { SunSkyPresetList } from './SunSkyPresetList';
 import { SunSkyPreview } from './SunSkyPreview';
 import { SunSkySnapshotStrip } from './SunSkySnapshotStrip';
+import { stopCanvasWheelPropagation } from '../../utils/canvasEvents';
 
 export interface SunSkyPanelProps {
   initialState?: SunSkyState;
@@ -126,9 +127,11 @@ export function SunSkyPanel({ initialState, onClose, onChange }: SunSkyPanelProp
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
+      onWheelCapture={stopCanvasWheelPropagation}
     >
       <div
         className="relative grid overflow-hidden rounded-xl"
+        onWheelCapture={stopCanvasWheelPropagation}
         style={{
           width: 'min(1520px, 98vw)',
           height: 'min(840px, 94vh)',
@@ -186,7 +189,7 @@ export function SunSkyPanel({ initialState, onClose, onChange }: SunSkyPanelProp
               <span className="text-sm font-semibold text-white">精选预设</span>
               <span className="text-sm text-white/75">16</span>
             </div>
-            <div className="h-[calc(100%-49px)] overflow-y-auto p-4">
+            <div className="h-[calc(100%-49px)] overflow-y-auto p-4 nowheel" onWheelCapture={stopCanvasWheelPropagation}>
               <SunSkyPresetList selectedPresetId={state.source.presetId} onSelect={handlePresetSelect} />
             </div>
           </aside>
@@ -218,7 +221,7 @@ export function SunSkyPanel({ initialState, onClose, onChange }: SunSkyPanelProp
           </main>
 
           <aside className="grid min-h-0 gap-3" style={{ gridTemplateRows: 'minmax(0, 1fr) 210px' }}>
-            <section className="min-h-0 overflow-y-auto rounded-lg border border-white/[0.08] bg-[#0f1219]/95 p-4">
+            <section className="min-h-0 overflow-y-auto rounded-lg border border-white/[0.08] bg-[#0f1219]/95 p-4 nowheel" onWheelCapture={stopCanvasWheelPropagation}>
               <div className="mb-4 flex items-center justify-between border-b border-white/[0.06] pb-3">
                 <h3 className="text-sm font-semibold text-white">参数控制</h3>
                 <div className="flex items-center gap-2 text-white/45">
@@ -231,7 +234,7 @@ export function SunSkyPanel({ initialState, onClose, onChange }: SunSkyPanelProp
               <SunSkyControls state={state} onChange={handleStateUpdate} />
             </section>
 
-            <section className="overflow-y-auto rounded-lg border border-white/[0.08] bg-[#0f1219]/95 p-4">
+            <section className="overflow-y-auto rounded-lg border border-white/[0.08] bg-[#0f1219]/95 p-4 nowheel" onWheelCapture={stopCanvasWheelPropagation}>
               <div className="mb-3 flex items-center gap-2">
                 <Droplets className="h-4 w-4 text-white/45" />
                 <h3 className="text-sm font-semibold text-white">当前光照信息</h3>

@@ -11,6 +11,7 @@ import {
   TEXT_NODE_MODELS,
   TEXT_NODE_PLACEHOLDER,
 } from '../constants/textNode';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
 import type { TextNodeModel, TextReferenceInfo } from '../types/basicNode.types';
 
@@ -90,6 +91,7 @@ export function TextNodeInputPanel({
   return (
     <div
       className="nodrag nowheel flex flex-col rounded-xl"
+      onWheelCapture={stopCanvasWheelPropagation}
       style={{
         width: IMAGE_NODE_CONTROL_WIDTH,
         height: IMAGE_NODE_CONTROL_HEIGHT,
@@ -264,6 +266,7 @@ export function TextNodeInputPanel({
           value={value}
           disabled={isProcessing}
           onChange={(event) => onChange(event.target.value)}
+          onWheelCapture={stopCanvasWheelPropagation}
           onKeyDown={(event) => {
             event.stopPropagation();
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -301,6 +304,7 @@ export function TextNodeInputPanel({
           {showModels && (
             <div
               className="absolute bottom-full left-0 z-30 mb-1 overflow-hidden rounded-lg py-1"
+              onWheelCapture={stopCanvasWheelPropagation}
               style={{
                 width: 190,
                 background: FLOATING_PANEL_BACKGROUND,

@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { GeneratedImage, ResultSetBatch } from '../types/history.types';
 import { BASIC_NODE_DEFINITIONS, type BasicNodeType } from '../constants/basicNodes';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 
 function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
@@ -126,7 +127,8 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
             WebkitBackdropFilter: 'blur(12px)',
           }}
           onClick={() => onSetActivePanel(null)}
-          onWheel={(e) => e.stopPropagation()}
+          onWheel={stopCanvasWheelPropagation}
+          onWheelCapture={stopCanvasWheelPropagation}
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -140,7 +142,8 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
               boxShadow: '0 20px 80px rgba(0,0,0,0.45)',
             }}
             onClick={(e) => e.stopPropagation()}
-            onWheel={(e) => e.stopPropagation()}
+            onWheel={stopCanvasWheelPropagation}
+            onWheelCapture={stopCanvasWheelPropagation}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -160,7 +163,8 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
             background: '#252526',
             borderRight: '1px solid #2a2a35',
           }}
-          onWheel={(e) => e.stopPropagation()}
+          onWheel={stopCanvasWheelPropagation}
+          onWheelCapture={stopCanvasWheelPropagation}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a35]">
             <span className="text-sm font-medium text-white">

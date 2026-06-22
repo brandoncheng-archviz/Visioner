@@ -4,6 +4,7 @@ import { X, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../constants/canvasConstants';
 import { styleDefinitions, getStylePresetById } from '../constants/presets';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 
 export function StylePickerModal({
   open,
@@ -46,13 +47,14 @@ export function StylePickerModal({
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55"
       onPointerDown={(event) => event.stopPropagation()}
-      onWheelCapture={(event) => event.stopPropagation()}
+      onWheelCapture={stopCanvasWheelPropagation}
       onClick={(event) => {
         if (event.target === event.currentTarget) handleCancel();
       }}
     >
       <div
         className="flex flex-col overflow-hidden rounded-xl"
+        onWheelCapture={stopCanvasWheelPropagation}
         style={{
           width: 'min(880px, calc(100vw - 48px))',
           height: 'min(720px, calc(100vh - 48px))',
@@ -81,7 +83,7 @@ export function StylePickerModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 nowheel" onWheelCapture={stopCanvasWheelPropagation}>
           <div className="grid grid-cols-4 gap-3">
             {styleDefinitions.map((style) => {
               const previewing = draftStyleId === style.id;

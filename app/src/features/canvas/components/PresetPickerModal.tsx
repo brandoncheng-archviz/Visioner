@@ -6,7 +6,7 @@ import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../constants/c
 import { PRESET_DATA, PRESET_TABS, getPresetById, isPresetVisibleInLibrary } from '../constants/presets';
 import { CustomPresetFallbackCover } from './CustomPresetFallbackCover';
 import type { PresetItem } from '../types/imageNode.types';
-import { getPresetPromptText } from '../utils/promptUtils';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 import {
   deleteUserPreset,
   loadUserPresets,
@@ -45,7 +45,7 @@ function getPresetName(preset: PresetItem): string {
 }
 
 function getPresetShortDesc(preset: PresetItem): string {
-  return preset.description || preset.shortDescription || (preset.owner === 'user' ? '用户自定义' : '');
+  return preset.shortDescription || preset.description || (preset.owner === 'user' ? '用户自定义' : '');
 }
 
 export function PresetPickerModal({
@@ -198,10 +198,6 @@ export function PresetPickerModal({
     return allPresets.find((preset) => preset.id === hoveredPresetId) || getPresetById(hoveredPresetId) || null;
   }, [allPresets, hoveredPresetId]);
 
-  const hoveredPresetPrompt = useMemo(() => {
-    return hoveredPreset ? getPresetPromptText(hoveredPreset) : '';
-  }, [hoveredPreset]);
-
   const handleCardClick = useCallback((preset: PresetItem) => {
     onApply([preset.id], [preset]);
     onClose();
@@ -284,13 +280,14 @@ export function PresetPickerModal({
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55"
       onPointerDown={(event) => event.stopPropagation()}
-      onWheelCapture={(event) => event.stopPropagation()}
+      onWheelCapture={stopCanvasWheelPropagation}
       onClick={(event) => {
         if (event.target === event.currentTarget) handleCancel();
       }}
     >
       <div
         className="rounded-xl"
+        onWheelCapture={stopCanvasWheelPropagation}
         style={{
           width: 'min(880px, calc(100vw - 48px))',
           height: 'min(720px, calc(100vh - 48px))',
@@ -329,7 +326,7 @@ export function PresetPickerModal({
         {/* Body */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Left sidebar tabs */}
-          <div className="flex h-full min-h-0 w-[150px] shrink-0 flex-col overflow-hidden border-r py-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="flex h-full min-h-0 w-[150px] shrink-0 flex-col overflow-hidden border-r py-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }} onWheelCapture={stopCanvasWheelPropagation}>
             {PRESET_TABS.map((tab) => {
               const isActive = activeTab === tab;
               return (
@@ -378,7 +375,7 @@ export function PresetPickerModal({
             </div>
 
             {/* Cards area */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2 nowheel" onWheelCapture={stopCanvasWheelPropagation}>
               {activeTab === '我的收藏' ? (
                 visiblePresets.length === 0 ? (
                   <div className="flex min-h-[360px] flex-col items-center justify-center text-center">
@@ -419,35 +416,27 @@ export function PresetPickerModal({
           </div>
         </div>
 
-        {/* Hover prompt preview */}
-        <div className="flex h-[200px] shrink-0 flex-col border-t px-5 py-3" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(16,16,20,0.62)' }}>
+        {/* Hover preset info */}
+        <div className="flex h-16 shrink-0 items-center justify-between gap-4 border-t px-5 nowheel" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(16,16,20,0.62)' }} onWheelCapture={stopCanvasWheelPropagation}>
           {hoveredPreset ? (
             <>
-              <div className="flex shrink-0 items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-semibold text-white/88">{getPresetName(hoveredPreset)}</div>
-                  <div className="mt-0.5 truncate text-[11px] text-white/42">{getPresetShortDesc(hoveredPreset)}</div>
-                </div>
-                <span className="shrink-0 rounded-md px-2 py-1 text-[11px]" style={{ color: 'rgba(255,255,255,0.48)', background: 'rgba(255,255,255,0.05)' }}>
-                  点击卡片插入
-                </span>
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-semibold text-white/88">{getPresetName(hoveredPreset)}</div>
+                <div className="mt-0.5 truncate text-[11px] text-white/42">{getPresetShortDesc(hoveredPreset)}</div>
               </div>
-              <div
-                className="mt-3 min-h-0 max-h-[132px] flex-1 overflow-y-auto overscroll-contain whitespace-pre-wrap rounded-lg px-3 py-2 text-[12px] leading-5"
-                style={{ color: 'rgba(255,255,255,0.76)', background: 'rgba(0,0,0,0.20)', border: '1px solid rgba(255,255,255,0.06)' }}
-              >
-                {hoveredPresetPrompt || '这个预设暂未配置提示词。'}
-              </div>
+              <span className="shrink-0 rounded-md px-2 py-1 text-[11px]" style={{ color: 'rgba(255,255,255,0.48)', background: 'rgba(255,255,255,0.05)' }}>
+                点击卡片插入
+              </span>
             </>
           ) : (
-            <div className="flex h-full items-center justify-center rounded-lg text-center text-[12px]" style={{ color: 'rgba(255,255,255,0.42)', background: 'rgba(0,0,0,0.16)', border: '1px solid rgba(255,255,255,0.05)' }}>
-              将鼠标移到卡片上，可预览完整提示词；点击卡片可直接插入。
+            <div className="min-w-0 truncate text-[12px]" style={{ color: 'rgba(255,255,255,0.42)' }}>
+              悬停卡片查看说明，点击卡片插入提示词。
             </div>
           )}
         </div>
       </div>
       {showPresetEditor && (
-        <div className="fixed inset-0 z-[1010] flex items-center justify-center bg-black/45" onClick={closePresetEditor}>
+        <div className="fixed inset-0 z-[1010] flex items-center justify-center bg-black/45" onClick={closePresetEditor} onWheelCapture={stopCanvasWheelPropagation}>
           <div
             className="w-[520px] max-w-[calc(100vw-40px)] rounded-xl p-5"
             style={{
@@ -456,6 +445,7 @@ export function PresetPickerModal({
               boxShadow: '0 24px 70px rgba(0,0,0,0.62)',
             }}
             onClick={(event) => event.stopPropagation()}
+            onWheelCapture={stopCanvasWheelPropagation}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -492,6 +482,7 @@ export function PresetPickerModal({
                   placeholder="让画面偏高端住宅宣传图气质，使用黄昏暖光、低饱和色调、真实材质和柔和植物层次，不改变建筑主体和构图。"
                   className="mt-2 h-32 w-full resize-none rounded-lg border bg-transparent px-3 py-2 text-[13px] leading-6 outline-none transition-colors placeholder:text-white/22 focus:border-[#a78bfa]"
                   style={{ borderColor: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.88)' }}
+                  onWheelCapture={stopCanvasWheelPropagation}
                 />
               </label>
 

@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 
 export function ImagePreviewModal({
   imageUrl,
@@ -35,6 +36,7 @@ export function ImagePreviewModal({
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.88)' }}
       onClick={handleOverlayClick}
+      onWheelCapture={stopCanvasWheelPropagation}
     >
       {/* Close button */}
       <button
