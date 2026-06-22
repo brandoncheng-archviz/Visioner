@@ -289,7 +289,13 @@ export function HistoryPanel({ scope, nodeId, onClose, onUseImages }: HistoryPan
           onClick={() => setPreviewImages(null)}
           onWheelCapture={stopCanvasWheelPropagation}
         >
-          <img src={previewImages[previewIndex].imageUrl} alt="" className="max-w-[85vw] max-h-[85vh] rounded-xl object-contain" onClick={(e) => e.stopPropagation()} />
+          <img
+            src={previewImages[previewIndex].imageUrl}
+            alt=""
+            className="block max-w-[85vw] max-h-[85vh] object-contain"
+            style={{ borderRadius: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          />
           {previewImages.length > 1 && (
             <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'rgba(0,0,0,0.52)', border: '1px solid rgba(255,255,255,0.12)' }} onClick={(e) => e.stopPropagation()}>
               {previewImages.map((image, index) => (

@@ -61,10 +61,11 @@ export function ImagePreviewModal({
       <img
         src={imageUrl}
         alt=""
-        className="object-contain rounded-lg"
+        className="block object-contain"
         style={{
           maxWidth: 'calc(100vw - 96px)',
           maxHeight: 'calc(100vh - 96px)',
+          borderRadius: 0,
         }}
         onClick={(e) => e.stopPropagation()}
       />

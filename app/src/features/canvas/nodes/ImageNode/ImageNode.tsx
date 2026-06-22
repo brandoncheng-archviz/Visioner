@@ -1557,13 +1557,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
-          className={`node-preview-card w-full rounded-xl flex items-center justify-center transition-all relative ${isMultiResultSet && !isMultiResultExpanded ? 'overflow-visible' : 'overflow-hidden'}`}
+          className="node-preview-card w-full rounded-[24px] flex items-center justify-center transition-colors relative overflow-hidden"
           style={{
             width: displayCardWidth,
             height: displayCardHeight,
-            background: isMultiResultExpanded ? 'transparent' : '#252526',
-            border: isMultiResultExpanded ? 'none' : `1px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.06)'}`,
-            boxShadow: isMultiResultExpanded ? 'none' : selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+            background: isMultiResultExpanded ? '#101014' : '#252526',
+            border: `2px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.12)'}`,
+            borderRadius: 24,
+            boxSizing: 'border-box',
           }}
         >
           {displayImage && currentResultSet && isMultiResultSet ? (
@@ -1582,14 +1583,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                     return (
                       <div
                         key={img.resultId}
-                        className="group/result relative min-h-0 min-w-0 overflow-hidden rounded-xl"
+                        className="group/result relative min-h-0 min-w-0 overflow-hidden"
                         style={{
-                          border: isPrimary ? '1.5px solid rgba(0,212,255,0.55)' : '1px solid rgba(255,255,255,0.10)',
                           background: '#101014',
-                          boxShadow: '0 12px 24px rgba(0,0,0,0.24)',
                         }}
                       >
-                        <img src={img.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                        <img src={img.imageUrl} alt="" className="block h-full w-full object-cover" draggable={false} />
                         {isPrimary && (
                           <div className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full" style={{ background: 'rgba(0,212,255,0.82)', color: '#061216' }}>
                             <Check className="h-3.5 w-3.5" />
@@ -1639,38 +1638,34 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 </div>
               </div>
             ) : (
-              <div className="relative block h-full w-full overflow-visible rounded-xl text-left">
+              <div className="relative block h-full w-full text-left">
                 {currentResultSet.images
                   .filter((_, imageIndex) => imageIndex !== currentResultSet.selectedIndex)
                   .slice(0, Math.min(3, currentResultSet.images.length - 1))
                   .map((img, idx) => (
                     <div
                       key={img.resultId}
-                      className="absolute overflow-hidden rounded-xl"
+                      className="absolute overflow-hidden rounded-[18px]"
                       style={{
                         inset: 0,
-                        transform: `translate(${10 + idx * 10}px, ${3 + idx * 4}px) scale(${0.97 - idx * 0.035})`,
+                        transform: `translate(${8 + idx * 8}px, ${3 + idx * 4}px) scale(${0.97 - idx * 0.035})`,
                         transformOrigin: 'right center',
                         zIndex: 3 - idx,
                         opacity: 1,
                         background: '#17171d',
-                        border: '1px solid rgba(255,255,255,0.14)',
-                        boxShadow: '0 12px 24px rgba(0,0,0,0.38)',
                         filter: `brightness(${0.62 - idx * 0.12})`,
                       }}
                     >
-                      <img src={img.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                      <img src={img.imageUrl} alt="" className="block h-full w-full object-cover" draggable={false} />
                     </div>
                   ))}
                 <div
-                  className="absolute inset-0 z-10 overflow-hidden rounded-xl"
+                  className="absolute inset-0 z-10 overflow-hidden"
                   style={{
-                    border: '1px solid rgba(255,255,255,0.16)',
-                    boxShadow: '0 18px 42px rgba(0,0,0,0.34)',
                     background: '#101014',
                   }}
                 >
-                  <img ref={imgRef} src={displayImage} alt="" className="h-full w-full object-cover" draggable={false} onLoad={handleDisplayImageLoad} />
+                  <img ref={imgRef} src={displayImage} alt="" className="block h-full w-full object-cover" draggable={false} onLoad={handleDisplayImageLoad} />
                 </div>
                 <button
                   type="button"
@@ -1700,7 +1695,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 .map((img, idx) => (
                 <div
                   key={img.resultId}
-                  className="absolute rounded-lg overflow-hidden"
+                  className="absolute rounded-[18px] overflow-hidden"
                   style={{
                     top: 4 + idx * 3,
                     left: 4 + idx * 3,
@@ -1709,10 +1704,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                     opacity: 0.35 - idx * 0.1,
                     transform: `scale(${0.96 - idx * 0.02})`,
                     zIndex: 1 + idx,
-                    border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <img src={img.imageUrl} alt="" className="w-full h-full object-cover" draggable={false} />
+                  <img src={img.imageUrl} alt="" className="block w-full h-full object-cover" draggable={false} />
                 </div>
               ))}
               <div className="absolute inset-0 z-10">
@@ -1720,7 +1714,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   ref={imgRef}
                   src={displayImage}
                   alt=""
-                  className="w-full h-full object-contain"
+                  className="block w-full h-full object-cover"
                   draggable={false}
                   onLoad={handleDisplayImageLoad}
                   onClick={handleImageClick}
@@ -1743,7 +1737,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               </button>
             </div>
           ) : displayImage && currentResultSet && currentResultSet.images.length > 1 && currentResultSet.isExpanded ? (
-            <div className="relative w-full h-full p-2.5">
+            <div className="relative w-full h-full">
               <div
                 className={currentResultSet.images.length === 2 ? 'flex h-full gap-2' : 'grid h-full gap-2'}
                 style={{
@@ -1754,13 +1748,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 {currentResultSet.images.map((img, idx) => (
                   <div
                     key={img.resultId}
-                    className="group/result relative h-full min-w-0 flex-1 overflow-hidden rounded-lg"
+                    className="group/result relative h-full min-w-0 flex-1 overflow-hidden"
                     style={{
-                      border: idx === currentResultSet.selectedIndex ? '1.5px solid #00d4ff' : '1.5px solid rgba(255,255,255,0.10)',
                       background: 'rgba(255,255,255,0.035)',
                     }}
                   >
-                    <img src={img.imageUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                    <img src={img.imageUrl} alt="" className="block h-full w-full object-cover" draggable={false} />
                     <div className="absolute right-1.5 top-1.5 flex gap-1">
                       <button
                         type="button"
@@ -1813,7 +1806,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 ref={imgRef}
                 src={displayImage}
                 alt=""
-                className="w-full h-full object-contain"
+                className="block w-full h-full object-cover"
                 draggable={false}
                 onLoad={handleDisplayImageLoad}
                 onClick={handleImageClick}
