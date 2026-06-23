@@ -61,12 +61,20 @@ export function useCanvasSelectionActions({
       (node.data?.label as string | undefined) || '',
       fallbackBaseTitle,
     );
+    const nextData = {
+      ...node.data,
+      label,
+      title: typeof node.data.title === 'string' ? label : node.data.title,
+    };
     const newNode: Node = {
       ...node,
       id: `${node.type}-${Date.now()}`,
       position: { x: node.position.x + 40, y: node.position.y + 40 },
-      data: { ...node.data, label },
+      data: nextData,
+      style: node.style ? { ...node.style } : undefined,
+      measured: node.measured ? { ...node.measured } : undefined,
       selected: true,
+      dragging: false,
     };
     setNodes((currentNodes) => [
       ...currentNodes.map((currentNode) => ({ ...currentNode, selected: false })),

@@ -36,8 +36,9 @@ export function ImageToolbar({
     {
       icon: Sun,
       label: relightLabel || t('imageNode.relight'),
-      tooltipLabel: relightTooltip || t('imageNode.relightTooltip', { defaultValue: '调整阳光方向' }),
+      tooltipLabel: relightTooltip || t('imageNode.relightTooltip', { defaultValue: '改光' }),
       action: onRelight,
+      disabled: !hasImage,
     },
     { icon: Sparkles, label: t('imageNode.upscale'), tooltipLabel: t('imageNode.upscaleShort', { defaultValue: '高清细节' }), action: onUpscale, disabled: !hasImage },
     { icon: Columns2, label: t('imageNode.compare'), action: onCompare, disabled: !hasImage },

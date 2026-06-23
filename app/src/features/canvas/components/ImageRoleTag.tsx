@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { ChevronDown, Check, Building2, MousePointerClick } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -26,6 +26,7 @@ export function ImageRoleTag({
   rootStyle,
   hideTrigger = false,
   popoverTop = 28,
+  disabled = false,
 }: {
   role: ImageRole | null;
   customRoleLabel?: string;
@@ -40,11 +41,12 @@ export function ImageRoleTag({
   rootStyle?: CSSProperties;
   hideTrigger?: boolean;
   popoverTop?: number;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(false);
-  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const setOpen = onOpenChange || setInternalOpen;
+  const rawOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const open = disabled ? false : rawOpen;
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
   const [isTagHovered, setIsTagHovered] = useState(false);
   const [expandedLocalRef, setExpandedLocalRef] = useState(false);
@@ -61,6 +63,21 @@ export function ImageRoleTag({
 
   const hasActiveRole = Boolean(role && role !== 'undefined_usage');
 
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (disabled) {
+        setInternalOpen(false);
+        onOpenChange?.(false);
+        return;
+      }
+      if (controlledOpen === undefined) {
+        setInternalOpen(nextOpen);
+      }
+      onOpenChange?.(nextOpen);
+    },
+    [controlledOpen, disabled, onOpenChange],
+  );
+
   useEffect(() => {
     if (!open) {
       const raf = requestAnimationFrame(() => {
@@ -74,6 +91,7 @@ export function ImageRoleTag({
   }, [open]);
 
   useEffect(() => {
+    if (disabled) return;
     if (openManualInputSignal) {
       const timer = setTimeout(() => {
         setExpandedLocalRef(true);
@@ -82,7 +100,18 @@ export function ImageRoleTag({
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openManualInputSignal]);
+  }, [disabled, openManualInputSignal]);
+
+  useEffect(() => {
+    if (!disabled) return;
+    setInternalOpen(false);
+    onOpenChange?.(false);
+    setIsTagHovered(false);
+    setHoveredRole(null);
+    setExpandedLocalRef(false);
+    setShowCustomInput(false);
+    setCustomInput('');
+  }, [disabled, onOpenChange]);
 
   useEffect(() => {
     if (showCustomInput) {
@@ -91,21 +120,24 @@ export function ImageRoleTag({
   }, [showCustomInput]);
 
   const handleSelectPrimary = (nextRole: ImageRole) => {
+    if (disabled) return;
     if (nextRole === 'local_reference') {
       setExpandedLocalRef(true);
       return;
     }
     onChange(nextRole);
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   const handleSelectLocalType = (type: LocalReferenceType, label: string) => {
+    if (disabled) return;
     onChange('local_reference', undefined, type, label);
     setExpandedLocalRef(false);
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   const submitCustomLocal = () => {
+    if (disabled) return;
     const result = validateCustomReferenceLabel(customInput);
     if (!result.ok) {
       setCustomInput('');
@@ -116,18 +148,20 @@ export function ImageRoleTag({
     setCustomInput('');
     setShowCustomInput(false);
     setExpandedLocalRef(false);
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   const handleClearUsage = () => {
+    if (disabled) return;
     onChange('undefined_usage', undefined, undefined, undefined);
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   const handleStartPointPick = () => {
+    if (disabled) return;
     if (onStartPointPick) {
       onStartPointPick();
-      setOpen(false);
+      handleOpenChange(false);
     }
   };
 
@@ -139,7 +173,7 @@ export function ImageRoleTag({
       if (target instanceof Node && rootRef.current?.contains(target)) {
         return;
       }
-      setOpen(false);
+      handleOpenChange(false);
     };
 
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -154,7 +188,7 @@ export function ImageRoleTag({
         setCustomInput('');
         return;
       }
-      setOpen(false);
+      handleOpenChange(false);
     };
 
     document.addEventListener('pointerdown', closeOnOutside, true);
@@ -163,7 +197,7 @@ export function ImageRoleTag({
       document.removeEventListener('pointerdown', closeOnOutside, true);
       document.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [open, setOpen, expandedLocalRef, showCustomInput]);
+  }, [open, handleOpenChange, expandedLocalRef, showCustomInput]);
 
   return (
     <div
@@ -177,15 +211,40 @@ export function ImageRoleTag({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setOpen(!open)}
-            onMouseEnter={() => setIsTagHovered(true)}
-            onMouseLeave={() => setIsTagHovered(false)}
-            className="image-role-tag-button flex h-6 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium transition-all"
+            disabled={disabled}
+            onPointerDown={(event) => {
+              if (!disabled) return;
+              event.preventDefault();
+              event.stopPropagation();
+              handleOpenChange(false);
+            }}
+            onMouseDown={(event) => {
+              if (!disabled) return;
+              event.preventDefault();
+              event.stopPropagation();
+              handleOpenChange(false);
+            }}
+            onClick={() => {
+              if (disabled) {
+                handleOpenChange(false);
+                return;
+              }
+              handleOpenChange(!open);
+            }}
+            onMouseEnter={() => {
+              if (disabled) return;
+              setIsTagHovered(true);
+            }}
+            onMouseLeave={() => {
+              if (disabled) return;
+              setIsTagHovered(false);
+            }}
+            className="image-role-tag-button flex h-6 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium transition-all disabled:cursor-default disabled:opacity-50"
             style={{
-              background: isTagHovered ? 'rgba(30, 41, 59, 0.86)' : 'rgba(15, 23, 42, 0.72)',
+              background: isTagHovered && !disabled ? 'rgba(30, 41, 59, 0.86)' : 'rgba(15, 23, 42, 0.72)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
-              border: `1px solid ${isTagHovered ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.12)'}`,
+              border: `1px solid ${isTagHovered && !disabled ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.12)'}`,
               color: 'rgba(255,255,255,0.88)',
               boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
             }}

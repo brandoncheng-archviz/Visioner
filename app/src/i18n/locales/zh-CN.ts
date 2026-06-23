@@ -96,6 +96,8 @@ const zhCN = {
     upscale: "高清细节",
     upscaleShort: "高清",
     upscaleTitle: "提升图片清晰度与材质细节",
+    relight: "改光",
+    relightTooltip: "改光",
     sunSky: "光影",
     compare: "对比",
     preview: "预览",

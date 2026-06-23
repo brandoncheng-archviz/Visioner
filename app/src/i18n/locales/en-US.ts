@@ -96,6 +96,8 @@ const enUS = {
     upscale: "HD Detail",
     upscaleShort: "HD",
     upscaleTitle: "Enhance clarity and material details",
+    relight: "Relight",
+    relightTooltip: "Relight",
     sunSky: "Lighting",
     compare: "Compare",
     preview: "Preview",

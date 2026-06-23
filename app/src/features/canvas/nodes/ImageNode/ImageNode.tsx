@@ -39,6 +39,7 @@ import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
+import { createImageNodeViewModel } from './imageNodeViewModel';
 
 const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或选择预设 / 风格 / 光影';
 
@@ -147,30 +148,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     : previewImage || currentImage;
   const resultImageCount = currentResultSet?.images.length ?? 0;
   const isMultiResultSet = resultImageCount > 1;
-  const isResultResource = Boolean(currentResultSet && resultImageCount > 0 && generationTask?.status !== 'running');
-  const isHistoryAsset = Boolean(data.isHistoryAsset);
   const isMultiResultExpanded = Boolean(isMultiResultSet && currentResultSet?.isExpanded);
-  const assetSource = data.assetSource as string | undefined;
-  const hasGeneratedResultState = Boolean(
-    currentResultSet ||
-    generatedImages.length > 0 ||
-    data.currentResultId ||
-    data.isGeneratedResult ||
-    data.generationStatus === 'completed' ||
-    data.currentResultSource === 'history' ||
-    assetSource === 'generated' ||
-    assetSource === 'history'
-  );
-  const isUploadedResource = Boolean(
-    displayImage &&
-    !hasGeneratedResultState &&
-    (
-      assetSource === 'upload' ||
-      assetSource === 'paste' ||
-      (!assetSource && (data.inputImage || data.currentImage || data.image))
-    )
-  );
-  const shouldShowInputHandle = !isUploadedResource;
 
   // Cleanup: abort running generation on unmount
   useEffect(() => {
@@ -417,7 +395,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [id, references, referencesSignature, savedReferencesSignature, setNodes]);
 
   const selectedStyle = getStylePresetById(selectedStyleId);
-  const isGenerating = generationTask?.status === 'running';
   const textReferencePrompt = textReferences
     .map((reference) => reference.content.trim())
     .filter(Boolean)
@@ -430,7 +407,33 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     Boolean(lightPreview?.enabled) ||
     hasModelParamIntent(modelParams)
   );
-  const canGenerate = !isGenerating && hasGenerationIntent;
+  const imageNodeViewModel = createImageNodeViewModel(data, {
+    displayImage,
+    currentResultSet,
+    generationTask,
+    hasGenerationIntent,
+  });
+  const isGenerating = imageNodeViewModel.isProcessing;
+  const canGenerate = imageNodeViewModel.canGenerate;
+  const shouldShowInputHandle = imageNodeViewModel.contentKind !== 'uploaded' && imageNodeViewModel.contentKind !== 'external';
+  const canEditRole = imageNodeViewModel.canEditReferenceUsage;
+
+  const handleRoleMenuOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!canEditRole) {
+        setRoleMenuOpen(false);
+        return;
+      }
+      setRoleMenuOpen(nextOpen);
+    },
+    [canEditRole],
+  );
+
+  useEffect(() => {
+    if (!canEditRole && roleMenuOpen) {
+      setRoleMenuOpen(false);
+    }
+  }, [canEditRole, roleMenuOpen]);
 
   const selectResultImage = useCallback((index: number) => {
     setCurrentResultSet((prev) => {
@@ -491,31 +494,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       .join('\n\n');
     const { textPrompt, imageReferences, referenceImages, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview);
 
-    const safetyResult = await checkGenerationRequestSafety({
-      prompt: textPrompt,
-      referenceImages: referenceImages.map((ref) => ({
-        id: ref.imageId,
-        url: ref.imageUrl,
-        usage: ref.usageKey,
-        label: ref.usageLabel,
-      })),
-    });
-    if (!safetyResult.allowed) {
-      showToast(safetyResult.message ?? '当前内容不适合生成，请修改后再试。');
-      return;
-    }
-    const safePrompt =
-      safetyResult.level === 'rewrite' && safetyResult.rewrittenPrompt
-        ? safetyResult.rewrittenPrompt
-        : textPrompt;
-
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    const task = createGenerationTask({
+    let task = createGenerationTask({
       sourceNodeId: id,
-      prompt: safePrompt,
+      prompt: textPrompt,
       inputRefs: referenceImages.map((ref) => ({
         imageId: ref.imageId,
         imageUrl: ref.imageUrl,
@@ -531,6 +512,83 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       },
     });
     setGenerationTask(task);
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                generationTask: task,
+                isGenerating: true,
+                isProcessing: true,
+              },
+            }
+          : n,
+      ),
+    );
+
+    const safetyResult = await checkGenerationRequestSafety({
+      prompt: textPrompt,
+      referenceImages: referenceImages.map((ref) => ({
+        id: ref.imageId,
+        url: ref.imageUrl,
+        usage: ref.usageKey,
+        label: ref.usageLabel,
+      })),
+    });
+    if (!safetyResult.allowed) {
+      showToast(safetyResult.message ?? '当前内容不适合生成，请修改后再试。');
+      const failedTask = {
+        ...task,
+        status: 'failed' as const,
+        errorMessage: safetyResult.message ?? '当前内容不适合生成，请修改后再试。',
+        updatedAt: Date.now(),
+      };
+      setGenerationTask(failedTask);
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  generationTask: failedTask,
+                  isGenerating: false,
+                  isProcessing: false,
+                },
+              }
+            : n,
+        ),
+      );
+      return;
+    }
+    const safePrompt =
+      safetyResult.level === 'rewrite' && safetyResult.rewrittenPrompt
+        ? safetyResult.rewrittenPrompt
+        : textPrompt;
+
+    if (safePrompt !== task.prompt) {
+      task = { ...task, prompt: safePrompt, updatedAt: Date.now() };
+      setGenerationTask(task);
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  generationTask: task,
+                },
+              }
+            : n,
+        ),
+      );
+    }
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const count = parseCount(modelParams.count);
@@ -575,12 +633,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               n.id === id
                 ? {
                     ...n,
-                    data: {
-                      ...n.data,
-                      generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
-                    },
-                  }
-                : n,
+                  data: {
+                    ...n.data,
+                    generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
+                    isGenerating: false,
+                    isProcessing: false,
+                  },
+                }
+              : n,
             ),
           );
           return;
@@ -676,6 +736,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   promptContent,
                   generatedImages: nextGeneratedImages,
                   generationTask: { ...task, status: 'success', progress: 100, result: results[0], updatedAt: Date.now() },
+                  isGenerating: false,
+                  isProcessing: false,
                   width: results[0]?.width,
                   height: results[0]?.height,
                 },
@@ -694,6 +756,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 data: {
                   ...n.data,
                   generationTask: { ...task, status: 'failed', errorMessage, updatedAt: Date.now() },
+                  isGenerating: false,
+                  isProcessing: false,
                 },
               }
             : n,
@@ -711,37 +775,44 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [hasGenerationIntent, runGeneration, showToast]);
 
   const handlePromptChange = (value: string) => {
+    if (!imageNodeViewModel.canEditPrompt) return;
     setPromptText(value);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, prompt: value } } : n)));
   };
 
   const handlePromptContentChange = (content: PromptContent[]) => {
+    if (!imageNodeViewModel.canEditPrompt) return;
     setPromptContent(content);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, promptContent: content } } : n)));
   };
 
   const handleLightPreviewChange = (data: LightPreviewData | null) => {
+    if (!imageNodeViewModel.canEditLighting) return;
     setLightPreview(data);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, lightPreview: data } } : n)));
   };
 
   const handlePresetsChange = (presets: string[]) => {
+    if (!imageNodeViewModel.canEditPreset) return;
     const presetOnly = presets.filter((presetId) => getPresetById(presetId)?.category !== 'style');
     setSelectedPresets(presetOnly);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, selectedPresets: presetOnly } } : n)));
   };
 
   const handleStyleChange = (styleId: string | null) => {
+    if (!imageNodeViewModel.canEditStyle) return;
     setSelectedStyleId(styleId);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, selectedStyleId: styleId } } : n)));
   };
 
   const handleModelParamsChange = (params: ModelParams) => {
+    if (!imageNodeViewModel.canEditModel) return;
     setModelParams(params);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, modelParams: params } } : n)));
   };
 
   const handleRemoveReference = (sourceNodeId: string) => {
+    if (!imageNodeViewModel.canDeleteReference) return;
     const removeReferenceEdge = data.onRemoveReferenceEdge as ((targetNodeId: string, sourceNodeId: string) => void) | undefined;
     if (removeReferenceEdge) {
       removeReferenceEdge(id, sourceNodeId);
@@ -763,6 +834,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const handleReorderReferences = (newOrder: string[]) => {
+    if (!imageNodeViewModel.canEditReferenceUsage) return;
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, referenceOrder: newOrder } } : n)));
   };
 
@@ -770,36 +842,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     // Shared entry point for top thumbnails and the @ reference menu.
   };
 
-  const handleAssignReferenceRole = (sourceNodeId: string, nextRole: ImageRole, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType, nextLocalRefLabel?: string) => {
-    const roleOption = getImageRoleOption(nextRole, nextCustomRoleLabel);
-    const roleData = getRoleData(nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel);
-    const assignReferenceEdgeRole = data.onAssignReferenceEdgeRole as ((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => void) | undefined;
-    if (assignReferenceEdgeRole) {
-      assignReferenceEdgeRole(id, sourceNodeId, nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel);
-    } else {
-      setEdges((eds) =>
-        eds.map((edge) =>
-          edge.source === sourceNodeId && edge.target === id
-            ? { ...edge, data: { ...edge.data, ...roleData } }
-            : edge,
-        ),
-      );
-      setNodes((nds) => nds.map((node) => (node.id === sourceNodeId ? { ...node, data: { ...node.data, ...roleData } } : node)));
-    }
-
-    const existingReference = references.find((reference) => reference.nodeId === sourceNodeId);
-    if (!existingReference) return null;
-    return {
-      ...existingReference,
-      role: nextRole,
-      customRoleLabel: nextCustomRoleLabel,
-      localReferenceType: nextLocalRefType,
-      localReferenceLabel: nextLocalRefLabel,
-      roleLabel: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel) || roleOption?.label || existingReference.roleLabel,
-    };
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!imageNodeViewModel.canUpload) return;
     const file = e.target.files?.[0];
     if (!file) return;
     const name = file.name.replace(/\.[^/.]+$/, '');
@@ -850,6 +894,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const handleRoleChange = (nextRole: ImageRole | null, nextCustomRoleLabel?: string, nextLocalRefType?: LocalReferenceType, nextLocalRefLabel?: string) => {
+    if (!imageNodeViewModel.canEditReferenceUsage) return;
     if (nextRole && UNIQUE_USAGES.includes(nextRole)) {
       const affectedTargetIds = allEdges.filter((edge) => edge.source === id).map((edge) => edge.target);
       const conflictingTarget = affectedTargetIds.find((targetId) =>
@@ -1028,7 +1073,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const openPointPickManualInput = () => {
     exitPointPickMode();
-    setRoleMenuOpen(true);
+    handleRoleMenuOpenChange(true);
     setManualInputSignal((s) => s + 1);
   };
 
@@ -1364,6 +1409,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const isOnlySelected = selected && selectedNodeCount === 1;
 
   const handleUpscale = useCallback(() => {
+    if (!imageNodeViewModel.canUpscale) return;
     const resolved = resolveNodeImage(data);
     if (!resolved) {
       showToast(t('imageNode.noImageForUpscale'));
@@ -1373,9 +1419,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const onCreateUpscaleNode = data.onCreateUpscaleNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
     if (!onCreateUpscaleNode) return;
     onCreateUpscaleNode(id, resolved.imageUrl, resolved.width, resolved.height);
-  }, [data, id, showToast, t]);
+  }, [data, id, imageNodeViewModel.canUpscale, showToast, t]);
 
   const handleRelight = useCallback(() => {
+    if (!imageNodeViewModel.canRelight) return;
     const resolved = resolveNodeImage(data);
     if (!resolved) {
       showToast('当前节点没有可改光的图片。');
@@ -1384,9 +1431,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const onCreateRelightNode = data.onCreateRelightNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
     if (!onCreateRelightNode) return;
     onCreateRelightNode(id, resolved.imageUrl, resolved.width, resolved.height);
-  }, [data, id, showToast]);
+  }, [data, id, imageNodeViewModel.canRelight, showToast]);
 
   const handleCompare = useCallback(() => {
+    if (!imageNodeViewModel.canCompare) return;
     const resolved = resolveNodeImage(data);
     if (!resolved) {
       showToast(t('imageNode.noImageForCompare'));
@@ -1396,15 +1444,16 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const onCreateCompareNode = data.onCreateCompareNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
     if (!onCreateCompareNode) return;
     onCreateCompareNode(id, resolved.imageUrl, resolved.width, resolved.height);
-  }, [data, id, showToast, t]);
+  }, [data, id, imageNodeViewModel.canCompare, showToast, t]);
 
   const handlePreview = useCallback(() => {
+    if (!imageNodeViewModel.canPreview) return;
     const resolved = resolveNodeImage(data);
     if (!resolved) return;
     setPreviewImage(resolved.imageUrl);
     setImgSize({ width: resolved.width, height: resolved.height });
     setShowPreview(true);
-  }, [data]);
+  }, [data, imageNodeViewModel.canPreview]);
 
   const handleDisplayImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = event.currentTarget;
@@ -1417,6 +1466,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, []);
 
   const handleDownload = useCallback(() => {
+    if (!imageNodeViewModel.canDownload) return;
     const resolved = resolveNodeImage(data);
     if (!resolved) return;
     const link = document.createElement('a');
@@ -1425,7 +1475,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [data, id]);
+  }, [data, id, imageNodeViewModel.canDownload]);
 
   // Global modifier + G shortcut for generation
   useEffect(() => {
@@ -1433,21 +1483,21 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       if (e.isComposing) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
         e.preventDefault();
-        if (!isResultResource && isOnlySelected && canGenerate) {
+        if (imageNodeViewModel.showControlPanel && isOnlySelected && canGenerate) {
           handleGenerate();
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isResultResource, isOnlySelected, canGenerate, handleGenerate]);
+  }, [imageNodeViewModel.showControlPanel, isOnlySelected, canGenerate, handleGenerate]);
 
   return (
     <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: displayCardWidth, cursor: 'default' }}>
       {pointPickModePortal}
       {pointPickResultPortal}
       {/* Toolbar — shown above title only when this node has a real image/result */}
-      {displayImage && isOnlySelected && !isMultiResultExpanded && (
+      {imageNodeViewModel.showTopToolbar && isOnlySelected && !isMultiResultExpanded && (
         <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: displayCardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
             onUpscale={handleUpscale}
@@ -1455,7 +1505,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             onCompare={handleCompare}
             onPreview={handlePreview}
             onDownload={handleDownload}
-            hasImage={!!displayImage}
+            hasImage={imageNodeViewModel.canUseToolbarActions}
           />
         </div>
       )}
@@ -1478,14 +1528,19 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         <div className="flex items-center justify-between overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
           <div className="flex flex-1 items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
             <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
-            {displayImage && !isResultResource && (
+            {imageNodeViewModel.showReferenceUsageControl && (
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  setRoleMenuOpen(true);
+                  handleRoleMenuOpenChange(true);
                 }}
-                className="flex-shrink-0 cursor-pointer select-none transition-all hover:brightness-125"
-                style={{ color: getImageRoleColor(role, localReferenceType), fontSize: 11 }}
+                className="flex-shrink-0 select-none transition-all hover:brightness-125"
+                style={{
+                  color: getImageRoleColor(role, localReferenceType),
+                  fontSize: 11,
+                  cursor: canEditRole ? 'pointer' : 'default',
+                  opacity: canEditRole ? 1 : 0.5,
+                }}
                 title={t('imageNode.setImagePurpose')}
               >
                 {RoleIconForTitle && (
@@ -1520,7 +1575,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               </span>
             )}
           </div>
-          {displayImage && showTitleMeta && (
+          {imageNodeViewModel.hasImage && showTitleMeta && (
             <span className="flex-shrink-0 ml-2" style={{ fontSize: 11 }}>
               {imgSize ? `${imgSize.width}×${imgSize.height}` : `${getNodeWidth(data) || 1024}×${getNodeHeight(data) || 1024}`}
             </span>
@@ -1531,7 +1586,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {/* Image card wrapper — relative for handles/upload positioning */}
       <div className="relative" style={{ width: displayCardWidth }}>
         {/* Upload icon — inside card top-right, hidden when node has input connection */}
-        {isOnlySelected && !hasInputConnection && !isResultResource && (
+        {isOnlySelected && !hasInputConnection && imageNodeViewModel.canUpload && (
           <>
             <button
               onClick={() => fileRef.current?.click()}
@@ -1551,8 +1606,19 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </>
         )}
 
-        {displayImage && !isResultResource && (isOnlySelected || roleMenuOpen) && (
-          <ImageRoleTag role={role} customRoleLabel={customRoleLabel} localReferenceType={localReferenceType} localReferenceLabel={localReferenceLabel} onChange={handleRoleChange} onStartPointPick={() => setIsPointPickMode(true)} openManualInputSignal={manualInputSignal} open={roleMenuOpen} onOpenChange={setRoleMenuOpen} />
+        {imageNodeViewModel.showReferenceUsageControl && (isOnlySelected || roleMenuOpen) && (
+          <ImageRoleTag
+            role={role}
+            customRoleLabel={customRoleLabel}
+            localReferenceType={localReferenceType}
+            localReferenceLabel={localReferenceLabel}
+            onChange={handleRoleChange}
+            onStartPointPick={() => setIsPointPickMode(true)}
+            openManualInputSignal={manualInputSignal}
+            open={roleMenuOpen && canEditRole}
+            onOpenChange={handleRoleMenuOpenChange}
+            disabled={!canEditRole}
+          />
         )}
 
         {/* Main card — aspect ratio adapts to uploaded image */}
@@ -1931,7 +1997,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       </div>
 
       {/* Control panel — below the preview area */}
-      {isOnlySelected && !isHistoryAsset && !isMultiResultExpanded && (!displayImage || generatedImages.length > 0 || isGenerating || isResultResource) && (
+      {isOnlySelected && !isMultiResultExpanded && imageNodeViewModel.showControlPanel && (
         <>
           <div
             className="absolute z-30"
@@ -1969,7 +2035,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onRemoveReference={handleRemoveReference}
               onReorderReferences={handleReorderReferences}
               onUseReference={handleUseReference}
-              onAssignReferenceRole={handleAssignReferenceRole}
               showToast={showToast}
               autoOpenLightPanel={pendingLightPanelOpen}
               onAcknowledgeAutoOpen={() => setPendingLightPanelOpen(false)}

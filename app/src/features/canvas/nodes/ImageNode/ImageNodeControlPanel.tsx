@@ -17,8 +17,6 @@ import type {
   PromptContent,
   ImageReferencePromptBlock,
   ReferenceInfo,
-  ImageRole,
-  LocalReferenceType,
   PresetItem,
 } from '../../types/imageNode.types';
 import type { ModelParams } from '../../types/canvas.types';
@@ -37,7 +35,7 @@ import {
   RATIO_OPTIONS,
   COUNT_OPTIONS,
 } from '../../constants/canvasConstants';
-import { UNIQUE_USAGES, getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
+import { getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
 import {
   PRESET_DATA,
   PRESET_TABS,
@@ -46,12 +44,11 @@ import {
   isPresetVisibleInLibrary,
 } from '../../constants/presets';
 import { createImageReferenceBlock, getPresetPromptText, stripReferencePromptMetadata } from '../../utils/promptUtils';
-import { areReferenceListsEqual, hasDefinedUsage } from '../../utils/referenceUtils';
-import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
+import { areReferenceListsEqual, getReferenceUsageSortRank, sortReferencesByUsage } from '../../utils/referenceUtils';
+import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { StylePickerModal } from '../../components/StylePickerModal';
 import { PresetPickerModal } from '../../components/PresetPickerModal';
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
-import { ImageRoleTag } from '../../components/ImageRoleTag';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
@@ -69,6 +66,52 @@ function TextReferenceIcon() {
       <rect x="3" y="14.5" width="8.5" height="1.5" rx="0.75" fill="currentColor" />
     </svg>
   );
+}
+
+function sortPromptContentByReferenceUsage(
+  content: PromptContent[],
+  references: ReferenceInfo[],
+  preferredOrder?: string[],
+) {
+  const referenceById = new Map(references.map((reference) => [reference.nodeId, reference]));
+  const referenceOrder = sortReferencesByUsage(references, preferredOrder).map((reference) => reference.nodeId);
+  const referenceOrderIndex = new Map(referenceOrder.map((nodeId, index) => [nodeId, index]));
+  const originalBlockIndex = new Map<string, number>();
+  const imageBlocks = content.filter((block, index): block is ImageReferencePromptBlock => {
+    if (block.type !== 'image_reference') return false;
+    originalBlockIndex.set(block.id, index);
+    return true;
+  });
+
+  const sortedImageBlocks = [...imageBlocks].sort((a, b) => {
+    const aReference = referenceById.get(a.sourceNodeId);
+    const bReference = referenceById.get(b.sourceNodeId);
+    const aRank = aReference
+      ? getReferenceUsageSortRank(aReference)
+      : getReferenceUsageSortRank({ role: null, roleLabel: a.usage, localReferenceType: undefined, localReferenceLabel: undefined, customRoleLabel: undefined });
+    const bRank = bReference
+      ? getReferenceUsageSortRank(bReference)
+      : getReferenceUsageSortRank({ role: null, roleLabel: b.usage, localReferenceType: undefined, localReferenceLabel: undefined, customRoleLabel: undefined });
+    if (aRank.group !== bRank.group) return aRank.group - bRank.group;
+    if (aRank.local !== bRank.local) return aRank.local - bRank.local;
+    const aOrder = referenceOrderIndex.get(a.sourceNodeId);
+    const bOrder = referenceOrderIndex.get(b.sourceNodeId);
+    if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) return aOrder - bOrder;
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+    return (originalBlockIndex.get(a.id) ?? 0) - (originalBlockIndex.get(b.id) ?? 0);
+  });
+
+  let imageBlockIndex = 0;
+  return content.map((block) => (
+    block.type === 'image_reference'
+      ? sortedImageBlocks[imageBlockIndex++] ?? block
+      : block
+  ));
+}
+
+function isPromptContentSame(a: PromptContent[], b: PromptContent[]) {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
 }
 
 export function ImageNodeControlPanel({
@@ -94,7 +137,6 @@ export function ImageNodeControlPanel({
   onRemoveReference,
   onReorderReferences,
   onUseReference,
-  onAssignReferenceRole,
   showToast,
   autoOpenLightPanel,
   onAcknowledgeAutoOpen,
@@ -123,7 +165,6 @@ export function ImageNodeControlPanel({
   onRemoveReference: (nodeId: string) => void;
   onReorderReferences: (newOrder: string[]) => void;
   onUseReference: (reference: ReferenceInfo) => void;
-  onAssignReferenceRole: (nodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => ReferenceInfo | null;
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
@@ -157,7 +198,6 @@ export function ImageNodeControlPanel({
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [showReferenceMenu, setShowReferenceMenu] = useState(false);
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
-  const [pendingReference, setPendingReference] = useState<ReferenceInfo | null>(null);
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
   const [editingPromptBlockId, setEditingPromptBlockId] = useState<string | null>(null);
@@ -197,7 +237,12 @@ export function ImageNodeControlPanel({
       const latestById = new Map(references.map((reference) => [reference.nodeId, reference]));
       const currentIds = new Set(currentRefs.map((reference) => reference.nodeId));
       const idsChanged = currentIds.size !== references.length || !references.every((reference) => currentIds.has(reference.nodeId));
-      const nextRefs = idsChanged ? references : currentRefs.map((reference) => latestById.get(reference.nodeId) || reference);
+      const nextRefs = idsChanged
+        ? sortReferencesByUsage(references)
+        : sortReferencesByUsage(
+            currentRefs.map((reference) => latestById.get(reference.nodeId) || reference),
+            currentRefs.map((reference) => reference.nodeId),
+          );
 
       return areReferenceListsEqual(currentRefs, nextRefs) ? currentRefs : nextRefs;
     });
@@ -247,10 +292,12 @@ export function ImageNodeControlPanel({
       captureReferenceRects();
       const newRefs = [...orderedRefsRef.current];
       const [moved] = newRefs.splice(sourceIndex, 1);
+      if (!moved) return;
       newRefs.splice(targetIndex, 0, moved);
-      orderedRefsRef.current = newRefs;
-      setOrderedRefs(newRefs);
-      onReorderReferences(newRefs.map((r) => r.nodeId));
+      const sortedRefs = sortReferencesByUsage(newRefs, newRefs.map((reference) => reference.nodeId));
+      orderedRefsRef.current = sortedRefs;
+      setOrderedRefs(sortedRefs);
+      onReorderReferences(sortedRefs.map((r) => r.nodeId));
     },
     [captureReferenceRects, onReorderReferences],
   );
@@ -354,11 +401,6 @@ export function ImageNodeControlPanel({
 
   const handleThumbnailClick = (ref: ReferenceInfo) => {
     if (isDraggingRef.current) return;
-    if (!hasDefinedUsage(ref)) {
-      setPendingReference(ref);
-      setShowReferenceMenu(false);
-      return;
-    }
     requestReferenceInsert(ref);
   };
 
@@ -525,6 +567,14 @@ export function ImageNodeControlPanel({
   };
 
   const imageReferenceBlocks = promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference');
+  const sortedImageReferenceBlocks = useMemo(
+    () => sortPromptContentByReferenceUsage(
+      promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference'),
+      references,
+      orderedRefs.map((reference) => reference.nodeId),
+    ) as ImageReferencePromptBlock[],
+    [orderedRefs, promptContent, references],
+  );
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const selectedStyle = getStylePresetById(selectedStyleId);
@@ -624,13 +674,12 @@ export function ImageNodeControlPanel({
 
   const closeReferenceMenus = () => {
     setShowReferenceMenu(false);
-    setPendingReference(null);
   };
 
   useEffect(() => {
     const referencesById = new Map(references.map((reference) => [reference.nodeId, reference]));
     let changed = false;
-    const nextContent = promptContent.flatMap((block) => {
+    const refreshedContent = promptContent.flatMap((block) => {
       if (block.type !== 'image_reference') return block;
       const reference = referencesById.get(block.sourceNodeId);
       if (!reference) {
@@ -651,6 +700,14 @@ export function ImageNodeControlPanel({
       }
       return updatedBlock;
     });
+    const nextContent = sortPromptContentByReferenceUsage(
+      refreshedContent,
+      references,
+      orderedRefsRef.current.map((reference) => reference.nodeId),
+    );
+    if (!isPromptContentSame(refreshedContent, nextContent)) {
+      changed = true;
+    }
     if (changed) {
       onPromptContentChange(nextContent);
     }
@@ -729,44 +786,8 @@ export function ImageNodeControlPanel({
   };
 
   const requestReferenceInsert = (reference: ReferenceInfo) => {
-    if (!hasDefinedUsage(reference)) {
-      setPendingReference(reference);
-      setShowReferenceMenu(false);
-      return;
-    }
     onUseReference(reference);
     insertReferenceBlock(reference);
-  };
-
-  const applyReferenceRole = (reference: ReferenceInfo, role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string, insertPromptBlock = true) => {
-    const roleLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
-    const updatedReference = onAssignReferenceRole(reference.nodeId, role, customRoleLabel, localReferenceType, localReferenceLabel) || { ...reference, role, roleLabel, customRoleLabel, localReferenceType, localReferenceLabel };
-    onUseReference(updatedReference);
-    if (insertPromptBlock) {
-      insertReferenceBlock(updatedReference);
-    } else {
-      removePendingAtMarker();
-      closeReferenceMenus();
-    }
-    return updatedReference;
-  };
-
-  const handleReferenceRoleSelect = (role: ImageRole, customRoleLabel?: string, localReferenceType?: LocalReferenceType, localReferenceLabel?: string) => {
-    if (!pendingReference) return;
-    const limitIssue = getReferenceLimitIssueForAdd(references, role, pendingReference.nodeId);
-    if (limitIssue) {
-      showToast?.(formatReferenceLimitIssue(limitIssue));
-      return;
-    }
-    // 检查唯一用途冲突
-    if (UNIQUE_USAGES.includes(role)) {
-      const conflictingRef = references.find((ref) => ref.nodeId !== pendingReference.nodeId && ref.role === role);
-      if (conflictingRef) {
-        showToast?.(t('reference.usageConflict', { role: getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel) }));
-        return;
-      }
-    }
-    applyReferenceRole(pendingReference, role, customRoleLabel, localReferenceType, localReferenceLabel);
   };
 
   const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -828,13 +849,8 @@ export function ImageNodeControlPanel({
       }
     }
 
-    if (pendingReference && event.key === 'Escape') {
-      event.preventDefault();
-      closeReferenceMenus();
-    }
-
     // Prompt input line break shortcuts (when no menu is open)
-    if (!showSlashMenu && !showReferenceMenu && !pendingReference) {
+    if (!showSlashMenu && !showReferenceMenu) {
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || event.shiftKey)) {
         event.preventDefault();
         const input = promptInputRef.current;
@@ -944,7 +960,6 @@ export function ImageNodeControlPanel({
 
     if (nextText[cursor - 1] === '@' && references.length > 0) {
       setActiveReferenceIndex(0);
-      setPendingReference(null);
       setShowReferenceMenu(true);
       return;
     }
@@ -960,12 +975,6 @@ export function ImageNodeControlPanel({
 
   const stopControlEvent = (event: React.SyntheticEvent) => {
     event.stopPropagation();
-  };
-
-  const openStylePicker = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-                    openStylePicker(event);
   };
 
   const slashMenuPortal = showSlashMenu && slashMenuStyle
@@ -1249,9 +1258,9 @@ export function ImageNodeControlPanel({
       {/* Prompt input */}
       <div style={{ padding: '4px 14px 12px' }} onWheel={stopControlEvent} onWheelCapture={stopControlEvent}>
         <div className="relative" onPointerDown={stopControlEvent} onMouseDown={stopControlEvent}>
-          {imageReferenceBlocks.length > 0 && (
+          {sortedImageReferenceBlocks.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
-              {imageReferenceBlocks.map((block) => {
+              {sortedImageReferenceBlocks.map((block) => {
                 const reference = references.find((item) => item.nodeId === block.sourceNodeId);
                 const previewImage = reference?.imageUrl || block.thumbnailUrl;
                 const highlighted = highlightedPromptBlockId === block.id;
@@ -1272,7 +1281,7 @@ export function ImageNodeControlPanel({
                     }}
                     onMouseEnter={() => setHoveredPromptBlockId(block.id)}
                     onMouseLeave={() => setHoveredPromptBlockId((currentId) => (currentId === block.id ? null : currentId))}
-                    className={`group/prompt-ref relative inline-flex max-w-full items-center rounded-lg border px-1.5 py-1 text-[12px] transition-all ${isEditing ? 'w-full flex-wrap gap-1.5' : 'gap-1.5'}`}
+                    className={`group/prompt-ref relative inline-flex max-w-full items-center rounded-lg border text-[13px] transition-all ${isEditing ? 'w-full flex-wrap gap-1.5 px-2 py-1.5' : 'gap-1.5 px-1.5 py-1'}`}
                     style={{
                       background: hovered || highlighted ? 'rgba(255,255,255,0.052)' : 'rgba(255,255,255,0.035)',
                       borderColor: highlighted ? `${usageColor}66` : hovered ? `${usageColor}52` : 'rgba(255,255,255,0.10)',
@@ -1296,7 +1305,7 @@ export function ImageNodeControlPanel({
                     <span
                       className="flex-shrink-0 rounded px-1.5 py-0.5 font-medium leading-none"
                       style={{
-                        color: 'rgba(255,255,255,0.72)',
+                        color: 'rgba(255,255,255,0.76)',
                         background: 'rgba(255,255,255,0.045)',
                         border: `1px solid ${hovered || highlighted ? `${usageColor}52` : `${usageColor}38`}`,
                       }}
@@ -1346,7 +1355,7 @@ export function ImageNodeControlPanel({
                         </div>
                       </>
                     ) : (
-                      <span className="min-w-0 truncate" style={{ maxWidth: 360, color: 'rgba(255,255,255,0.62)' }}>{displayPromptText}</span>
+                      <span className="min-w-0 truncate text-[13px]" style={{ maxWidth: 380, color: 'rgba(255,255,255,0.66)' }}>{displayPromptText}</span>
                     )}
                     {!isEditing && (
                       <button
@@ -1425,29 +1434,6 @@ export function ImageNodeControlPanel({
                 </button>
               ))}
             </div>
-          )}
-          {pendingReference && (
-            <ImageRoleTag
-              role={pendingReference.role}
-              customRoleLabel={pendingReference.customRoleLabel}
-              localReferenceType={pendingReference.localReferenceType}
-              localReferenceLabel={pendingReference.localReferenceLabel}
-              onChange={(role, customRoleLabel, localReferenceType, localReferenceLabel) => {
-                if (!role) {
-                  closeReferenceMenus();
-                  return;
-                }
-                handleReferenceRoleSelect(role, customRoleLabel, localReferenceType, localReferenceLabel);
-              }}
-              open
-              onOpenChange={(open) => {
-                if (!open) closeReferenceMenus();
-              }}
-              hideTrigger
-              popoverTop={0}
-              rootClassName="absolute left-0 top-7 z-50 nodrag nowheel"
-              rootStyle={{ left: 0, top: 28 }}
-            />
           )}
         </div>
       </div>
