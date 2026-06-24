@@ -17,6 +17,7 @@ type CreateImageNodeViewModelContext = {
   currentResultSet?: CurrentResultSet | null;
   generationTask?: GenerationTask | null;
   hasGenerationIntent?: boolean;
+  isReferenceLocked?: boolean;
 };
 
 export type ImageNodeViewModel = {
@@ -27,6 +28,7 @@ export type ImageNodeViewModel = {
   isEmpty: boolean;
   isReady: boolean;
   isProcessing: boolean;
+  isReferenceLocked: boolean;
   hasImage: boolean;
   hasGeneratedResult: boolean;
   showUploadArea: boolean;
@@ -38,6 +40,7 @@ export type ImageNodeViewModel = {
   showReferenceUsageControl: boolean;
   canUpload: boolean;
   canEditPrompt: boolean;
+  canEditPromptReferences: boolean;
   canEditReferenceUsage: boolean;
   canEditPreset: boolean;
   canEditStyle: boolean;
@@ -60,6 +63,7 @@ export function createImageNodeViewModel(
   const generationTask = context.generationTask ?? getNodeTask(data);
   const taskType = getTaskType(data, generationTask);
   const isProcessing = generationTask?.status === 'running' || Boolean(data.isGenerating || data.isProcessing);
+  const isReferenceLocked = context.isReferenceLocked ?? Boolean(data.isReferenceLocked);
   const displayImage = context.displayImage ?? getCurrentImage(data);
   const generatedImages = normalizeGeneratedImages(data.generatedImages);
   const currentResultSet = context.currentResultSet ?? (data.currentResultSet as CurrentResultSet | null | undefined) ?? null;
@@ -83,12 +87,13 @@ export function createImageNodeViewModel(
   const hasGenerationIntent = Boolean(context.hasGenerationIntent);
   const showEditorSurface = viewKind === 'empty' || viewKind === 'editor' || viewKind === 'processing';
   const canEditEditorControls = (viewKind === 'empty' || viewKind === 'editor') && !isProcessing;
+  const canEditPromptReferences = (viewKind === 'empty' || viewKind === 'editor') && !isProcessing;
   const showReferenceUsageControl = hasImage && (
     viewKind === 'resource' ||
     viewKind === 'editor' ||
     viewKind === 'processing'
   );
-  const canEditReferenceUsage = hasImage && (viewKind === 'resource' || viewKind === 'editor') && !isProcessing;
+  const canEditReferenceUsage = hasImage && !isProcessing && !isReferenceLocked && (viewKind === 'resource' || viewKind === 'editor');
   const canUseToolbarActions = hasImage && !isProcessing;
 
   return {
@@ -99,6 +104,7 @@ export function createImageNodeViewModel(
     isEmpty,
     isReady,
     isProcessing,
+    isReferenceLocked,
     hasImage,
     hasGeneratedResult,
     showUploadArea: isEmpty,
@@ -110,6 +116,7 @@ export function createImageNodeViewModel(
     showReferenceUsageControl,
     canUpload: viewKind === 'empty' && !isProcessing,
     canEditPrompt: canEditEditorControls,
+    canEditPromptReferences,
     canEditReferenceUsage,
     canEditPreset: canEditEditorControls,
     canEditStyle: canEditEditorControls,

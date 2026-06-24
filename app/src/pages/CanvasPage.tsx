@@ -22,7 +22,7 @@ import { useTextNodeFloatingPanelPosition } from '../features/canvas/hooks/useTe
 import { useCanvasUndoRedo } from '../features/canvas/hooks/useCanvasUndoRedo';
 import { useCanvasImageImport } from '../features/canvas/hooks/useCanvasImageImport';
 import { useCanvasNodeClipboard } from '../features/canvas/hooks/useCanvasNodeClipboard';
-import type { ImageRole } from '../features/canvas/types/imageNode.types';
+import type { ImageRole, PromptContent } from '../features/canvas/types/imageNode.types';
 import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
@@ -174,6 +174,21 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
     width: image.width,
     height: image.height,
   };
+}
+
+function isProcessingImageNode(node: Node) {
+  if (node.type !== 'image') return false;
+  const generationTask = node.data.generationTask as GenerationTask | null | undefined;
+  return generationTask?.status === 'running' || Boolean(node.data.isGenerating || node.data.isProcessing);
+}
+
+function getPromptReferenceSourceNodeIds(data: Node['data']) {
+  const promptContent = Array.isArray(data.promptContent) ? (data.promptContent as PromptContent[]) : [];
+  return promptContent.flatMap((block) => (
+    block.type === 'image_reference' && block.sourceNodeId
+      ? [block.sourceNodeId]
+      : []
+  ));
 }
 
 /* ─── Flow Inner ─── */
@@ -1018,11 +1033,23 @@ function FlowCanvas() {
     lastPointerPositionRef,
   });
 
+  const lockedPromptReferenceNodeIds = useMemo(() => {
+    const lockedNodeIds = new Set<string>();
+    nodes.forEach((node) => {
+      if (!isProcessingImageNode(node)) return;
+      getPromptReferenceSourceNodeIds(node.data).forEach((sourceNodeId) => {
+        lockedNodeIds.add(sourceNodeId);
+      });
+    });
+    return lockedNodeIds;
+  }, [nodes]);
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
       ...n,
       data: {
         ...n.data,
+        isReferenceLocked: n.type === 'image' ? lockedPromptReferenceNodeIds.has(n.id) : undefined,
         onStartLineDraw: startLineDraw,
         onRemoveReferenceEdge: removeReferenceEdge,
         onSwapCompareInputs: swapCompareInputs,
@@ -1037,7 +1064,7 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [nodes, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [nodes, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {

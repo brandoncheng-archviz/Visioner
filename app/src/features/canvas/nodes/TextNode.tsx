@@ -312,7 +312,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
               onKeyDown={handleInlineEditorKeyDown}
               onWheel={(event) => event.stopPropagation()}
               onWheelCapture={(event) => event.stopPropagation()}
-              className={`text-node-editor-scrollbar nodrag nowheel block h-full min-h-0 w-full resize-none overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent px-4 py-4 text-[13px] leading-6 text-white/72 outline-none placeholder:text-white/24 ${
+              className={`text-node-editor-scrollbar nodrag nowheel block h-full min-h-0 w-full resize-none overflow-x-hidden overflow-y-auto overscroll-contain bg-transparent px-4 py-4 text-[15px] leading-6 text-white/72 outline-none placeholder:text-white/24 ${
                 usesTextResourceLayout ? 'pb-9 pr-8' : ''
               }`}
               style={{
@@ -323,7 +323,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
             />
           ) : content ? (
             <div
-              className={`text-node-editor-scrollbar nowheel h-full min-h-0 w-full select-none overflow-x-hidden overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-4 py-4 text-[13px] leading-6 text-white/68 [overflow-wrap:anywhere] ${
+              className={`text-node-editor-scrollbar nowheel h-full min-h-0 w-full select-none overflow-x-hidden overflow-y-auto overscroll-contain whitespace-pre-wrap break-words px-4 py-4 text-[15px] leading-6 text-white/68 [overflow-wrap:anywhere] ${
                 usesTextResourceLayout ? 'pb-9 pr-8' : 'pr-3'
               }`}
               style={{ maxHeight: usesTextResourceLayout ? '100%' : TEXT_NODE_MAX_HEIGHT }}
@@ -345,7 +345,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
               }}
             >
               <TextNodeGlyph className="mb-7 text-white/20" />
-              <div className="text-[13px] leading-6 text-white/32">
+              <div className="text-[15px] leading-6 text-white/32">
                 双击编写内容，开始你的创作。
               </div>
             </div>

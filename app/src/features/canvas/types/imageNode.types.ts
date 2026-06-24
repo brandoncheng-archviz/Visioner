@@ -107,6 +107,7 @@ export type PromptContent =
       usage: string;
       thumbnailUrl: string;
       promptText: string;
+      promptTextEdited?: boolean;
     }
   | {
       type: 'preset';

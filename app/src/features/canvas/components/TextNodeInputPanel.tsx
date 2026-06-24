@@ -278,7 +278,7 @@ export function TextNodeInputPanel({
           className="nowheel w-full resize-none bg-transparent outline-none placeholder:text-[rgba(255,255,255,0.38)]"
           style={{
             color: 'rgba(255,255,255,0.94)',
-            fontSize: 16,
+            fontSize: 15,
             lineHeight: 1.58,
             height: '100%',
           }}

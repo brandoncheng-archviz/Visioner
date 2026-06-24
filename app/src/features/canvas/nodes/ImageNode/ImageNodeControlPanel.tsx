@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ArrowUp,
   Maximize2,
-  Pencil,
   Zap,
 } from 'lucide-react';
 import type {
@@ -44,7 +43,10 @@ import {
   isPresetVisibleInLibrary,
 } from '../../constants/presets';
 import { createImageReferenceBlock, getPresetPromptText, stripReferencePromptMetadata } from '../../utils/promptUtils';
-import { areReferenceListsEqual, getReferenceUsageSortRank, sortReferencesByUsage } from '../../utils/referenceUtils';
+import {
+  getReferenceUsageSortRank,
+  sortReferencesByUsage,
+} from '../../utils/referenceUtils';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { StylePickerModal } from '../../components/StylePickerModal';
 import { PresetPickerModal } from '../../components/PresetPickerModal';
@@ -52,6 +54,8 @@ import { LightPreviewPanel } from '../../components/LightPreviewPanel';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
+const GENERATION_CONTROL_BUTTON_DISABLED_CLASS =
+  'border-[rgba(148,163,184,0.14)] bg-transparent text-[rgba(203,213,225,0.62)]';
 const GENERATION_CONTROL_BUTTON_SELECTED_CLASS =
   'border-[#94A3B8] bg-[rgba(148,163,184,0.12)] text-[#E2E8F0] shadow-none';
 const GENERATION_CREDIT_COST = 14;
@@ -71,11 +75,10 @@ function TextReferenceIcon() {
 function sortPromptContentByReferenceUsage(
   content: PromptContent[],
   references: ReferenceInfo[],
-  preferredOrder?: string[],
 ) {
   const referenceById = new Map(references.map((reference) => [reference.nodeId, reference]));
-  const referenceOrder = sortReferencesByUsage(references, preferredOrder).map((reference) => reference.nodeId);
-  const referenceOrderIndex = new Map(referenceOrder.map((nodeId, index) => [nodeId, index]));
+  const sortedReferenceIds = sortReferencesByUsage(references).map((reference) => reference.nodeId);
+  const sortedReferenceIndex = new Map(sortedReferenceIds.map((nodeId, index) => [nodeId, index]));
   const originalBlockIndex = new Map<string, number>();
   const imageBlocks = content.filter((block, index): block is ImageReferencePromptBlock => {
     if (block.type !== 'image_reference') return false;
@@ -93,9 +96,8 @@ function sortPromptContentByReferenceUsage(
       ? getReferenceUsageSortRank(bReference)
       : getReferenceUsageSortRank({ role: null, roleLabel: b.usage, localReferenceType: undefined, localReferenceLabel: undefined, customRoleLabel: undefined });
     if (aRank.group !== bRank.group) return aRank.group - bRank.group;
-    if (aRank.local !== bRank.local) return aRank.local - bRank.local;
-    const aOrder = referenceOrderIndex.get(a.sourceNodeId);
-    const bOrder = referenceOrderIndex.get(b.sourceNodeId);
+    const aOrder = sortedReferenceIndex.get(a.sourceNodeId);
+    const bOrder = sortedReferenceIndex.get(b.sourceNodeId);
     if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) return aOrder - bOrder;
     if (aOrder !== undefined) return -1;
     if (bOrder !== undefined) return 1;
@@ -108,10 +110,6 @@ function sortPromptContentByReferenceUsage(
       ? sortedImageBlocks[imageBlockIndex++] ?? block
       : block
   ));
-}
-
-function isPromptContentSame(a: PromptContent[], b: PromptContent[]) {
-  return a.length === b.length && a.every((item, index) => item === b[index]);
 }
 
 export function ImageNodeControlPanel({
@@ -129,13 +127,19 @@ export function ImageNodeControlPanel({
   onModelParamsChange,
   onGenerate,
   canGenerate,
+  canEditPrompt,
+  canEditPromptReferences,
+  canEditPreset,
+  canEditStyle,
+  canEditLighting,
+  canEditModel,
+  canDeleteReference,
   isGenerating,
   generationTask,
   textReferences,
   onFocusTextReference,
   references,
   onRemoveReference,
-  onReorderReferences,
   onUseReference,
   showToast,
   autoOpenLightPanel,
@@ -155,6 +159,13 @@ export function ImageNodeControlPanel({
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void | Promise<void>;
   canGenerate: boolean;
+  canEditPrompt: boolean;
+  canEditPromptReferences: boolean;
+  canEditPreset: boolean;
+  canEditStyle: boolean;
+  canEditLighting: boolean;
+  canEditModel: boolean;
+  canDeleteReference: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   textReferences: TextReferenceInfo[];
@@ -163,7 +174,6 @@ export function ImageNodeControlPanel({
   onAcknowledgeAutoOpen?: () => void;
   references: ReferenceInfo[];
   onRemoveReference: (nodeId: string) => void;
-  onReorderReferences: (newOrder: string[]) => void;
   onUseReference: (reference: ReferenceInfo) => void;
   showToast?: (msg: string) => void;
 }) {
@@ -181,15 +191,14 @@ export function ImageNodeControlPanel({
   const [showLightPreview, setShowLightPreview] = useState(false);
 
   useEffect(() => {
-    if (autoOpenLightPanel) {
+    if (autoOpenLightPanel && canEditLighting) {
       const timer = setTimeout(() => {
         setShowLightPreview(true);
         onAcknowledgeAutoOpen?.();
       }, 0);
       return () => clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoOpenLightPanel]);
+  }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
   const [showPresetModal, setShowPresetModal] = useState(false);
   const [showStylePicker, setShowStylePicker] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -217,204 +226,20 @@ export function ImageNodeControlPanel({
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  /* ─── Reference thumbnail drag-and-drop reorder ─── */
-  const [orderedRefs, setOrderedRefs] = useState(references);
-  const [draggingRefId, setDraggingRefId] = useState<string | null>(null);
-  const isDraggingRef = useRef(false);
-  const orderedRefsRef = useRef(references);
-  const referenceItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const referenceRectsBeforeUpdateRef = useRef<Map<string, DOMRect> | null>(null);
-  const referenceDragRef = useRef<{
-    nodeId: string;
-    pointerId: number;
-    startX: number;
-    startY: number;
-    moved: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    setOrderedRefs((currentRefs) => {
-      const latestById = new Map(references.map((reference) => [reference.nodeId, reference]));
-      const currentIds = new Set(currentRefs.map((reference) => reference.nodeId));
-      const idsChanged = currentIds.size !== references.length || !references.every((reference) => currentIds.has(reference.nodeId));
-      const nextRefs = idsChanged
-        ? sortReferencesByUsage(references)
-        : sortReferencesByUsage(
-            currentRefs.map((reference) => latestById.get(reference.nodeId) || reference),
-            currentRefs.map((reference) => reference.nodeId),
-          );
-
-      return areReferenceListsEqual(currentRefs, nextRefs) ? currentRefs : nextRefs;
-    });
-  }, [references]);
-
-  useEffect(() => {
-    orderedRefsRef.current = orderedRefs;
-  }, [orderedRefs]);
-
-  useLayoutEffect(() => {
-    const previousRects = referenceRectsBeforeUpdateRef.current;
-    if (!previousRects) return;
-    referenceRectsBeforeUpdateRef.current = null;
-
-    orderedRefsRef.current.forEach((ref) => {
-      if (ref.nodeId === draggingRefId) return;
-      const element = referenceItemRefs.current.get(ref.nodeId);
-      const previousRect = previousRects.get(ref.nodeId);
-      if (!element || !previousRect) return;
-
-      const nextRect = element.getBoundingClientRect();
-      const deltaX = previousRect.left - nextRect.left;
-      const deltaY = previousRect.top - nextRect.top;
-      if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
-
-      element.style.transition = 'none';
-      element.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-      requestAnimationFrame(() => {
-        element.style.transition = 'transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 120ms ease';
-        element.style.transform = 'translate(0, 0)';
-      });
-    });
-  }, [orderedRefs, draggingRefId]);
-
-  const captureReferenceRects = useCallback(() => {
-    const rects = new Map<string, DOMRect>();
-    orderedRefsRef.current.forEach((ref) => {
-      const element = referenceItemRefs.current.get(ref.nodeId);
-      if (element) rects.set(ref.nodeId, element.getBoundingClientRect());
-    });
-    referenceRectsBeforeUpdateRef.current = rects;
-  }, []);
-
-  const reorderReferences = useCallback(
-    (sourceIndex: number, targetIndex: number) => {
-      if (sourceIndex === targetIndex) return;
-      captureReferenceRects();
-      const newRefs = [...orderedRefsRef.current];
-      const [moved] = newRefs.splice(sourceIndex, 1);
-      if (!moved) return;
-      newRefs.splice(targetIndex, 0, moved);
-      const sortedRefs = sortReferencesByUsage(newRefs, newRefs.map((reference) => reference.nodeId));
-      orderedRefsRef.current = sortedRefs;
-      setOrderedRefs(sortedRefs);
-      onReorderReferences(sortedRefs.map((r) => r.nodeId));
-    },
-    [captureReferenceRects, onReorderReferences],
+  /* ─── Reference thumbnails ─── */
+  const sortedReferences = useMemo(
+    () => sortReferencesByUsage(references),
+    [references],
   );
-
-  const resetPointerReferenceDrag = useCallback(
-    (keepClickBlocked = true) => {
-      referenceDragRef.current = null;
-      setDraggingRefId(null);
-      if (keepClickBlocked) {
-        window.setTimeout(() => {
-          isDraggingRef.current = false;
-        }, 50);
-      } else {
-        isDraggingRef.current = false;
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const drag = referenceDragRef.current;
-      if (!drag || event.pointerId !== drag.pointerId) return;
-
-      event.preventDefault();
-      const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-      if (distance > 3) drag.moved = true;
-
-      let swapped = false;
-      do {
-        swapped = false;
-        const currentRefs = orderedRefsRef.current;
-        const currentIndex = currentRefs.findIndex((ref) => ref.nodeId === drag.nodeId);
-        if (currentIndex < 0) return;
-
-        const prevRef = currentRefs[currentIndex - 1];
-        const nextRef = currentRefs[currentIndex + 1];
-        const prevEl = prevRef ? referenceItemRefs.current.get(prevRef.nodeId) : null;
-        const nextEl = nextRef ? referenceItemRefs.current.get(nextRef.nodeId) : null;
-
-        if (prevEl) {
-          const prevRect = prevEl.getBoundingClientRect();
-          if (event.clientX < prevRect.left + prevRect.width / 2) {
-            reorderReferences(currentIndex, currentIndex - 1);
-            swapped = true;
-            continue;
-          }
-        }
-
-        if (nextEl) {
-          const nextRect = nextEl.getBoundingClientRect();
-          if (event.clientX > nextRect.left + nextRect.width / 2) {
-            reorderReferences(currentIndex, currentIndex + 1);
-            swapped = true;
-          }
-        }
-      } while (swapped);
-    };
-
-    const handlePointerEnd = (event: PointerEvent) => {
-      const drag = referenceDragRef.current;
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      event.preventDefault();
-      resetPointerReferenceDrag(drag.moved);
-    };
-
-    const handleWindowBlur = () => resetPointerReferenceDrag(true);
-
-    window.addEventListener('pointermove', handlePointerMove, { passive: false });
-    window.addEventListener('pointerup', handlePointerEnd, { passive: false });
-    window.addEventListener('pointercancel', handlePointerEnd, { passive: false });
-    window.addEventListener('blur', handleWindowBlur);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerEnd);
-      window.removeEventListener('pointercancel', handlePointerEnd);
-      window.removeEventListener('blur', handleWindowBlur);
-    };
-  }, [reorderReferences, resetPointerReferenceDrag]);
-
-  const handleRefPointerDown =
-    (index: number) =>
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) return;
-      const ref = orderedRefsRef.current[index];
-      if (!ref) return;
-      referenceDragRef.current = {
-        nodeId: ref.nodeId,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        moved: false,
-      };
-      isDraggingRef.current = true;
-      setDraggingRefId(ref.nodeId);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      event.preventDefault();
-      event.stopPropagation();
-    };
 
   const handleThumbnailClick = (ref: ReferenceInfo) => {
-    if (isDraggingRef.current) return;
+    if (!canEditPromptReferences) return;
     requestReferenceInsert(ref);
   };
 
-  const renderReferenceThumbnail = (ref: ReferenceInfo, idx: number, sortable: boolean) => (
+  const renderReferenceThumbnail = (ref: ReferenceInfo) => (
     <div
       key={ref.nodeId}
-      ref={(element) => {
-        if (!sortable) return;
-        if (element) {
-          referenceItemRefs.current.set(ref.nodeId, element);
-        } else {
-          referenceItemRefs.current.delete(ref.nodeId);
-        }
-      }}
       role="button"
       tabIndex={0}
       draggable={false}
@@ -422,19 +247,18 @@ export function ImageNodeControlPanel({
       onKeyDown={(event) => {
         if (event.key === 'Enter') handleThumbnailClick(ref);
       }}
-      onPointerDown={sortable ? handleRefPointerDown(idx) : (event) => event.stopPropagation()}
-      onPointerCancel={() => sortable && resetPointerReferenceDrag(true)}
-      className={`nodrag nowheel group/ref relative flex-shrink-0 rounded-lg outline-none ${sortable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+      onPointerDown={(event) => event.stopPropagation()}
+      className="nodrag nowheel group/ref relative flex-shrink-0 rounded-lg outline-none"
       style={{
         width: 54,
         height: 50,
-        opacity: draggingRefId === ref.nodeId ? 0.48 : 1,
-        transform: draggingRefId === ref.nodeId ? 'scale(0.96)' : 'scale(1)',
         transition: 'transform 160ms ease, opacity 120ms ease',
         touchAction: 'none',
+        cursor: canEditPromptReferences ? 'pointer' : 'default',
+        opacity: canEditPromptReferences ? 1 : 0.72,
       }}
     >
-      {ref.imageUrl && draggingRefId === null && (
+      {ref.imageUrl && canEditPromptReferences && (
         <div
           className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/ref:block"
           style={{
@@ -463,7 +287,11 @@ export function ImageNodeControlPanel({
         className="relative h-full w-full overflow-hidden rounded-lg"
         style={{
           background: ref.role === 'undefined_usage' ? 'rgba(156,163,175,0.08)' : 'rgba(255,255,255,0.04)',
-          border: ref.role === 'undefined_usage' ? '1px solid rgba(156,163,175,0.20)' : `1px solid ${getImageRoleColor(ref.role, ref.localReferenceType)}`,
+          border: canEditPromptReferences
+            ? ref.role === 'undefined_usage'
+              ? '1px solid rgba(156,163,175,0.20)'
+              : `1px solid ${getImageRoleColor(ref.role, ref.localReferenceType)}`
+            : '1px solid rgba(255,255,255,0.12)',
         }}
       >
         {ref.imageUrl ? (
@@ -477,22 +305,20 @@ export function ImageNodeControlPanel({
           draggable={false}
           type="button"
           onPointerDownCapture={(event) => {
-            referenceDragRef.current = null;
-            isDraggingRef.current = false;
-            setDraggingRefId(null);
             event.preventDefault();
             event.stopPropagation();
           }}
           onClickCapture={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (!canDeleteReference) return;
             onRemoveReference(ref.nodeId);
           }}
           onDragStart={(event) => {
             event.preventDefault();
             event.stopPropagation();
           }}
-          className="nodrag nowheel absolute right-0 top-0 z-30 hidden items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/ref:flex"
+          className={`nodrag nowheel absolute right-0 top-0 z-30 items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black ${canDeleteReference ? 'hidden group-hover/ref:flex' : 'hidden'}`}
           style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
           title={t('imageNode.removeReference')}
         >
@@ -552,9 +378,10 @@ export function ImageNodeControlPanel({
             onClickCapture={(event) => {
               event.preventDefault();
               event.stopPropagation();
+              if (!canDeleteReference) return;
               onRemoveReference(reference.nodeId);
             }}
-            className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition-colors hover:bg-black hover:text-white group-hover/text-ref:flex"
+            className={`nodrag nowheel absolute right-0 top-0 z-30 h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition-colors hover:bg-black hover:text-white ${canDeleteReference ? 'hidden group-hover/text-ref:flex' : 'hidden'}`}
             style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
             title="断开文本引用"
             aria-label="断开文本引用"
@@ -571,15 +398,14 @@ export function ImageNodeControlPanel({
     () => sortPromptContentByReferenceUsage(
       promptContent.filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference'),
       references,
-      orderedRefs.map((reference) => reference.nodeId),
     ) as ImageReferencePromptBlock[],
-    [orderedRefs, promptContent, references],
+    [promptContent, references],
   );
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const selectedStyle = getStylePresetById(selectedStyleId);
-  const hasTooManyReferences = orderedRefs.length > MAX_REFERENCE_IMAGES_PER_NODE;
-  const hasManyReferences = orderedRefs.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
+  const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
+  const hasManyReferences = sortedReferences.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
 
   const getSlashPresetName = (preset: PresetItem) =>
     t(`preset.${preset.id}.name`, { defaultValue: preset.title || preset.name });
@@ -639,6 +465,7 @@ export function ImageNodeControlPanel({
   };
 
   const appendPresetPromptBlocks = (presetIds: string[], appliedPresets?: PresetItem[]) => {
+    if (!canEditPreset || !canEditPrompt) return;
     const appliedPresetMap = new Map((appliedPresets || []).map((preset) => [preset.id, preset]));
     const blocks = presetIds
       .map((presetId) => appliedPresetMap.get(presetId) || getPresetById(presetId))
@@ -652,6 +479,7 @@ export function ImageNodeControlPanel({
   };
 
   const handlePresetModalApply = (presetIds: string[], appliedPresets?: PresetItem[]) => {
+    if (!canEditPreset) return;
     const newlySelectedPresetIds = presetIds.filter((presetId) => !selectedPresets.includes(presetId));
     const idsToInsert = newlySelectedPresetIds.length > 0 ? newlySelectedPresetIds : presetIds;
     appendPresetPromptBlocks(idsToInsert, appliedPresets);
@@ -677,6 +505,7 @@ export function ImageNodeControlPanel({
   };
 
   useEffect(() => {
+    if (!canEditPromptReferences) return;
     const referencesById = new Map(references.map((reference) => [reference.nodeId, reference]));
     let changed = false;
     const refreshedContent = promptContent.flatMap((block) => {
@@ -688,10 +517,11 @@ export function ImageNodeControlPanel({
       }
       const nextBlock = createImageReferenceBlock(reference);
       const currentPromptText = stripReferencePromptMetadata(block.promptText || '');
-      const shouldRefreshPromptText = block.usage !== nextBlock.usage || !currentPromptText;
+      const shouldRefreshUsage = block.usage !== nextBlock.usage;
+      const shouldRefreshPromptText = !block.promptTextEdited && (shouldRefreshUsage || !currentPromptText);
       const updatedBlock = {
         ...block,
-        usage: nextBlock.usage,
+        usage: shouldRefreshUsage ? nextBlock.usage : block.usage,
         thumbnailUrl: nextBlock.thumbnailUrl,
         promptText: shouldRefreshPromptText ? nextBlock.promptText : currentPromptText,
       };
@@ -700,20 +530,13 @@ export function ImageNodeControlPanel({
       }
       return updatedBlock;
     });
-    const nextContent = sortPromptContentByReferenceUsage(
-      refreshedContent,
-      references,
-      orderedRefsRef.current.map((reference) => reference.nodeId),
-    );
-    if (!isPromptContentSame(refreshedContent, nextContent)) {
-      changed = true;
-    }
     if (changed) {
-      onPromptContentChange(nextContent);
+      onPromptContentChange(refreshedContent);
     }
-  }, [onPromptContentChange, promptContent, references]);
+  }, [canEditPromptReferences, onPromptContentChange, promptContent, references]);
 
   const removePendingAtMarker = () => {
+    if (!canEditPrompt) return;
     const input = promptInputRef.current;
     const cursor = input?.selectionStart ?? promptText.length;
     if (cursor > 0 && promptText[cursor - 1] === '@') {
@@ -735,6 +558,7 @@ export function ImageNodeControlPanel({
   };
 
   const insertReferenceBlock = (reference: ReferenceInfo) => {
+    if (!canEditPromptReferences) return;
     const existingBlock = imageReferenceBlocks.find((block) => block.sourceNodeId === reference.nodeId);
     if (existingBlock) {
       flashPromptBlock(existingBlock.id);
@@ -755,6 +579,7 @@ export function ImageNodeControlPanel({
   };
 
   const removePromptReferenceBlock = (blockId: string) => {
+    if (!canEditPromptReferences) return;
     onPromptContentChange(promptContent.filter((item) => item.type === 'text' || item.id !== blockId));
     if (editingPromptBlockId === blockId) {
       setEditingPromptBlockId(null);
@@ -763,16 +588,22 @@ export function ImageNodeControlPanel({
   };
 
   const startEditPromptReferenceBlock = (block: ImageReferencePromptBlock) => {
+    if (!canEditPromptReferences) return;
     setEditingPromptBlockId(block.id);
     setEditingPromptText(stripReferencePromptMetadata(block.promptText));
   };
 
   const savePromptReferenceBlock = (blockId: string) => {
+    if (!canEditPromptReferences) return;
     const nextPromptText = stripReferencePromptMetadata(editingPromptText);
     onPromptContentChange(
       promptContent.map((item) =>
         item.type === 'image_reference' && item.id === blockId
-          ? { ...item, promptText: nextPromptText }
+          ? {
+              ...item,
+              promptText: nextPromptText,
+              promptTextEdited: true,
+            }
           : item,
       ),
     );
@@ -780,17 +611,14 @@ export function ImageNodeControlPanel({
     setEditingPromptText('');
   };
 
-  const cancelEditPromptReferenceBlock = () => {
-    setEditingPromptBlockId(null);
-    setEditingPromptText('');
-  };
-
   const requestReferenceInsert = (reference: ReferenceInfo) => {
+    if (!canEditPromptReferences) return;
     onUseReference(reference);
     insertReferenceBlock(reference);
   };
 
   const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!canEditPrompt) return;
     if (event.nativeEvent.isComposing) return;
 
     if (showSlashMenu) {
@@ -827,20 +655,21 @@ export function ImageNodeControlPanel({
       }
     }
 
-    if (showReferenceMenu && references.length > 0) {
+    if (showReferenceMenu && sortedReferences.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        setActiveReferenceIndex((index) => (index + 1) % references.length);
+        setActiveReferenceIndex((index) => (index + 1) % sortedReferences.length);
         return;
       }
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        setActiveReferenceIndex((index) => (index - 1 + references.length) % references.length);
+        setActiveReferenceIndex((index) => (index - 1 + sortedReferences.length) % sortedReferences.length);
         return;
       }
       if (event.key === 'Enter') {
         event.preventDefault();
-        requestReferenceInsert(references[activeReferenceIndex]);
+        const selectedReference = sortedReferences[activeReferenceIndex];
+        if (selectedReference) requestReferenceInsert(selectedReference);
         return;
       }
       if (event.key === 'Escape') {
@@ -874,7 +703,7 @@ export function ImageNodeControlPanel({
   };
 
   useEffect(() => {
-    if (!showSlashMenu) return;
+    if (!showSlashMenu || !canEditPrompt) return;
 
     updateSlashMenuPosition();
 
@@ -896,14 +725,15 @@ export function ImageNodeControlPanel({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [showSlashMenu, updateSlashMenuPosition]);
+  }, [canEditPrompt, showSlashMenu, updateSlashMenuPosition]);
 
   useLayoutEffect(() => {
-    if (!showSlashMenu) return;
+    if (!showSlashMenu || !canEditPrompt) return;
     updateSlashMenuPosition();
-  }, [showSlashMenu, slashActiveTab, slashQuery, updateSlashMenuPosition]);
+  }, [canEditPrompt, showSlashMenu, slashActiveTab, slashQuery, updateSlashMenuPosition]);
 
   const insertSlashPreset = (presetId: string) => {
+    if (!canEditPrompt || !canEditPreset) return;
     const preset = getPresetById(presetId);
     if (!preset) {
       closeSlashMenu();
@@ -935,6 +765,7 @@ export function ImageNodeControlPanel({
   };
 
   const handlePromptChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!canEditPrompt) return;
     const nextText = event.target.value;
     const cursor = event.target.selectionStart;
     onPromptChange(nextText);
@@ -958,7 +789,7 @@ export function ImageNodeControlPanel({
       closeSlashMenu();
     }
 
-    if (nextText[cursor - 1] === '@' && references.length > 0) {
+    if (nextText[cursor - 1] === '@' && sortedReferences.length > 0) {
       setActiveReferenceIndex(0);
       setShowReferenceMenu(true);
       return;
@@ -977,7 +808,7 @@ export function ImageNodeControlPanel({
     event.stopPropagation();
   };
 
-  const slashMenuPortal = showSlashMenu && slashMenuStyle
+  const slashMenuPortal = canEditPrompt && showSlashMenu && slashMenuStyle
     ? createPortal(
       <div
         ref={slashMenuRef}
@@ -1077,18 +908,26 @@ export function ImageNodeControlPanel({
           {/* Preset */}
           <div className="relative">
             <button
-              onClick={() => { setShowPresetModal(true); setShowLightPreview(false); setShowStylePicker(false); }}
-              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${GENERATION_CONTROL_BUTTON_CLASS}`}
+              disabled={!canEditPreset}
+              onClick={() => {
+                if (!canEditPreset) return;
+                setShowPresetModal(true);
+                setShowLightPreview(false);
+                setShowStylePicker(false);
+              }}
+              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canEditPreset ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
               style={{
                 width: 54,
                 height: 50,
                 padding: '4px',
+                opacity: canEditPreset ? 1 : 0.45,
+                cursor: canEditPreset ? 'pointer' : 'not-allowed',
               }}
             >
               <Bookmark className="w-4 h-4" />
               <span style={{ fontSize: 14 }}>{t('imageNode.preset')}</span>
             </button>
-            {showPresetModal && (
+            {canEditPreset && showPresetModal && (
               <PresetPickerModal
                 open={showPresetModal}
                 selectedPresetIds={selectedPresets}
@@ -1103,8 +942,18 @@ export function ImageNodeControlPanel({
               <div className="group/light-btn relative" style={{ width: 54, height: 50 }}>
                 <button
                   type="button"
-                  onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
-                  className={`relative flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border p-0 transition-colors ${GENERATION_CONTROL_BUTTON_SELECTED_CLASS}`}
+                  disabled={!canEditLighting}
+                  onClick={() => {
+                    if (!canEditLighting) return;
+                    setShowLightPreview(true);
+                    setShowPresetModal(false);
+                    setShowStylePicker(false);
+                  }}
+                  className={`relative flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border p-0 transition-colors ${canEditLighting ? GENERATION_CONTROL_BUTTON_SELECTED_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
+                  style={{
+                    opacity: canEditLighting ? 1 : 0.45,
+                    cursor: canEditLighting ? 'pointer' : 'not-allowed',
+                  }}
                 >
                   <img
                     src={lightPreview.derived.previewImagePath}
@@ -1122,10 +971,11 @@ export function ImageNodeControlPanel({
                   onClickCapture={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
+                    if (!canEditLighting) return;
                     onLightPreviewChange(null);
                     setShowLightPreview(false);
                   }}
-                  className="nodrag nowheel absolute right-0 top-0 z-30 hidden items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black group-hover/light-btn:flex"
+                  className={`nodrag nowheel absolute right-0 top-0 z-30 items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black ${canEditLighting ? 'hidden group-hover/light-btn:flex' : 'hidden'}`}
                   style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
                   title="清除光影设置"
                   aria-label="清除光影设置"
@@ -1133,33 +983,48 @@ export function ImageNodeControlPanel({
                   <X className="h-2.5 w-2.5" />
                 </button>
                 {/* Hover tooltip */}
-                <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[220px] rounded-xl p-2.5 text-left group-hover/light-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
-                  <div className="text-[14px] font-medium text-white/90">光影</div>
-                  <div className="mt-1 text-[13px] text-white/55">{lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}</div>
-                  <div className="mt-1.5 space-y-0.5 text-[13px] text-white/48">
-                    <div>太阳高度：{lightPreview.sun.elevation}°</div>
-                    <div>太阳方位：{lightPreview.sun.azimuth}°</div>
-                    <div>天空：{lightPreview.derived.skyLabel}</div>
-                    <div>阴影：{lightPreview.derived.shadowLengthLabel} · {lightPreview.derived.shadowBlurLabel}</div>
+                {canEditLighting && (
+                  <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[220px] rounded-xl p-2.5 text-left group-hover/light-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
+                    <div className="text-[14px] font-medium text-white/90">光影</div>
+                    <div className="mt-1 text-[13px] text-white/55">{lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}</div>
+                    <div className="mt-1.5 space-y-0.5 text-[13px] text-white/48">
+                      <div>太阳高度：{lightPreview.sun.elevation}°</div>
+                      <div>太阳方位：{lightPreview.sun.azimuth}°</div>
+                      <div>天空：{lightPreview.derived.skyLabel}</div>
+                      <div>阴影：{lightPreview.derived.shadowLengthLabel} · {lightPreview.derived.shadowBlurLabel}</div>
+                    </div>
+                    <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.72)' }}>点击可重新设置</div>
                   </div>
-                  <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.72)' }}>点击可重新设置</div>
-                </div>
+                )}
               </div>
             ) : (
               <button
-                onClick={() => { setShowLightPreview(true); setShowPresetModal(false); setShowStylePicker(false); }}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${GENERATION_CONTROL_BUTTON_CLASS}`}
-                style={{ width: 54, height: 50, padding: '4px' }}
+                disabled={!canEditLighting}
+                onClick={() => {
+                  if (!canEditLighting) return;
+                  setShowLightPreview(true);
+                  setShowPresetModal(false);
+                  setShowStylePicker(false);
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canEditLighting ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
+                style={{
+                  width: 54,
+                  height: 50,
+                  padding: '4px',
+                  opacity: canEditLighting ? 1 : 0.45,
+                  cursor: canEditLighting ? 'pointer' : 'not-allowed',
+                }}
               >
                 <Sun className="w-4 h-4" />
                 <span style={{ fontSize: 14 }}>光影</span>
               </button>
             )}
-            {showLightPreview && (
+            {canEditLighting && showLightPreview && (
               <LightPreviewPanel
                 initialSun={lightPreview?.sun}
                 initialSettings={lightPreview?.settings}
                 onApply={(data) => {
+                  if (!canEditLighting) return;
                   onLightPreviewChange(data);
                   setShowLightPreview(false);
                 }}
@@ -1170,7 +1035,9 @@ export function ImageNodeControlPanel({
           {/* Style */}
           <div className="relative">
             <button
+              disabled={!canEditStyle}
               onClick={() => {
+                if (!canEditStyle) return;
                 setShowStylePicker(true);
                 setShowPresetModal(false);
                 setShowLightPreview(false);
@@ -1178,6 +1045,7 @@ export function ImageNodeControlPanel({
               onPointerDown={(e) => {
                 if (e.button !== 0) return;
                 e.stopPropagation();
+                if (!canEditStyle) return;
                 setShowStylePicker(true);
                 setShowPresetModal(false);
                 setShowLightPreview(false);
@@ -1185,13 +1053,14 @@ export function ImageNodeControlPanel({
               className={`group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
                 selectedStyle
                   ? GENERATION_CONTROL_BUTTON_SELECTED_CLASS
-                  : GENERATION_CONTROL_BUTTON_CLASS
+                  : canEditStyle ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS
               }`}
               style={{
                 width: 54,
                 height: 50,
                 padding: selectedStyle ? 0 : '4px',
-                opacity: 1,
+                opacity: canEditStyle ? 1 : 0.45,
+                cursor: canEditStyle ? 'pointer' : 'not-allowed',
               }}
               title={t('style.selectStyle')}
             >
@@ -1205,7 +1074,7 @@ export function ImageNodeControlPanel({
                   <span style={{ fontSize: 14 }}>{t('imageNode.style')}</span>
                 </>
               )}
-              {selectedStyle && (
+              {selectedStyle && canEditStyle && (
                 <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-xl p-2.5 text-left group-hover/style-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
                   <div className="text-[14px] font-medium text-white/90">{selectedStyle.title}</div>
                   <div className="mt-1 text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.56)' }}>{selectedStyle.shortDescription}</div>
@@ -1214,17 +1083,17 @@ export function ImageNodeControlPanel({
               )}
             </button>
           </div>
-          {(textReferences.length > 0 || orderedRefs.length > 0) && (
+          {(textReferences.length > 0 || sortedReferences.length > 0) && (
             <div
               aria-hidden="true"
               className="mx-1 h-6 w-px flex-shrink-0"
               style={{ background: 'rgba(255,255,255,0.12)' }}
             />
           )}
-          {/* Reference thumbnails — supports drag sorting */}
+          {/* Reference thumbnails */}
           <div className="relative flex items-center gap-2">
             {textReferences.map(renderTextReference)}
-            {orderedRefs.map((ref, idx) => renderReferenceThumbnail(ref, idx, true))}
+            {sortedReferences.map((ref) => renderReferenceThumbnail(ref))}
           </div>
         </div>
         {/* Expand */}
@@ -1259,15 +1128,17 @@ export function ImageNodeControlPanel({
       <div style={{ padding: '4px 14px 12px' }} onWheel={stopControlEvent} onWheelCapture={stopControlEvent}>
         <div className="relative" onPointerDown={stopControlEvent} onMouseDown={stopControlEvent}>
           {sortedImageReferenceBlocks.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
+            <div className="mb-2 flex w-full flex-col gap-1.5">
               {sortedImageReferenceBlocks.map((block) => {
                 const reference = references.find((item) => item.nodeId === block.sourceNodeId);
                 const previewImage = reference?.imageUrl || block.thumbnailUrl;
                 const highlighted = highlightedPromptBlockId === block.id;
-                const hovered = hoveredPromptBlockId === block.id;
+                const isPromptBlockHovered = hoveredPromptBlockId === block.id;
+                const hovered = canEditPromptReferences && isPromptBlockHovered;
                 const usageColor = getImageRoleColor(reference?.role ?? null, reference?.localReferenceType);
-                const isEditing = editingPromptBlockId === block.id;
+                const isEditing = canEditPromptReferences && editingPromptBlockId === block.id;
                 const displayPromptText = stripReferencePromptMetadata(block.promptText);
+                const displayUsage = reference?.roleLabel || block.usage;
 
                 return (
                   <div
@@ -1281,14 +1152,56 @@ export function ImageNodeControlPanel({
                     }}
                     onMouseEnter={() => setHoveredPromptBlockId(block.id)}
                     onMouseLeave={() => setHoveredPromptBlockId((currentId) => (currentId === block.id ? null : currentId))}
-                    className={`group/prompt-ref relative inline-flex max-w-full items-center rounded-lg border text-[13px] transition-all ${isEditing ? 'w-full flex-wrap gap-1.5 px-2 py-1.5' : 'gap-1.5 px-1.5 py-1'}`}
+                    onDoubleClick={(event) => {
+                      event.stopPropagation();
+                      startEditPromptReferenceBlock(block);
+                    }}
+                    className="group/prompt-ref relative flex w-full items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[15px] transition-all"
                     style={{
                       background: hovered || highlighted ? 'rgba(255,255,255,0.052)' : 'rgba(255,255,255,0.035)',
                       borderColor: highlighted ? `${usageColor}66` : hovered ? `${usageColor}52` : 'rgba(255,255,255,0.10)',
                       boxShadow: 'none',
                       color: 'rgba(255,255,255,0.82)',
+                      opacity: canEditPromptReferences ? 1 : 0.82,
                     }}
-                  >
+                    >
+                    {!isEditing && isPromptBlockHovered && (
+                      <div
+                        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-[320px] rounded-xl p-3 text-left"
+                        style={{
+                          background: FLOATING_PANEL_BACKGROUND,
+                          border: FLOATING_PANEL_BORDER,
+                          boxShadow: '0 14px 32px rgba(0,0,0,0.46)',
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {previewImage ? (
+                            <img
+                              src={previewImage}
+                              alt=""
+                              className="h-7 w-7 flex-shrink-0 rounded object-cover"
+                              draggable={false}
+                              style={{ border: `1px solid ${usageColor}` }}
+                            />
+                          ) : (
+                            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${usageColor}` }}>
+                              <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <div className="truncate text-[14px] font-medium" style={{ color: 'rgba(255,255,255,0.86)' }}>
+                              {displayUsage}
+                            </div>
+                            <div className="mt-0.5 text-[12px]" style={{ color: 'rgba(255,255,255,0.46)' }}>
+                              双击编辑引用说明
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-5" style={{ color: 'rgba(255,255,255,0.68)' }}>
+                          {displayPromptText || '暂无用途说明'}
+                        </div>
+                      </div>
+                    )}
                     {previewImage ? (
                       <img
                         src={previewImage}
@@ -1310,79 +1223,62 @@ export function ImageNodeControlPanel({
                         border: `1px solid ${hovered || highlighted ? `${usageColor}52` : `${usageColor}38`}`,
                       }}
                     >
-                      {block.usage}
+                      {displayUsage}
                     </span>
                     {isEditing ? (
-                      <>
-                        <textarea
-                          value={editingPromptText}
-                          onChange={(event) => setEditingPromptText(event.target.value)}
-                          onPointerDown={stopControlEvent}
-                          onMouseDown={stopControlEvent}
-                          onWheel={stopControlEvent}
-                          onWheelCapture={stopControlEvent}
-                          className="basis-full resize-none rounded-md px-2 py-1.5 text-[12px] leading-5 outline-none nowheel"
-                          style={{
-                            minHeight: 74,
-                            background: 'rgba(255,255,255,0.07)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: 'rgba(255,255,255,0.86)',
-                          }}
-                        />
-                        <div className="flex basis-full justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              cancelEditPromptReferenceBlock();
-                            }}
-                            className="rounded-md px-2 py-1 text-[12px] transition-colors hover:bg-white/10"
-                            style={{ color: 'rgba(255,255,255,0.58)' }}
-                          >
-                            {t('common.cancel')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              savePromptReferenceBlock(block.id);
-                            }}
-                            className="rounded-md px-2 py-1 text-[12px] font-medium transition-colors hover:brightness-110"
-                            style={{ background: 'rgba(0,212,255,0.16)', color: '#ffffff', border: '1px solid rgba(0,212,255,0.35)' }}
-                          >
-                            {t('common.save')}
-                          </button>
-                        </div>
-                      </>
+                      <textarea
+                        autoFocus
+                        ref={(element) => {
+                          if (!element) return;
+                          requestAnimationFrame(() => {
+                            element.focus();
+                            const end = element.value.length;
+                            element.setSelectionRange(end, end);
+                          });
+                        }}
+                        value={editingPromptText}
+                        onChange={(event) => setEditingPromptText(event.target.value)}
+                        onBlur={() => savePromptReferenceBlock(block.id)}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            savePromptReferenceBlock(block.id);
+                          }
+                        }}
+                        onPointerDown={stopControlEvent}
+                        onMouseDown={stopControlEvent}
+                        onWheel={stopControlEvent}
+                        onWheelCapture={stopControlEvent}
+                        className="nodrag nowheel min-w-0 flex-1 resize-none overflow-y-auto bg-transparent text-[15px] leading-5 outline-none"
+                        style={{
+                          height: 76,
+                          color: 'rgba(255,255,255,0.82)',
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          borderRadius: 6,
+                          padding: '4px 6px',
+                        }}
+                      />
                     ) : (
-                      <span className="min-w-0 truncate text-[13px]" style={{ maxWidth: 380, color: 'rgba(255,255,255,0.66)' }}>{displayPromptText}</span>
+                      <span className="min-w-0 flex-1 truncate text-[15px] leading-5" style={{ color: 'rgba(255,255,255,0.66)' }}>{displayPromptText}</span>
                     )}
-                    {!isEditing && (
+                    {canEditPromptReferences && !isEditing && (
                       <button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          startEditPromptReferenceBlock(block);
+                          removePromptReferenceBlock(block.id);
                         }}
-                        className="ml-0.5 hidden h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 group-hover/prompt-ref:flex"
+                        className="ml-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full opacity-0 transition-colors hover:bg-white/15 group-hover/prompt-ref:opacity-100"
                         style={{ color: 'rgba(255,255,255,0.58)' }}
-                        title={t('imageNode.editReferencePrompt')}
+                        title={t('imageNode.removeReferencePrompt')}
                       >
-                        <Pencil className="h-2.5 w-2.5" />
+                        <X className="h-2.5 w-2.5" />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        removePromptReferenceBlock(block.id);
-                      }}
-                      className={`ml-0.5 h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/15 ${isEditing ? 'hidden' : 'hidden group-hover/prompt-ref:flex'}`}
-                      style={{ color: 'rgba(255,255,255,0.58)' }}
-                      title={t('imageNode.removeReferencePrompt')}
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
+                    {(!canEditPromptReferences || isEditing) && <span className="ml-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />}
                   </div>
                 );
               })}
@@ -1393,16 +1289,24 @@ export function ImageNodeControlPanel({
             value={promptText}
             onChange={handlePromptChange}
             onKeyDown={handlePromptKeyDown}
+            readOnly={!canEditPrompt}
             placeholder={t('imageNode.promptPlaceholder')}
             className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
-            style={{ color: 'rgba(255,255,255,0.94)', fontSize: 16, lineHeight: 1.58, minHeight: promptExpanded ? 176 : 104 }}
+            style={{
+              color: 'rgba(255,255,255,0.94)',
+              fontSize: 15,
+              lineHeight: 1.58,
+              minHeight: promptExpanded ? 176 : 104,
+              opacity: canEditPrompt ? 1 : 0.82,
+              cursor: canEditPrompt ? 'text' : 'default',
+            }}
             rows={promptExpanded ? 7 : 4}
             onPointerDown={stopControlEvent}
             onMouseDown={stopControlEvent}
             onWheel={stopControlEvent}
             onWheelCapture={stopControlEvent}
           />
-          {showReferenceMenu && references.length > 0 && (
+          {canEditPromptReferences && showReferenceMenu && sortedReferences.length > 0 && (
             <div
               className="absolute left-0 top-7 z-40 overflow-hidden rounded-xl py-1"
               style={{
@@ -1412,7 +1316,7 @@ export function ImageNodeControlPanel({
                 boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
               }}
             >
-              {references.map((reference, index) => (
+              {sortedReferences.map((reference, index) => (
                 <button
                   key={reference.nodeId}
                   onMouseEnter={() => setActiveReferenceIndex(index)}
@@ -1443,15 +1347,34 @@ export function ImageNodeControlPanel({
         <div className="flex items-center gap-4">
           {/* Model */}
           <div className="relative">
-            <button onClick={() => { setShowModelMenu(!showModelMenu); setShowRatioMenu(false); setShowCountMenu(false); }} className="flex items-center gap-1.5 transition-colors hover:text-white" style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)' }}>
+            <button
+              disabled={!canEditModel}
+              onClick={() => {
+                if (!canEditModel) return;
+                setShowModelMenu(!showModelMenu);
+                setShowRatioMenu(false);
+                setShowCountMenu(false);
+              }}
+              className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
+              style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
+            >
               <span style={{ color: 'rgba(255,255,255,0.72)' }}>×</span>
               <span className="truncate" style={{ maxWidth: 150 }}>{selectedModel.name}</span>
               <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
             </button>
-            {showModelMenu && (
+            {canEditModel && showModelMenu && (
               <div className="absolute bottom-full left-0 mb-1 py-1 rounded-lg z-30 overflow-hidden" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 190 }}>
                 {MODEL_OPTIONS.map((m) => (
-                  <button key={m.name} onClick={() => { onModelParamsChange({ ...modelParams, model: m.name }); setShowModelMenu(false); }} className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left transition-colors ${modelParams.model === m.name ? 'bg-white/10' : 'hover:bg-white/5'}`}>
+                  <button
+                    key={m.name}
+                    disabled={!canEditModel}
+                    onClick={() => {
+                      if (!canEditModel) return;
+                      onModelParamsChange({ ...modelParams, model: m.name });
+                      setShowModelMenu(false);
+                    }}
+                    className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left transition-colors ${modelParams.model === m.name ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                  >
                     <span className="flex-shrink-0 flex items-center justify-center rounded text-[10px] font-bold text-white" style={{ width: 20, height: 20, background: m.iconBg }}>{m.icon}</span>
                     <span className="text-[15px] text-white/85">{m.name}</span>
                   </button>
@@ -1461,12 +1384,22 @@ export function ImageNodeControlPanel({
           </div>
           {/* Ratio · Resolution */}
           <div className="relative">
-            <button onClick={() => { setShowRatioMenu(!showRatioMenu); setShowModelMenu(false); setShowCountMenu(false); }} className="flex items-center gap-1.5 transition-colors hover:text-white" style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)' }}>
+            <button
+              disabled={!canEditModel}
+              onClick={() => {
+                if (!canEditModel) return;
+                setShowRatioMenu(!showRatioMenu);
+                setShowModelMenu(false);
+                setShowCountMenu(false);
+              }}
+              className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
+              style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
+            >
               <Maximize2 className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.68)' }} />
               <span>{modelParams.ratio} · {modelParams.resolution}</span>
               <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
             </button>
-            {showRatioMenu && (
+            {canEditModel && showRatioMenu && (
               <div className="absolute bottom-full left-0 mb-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 16px 34px rgba(0,0,0,0.48)', width: 326, padding: 8 }}>
                 <div className="pb-2">
                   <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('imageNode.resolution')}</div>
@@ -1474,7 +1407,11 @@ export function ImageNodeControlPanel({
                     {RESOLUTION_OPTIONS.map((r) => (
                       <button
                         key={r}
-                        onClick={() => onModelParamsChange({ ...modelParams, resolution: r })}
+                        disabled={!canEditModel}
+                        onClick={() => {
+                          if (!canEditModel) return;
+                          onModelParamsChange({ ...modelParams, resolution: r });
+                        }}
                         className="h-9 rounded-md text-[14px] font-medium transition-colors"
                         style={{
                           color: modelParams.resolution === r ? '#ffffff' : 'rgba(255,255,255,0.54)',
@@ -1493,7 +1430,12 @@ export function ImageNodeControlPanel({
                     {RATIO_OPTIONS.map((ar) => (
                       <button
                         key={ar.value}
-                        onClick={() => { onModelParamsChange({ ...modelParams, ratio: ar.value }); setShowRatioMenu(false); }}
+                        disabled={!canEditModel}
+                        onClick={() => {
+                          if (!canEditModel) return;
+                          onModelParamsChange({ ...modelParams, ratio: ar.value });
+                          setShowRatioMenu(false);
+                        }}
                         className="flex h-[64px] flex-col items-center justify-center gap-2 rounded-md transition-colors"
                         style={{
                           color: modelParams.ratio === ar.value ? '#ffffff' : 'rgba(255,255,255,0.58)',
@@ -1514,17 +1456,34 @@ export function ImageNodeControlPanel({
         {/* Generate button */}
         <div className="relative flex items-center rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: FLOATING_PANEL_BORDER, padding: '5px 6px 5px 12px', gap: 8 }}>
           <button
-            onClick={() => { setShowCountMenu(!showCountMenu); setShowModelMenu(false); setShowRatioMenu(false); }}
-            className="flex h-[34px] min-w-[82px] items-center justify-center gap-1 transition-colors hover:text-white"
-            style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}
+            disabled={!canEditModel}
+            onClick={() => {
+              if (!canEditModel) return;
+              setShowCountMenu(!showCountMenu);
+              setShowModelMenu(false);
+              setShowRatioMenu(false);
+            }}
+            className={`flex h-[34px] min-w-[82px] items-center justify-center gap-1 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
+            style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', fontWeight: 600, opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
           >
             {formatGenerationCount(modelParams.count)}
             <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
           </button>
-          {showCountMenu && (
+          {canEditModel && showCountMenu && (
             <div className="absolute bottom-full left-0 mb-2 py-1 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 82 }}>
               {COUNT_OPTIONS.map((c) => (
-                <button key={c} onClick={() => { onModelParamsChange({ ...modelParams, count: c }); setShowCountMenu(false); }} className={`w-full px-3 py-2 text-center text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}>{formatGenerationCount(c)}</button>
+                <button
+                  key={c}
+                  disabled={!canEditModel}
+                  onClick={() => {
+                    if (!canEditModel) return;
+                    onModelParamsChange({ ...modelParams, count: c });
+                    setShowCountMenu(false);
+                  }}
+                  className={`w-full px-3 py-2 text-center text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}
+                >
+                  {formatGenerationCount(c)}
+                </button>
               ))}
             </div>
           )}
@@ -1571,6 +1530,7 @@ export function ImageNodeControlPanel({
                 height: 34,
                 background: canGenerate ? '#ffffff' : 'rgba(255,255,255,0.14)',
                 opacity: canGenerate ? 1 : 0.45,
+                cursor: canGenerate ? 'pointer' : 'not-allowed',
               }}
               title={isGenerating ? t('imageNode.generating') : t('imageNode.generate')}
             >
@@ -1589,9 +1549,12 @@ export function ImageNodeControlPanel({
         </div>
       </div>
       <StylePickerModal
-        open={showStylePicker}
+        open={canEditStyle && showStylePicker}
         selectedStyleId={selectedStyleId}
-        onApply={onStyleChange}
+        onApply={(styleId) => {
+          if (!canEditStyle) return;
+          onStyleChange(styleId);
+        }}
         onClose={() => setShowStylePicker(false)}
       />
       {slashMenuPortal}

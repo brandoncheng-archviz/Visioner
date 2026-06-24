@@ -280,7 +280,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   /* ─── Reference tracking ─── */
   const allEdges = useStore((state) => state.edges);
   const allNodes = useStore((state) => state.nodes);
-  const referenceOrder = (data.referenceOrder as string[]) || [];
   const references: ReferenceInfo[] = useMemo(() => {
     const inputEdges = allEdges.filter((e) => e.target === id);
     const rawReferences = inputEdges.flatMap((edge) => {
@@ -317,17 +316,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         height: getNodeHeight(sourceNode?.data),
       }];
     });
-    return rawReferences
-      .sort((a, b) => {
-        const aIndex = referenceOrder.indexOf(a.nodeId);
-        const bIndex = referenceOrder.indexOf(b.nodeId);
-        if (aIndex >= 0 && bIndex >= 0) return aIndex - bIndex;
-        if (aIndex >= 0) return -1;
-        if (bIndex >= 0) return 1;
-        return 0;
-      })
-      .map((ref, idx) => ({ ...ref, index: idx + 1 }));
-  }, [allEdges, allNodes, id, referenceOrder, i18n.language]);
+    return rawReferences.map((ref, idx) => ({ ...ref, index: idx + 1 }));
+  }, [allEdges, allNodes, id, i18n.language]);
   const textReferences: TextReferenceInfo[] = useMemo(() => {
     return allEdges
       .filter((edge) => edge.target === id)
@@ -412,6 +402,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     currentResultSet,
     generationTask,
     hasGenerationIntent,
+    isReferenceLocked: Boolean(data.isReferenceLocked),
   });
   const isGenerating = imageNodeViewModel.isProcessing;
   const canGenerate = imageNodeViewModel.canGenerate;
@@ -767,12 +758,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
 
   const handleGenerate = useCallback(() => {
-    if (!hasGenerationIntent) {
+    if (!canGenerate) {
       showToast(EMPTY_GENERATION_INTENT_MESSAGE);
       return;
     }
     void runGeneration();
-  }, [hasGenerationIntent, runGeneration, showToast]);
+  }, [canGenerate, runGeneration, showToast]);
 
   const handlePromptChange = (value: string) => {
     if (!imageNodeViewModel.canEditPrompt) return;
@@ -819,23 +810,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     } else {
       setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === id)));
     }
-    setNodes((nds) =>
-      nds.map((n) => {
-        if (n.id !== id) return n;
-        const referenceOrder = ((n.data.referenceOrder as string[]) || []).filter((nodeId) => nodeId !== sourceNodeId);
-        return { ...n, data: { ...n.data, referenceOrder } };
-      }),
-    );
     // 同步清理 promptContent 中对应的图片引用块（规则11）
     const nextPromptContent = promptContent.filter((item) => item.type !== 'image_reference' || item.sourceNodeId !== sourceNodeId);
     if (nextPromptContent.length !== promptContent.length) {
       handlePromptContentChange(nextPromptContent);
     }
-  };
-
-  const handleReorderReferences = (newOrder: string[]) => {
-    if (!imageNodeViewModel.canEditReferenceUsage) return;
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, referenceOrder: newOrder } } : n)));
   };
 
   const handleUseReference = () => {
@@ -1534,7 +1513,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   e.stopPropagation();
                   handleRoleMenuOpenChange(true);
                 }}
-                className="flex-shrink-0 select-none transition-all hover:brightness-125"
+                className={`flex-shrink-0 select-none transition-all ${canEditRole ? 'hover:brightness-125' : ''}`}
                 style={{
                   color: getImageRoleColor(role, localReferenceType),
                   fontSize: 11,
@@ -2024,6 +2003,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
               canGenerate={canGenerate}
+              canEditPrompt={imageNodeViewModel.canEditPrompt}
+              canEditPromptReferences={imageNodeViewModel.canEditPromptReferences}
+              canEditPreset={imageNodeViewModel.canEditPreset}
+              canEditStyle={imageNodeViewModel.canEditStyle}
+              canEditLighting={imageNodeViewModel.canEditLighting}
+              canEditModel={imageNodeViewModel.canEditModel}
+              canDeleteReference={imageNodeViewModel.canDeleteReference}
               isGenerating={isGenerating}
               generationTask={generationTask}
               textReferences={textReferences}
@@ -2033,7 +2019,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               }}
               references={references}
               onRemoveReference={handleRemoveReference}
-              onReorderReferences={handleReorderReferences}
               onUseReference={handleUseReference}
               showToast={showToast}
               autoOpenLightPanel={pendingLightPanelOpen}

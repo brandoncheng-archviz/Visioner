@@ -3,15 +3,6 @@ import { normalizeLocalReferenceType } from '../constants/imageUsages';
 
 const UNDEFINED_USAGE_VALUES = new Set(['', 'unknown', 'unassigned', 'undefined', 'null', '未设置参考用途', '未定义用途']);
 const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
-const LOCAL_REFERENCE_SORT_ORDER: LocalReferenceType[] = [
-  'vegetation',
-  'people',
-  'sky',
-  'seawater',
-  'city',
-  'mist',
-  'custom',
-];
 
 function isDefinedUsageValue(value: unknown) {
   if (typeof value !== 'string') return value !== undefined && value !== null;
@@ -54,10 +45,10 @@ export function getReferenceUsageSortRank(reference: Pick<ReferenceInfo, 'role' 
   const roleLabel = reference.roleLabel || '';
 
   if (reference.role === 'primary_building' || roleLabel.includes('主体建筑')) {
-    return { group: 0, local: 0 };
+    return { group: 0 };
   }
   if (reference.role === 'atmosphere_reference' || reference.role === 'overall_reference' || roleLabel.includes('氛围')) {
-    return { group: 1, local: 0 };
+    return { group: 1 };
   }
   if (
     reference.role === 'local_reference' ||
@@ -72,22 +63,24 @@ export function getReferenceUsageSortRank(reference: Pick<ReferenceInfo, 'role' 
     reference.localReferenceLabel ||
     reference.customRoleLabel
   ) {
-    const localIndex = normalizedLocalReferenceType
-      ? LOCAL_REFERENCE_SORT_ORDER.indexOf(normalizedLocalReferenceType)
-      : LOCAL_REFERENCE_SORT_ORDER.length;
-    return { group: 2, local: localIndex >= 0 ? localIndex : LOCAL_REFERENCE_SORT_ORDER.length };
+    return { group: 2 };
   }
-  return { group: 3, local: 0 };
+  return { group: 3 };
 }
 
-export function sortReferencesByUsage(references: ReferenceInfo[], preferredOrder?: string[]) {
-  const orderIndex = new Map((preferredOrder ?? references.map((reference) => reference.nodeId)).map((nodeId, index) => [nodeId, index]));
+export function getReferenceUsageGroup(reference: Pick<ReferenceInfo, 'role' | 'roleLabel' | 'localReferenceType' | 'localReferenceLabel' | 'customRoleLabel'>) {
+  return getReferenceUsageSortRank(reference).group;
+}
+
+export function sortReferencesByUsage(references: ReferenceInfo[]) {
+  const fallbackOrder = references.map((reference) => reference.nodeId);
+  const originalIndex = new Map(fallbackOrder.map((nodeId, index) => [nodeId, index]));
+
   return [...references].sort((a, b) => {
     const aRank = getReferenceUsageSortRank(a);
     const bRank = getReferenceUsageSortRank(b);
     if (aRank.group !== bRank.group) return aRank.group - bRank.group;
-    if (aRank.local !== bRank.local) return aRank.local - bRank.local;
-    return (orderIndex.get(a.nodeId) ?? 0) - (orderIndex.get(b.nodeId) ?? 0);
+    return (originalIndex.get(a.nodeId) ?? 0) - (originalIndex.get(b.nodeId) ?? 0);
   });
 }
 

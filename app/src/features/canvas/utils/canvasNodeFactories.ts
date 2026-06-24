@@ -70,7 +70,6 @@ export function createBasicCanvasNode({
             references: [],
             referenceImages: [],
             referencesSignature: '[]',
-            referenceOrder: [],
           }
         : {}),
       ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),

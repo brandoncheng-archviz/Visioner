@@ -96,7 +96,6 @@ function removeEmptyImageDefaults(data: Record<string, unknown>) {
   removeEmptyArray(data, 'generatedImages');
   removeEmptyArray(data, 'references');
   removeEmptyArray(data, 'referenceImages');
-  removeEmptyArray(data, 'referenceOrder');
   removeNullish(data, 'lightPreview');
   removeNullish(data, 'selectedStyleId');
   removeNullish(data, 'generationTask');

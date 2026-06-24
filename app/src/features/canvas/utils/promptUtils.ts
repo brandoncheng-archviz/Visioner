@@ -9,6 +9,7 @@ import {
 import type { LightPreviewData } from '../types/lightPreview.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
+import { sortReferencesByUsage } from './referenceUtils';
 import i18n from '@/i18n';
 
 const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
@@ -163,6 +164,7 @@ export function buildPromptSubmission(
   lightPreview?: LightPreviewData | null,
 ) {
   const trimmedUserText = userText.trim();
+  const sortedNodeReferences = sortReferencesByUsage(nodeReferences);
   const imageRefBlocks = promptContent
     .filter((block): block is ImageReferencePromptBlock => block.type === 'image_reference')
     .map((block) => ({
@@ -170,7 +172,8 @@ export function buildPromptSubmission(
       promptText: stripReferencePromptMetadata(block.promptText),
     }));
 
-  const referenceById = new Map(nodeReferences.map((reference) => [reference.nodeId, reference]));
+  const referenceById = new Map(sortedNodeReferences.map((reference) => [reference.nodeId, reference]));
+  const sortedReferenceIndex = new Map(sortedNodeReferences.map((reference, index) => [reference.nodeId, index]));
   const blockRole = (block: ImageReferencePromptBlock) => referenceById.get(block.sourceNodeId)?.role ?? null;
   const blockLocalReferenceType = (block: ImageReferencePromptBlock) =>
     normalizeLocalReferenceType(referenceById.get(block.sourceNodeId)?.localReferenceType);
@@ -190,10 +193,20 @@ export function buildPromptSubmission(
     block.usage?.includes('雾气') ||
     block.usage?.includes('局部');
 
-  const primaryBuilding = imageRefBlocks.filter((block) => blockRole(block) === 'primary_building' || block.usage?.includes('主体建筑'));
-  const localRefs = imageRefBlocks.filter(isLocalReferenceBlock);
-  const atmosphereRefs = imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围'));
-  const undefinedRefs = imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未设置参考用途' || block.usage === '未定义用途');
+  const sortBlocksByReferenceOrder = (blocks: ImageReferencePromptBlock[]) =>
+    [...blocks].sort((a, b) => {
+      const aOrder = sortedReferenceIndex.get(a.sourceNodeId);
+      const bOrder = sortedReferenceIndex.get(b.sourceNodeId);
+      if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) return aOrder - bOrder;
+      if (aOrder !== undefined) return -1;
+      if (bOrder !== undefined) return 1;
+      return imageRefBlocks.indexOf(a) - imageRefBlocks.indexOf(b);
+    });
+
+  const primaryBuilding = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'primary_building' || block.usage?.includes('主体建筑')));
+  const localRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter(isLocalReferenceBlock));
+  const atmosphereRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围')));
+  const undefinedRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未设置参考用途' || block.usage === '未定义用途'));
 
   const selectedPresetsList = selectedPresetIds
     .map(getPresetById)
@@ -219,13 +232,23 @@ export function buildPromptSubmission(
     sections.push(`光影控制：${lightPreview.derived.promptText}`);
   }
 
-  if (nodeReferences.length) {
+  const sortedImageRefBlocks = sortBlocksByReferenceOrder(imageRefBlocks);
+  let imageBlockIndex = 0;
+  const sortedPromptContent = promptContent.map((block) => {
+    if (block.type !== 'image_reference') return block;
+    return sortedImageRefBlocks[imageBlockIndex++] ?? {
+      ...block,
+      promptText: stripReferencePromptMetadata(block.promptText),
+    };
+  });
+
+  if (sortedNodeReferences.length) {
     sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空、海水、城市、雾气等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
   }
 
   return {
     textPrompt: sections.join('\n\n'),
-    referenceImages: nodeReferences.map((reference) => ({
+    referenceImages: sortedNodeReferences.map((reference) => ({
       imageId: reference.nodeId,
       imageUrl: reference.imageUrl,
       usageKey: reference.role ?? 'undefined_usage',
@@ -234,7 +257,7 @@ export function buildPromptSubmission(
       localReferenceType: reference.localReferenceType,
       promptText: getImageReferencePromptText(reference),
     })),
-    promptBlocks: promptContent.map((block) =>
+    promptBlocks: sortedPromptContent.map((block) =>
       block.type === 'image_reference'
         ? { ...block, promptText: stripReferencePromptMetadata(block.promptText) }
         : block,
@@ -249,7 +272,7 @@ export function buildPromptSubmission(
           styleRole: 'global-look' as const,
         }
       : null,
-    imageReferences: nodeReferences.map((reference) => ({
+    imageReferences: sortedNodeReferences.map((reference) => ({
       imageId: reference.nodeId,
       sourceNodeId: reference.nodeId,
       usage: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),

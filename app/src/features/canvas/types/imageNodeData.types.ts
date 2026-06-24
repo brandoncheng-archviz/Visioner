@@ -27,6 +27,9 @@ export interface ImageNodeData {
   currentResultSource?: 'history' | string;
   generatedImages?: GenerationHistoryItem[] | string[];
   generationTask?: GenerationTask | null;
+  isGenerating?: boolean;
+  isProcessing?: boolean;
+  isReferenceLocked?: boolean;
   prompt?: string;
   promptContent?: PromptContent[];
   selectedPresets?: string[];
@@ -43,7 +46,6 @@ export interface ImageNodeData {
   userPrompt?: string;
   marks?: MarkItem[];
   modelParams?: ModelParams;
-  referenceOrder?: string[];
   referencesSignature?: string;
   // Edge-related callbacks injected by CanvasPage
   onStartLineDraw?: (
