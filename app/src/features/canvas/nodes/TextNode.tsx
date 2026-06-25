@@ -37,6 +37,7 @@ const EMPTY_ACTIONS: Array<{
 const TEXT_NODE_RESIZE_MIN_HEIGHT = 240;
 const TEXT_NODE_RESIZE_MAX_WIDTH = 960;
 const TEXT_NODE_RESIZE_MAX_HEIGHT = 800;
+const TEXT_NODE_CARD_RADIUS = 24;
 
 function TextNodeGlyph({ className }: { className?: string }) {
   return (
@@ -287,15 +288,16 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
       <div className={`relative overflow-visible ${usesTextResourceLayout ? 'min-h-0 flex-1' : ''}`}>
         <div
           ref={previewCardRef}
-          className="node-preview-card relative rounded-xl transition-all"
+          className="node-preview-card relative overflow-hidden rounded-[24px] transition-colors"
           style={{
             width: '100%',
             minHeight: usesTextResourceLayout ? 0 : TEXT_NODE_MIN_HEIGHT,
             maxHeight: usesTextResourceLayout ? undefined : TEXT_NODE_MAX_HEIGHT,
             height: usesTextResourceLayout ? '100%' : isInlineEditing ? inlineEditorHeight : undefined,
-            overflow: usesTextResourceLayout || isInlineEditing ? 'hidden' : undefined,
             background: '#252526',
-            border: `2.5px solid ${selected ? '#2f6bff' : 'rgba(42,42,53,0.98)'}`,
+            border: `2px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.12)'}`,
+            borderRadius: TEXT_NODE_CARD_RADIUS,
+            boxSizing: 'border-box',
             boxShadow: 'none',
           }}
         >

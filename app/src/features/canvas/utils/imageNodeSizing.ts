@@ -34,6 +34,17 @@ export function resolveImageNodeSize({
 
   const safeWidth = Math.max(1, sourceWidth);
   const safeHeight = Math.max(1, sourceHeight);
+
+  if (safeWidth > safeHeight) {
+    const imageDisplayScale = IMAGE_NODE_EMPTY_HEIGHT / safeHeight;
+
+    return {
+      cardWidth: Math.round(safeWidth * imageDisplayScale),
+      cardHeight: IMAGE_NODE_EMPTY_HEIGHT,
+      imageDisplayScale,
+    };
+  }
+
   let imageDisplayScale = Math.min(
     IMAGE_NODE_MAX_IMAGE_WIDTH / safeWidth,
     IMAGE_NODE_MAX_IMAGE_HEIGHT / safeHeight,
