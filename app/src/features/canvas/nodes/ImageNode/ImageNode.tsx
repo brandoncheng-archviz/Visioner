@@ -41,24 +41,14 @@ import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
 import { createImageNodeViewModel } from './imageNodeViewModel';
 
-const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或选择预设 / 风格 / 光影';
+const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或插入图片引用';
 
-function hasPromptContentIntent(promptContent: PromptContent[]) {
+function hasValidPromptContentInput(promptContent: PromptContent[]) {
   return promptContent.some((block) => {
-    if (block.type === 'image_reference') return false;
+    if (block.type === 'image_reference') return true;
     if (block.type === 'text') return block.text.trim().length > 0;
-    return block.promptText.trim().length > 0;
+    return false;
   });
-}
-
-function hasModelParamIntent(modelParams: ModelParams) {
-  return (
-    modelParams.model !== DEFAULT_MODEL_PARAMS.model ||
-    modelParams.ratio !== DEFAULT_MODEL_PARAMS.ratio ||
-    modelParams.resolution !== DEFAULT_MODEL_PARAMS.resolution ||
-    modelParams.lens !== DEFAULT_MODEL_PARAMS.lens ||
-    modelParams.count !== DEFAULT_MODEL_PARAMS.count
-  );
 }
 
 export function ImageNode({ data, selected, id }: NodeProps) {
@@ -391,11 +381,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     .join('\n\n');
   const hasGenerationIntent = (
     promptText.trim().length > 0 ||
-    hasPromptContentIntent(promptContent) ||
-    selectedPresets.length > 0 ||
-    selectedStyle !== null ||
-    Boolean(lightPreview?.enabled) ||
-    hasModelParamIntent(modelParams)
+    hasValidPromptContentInput(promptContent)
   );
   const imageNodeViewModel = createImageNodeViewModel(data, {
     displayImage,
