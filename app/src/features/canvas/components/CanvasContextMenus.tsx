@@ -1,7 +1,8 @@
-import { Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug } from 'lucide-react';
+import { Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   BASIC_NODE_DEFINITIONS,
+  BASIC_NODE_GROUPS,
   CREATE_NODE_MENU_WIDTH,
   type BasicNodeType,
 } from '../constants/basicNodes';
@@ -17,6 +18,60 @@ function TextNodeIcon({ className, style }: { className?: string; style?: React.
       <rect x="2" y="9" width="12" height="1.5" rx="0.75" fill="currentColor" />
       <rect x="2" y="12.5" width="7" height="1.5" rx="0.75" fill="currentColor" />
     </svg>
+  );
+}
+
+const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
+  text: TextNodeIcon as unknown as typeof Image,
+  image: Image,
+  video: Video,
+  relight: Sun,
+  upscale: Sparkles,
+  compare: Columns2,
+};
+
+function BasicNodeMenuItems({
+  onSelect,
+}: {
+  onSelect: (type: BasicNodeType, label: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      {BASIC_NODE_GROUPS.map((group, groupIndex) => {
+        const items = BASIC_NODE_DEFINITIONS.filter((item) => item.group === group.id);
+        if (items.length === 0) return null;
+
+        return (
+          <div key={group.id} className={groupIndex > 0 ? 'mt-2 border-t border-white/[0.06] pt-2' : undefined}>
+            <div className="px-5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wider text-white/[0.42]">
+              {t(group.labelKey)}
+            </div>
+            {items.map((item) => {
+              const ItemIcon = basicNodeIcons[item.type];
+              const label = t(item.labelKey);
+              return (
+                <button
+                  key={item.type}
+                  onClick={() => onSelect(item.type, label)}
+                  className="w-full flex items-center gap-3 px-5 py-3 text-left text-[15px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+                  style={{ color: 'rgba(255,255,255,0.78)' }}
+                >
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.035]"
+                    style={{ color: 'rgba(255,255,255,0.72)' }}
+                  >
+                    <ItemIcon className="w-4 h-4" />
+                  </span>
+                  <span className="min-w-0 truncate">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -39,12 +94,6 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
   const { t } = useTranslation();
   if (!menu) return null;
 
-  const icons: Record<BasicNodeType, typeof Image> = {
-    text: TextNodeIcon as unknown as typeof Image,
-    image: Image,
-    video: Video,
-  };
-
   return (
     <>
       <div
@@ -63,21 +112,8 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
         }}
         onWheelCapture={stopCanvasWheelPropagation}
       >
-        <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
-        {BASIC_NODE_DEFINITIONS.map((item) => {
-          const ItemIcon = icons[item.type];
-          const label = t(item.labelKey);
-          return (
-            <button
-              key={item.type}
-              onClick={() => onAddNode(item.type, label)}
-              className="w-full flex items-center gap-4 px-5 py-3.5 text-left text-[16px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
-            >
-              <ItemIcon className="w-5 h-5" style={{ color: item.color }} />
-              {label}
-            </button>
-          );
-        })}
+        <div className="px-5 py-2.5 text-[12px] font-medium uppercase tracking-wider text-white/[0.42]">{t('contextMenu.addNodeTitle')}</div>
+        <BasicNodeMenuItems onSelect={(type, label) => onAddNode(type, label)} />
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
     </>
@@ -96,12 +132,6 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
   const { t } = useTranslation();
   if (!menu) return null;
 
-  const icons: Record<BasicNodeType, typeof Image> = {
-    text: TextNodeIcon as unknown as typeof Image,
-    image: Image,
-    video: Video,
-  };
-
   return (
     <>
       <div
@@ -116,20 +146,8 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
         }}
         onWheelCapture={stopCanvasWheelPropagation}
       >
-        <div className="px-5 py-2.5 text-[13px] text-[#6a6a7a] uppercase tracking-wider">{t('contextMenu.addNodeTitle')}</div>
-        {BASIC_NODE_DEFINITIONS.map((item) => {
-          const ItemIcon = icons[item.type];
-          return (
-            <button
-              key={item.type}
-              onClick={() => onCreateAndConnect(item.type)}
-              className="w-full flex items-center gap-4 px-5 py-3.5 text-left text-[16px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
-            >
-              <ItemIcon className="w-5 h-5" style={{ color: item.color }} />
-              {t(item.labelKey)}
-            </button>
-          );
-        })}
+        <div className="px-5 py-2.5 text-[12px] font-medium uppercase tracking-wider text-white/[0.42]">{t('contextMenu.addNodeTitle')}</div>
+        <BasicNodeMenuItems onSelect={(type) => onCreateAndConnect(type)} />
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
     </>
@@ -148,6 +166,8 @@ export interface NodeContextMenuProps {
   menu: NodeContextMenuData | null;
   onClose: () => void;
   onReopen: (clientX: number, clientY: number) => void;
+  canCreateImageTools?: boolean;
+  onCreateImageToolNode?: (nodeId: string, type: 'relight' | 'upscale' | 'compare') => void;
   onDuplicate: (nodeId: string) => void;
   onPaste: () => void;
   onDelete: (nodeId: string) => void;
@@ -158,6 +178,8 @@ export function NodeContextMenu({
   menu,
   onClose,
   onReopen,
+  canCreateImageTools = false,
+  onCreateImageToolNode,
   onDuplicate,
   onPaste,
   onDelete,
@@ -166,6 +188,12 @@ export function NodeContextMenu({
   const { t } = useTranslation();
   const shortcuts = getPlatformShortcutLabels();
   if (!menu) return null;
+
+  const imageToolItems = [
+    { type: 'relight' as const, label: t('canvas.createMenuRelightNode'), Icon: Sun },
+    { type: 'upscale' as const, label: t('canvas.createMenuUpscaleNode'), Icon: Sparkles },
+    { type: 'compare' as const, label: t('canvas.createMenuCompareNode'), Icon: Columns2 },
+  ];
 
   return (
     <>
@@ -187,50 +215,78 @@ export function NodeContextMenu({
       >
         <button
           onClick={onClose}
-          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+          style={{ color: 'rgba(255,255,255,0.78)' }}
         >
-          <Download className="w-3.5 h-3.5" /> {t('contextMenu.saveToLibrary')}
+          <Download className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('contextMenu.saveToLibrary')}
         </button>
+        {onCreateImageToolNode && (
+          <>
+            <div className="mx-3 my-1 h-px bg-white/5" />
+            <div className="px-4 pb-1 pt-1 text-[11px] uppercase tracking-wider text-white/[0.42]">{t('contextMenu.continueProcessing', { defaultValue: '继续处理' })}</div>
+            {imageToolItems.map(({ type, label, Icon }) => (
+              <button
+                key={type}
+                disabled={!canCreateImageTools}
+                onClick={() => {
+                  if (!canCreateImageTools) return;
+                  onCreateImageToolNode(menu.nodeId, type);
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-[0.38] disabled:hover:bg-transparent"
+                style={{ color: 'rgba(255,255,255,0.78)' }}
+              >
+                <Icon className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {label}
+              </button>
+            ))}
+          </>
+        )}
         <button
           onClick={() => { onDuplicate(menu.nodeId); onClose(); }}
-          className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+          style={{ color: 'rgba(255,255,255,0.78)' }}
         >
-          <span className="flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> {t('common.copy')}</span>
+          <span className="flex items-center gap-2"><Copy className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('common.copy')}</span>
           <span className="text-[11px] text-[#6a6a7a]">{formatShortcut(shortcuts.copy)}</span>
         </button>
         <button
           onClick={() => { onPaste(); onClose(); }}
-          className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+          style={{ color: 'rgba(255,255,255,0.78)' }}
         >
-          <span className="flex items-center gap-2"><ClipboardPaste className="w-3.5 h-3.5" /> {t('common.paste')}</span>
+          <span className="flex items-center gap-2"><ClipboardPaste className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('common.paste')}</span>
           <span className="text-[11px] text-[#6a6a7a]">{formatShortcut(shortcuts.paste)}</span>
         </button>
         <button
           onClick={() => { onDuplicate(menu.nodeId); onClose(); }}
-          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+          style={{ color: 'rgba(255,255,255,0.78)' }}
         >
-          <Copy className="w-3.5 h-3.5" /> {t('common.duplicate')}
+          <Copy className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('common.duplicate')}
         </button>
         <div className="mx-3 my-1 h-px bg-white/5" />
         <button
           onClick={() => { onDelete(menu.nodeId); onClose(); }}
-          className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] text-[#ef4444] hover:bg-[rgba(239,68,68,0.1)] transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+          style={{ color: 'rgba(255,255,255,0.78)' }}
         >
-          <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> {t('common.delete')}</span>
+          <span className="flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('common.delete')}</span>
           <span className="text-[11px] text-[#6a6a7a]">{t('contextMenu.deleteShortcut')}</span>
         </button>
         <div className="mx-3 my-1 h-px bg-white/5" />
         <button
           onClick={() => { onCopy(); onClose(); }}
-          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+          style={{ color: 'rgba(255,255,255,0.78)' }}
         >
-          <Copy className="w-3.5 h-3.5" /> {t('contextMenu.copyToClipboard')}
+          <Copy className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('contextMenu.copyToClipboard')}
         </button>
         <button
           onClick={onClose}
-          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] text-[#a0a0b0] hover:bg-white/5 hover:text-white transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-[14px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+          style={{ color: 'rgba(255,255,255,0.78)' }}
         >
-          <Bug className="w-3.5 h-3.5" /> {t('contextMenu.feedback')}
+          <Bug className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('contextMenu.feedback')}
         </button>
       </div>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
@@ -253,6 +309,8 @@ export interface CanvasContextMenusProps {
   nodeContextMenu: NodeContextMenuData | null;
   onCloseNodeContextMenu: () => void;
   onNodeContextMenuReopen: (clientX: number, clientY: number) => void;
+  canCreateImageTools?: boolean;
+  onCreateImageToolNode?: (nodeId: string, type: 'relight' | 'upscale' | 'compare') => void;
   onNodeDuplicate: (nodeId: string) => void;
   onNodePaste: () => void;
   onNodeDelete: (nodeId: string) => void;
@@ -270,6 +328,8 @@ export function CanvasContextMenus({
   nodeContextMenu,
   onCloseNodeContextMenu,
   onNodeContextMenuReopen,
+  canCreateImageTools,
+  onCreateImageToolNode,
   onNodeDuplicate,
   onNodePaste,
   onNodeDelete,
@@ -292,6 +352,8 @@ export function CanvasContextMenus({
         menu={nodeContextMenu}
         onClose={onCloseNodeContextMenu}
         onReopen={onNodeContextMenuReopen}
+        canCreateImageTools={canCreateImageTools}
+        onCreateImageToolNode={onCreateImageToolNode}
         onDuplicate={onNodeDuplicate}
         onPaste={onNodePaste}
         onDelete={onNodeDelete}

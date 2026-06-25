@@ -1,10 +1,10 @@
 import type { MouseEvent, PointerEvent } from 'react';
-import { Sparkles, Columns2, Maximize2, Download, Sun } from 'lucide-react';
+import { Maximize2, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ToolbarAction {
-  icon: typeof Sparkles;
+  icon: typeof Maximize2;
   label: string;
   tooltipLabel?: string;
   action: () => void;
@@ -12,36 +12,17 @@ interface ToolbarAction {
 }
 
 export function ImageToolbar({
-  onUpscale,
-  onCompare,
   onPreview,
   onDownload,
-  onRelight,
   hasImage,
-  relightLabel,
-  relightTooltip,
 }: {
-  onUpscale: () => void;
-  onCompare: () => void;
   onPreview: () => void;
   onDownload: () => void;
-  onRelight: () => void;
   hasImage: boolean;
-  relightLabel?: string;
-  relightTooltip?: string;
 }) {
   const { t } = useTranslation();
 
   const tools: ToolbarAction[] = [
-    {
-      icon: Sun,
-      label: relightLabel || t('imageNode.relight'),
-      tooltipLabel: relightTooltip || t('imageNode.relightTooltip', { defaultValue: '改光' }),
-      action: onRelight,
-      disabled: !hasImage,
-    },
-    { icon: Sparkles, label: t('imageNode.upscale'), tooltipLabel: t('imageNode.upscaleShort', { defaultValue: '高清细节' }), action: onUpscale, disabled: !hasImage },
-    { icon: Columns2, label: t('imageNode.compare'), action: onCompare, disabled: !hasImage },
     { icon: Maximize2, label: t('imageNode.preview'), action: onPreview, disabled: !hasImage },
     { icon: Download, label: t('common.download'), action: onDownload, disabled: !hasImage },
   ];

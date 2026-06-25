@@ -262,7 +262,7 @@ export function ImageRoleTag({
           onMouseLeave={() => setHoveredRole(null)}
           style={{
             top: popoverTop,
-            width: 300,
+            width: 330,
             maxWidth: 'calc(100vw - 32px)',
             background: FLOATING_PANEL_BACKGROUND,
             backdropFilter: 'blur(18px)',
@@ -282,7 +282,7 @@ export function ImageRoleTag({
                   onMouseEnter={() => setHoveredRole(option.value)}
                   onFocus={() => setHoveredRole(option.value)}
                   onClick={() => handleSelectPrimary(option.value)}
-                  className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors"
+                  className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[15px] transition-colors"
                   style={{
                     background: hovered ? 'rgba(255,255,255,0.09)' : active ? 'rgba(255,255,255,0.045)' : 'transparent',
                     color: hovered ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.82)',
@@ -296,7 +296,7 @@ export function ImageRoleTag({
                 {isLocalRef && expandedLocalRef && (
                   <div className="mx-1.5 mb-1.5 mt-0.5 rounded-[10px] p-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     {/* Section title */}
-                    <div className="mb-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    <div className="mb-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.54)' }}>
                       {t('reference.selectLocalElement', { defaultValue: '选择参考元素' })}
                     </div>
 
@@ -307,7 +307,7 @@ export function ImageRoleTag({
                           key={sub.value}
                           type="button"
                           onClick={() => handleSelectLocalType(sub.value, sub.label)}
-                          className="rounded-lg px-1 py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
+                          className="rounded-lg px-1.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-white/10"
                           style={{
                             background: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? 'rgba(20,184,166,0.18)' : 'rgba(255,255,255,0.045)',
                             border: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? '1px solid rgba(20,184,166,0.4)' : '1px solid rgba(255,255,255,0.08)',
@@ -329,10 +329,10 @@ export function ImageRoleTag({
                       >
                         <MousePointerClick className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#2dd4bf' }} />
                         <div className="flex-1">
-                          <div className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.82)' }}>
+                          <div className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.84)' }}>
                             {t('reference.pointPickTitle', { defaultValue: '点选参考元素' })}
                           </div>
-                          <div className="mt-0.5 text-[10px] leading-4" style={{ color: 'rgba(255,255,255,0.48)' }}>
+                          <div className="mt-0.5 text-[12px] leading-5" style={{ color: 'rgba(255,255,255,0.52)' }}>
                             {t('reference.pointPickHint', { defaultValue: '点击图片中的目标区域，选择要参考的局部内容' })}
                           </div>
                         </div>
@@ -344,7 +344,7 @@ export function ImageRoleTag({
                       <button
                         type="button"
                         onClick={() => setShowCustomInput(true)}
-                        className="mt-1.5 flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[11px] transition-colors hover:bg-white/5"
+                        className="mt-1.5 flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-white/5"
                         style={{ color: 'rgba(255,255,255,0.55)' }}
                       >
                         {t('reference.manualInputTitle', { defaultValue: '手动输入其他元素' })}
@@ -354,7 +354,7 @@ export function ImageRoleTag({
                     {/* Manual input area (expanded) */}
                     {showCustomInput && (
                       <div className="mt-2">
-                        <div className="mb-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <div className="mb-1.5 text-[13px]" style={{ color: 'rgba(255,255,255,0.54)' }}>
                           {t('reference.elementNameLabel', { defaultValue: '参考元素名称' })}
                         </div>
                         <input
@@ -373,7 +373,7 @@ export function ImageRoleTag({
                             }
                           }}
                           placeholder={t('reference.elementNamePlaceholder', { defaultValue: '例如：铺装 / 家具 / 灯具 / 栏杆' })}
-                          className="w-full rounded-[9px] px-2 py-1.5 text-[12px] outline-none"
+                          className="w-full rounded-[9px] px-2 py-1.5 text-[13px] outline-none"
                           style={{
                             background: 'rgba(255,255,255,0.08)',
                             border: '1px solid rgba(255,255,255,0.12)',
@@ -387,7 +387,7 @@ export function ImageRoleTag({
                               setShowCustomInput(false);
                               setCustomInput('');
                             }}
-                            className="rounded-md px-2.5 py-1 text-[11px] transition-colors hover:bg-white/10"
+                            className="rounded-md px-2.5 py-1 text-[13px] transition-colors hover:bg-white/10"
                             style={{ color: 'rgba(255,255,255,0.62)' }}
                           >
                             {t('common.cancel', { defaultValue: '取消' })}
@@ -396,7 +396,7 @@ export function ImageRoleTag({
                             type="button"
                             onClick={submitCustomLocal}
                             disabled={!customInput.trim()}
-                            className="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                            className="rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors"
                             style={{
                               color: customInput.trim() ? '#ffffff' : 'rgba(255,255,255,0.35)',
                               background: customInput.trim() ? 'rgba(20,184,166,0.35)' : 'rgba(255,255,255,0.06)',
@@ -419,7 +419,7 @@ export function ImageRoleTag({
               <button
                 type="button"
                 onClick={handleClearUsage}
-                className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12px] transition-colors hover:bg-white/5"
+                className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-white/5"
                 style={{ color: 'rgba(255,255,255,0.58)' }}
               >
                 <span className="flex-1">{t('reference.clearUsage', { defaultValue: '清除参考用途' })}</span>
@@ -429,7 +429,7 @@ export function ImageRoleTag({
 
           {!expandedLocalRef && (
             <div
-              className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[12px] leading-relaxed"
+              className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[14px] leading-relaxed"
               style={{
                 borderColor: 'rgba(255,255,255,0.08)',
                 color: 'rgba(255,255,255,0.54)',
@@ -441,7 +441,7 @@ export function ImageRoleTag({
                   {previewOption.constraints.map((constraint) => (
                     <span
                       key={constraint}
-                      className="rounded-md px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                      className="rounded-md px-2 py-0.5 text-[12px] whitespace-nowrap"
                       style={{
                         background: 'rgba(255,255,255,0.07)',
                         border: '1px solid rgba(255,255,255,0.08)',

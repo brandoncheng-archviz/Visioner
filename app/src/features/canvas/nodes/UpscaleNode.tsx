@@ -4,6 +4,11 @@ import { Sparkles, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import {
+  CANVAS_NODE_CARD_BACKGROUND,
+  CANVAS_NODE_CARD_BORDER_COLOR,
+  CANVAS_NODE_CARD_BORDER_WIDTH,
+  CANVAS_NODE_CARD_RADIUS,
+  CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
   IMAGE_NODE_EMPTY_HEIGHT,
   IMAGE_NODE_MAX_IMAGE_HEIGHT,
   IMAGE_NODE_MAX_IMAGE_WIDTH,
@@ -442,16 +447,15 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
       <div className="relative" style={{ width: cardWidth }}>
         {isResultMode ? (
           <div
-            className="node-preview-card w-full rounded-xl transition-all overflow-hidden"
+            className="node-preview-card w-full rounded-[24px] transition-all overflow-hidden"
             style={{
               width: cardWidth,
               height: cardHeight,
               background: 'transparent',
-              outline: selected ? '1.5px solid #00d4ff' : '1.5px solid transparent',
+              borderRadius: CANVAS_NODE_CARD_RADIUS,
+              outline: selected ? `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${CANVAS_NODE_CARD_SELECTED_BORDER_COLOR}` : `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid transparent`,
               outlineOffset: 0,
-              boxShadow: selected
-                ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)'
-                : 'none',
+              boxShadow: 'none',
             }}
           >
             <img
@@ -486,13 +490,15 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
           </div>
         ) : (
           <div
-            className="node-preview-card w-full rounded-[16px] flex items-center justify-center transition-all overflow-hidden"
+            className="node-preview-card w-full rounded-[24px] flex items-center justify-center transition-all overflow-hidden"
             style={{
               width: cardWidth,
               height: cardHeight,
-              background: '#1a1a1a',
-              border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
-              boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+              background: CANVAS_NODE_CARD_BACKGROUND,
+              border: `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR}`,
+              borderRadius: CANVAS_NODE_CARD_RADIUS,
+              boxShadow: 'none',
+              boxSizing: 'border-box',
             }}
           >
             {displayImage ? (
@@ -531,9 +537,14 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
                 )}
               </div>
             ) : (
-              <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {t('imageNode.configParamsToGenerate')}
-              </span>
+              <div className="flex flex-col items-center justify-center gap-2 text-center">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/55">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <span className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  {t('imageNode.connectImageToEnhance', { defaultValue: '连接图片后增强细节' })}
+                </span>
+              </div>
             )}
           </div>
         )}

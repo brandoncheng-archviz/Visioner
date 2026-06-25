@@ -73,6 +73,17 @@ export function createBasicCanvasNode({
           }
         : {}),
       ...(type === 'upscale' ? UPSCALE_NODE_DEFAULTS : {}),
+      ...(type === 'relight'
+        ? {
+            generationMode: 'relight',
+            sourceImageNodeIds: [],
+            status: 'empty',
+            viewMode: 'edit',
+          }
+        : {}),
+      ...(type === 'compare'
+        ? createCompareNodeData(label)
+        : {}),
       ...(type === 'text'
         ? {
             title: label,

@@ -7,16 +7,48 @@ export const BASIC_NODE_DEFINITIONS = [
     type: 'text',
     labelKey: 'canvas.createMenuTextNode',
     color: '#a855f7',
+    group: 'content',
   },
   {
     type: 'image',
     labelKey: 'canvas.createMenuImageNode',
     color: '#22d3ee',
+    group: 'content',
   },
   {
     type: 'video',
     labelKey: 'canvas.createMenuVideoNode',
     color: '#60a5fa',
+    group: 'content',
+  },
+  {
+    type: 'relight',
+    labelKey: 'canvas.createMenuRelightNode',
+    color: '#facc15',
+    group: 'imageProcessing',
+  },
+  {
+    type: 'upscale',
+    labelKey: 'canvas.createMenuUpscaleNode',
+    color: '#22c55e',
+    group: 'imageProcessing',
+  },
+  {
+    type: 'compare',
+    labelKey: 'canvas.createMenuCompareNode',
+    color: '#38bdf8',
+    group: 'imageProcessing',
+  },
+] as const;
+
+export const BASIC_NODE_GROUPS = [
+  {
+    id: 'content',
+    labelKey: 'canvas.createMenuContentGroup',
+  },
+  {
+    id: 'imageProcessing',
+    labelKey: 'canvas.createMenuImageProcessingGroup',
   },
 ] as const;
 

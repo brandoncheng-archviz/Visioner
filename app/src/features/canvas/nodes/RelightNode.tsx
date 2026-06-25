@@ -12,7 +12,15 @@ import {
   cancelRelightTask,
   type RelightTaskState,
 } from '../utils/mockRelightTask';
-import { CANVAS_NODE_CONTROL_SCALE, IMAGE_NODE_CONTROL_WIDTH } from '../constants/canvasConstants';
+import {
+  CANVAS_NODE_CARD_BACKGROUND,
+  CANVAS_NODE_CARD_BORDER_COLOR,
+  CANVAS_NODE_CARD_BORDER_WIDTH,
+  CANVAS_NODE_CARD_RADIUS,
+  CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
+  CANVAS_NODE_CONTROL_SCALE,
+  IMAGE_NODE_CONTROL_WIDTH,
+} from '../constants/canvasConstants';
 import { resolveImageNodeSize } from '../utils/imageNodeSizing';
 import { getCurrentImage, getNodeHeight, getNodeWidth } from '../types/imageNodeData.types';
 import { useHistory } from '../contexts/HistoryContext';
@@ -107,8 +115,6 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const isEditMode = !isResultMode;
   const selectedResult = nodeData.currentResultSet?.images[nodeData.currentResultSet.selectedIndex];
   const resultImage = selectedResult?.imageUrl || nodeData.resultImageUrl || nodeData.currentImage;
-  const resultWidth = selectedResult?.width || nodeData.width || connectedInput?.width || 1024;
-  const resultHeight = selectedResult?.height || nodeData.height || connectedInput?.height || 1024;
   const displayImage = isResultMode
     ? resultImage
     : nodeData.previewImageUrl || resultImage;
@@ -138,7 +144,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const isOnlySelected = selected && selectedNodeCount === 1;
   const showControlPanel = isOnlySelected && isEditMode;
 
-  const label = nodeData.label || t('canvas.nodeLabels.relight', { defaultValue: '改光' });
+  const label = nodeData.label || t('canvas.nodeLabels.relight', { defaultValue: '光影调整' });
 
   const stopNodeEvent = useCallback((event: SyntheticEvent) => {
     event.stopPropagation();
@@ -393,30 +399,6 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     updateData({ relightTask: task });
   }, [addBatch, connectedInput, isGenerating, lightPreview, nodeData.sourceImageNodeIds, id, relightSettings.lightingPresetId, updateData]);
 
-  const handleContinueRelight = useCallback(() => {
-    if (!resultImage) return;
-    nodeData.onCreateRelightNode?.(
-      id,
-      resultImage,
-      resultWidth,
-      resultHeight,
-      {
-        lightPreview,
-        relightSettings,
-      },
-    );
-  }, [id, lightPreview, nodeData, relightSettings, resultHeight, resultImage, resultWidth]);
-
-  const handleUpscaleResult = useCallback(() => {
-    if (!resultImage) return;
-    nodeData.onCreateUpscaleNode?.(id, resultImage, resultWidth, resultHeight);
-  }, [id, nodeData, resultHeight, resultImage, resultWidth]);
-
-  const handleCompareResult = useCallback(() => {
-    if (!resultImage) return;
-    nodeData.onCreateCompareNode?.(id, resultImage, resultWidth, resultHeight);
-  }, [id, nodeData, resultHeight, resultImage, resultWidth]);
-
   const handleDownloadResult = useCallback(() => {
     if (!resultImage) return;
     const link = document.createElement('a');
@@ -483,7 +465,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const renderPreviewContent = () => {
     if (isGenerating) {
       return (
-        <StatusMessage icon={<Loader2 className="h-4 w-4 animate-spin" />} text="改光生成中..." />
+        <StatusMessage icon={<Loader2 className="h-4 w-4 animate-spin" />} text="光影调整生成中..." />
       );
     }
     if (isPreviewing) {
@@ -497,7 +479,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     return (
       <StatusMessage
         icon={<Sun className="h-4 w-4" />}
-        text={connectedInput ? '调整阳光方向后生成图像' : '连接图片后配置改光图像'}
+        text={connectedInput ? '调整阳光方向后生成图像' : '连接图片后调整光影'}
       />
     );
   };
@@ -515,14 +497,9 @@ export function RelightNode({ data, selected, id }: NodeProps) {
           }}
         >
           <ImageToolbar
-            onUpscale={handleUpscaleResult}
-            onRelight={handleContinueRelight}
-            onCompare={handleCompareResult}
             onPreview={() => setShowResultPreview(true)}
             onDownload={handleDownloadResult}
             hasImage
-            relightLabel="继续改光"
-            relightTooltip="基于当前结果创建新的改光节点"
           />
         </div>
       )}
@@ -542,20 +519,22 @@ export function RelightNode({ data, selected, id }: NodeProps) {
         }}
       >
         <div className="flex items-center gap-1.5 overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
-          <Sun className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13, color: '#00d4ff' }} />
+          <Sun className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
           <span className="min-w-0 truncate transition-colors hover:text-white">{label}</span>
         </div>
       </div>
 
       {/* Preview area */}
       <div
-        className="node-preview-card relative flex items-center justify-center overflow-hidden rounded-xl transition-all nowheel"
+        className="node-preview-card relative flex items-center justify-center overflow-hidden rounded-[24px] transition-all nowheel"
         style={{
           width: cardWidth,
           height: previewHeight,
-          background: '#252526',
-          border: `1px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.06)'}`,
-          boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+          background: CANVAS_NODE_CARD_BACKGROUND,
+          border: `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR}`,
+          borderRadius: CANVAS_NODE_CARD_RADIUS,
+          boxShadow: 'none',
+          boxSizing: 'border-box',
         }}
         onWheel={stopNodeEvent}
       >
@@ -742,7 +721,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
                         ? 'rgba(255,255,255,0.92)'
                         : 'rgba(255,255,255,0.34)',
                     }}
-                    title={isGenerating ? '改光生成中...' : `生成，消耗 ${RELIGHT_COST} 积分`}
+                    title={isGenerating ? '光影调整生成中...' : `生成，消耗 ${RELIGHT_COST} 积分`}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
                     {isGenerating ? (

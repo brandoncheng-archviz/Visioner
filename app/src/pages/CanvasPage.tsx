@@ -1501,6 +1501,38 @@ function FlowCanvas() {
     openNodeContextMenu(clientX, clientY, nodeContextMenu.nodeId);
   }, [nodeContextMenu, openNodeContextMenu]);
 
+  const nodeContextMenuNode = useMemo(
+    () => nodeContextMenu ? nodes.find((node) => node.id === nodeContextMenu.nodeId) : null,
+    [nodeContextMenu, nodes],
+  );
+  const canCreateImageToolsFromContextNode = Boolean(
+    nodeContextMenuNode?.type === 'image' &&
+    !isProcessingImageNode(nodeContextMenuNode) &&
+    resolveNodeImage(nodeContextMenuNode.data),
+  );
+
+  const handleCreateImageToolFromContextMenu = useCallback((nodeId: string, type: 'relight' | 'upscale' | 'compare') => {
+    const sourceNode = nodes.find((node) => node.id === nodeId);
+    if (!sourceNode || sourceNode.type !== 'image') return;
+    if (isProcessingImageNode(sourceNode)) return;
+
+    const resolved = resolveNodeImage(sourceNode.data);
+    if (!resolved) {
+      showToast(t('imageNode.noImageForCompare'));
+      return;
+    }
+
+    if (type === 'relight') {
+      createRelightNode(nodeId, resolved.imageUrl, resolved.width, resolved.height);
+      return;
+    }
+    if (type === 'upscale') {
+      createUpscaleNode(nodeId, resolved.imageUrl, resolved.width, resolved.height);
+      return;
+    }
+    createCompareNode(nodeId);
+  }, [createCompareNode, createRelightNode, createUpscaleNode, nodes, showToast, t]);
+
   const handleContextMenuAddNode = useCallback((type: string, label: string) => {
     if (!contextMenu) return;
     addNode(type, contextMenu.flowPos, label);
@@ -1508,7 +1540,7 @@ function FlowCanvas() {
 
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
-    if (!['text', 'image', 'video'].includes(type)) {
+    if (!['text', 'image', 'video', 'relight', 'upscale', 'compare'].includes(type)) {
       setCreateMenu(null);
       setTempLine(null);
       return;
@@ -1736,6 +1768,8 @@ function FlowCanvas() {
         nodeContextMenu={nodeContextMenu}
         onCloseNodeContextMenu={handleCloseNodeContextMenu}
         onNodeContextMenuReopen={handleNodeContextMenuReopen}
+        canCreateImageTools={canCreateImageToolsFromContextNode}
+        onCreateImageToolNode={nodeContextMenuNode?.type === 'image' ? handleCreateImageToolFromContextMenu : undefined}
         onNodeDuplicate={duplicateNode}
         onNodePaste={pasteNodes}
         onNodeDelete={handleNodeDelete}

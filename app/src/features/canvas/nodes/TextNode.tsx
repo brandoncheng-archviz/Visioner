@@ -14,6 +14,13 @@ import {
   TEXT_NODE_MIN_HEIGHT,
   TEXT_NODE_WIDTH,
 } from '../constants/textNode';
+import {
+  CANVAS_NODE_CARD_BACKGROUND,
+  CANVAS_NODE_CARD_BORDER_COLOR,
+  CANVAS_NODE_CARD_BORDER_WIDTH,
+  CANVAS_NODE_CARD_RADIUS,
+  CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
+} from '../constants/canvasConstants';
 import type { TextNodeActionType, TextNodeData } from '../types/basicNode.types';
 import {
   getTextContent,
@@ -37,7 +44,6 @@ const EMPTY_ACTIONS: Array<{
 const TEXT_NODE_RESIZE_MIN_HEIGHT = 240;
 const TEXT_NODE_RESIZE_MAX_WIDTH = 960;
 const TEXT_NODE_RESIZE_MAX_HEIGHT = 800;
-const TEXT_NODE_CARD_RADIUS = 24;
 
 function TextNodeGlyph({ className }: { className?: string }) {
   return (
@@ -294,9 +300,9 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
             minHeight: usesTextResourceLayout ? 0 : TEXT_NODE_MIN_HEIGHT,
             maxHeight: usesTextResourceLayout ? undefined : TEXT_NODE_MAX_HEIGHT,
             height: usesTextResourceLayout ? '100%' : isInlineEditing ? inlineEditorHeight : undefined,
-            background: '#252526',
-            border: `2px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.12)'}`,
-            borderRadius: TEXT_NODE_CARD_RADIUS,
+            background: CANVAS_NODE_CARD_BACKGROUND,
+            border: `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR}`,
+            borderRadius: CANVAS_NODE_CARD_RADIUS,
             boxSizing: 'border-box',
             boxShadow: 'none',
           }}
@@ -346,14 +352,14 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                 startInlineEditing();
               }}
             >
-              <TextNodeGlyph className="mb-7 text-white/20" />
-              <div className="text-[15px] leading-6 text-white/32">
+              <TextNodeGlyph className="mb-7 text-white/16" />
+              <div className="text-[15px] leading-6 text-white/30">
                 双击编写内容，开始你的创作。
               </div>
             </div>
           ) : nodeState !== 'empty' || incomingSourceNodes.length > 0 ? (
             <div className="flex min-h-[300px] items-center justify-center">
-              <TextNodeGlyph className="text-white/20" />
+              <TextNodeGlyph className="text-white/16" />
             </div>
           ) : (
             <div
@@ -364,8 +370,8 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                 triggerAction('draft');
               }}
             >
-              <TextNodeGlyph className="-mt-3 mb-7 text-white/15" />
-              <div className="mb-1 w-full px-2 text-[11px] text-white/18">尝试：</div>
+              <TextNodeGlyph className="-mt-3 mb-7 text-white/14" />
+              <div className="mb-1 w-full px-2 text-[11px] text-white/22">尝试：</div>
               <div className="w-full space-y-0.5">
                 {EMPTY_ACTIONS.map(({ action, label, icon: Icon }) => (
                   <button
@@ -375,9 +381,9 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                       event.stopPropagation();
                       triggerAction(action);
                     }}
-                    className="nodrag flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/30 transition-colors hover:bg-white/[0.035] hover:text-white/50"
+                    className="nodrag flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/34 transition-colors hover:bg-white/[0.035] hover:text-white/46"
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-white/15" />
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-white/22" />
                     <span>{label}</span>
                   </button>
                 ))}

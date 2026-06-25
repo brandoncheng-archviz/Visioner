@@ -3,6 +3,13 @@ import { Handle, Position, useStore, useReactFlow, useUpdateNodeInternals, type 
 import { ArrowLeftRight, Columns2, RotateCcw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { resolveNodeImage } from '../utils/resolveNodeImage';
+import {
+  CANVAS_NODE_CARD_BACKGROUND,
+  CANVAS_NODE_CARD_BORDER_COLOR,
+  CANVAS_NODE_CARD_BORDER_WIDTH,
+  CANVAS_NODE_CARD_RADIUS,
+  CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
+} from '../constants/canvasConstants';
 
 interface ConnectedImage {
   nodeId: string;
@@ -169,7 +176,7 @@ function CompareImageArea({
         width,
         height,
         cursor: 'default',
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012))',
+        background: CANVAS_NODE_CARD_BACKGROUND,
       }}
     >
       {!leftImage && !rightImage && emptyContent}
@@ -351,21 +358,27 @@ export function CompareNode({ id, data, selected }: NodeProps) {
     setEdges((edges) => edges.filter((edge) => !(edge.target === id && edge.source === rightImage.nodeId)));
   }, [id, removeReferenceEdge, rightImage, setEdges]);
 
-  const renderEmptyState = (compact = false) => (
+  const renderEmptyState = () => (
     <div className="grid h-full w-full grid-cols-2 gap-2 p-3">
       {[t('compare.left'), t('compare.right')].map((label) => (
         <div
           key={label}
-          className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed"
-          style={{ borderColor: 'rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.42)' }}
+          className="flex flex-col items-center justify-center gap-2 rounded-[18px] border border-dashed"
+          style={{
+            background: 'rgba(255,255,255,0.025)',
+            borderColor: 'rgba(255,255,255,0.14)',
+            color: 'rgba(255,255,255,0.5)',
+          }}
         >
-          <Columns2 className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
-          <span className="text-xs">{label}</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/55">
+            <Columns2 className="h-4 w-4" />
+          </span>
+          <span className="text-[13px] font-medium">{label}</span>
         </div>
       ))}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-xs"
-        style={{ color: 'rgba(255,255,255,0.38)' }}
+        className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-[13px] font-medium"
+        style={{ color: 'rgba(255,255,255,0.5)' }}
       >
         {t('compare.connectTwoImages')}
       </div>
@@ -449,20 +462,22 @@ export function CompareNode({ id, data, selected }: NodeProps) {
 
       <div className="relative" style={{ width: nodeWidth }}>
         <div
-          className="node-preview-card w-full overflow-hidden rounded-[16px] transition-all"
+          className="node-preview-card w-full overflow-hidden rounded-[24px] transition-all"
           style={{
             width: nodeWidth,
-            background: '#1a1a1a',
-            border: `1.5px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
-            boxShadow: selected ? '0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12)' : 'none',
+            background: CANVAS_NODE_CARD_BACKGROUND,
+            border: `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR}`,
+            borderRadius: CANVAS_NODE_CARD_RADIUS,
+            boxShadow: 'none',
+            boxSizing: 'border-box',
           }}
         >
           <div className="px-3 pt-3">
             <div
-              className="mx-auto overflow-hidden rounded-xl"
+              className="mx-auto overflow-hidden rounded-[18px]"
               style={{
                 width: imageAreaWidth,
-                border: '1px solid rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
               }}
             >
               <CompareImageArea
@@ -471,7 +486,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
                 sliderPosition={sliderPosition}
                 width={imageAreaWidth}
                 height={imageAreaHeight}
-                emptyContent={renderEmptyState(true)}
+                emptyContent={renderEmptyState()}
                 singleContent={renderSingleState()}
                 onSliderChange={setSliderPosition}
               />

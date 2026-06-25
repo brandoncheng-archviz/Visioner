@@ -56,7 +56,7 @@ export function VideoNode({ data, selected, id }: NodeProps) {
       <NodeShell label={label} selected={selected}>
         <div className="w-[260px] px-4 py-3.5">
           <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#60a5fa]/10 text-[#7dd3fc]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-white/55">
               <Film className="h-3.5 w-3.5" />
             </span>
             <input

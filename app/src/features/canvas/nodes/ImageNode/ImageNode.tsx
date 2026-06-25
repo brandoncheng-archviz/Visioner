@@ -21,6 +21,11 @@ import { useHistory } from '../../contexts/HistoryContext';
 import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
 import { checkGenerationRequestSafety, checkGenerationResultSafety } from '../../utils/contentSafety';
 import {
+  CANVAS_NODE_CARD_BACKGROUND,
+  CANVAS_NODE_CARD_BORDER_COLOR,
+  CANVAS_NODE_CARD_BORDER_WIDTH,
+  CANVAS_NODE_CARD_RADIUS,
+  CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
   CANVAS_NODE_CONTROL_SCALE,
   IMAGE_NODE_CONTROL_WIDTH,
   IMAGE_NODE_CONTROL_HEIGHT,
@@ -1373,44 +1378,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
   const isOnlySelected = selected && selectedNodeCount === 1;
 
-  const handleUpscale = useCallback(() => {
-    if (!imageNodeViewModel.canUpscale) return;
-    const resolved = resolveNodeImage(data);
-    if (!resolved) {
-      showToast(t('imageNode.noImageForUpscale'));
-      return;
-    }
-
-    const onCreateUpscaleNode = data.onCreateUpscaleNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
-    if (!onCreateUpscaleNode) return;
-    onCreateUpscaleNode(id, resolved.imageUrl, resolved.width, resolved.height);
-  }, [data, id, imageNodeViewModel.canUpscale, showToast, t]);
-
-  const handleRelight = useCallback(() => {
-    if (!imageNodeViewModel.canRelight) return;
-    const resolved = resolveNodeImage(data);
-    if (!resolved) {
-      showToast('当前节点没有可改光的图片。');
-      return;
-    }
-    const onCreateRelightNode = data.onCreateRelightNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
-    if (!onCreateRelightNode) return;
-    onCreateRelightNode(id, resolved.imageUrl, resolved.width, resolved.height);
-  }, [data, id, imageNodeViewModel.canRelight, showToast]);
-
-  const handleCompare = useCallback(() => {
-    if (!imageNodeViewModel.canCompare) return;
-    const resolved = resolveNodeImage(data);
-    if (!resolved) {
-      showToast(t('imageNode.noImageForCompare'));
-      return;
-    }
-
-    const onCreateCompareNode = data.onCreateCompareNode as ((sourceNodeId: string, inputImage: string, width: number, height: number) => void) | undefined;
-    if (!onCreateCompareNode) return;
-    onCreateCompareNode(id, resolved.imageUrl, resolved.width, resolved.height);
-  }, [data, id, imageNodeViewModel.canCompare, showToast, t]);
-
   const handlePreview = useCallback(() => {
     if (!imageNodeViewModel.canPreview) return;
     const resolved = resolveNodeImage(data);
@@ -1465,9 +1432,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {imageNodeViewModel.showTopToolbar && isOnlySelected && !isMultiResultExpanded && (
         <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: displayCardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
-            onUpscale={handleUpscale}
-            onRelight={handleRelight}
-            onCompare={handleCompare}
             onPreview={handlePreview}
             onDownload={handleDownload}
             hasImage={imageNodeViewModel.canUseToolbarActions}
@@ -1592,9 +1556,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           style={{
             width: displayCardWidth,
             height: displayCardHeight,
-            background: isMultiResultExpanded ? '#101014' : '#252526',
-            border: `2px solid ${selected ? '#00d4ff' : 'rgba(255,255,255,0.12)'}`,
-            borderRadius: 24,
+            background: isMultiResultExpanded ? '#101014' : CANVAS_NODE_CARD_BACKGROUND,
+            border: `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR}`,
+            borderRadius: CANVAS_NODE_CARD_RADIUS,
             boxSizing: 'border-box',
           }}
         >
@@ -1853,12 +1817,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               />
             </div>
           ) : (
-            <div className="flex items-center justify-center">
-              <Image
-                className="h-12 w-12"
-                strokeWidth={1.35}
-                style={{ color: 'rgba(255,255,255,0.22)' }}
-              />
+            <div className="flex flex-col items-center justify-center gap-2 text-center">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/55">
+                <Image className="h-4 w-4" strokeWidth={1.7} />
+              </span>
+              <span className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                添加图片
+              </span>
             </div>
           )}
         </div>
