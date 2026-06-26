@@ -72,4 +72,6 @@ export interface UpscaleNodeData {
     sourceHandleType?: ConnectionHandleType,
   ) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
+  onDuplicateNode?: (nodeId: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
 }

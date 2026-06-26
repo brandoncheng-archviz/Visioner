@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
-import { Loader2, Play, Plus, Square, Sun, Zap } from 'lucide-react';
+import { Copy, Download, Loader2, Maximize2, Play, Plus, Square, Sun, Trash2, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { LightPreviewData } from '../types/lightPreview.types';
 import type { RelightCreationOptions, RelightPreset, RelightSettings } from '../types/relight.types';
@@ -63,6 +63,8 @@ export interface RelightNodeData {
     height: number,
     options?: RelightCreationOptions,
   ) => void;
+  onDuplicateNode?: (nodeId: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
 }
 
 const RELIGHT_COST = 14;
@@ -409,6 +411,23 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     document.body.removeChild(link);
   }, [id, resultImage]);
 
+  const handleDuplicateNode = useCallback(() => {
+    if (isGenerating || isPreviewing) return;
+    nodeData.onDuplicateNode?.(id);
+  }, [id, isGenerating, isPreviewing, nodeData]);
+
+  const handleDeleteNode = useCallback(() => {
+    if (isGenerating || isPreviewing) return;
+    nodeData.onDeleteNode?.(id);
+  }, [id, isGenerating, isPreviewing, nodeData]);
+
+  const toolbarActions = [
+    { icon: Maximize2, label: t('imageNode.fullscreen'), action: () => setShowResultPreview(true), disabled: !resultImage || isGenerating || isPreviewing },
+    { icon: Copy, label: t('common.createCopy'), action: handleDuplicateNode, disabled: isGenerating || isPreviewing },
+    { icon: Download, label: t('common.download'), action: handleDownloadResult, disabled: !resultImage || isGenerating || isPreviewing },
+    { icon: Trash2, label: t('common.delete'), action: handleDeleteNode, disabled: isGenerating || isPreviewing, danger: true },
+  ];
+
   const handleSliderChange = useCallback(
     (newElevation: number, newAzimuth: number) => {
       setElevation(newElevation);
@@ -497,9 +516,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
           }}
         >
           <ImageToolbar
-            onPreview={() => setShowResultPreview(true)}
-            onDownload={handleDownloadResult}
-            hasImage
+            actions={toolbarActions}
           />
         </div>
       )}

@@ -1044,11 +1044,48 @@ function FlowCanvas() {
     return lockedNodeIds;
   }, [nodes]);
 
+  const duplicateNodeById = useCallback((nodeId: string) => {
+    const node = nodes.find((currentNode) => currentNode.id === nodeId);
+    if (!node) return;
+    const nodeType = node.type || '';
+    const fallbackBaseTitle = NODE_BASE_TITLES[nodeType] || nodeType;
+    const label = getNextCopiedNodeTitle(
+      getAllNodeLabels(),
+      (node.data?.label as string | undefined) || '',
+      fallbackBaseTitle,
+    );
+    const newNode: Node = {
+      ...node,
+      id: `${node.type}-${Date.now()}`,
+      position: { x: node.position.x + 40, y: node.position.y + 40 },
+      data: {
+        ...node.data,
+        label,
+        title: typeof node.data.title === 'string' ? label : node.data.title,
+      },
+      style: node.style ? { ...node.style } : undefined,
+      measured: node.measured ? { ...node.measured } : undefined,
+      selected: true,
+      dragging: false,
+    };
+    setNodes((currentNodes) => [
+      ...currentNodes.map((currentNode) => ({ ...currentNode, selected: false })),
+      newNode,
+    ]);
+  }, [getAllNodeLabels, nodes, setNodes]);
+
+  const deleteNodeById = useCallback((nodeId: string) => {
+    setNodes((currentNodes) => currentNodes.filter((node) => node.id !== nodeId));
+    setEdges((currentEdges) => currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+  }, [setEdges, setNodes]);
+
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((n) => ({
       ...n,
       data: {
         ...n.data,
+        onDuplicateNode: duplicateNodeById,
+        onDeleteNode: deleteNodeById,
         isReferenceLocked: n.type === 'image' ? lockedPromptReferenceNodeIds.has(n.id) : undefined,
         onStartLineDraw: startLineDraw,
         onRemoveReferenceEdge: removeReferenceEdge,
@@ -1064,7 +1101,7 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [nodes, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {

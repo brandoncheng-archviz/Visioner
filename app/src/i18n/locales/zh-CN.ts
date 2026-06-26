@@ -8,6 +8,7 @@ const zhCN = {
     edit: "编辑",
     save: "保存",
     copy: "复制",
+    copyText: "复制内容",
     paste: "粘贴",
     duplicate: "副本",
     download: "下载",
@@ -33,6 +34,8 @@ const zhCN = {
     apply: "应用",
     remove: "移除",
     replace: "替换",
+    uploadFromDevice: "本地上传",
+    selectFromCanvas: "从画布选择",
     back: "返回",
     more: "更多",
     crop: "裁剪",
@@ -40,6 +43,7 @@ const zhCN = {
     redraw: "重绘",
     lighting: "光影预览",
     expand: "扩展",
+    fullscreen: "全屏",
   },
 
   canvas: {
@@ -104,7 +108,7 @@ const zhCN = {
     relightTooltip: "光影调整",
     sunSky: "光影",
     compare: "图像对比",
-    preview: "预览",
+    preview: "全屏",
     noImageForUpscale: "请先上传或生成图片",
     connectImageToEnhance: "连接图片后增强细节",
     noImageForSunSky: "请先上传或生成图片",

@@ -1,6 +1,6 @@
 import { useRef, useCallback, useMemo, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Sparkles, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { Copy, Download, Maximize2, Plus, Loader2, AlertCircle, Sparkles, Trash2 } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,7 +17,7 @@ import {
   IMAGE_NODE_PREVIEW_WIDTH,
 } from '../constants/canvasConstants';
 import { UpscaleParamPanel } from '../components/UpscaleParamPanel';
-import { UpscaleResultToolbar } from '../components/UpscaleResultToolbar';
+import { ImageToolbar } from '../components/ImageToolbar';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
 import { createUpscaleTask, simulateUpscale } from '../utils/mockUpscaleTask';
 import { resolveImageNodeSize } from '../utils/imageNodeSizing';
@@ -371,16 +371,15 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
     }
   }, [id, nodeData, setNodes]);
 
-  const handleUpscaleAgain = useCallback(() => {
-    if (!nodeData.outputImage) return;
-    const onCreateUpscaleNode = (data as unknown as UpscaleNodeData).onCreateUpscaleNode;
-    if (!onCreateUpscaleNode) return;
-    onCreateUpscaleNode(id, nodeData.outputImage, nodeData.width, nodeData.height);
-  }, [id, nodeData, data]);
-
   const handleDelete = useCallback(() => {
-    setNodes((nds) => nds.filter((n) => n.id !== id));
-  }, [id, setNodes]);
+    if (nodeData.status === 'running') return;
+    (data as unknown as UpscaleNodeData).onDeleteNode?.(id);
+  }, [data, id, nodeData.status]);
+
+  const handleDuplicate = useCallback(() => {
+    if (nodeData.status === 'running') return;
+    (data as unknown as UpscaleNodeData).onDuplicateNode?.(id);
+  }, [data, id, nodeData.status]);
 
   const handleDownload = useCallback(() => {
     if (!nodeData.outputImage) return;
@@ -412,6 +411,12 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
   );
 
   const canGenerate = Boolean(nodeData.inputImage) && nodeData.status !== 'running';
+  const toolbarActions = [
+    { icon: Maximize2, label: t('imageNode.fullscreen'), action: () => setShowPreview(true), disabled: !displayImage || nodeData.status === 'running' },
+    { icon: Copy, label: t('common.createCopy'), action: handleDuplicate, disabled: nodeData.status === 'running' },
+    { icon: Download, label: t('common.download'), action: handleDownload, disabled: !nodeData.outputImage || nodeData.status === 'running' },
+    { icon: Trash2, label: t('common.delete'), action: handleDelete, disabled: nodeData.status === 'running', danger: true },
+  ];
 
   return (
     <div className="relative group/upscale" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
@@ -426,12 +431,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
             transformOrigin: 'top center',
           }}
         >
-          <UpscaleResultToolbar
-            onPreview={() => setShowPreview(true)}
-            onDownload={handleDownload}
-            onDelete={handleDelete}
-            onUpscaleAgain={handleUpscaleAgain}
-          />
+          <ImageToolbar actions={toolbarActions} />
         </div>
       )}
 

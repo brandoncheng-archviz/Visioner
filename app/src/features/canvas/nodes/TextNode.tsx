@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { FileText, ImagePlus, PenLine, Plus } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Clipboard, Copy, Download, FileText, ImagePlus, Maximize2, PenLine, Plus, Trash2, X } from 'lucide-react';
 import {
   Handle,
   NodeResizeControl,
@@ -8,6 +9,7 @@ import {
   useStore,
   type NodeProps,
 } from '@xyflow/react';
+import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_TEXT_NODE_MODEL,
   TEXT_NODE_MAX_HEIGHT,
@@ -21,6 +23,7 @@ import {
   CANVAS_NODE_CARD_RADIUS,
   CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
 } from '../constants/canvasConstants';
+import { ImageToolbar } from '../components/ImageToolbar';
 import type { TextNodeActionType, TextNodeData } from '../types/basicNode.types';
 import {
   getTextContent,
@@ -64,6 +67,7 @@ function TextNodeGlyph({ className }: { className?: string }) {
 }
 
 export function TextNode({ data, selected, id, width, height }: NodeProps) {
+  const { t } = useTranslation();
   const { setNodes } = useReactFlow();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
@@ -81,6 +85,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
     : undefined;
   const inlineContent = nodeData.content ?? nodeData.text ?? '';
   const [isInlineEditing, setIsInlineEditing] = useState(false);
+  const [showFullscreen, setShowFullscreen] = useState(false);
   const [inlineEditorHeight, setInlineEditorHeight] = useState(TEXT_NODE_MIN_HEIGHT);
   const previewCardRef = useRef<HTMLDivElement>(null);
   const inlineTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -95,6 +100,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
     [allEdges, allNodes, id, isComposeMode],
   );
   const { isProcessing, nodeState } = getTextNodeSubmitState(nodeData, incomingSourceNodes);
+  const hasTextContent = content.trim().length > 0;
 
   const references = useMemo(() => {
     const incoming = isComposeMode ? [] : allEdges.filter((edge) => edge.target === id);
@@ -230,6 +236,42 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
     }
   };
 
+  const handleCopyText = async () => {
+    if (isProcessing || !hasTextContent) return;
+    await navigator.clipboard?.writeText(content);
+  };
+
+  const handleDownloadText = () => {
+    if (isProcessing || !hasTextContent) return;
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title || 'text-node'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDuplicateNode = () => {
+    if (isProcessing) return;
+    nodeData.onDuplicateNode?.(id);
+  };
+
+  const handleDeleteNode = () => {
+    if (isProcessing) return;
+    nodeData.onDeleteNode?.(id);
+  };
+
+  const toolbarActions = [
+    { icon: Maximize2, label: t('imageNode.fullscreen'), action: () => setShowFullscreen(true), disabled: isProcessing || !hasTextContent },
+    { icon: Clipboard, label: t('common.copyText'), action: handleCopyText, disabled: isProcessing || !hasTextContent },
+    { icon: Copy, label: t('common.createCopy'), action: handleDuplicateNode, disabled: isProcessing },
+    { icon: Download, label: t('common.download'), action: handleDownloadText, disabled: isProcessing || !hasTextContent },
+    { icon: Trash2, label: t('common.delete'), action: handleDeleteNode, disabled: isProcessing, danger: true },
+  ];
+
   const startLineDraw = (
     event: PointerEvent<HTMLDivElement>,
     sourceHandleId: 'left-target' | 'right-source',
@@ -258,6 +300,19 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
         minHeight: usesTextResourceLayout ? 240 : undefined,
       }}
     >
+      {selected && (
+        <div
+          className="absolute z-20 flex justify-center"
+          style={{
+            top: -80 / zoom,
+            left: nodeWidth / 2,
+            transform: `translateX(-50%) scale(${inverseScale})`,
+            transformOrigin: 'top center',
+          }}
+        >
+          <ImageToolbar actions={toolbarActions} />
+        </div>
+      )}
       <div
         className="pointer-events-none"
         style={{
@@ -527,6 +582,31 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
           style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%', zIndex: 9, pointerEvents: 'none' }}
         />
       </div>
+      {showFullscreen && hasTextContent && createPortal(
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-8"
+          onClick={() => setShowFullscreen(false)}
+        >
+          <div
+            className="max-h-[82vh] w-[min(820px,92vw)] overflow-hidden rounded-[18px] border border-white/10 bg-[#1a1a1a] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-3">
+              <div className="truncate text-[14px] font-medium text-white/82">{title}</div>
+              <button
+                type="button"
+                onClick={() => setShowFullscreen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-white/62 transition hover:bg-white/[0.08] hover:text-white"
+                aria-label={t('common.close')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <pre className="max-h-[72vh] overflow-auto whitespace-pre-wrap break-words px-5 py-4 text-[15px] leading-7 text-white/76">{content}</pre>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

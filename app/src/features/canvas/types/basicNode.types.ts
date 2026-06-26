@@ -54,6 +54,8 @@ export interface TextNodeData {
     sourceHandleType?: ConnectionHandleType,
   ) => void;
   onTextAction?: (nodeId: string, action: TextNodeActionType) => void;
+  onDuplicateNode?: (nodeId: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
 }
 
 export interface VideoNodeData {
@@ -69,4 +71,6 @@ export interface VideoNodeData {
     sourceHandleId: string,
     sourceHandleType?: ConnectionHandleType,
   ) => void;
+  onDuplicateNode?: (nodeId: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
 }

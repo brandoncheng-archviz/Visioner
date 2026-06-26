@@ -63,6 +63,8 @@ export interface ImageNodeData {
   onCreateRelightNode?: (sourceNodeId: string, inputImage: string, width: number, height: number, options?: RelightCreationOptions) => void;
   onOpenNodeHistory?: (nodeId: string) => void;
   onFocusNode?: (nodeId: string) => void;
+  onDuplicateNode?: (nodeId: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
   lightPreview?: LightPreviewData;
 }
 

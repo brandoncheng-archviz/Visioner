@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Download, Image, Maximize2, Minimize2, Plus, Upload } from 'lucide-react';
+import { Check, Copy, Crop, Download, Image, Maximize2, Minimize2, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
@@ -70,6 +70,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const localReferenceType = normalizeLocalReferenceType((data.localReferenceType as LocalReferenceType | undefined)) ?? getLocalReferenceTypeFromRole(rawRole);
   const localReferenceLabel = (data.localReferenceLabel as string | undefined) ?? getLocalReferenceLabel(rawRole, localReferenceType, data.localReferenceLabel as string | undefined, customRoleLabel);
   const fileRef = useRef<HTMLInputElement>(null);
+  const replaceFileRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || t('canvas.nodeLabels.image', { defaultValue: '图片' }));
   const [previewImage, setPreviewImage] = useState(currentImage);
@@ -856,6 +857,48 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setPreviewImage(url);
   };
 
+  const handleReplaceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!imageNodeViewModel.canUseToolbarActions) return;
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const onRegisterObjectUrl = data.onRegisterObjectUrl as ((nextUrl: string) => void) | undefined;
+    onRegisterObjectUrl?.(url);
+
+    const imgEl = new window.Image();
+    imgEl.onload = () => {
+      setImgSize({ width: imgEl.width, height: imgEl.height });
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  image: url,
+                  inputImage: url,
+                  currentImage: url,
+                  currentResultId: null,
+                  currentResultSet: null,
+                  generatedImages: [],
+                  generationTask: null,
+                  isGenerating: false,
+                  isProcessing: false,
+                  assetSource: 'upload',
+                  isGeneratedResult: false,
+                  width: imgEl.width,
+                  height: imgEl.height,
+                },
+              }
+            : n,
+        ),
+      );
+    };
+    imgEl.src = url;
+    setPreviewImage(url);
+  };
+
   const handleNameSave = () => {
     const newName = nameInputRef.current?.value.trim() || nodeName;
     setNodeName(newName);
@@ -1409,6 +1452,68 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     document.body.removeChild(link);
   }, [data, id, imageNodeViewModel.canDownload]);
 
+  const handleDuplicateNode = useCallback(() => {
+    if (!imageNodeViewModel.canUseToolbarActions) return;
+    const onDuplicateNode = data.onDuplicateNode as ((nodeId: string) => void) | undefined;
+    onDuplicateNode?.(id);
+  }, [data, id, imageNodeViewModel.canUseToolbarActions]);
+
+  const handleDeleteNode = useCallback(() => {
+    if (!imageNodeViewModel.canUseToolbarActions) return;
+    const onDeleteNode = data.onDeleteNode as ((nodeId: string) => void) | undefined;
+    onDeleteNode?.(id);
+  }, [data, id, imageNodeViewModel.canUseToolbarActions]);
+
+  const imageToolbarActions = useMemo(() => [
+    {
+      icon: Maximize2,
+      label: t('imageNode.fullscreen'),
+      action: handlePreview,
+      disabled: !imageNodeViewModel.canUseToolbarActions,
+    },
+    {
+      icon: Copy,
+      label: t('common.createCopy'),
+      action: handleDuplicateNode,
+      disabled: !imageNodeViewModel.canUseToolbarActions,
+    },
+    {
+      icon: Download,
+      label: t('common.download'),
+      action: handleDownload,
+      disabled: !imageNodeViewModel.canUseToolbarActions,
+    },
+    {
+      icon: RefreshCw,
+      label: t('common.replace'),
+      disabled: !imageNodeViewModel.canUseToolbarActions,
+      menuItems: [
+        {
+          label: t('common.uploadFromDevice'),
+          action: () => replaceFileRef.current?.click(),
+        },
+        {
+          label: t('common.selectFromCanvas'),
+          action: () => undefined,
+          disabled: true,
+        },
+      ],
+    },
+    {
+      icon: Crop,
+      label: t('common.crop'),
+      action: () => undefined,
+      disabled: true,
+    },
+    {
+      icon: Trash2,
+      label: t('common.delete'),
+      action: handleDeleteNode,
+      disabled: !imageNodeViewModel.canUseToolbarActions,
+      danger: true,
+    },
+  ], [handleDeleteNode, handleDownload, handleDuplicateNode, handlePreview, imageNodeViewModel.canUseToolbarActions, t]);
+
   // Global modifier + G shortcut for generation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1430,11 +1535,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {pointPickResultPortal}
       {/* Toolbar — shown above title only when this node has a real image/result */}
       {imageNodeViewModel.showTopToolbar && isOnlySelected && !isMultiResultExpanded && (
-        <div className="absolute z-20 flex justify-center" style={{ top: -80 / zoom, left: displayCardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
+        <div className="absolute z-[80] flex justify-center" style={{ top: -80 / zoom, left: displayCardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
-            onPreview={handlePreview}
-            onDownload={handleDownload}
-            hasImage={imageNodeViewModel.canUseToolbarActions}
+            actions={imageToolbarActions}
           />
         </div>
       )}
@@ -1531,9 +1634,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             >
               <Upload style={{ width: 11, height: 11, color: 'rgba(255,255,255,0.7)' }} />
             </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-          </>
-        )}
+	            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+	          </>
+	        )}
+        <input ref={replaceFileRef} type="file" accept="image/*" className="hidden" onChange={handleReplaceFileChange} />
 
         {imageNodeViewModel.showReferenceUsageControl && (isOnlySelected || roleMenuOpen) && (
           <ImageRoleTag

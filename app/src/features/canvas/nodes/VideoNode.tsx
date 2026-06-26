@@ -1,8 +1,10 @@
-import { useCallback, useRef } from 'react';
-import { Film, Play, Plus, Upload } from 'lucide-react';
-import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react';
+import { useCallback, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Copy, Download, Film, Maximize2, Play, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react';
+import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { NodeShell } from '../components/NodeShell';
+import { ImageToolbar } from '../components/ImageToolbar';
 import type { VideoNodeData } from '../types/basicNode.types';
 
 function formatFileSize(bytes?: number): string {
@@ -14,7 +16,10 @@ function formatFileSize(bytes?: number): string {
 export function VideoNode({ data, selected, id }: NodeProps) {
   const { t } = useTranslation();
   const { setNodes } = useReactFlow();
+  const zoom = useStore((state) => state.transform[2]);
+  const inverseScale = 1 / zoom;
   const inputRef = useRef<HTMLInputElement>(null);
+  const [showFullscreen, setShowFullscreen] = useState(false);
   const nodeData = data as VideoNodeData;
   const label = nodeData.label || t('canvas.nodeLabels.video');
 
@@ -51,8 +56,47 @@ export function VideoNode({ data, selected, id }: NodeProps) {
     [nodeData.videoUrl, updateData],
   );
 
+  const handleDuplicateNode = useCallback(() => {
+    nodeData.onDuplicateNode?.(id);
+  }, [id, nodeData]);
+
+  const handleDeleteNode = useCallback(() => {
+    nodeData.onDeleteNode?.(id);
+  }, [id, nodeData]);
+
+  const handleDownload = useCallback(() => {
+    if (!nodeData.videoUrl) return;
+    const link = document.createElement('a');
+    link.href = nodeData.videoUrl;
+    link.download = nodeData.fileName || `video-node-${id}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [id, nodeData.fileName, nodeData.videoUrl]);
+
+  const toolbarActions = [
+    { icon: Maximize2, label: t('imageNode.fullscreen'), action: () => setShowFullscreen(true), disabled: !nodeData.videoUrl },
+    { icon: Copy, label: t('common.createCopy'), action: handleDuplicateNode },
+    { icon: Download, label: t('common.download'), action: handleDownload, disabled: !nodeData.videoUrl },
+    { icon: RefreshCw, label: t('common.replace'), action: () => inputRef.current?.click() },
+    { icon: Trash2, label: t('common.delete'), action: handleDeleteNode, danger: true },
+  ];
+
   return (
     <div className="relative">
+      {selected && (
+        <div
+          className="absolute z-20 flex justify-center"
+          style={{
+            top: -80 / zoom,
+            left: 130,
+            transform: `translateX(-50%) scale(${inverseScale})`,
+            transformOrigin: 'top center',
+          }}
+        >
+          <ImageToolbar actions={toolbarActions} />
+        </div>
+      )}
       <NodeShell label={label} selected={selected}>
         <div className="w-[260px] px-4 py-3.5">
           <div className="mb-3 flex items-center gap-2">
@@ -217,6 +261,28 @@ export function VideoNode({ data, selected, id }: NodeProps) {
         id="right-target"
         style={{ opacity: 0, width: 28, height: 28, right: 0, top: '50%', pointerEvents: 'none' }}
       />
+      {showFullscreen && nodeData.videoUrl && createPortal(
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-8"
+          onClick={() => setShowFullscreen(false)}
+        >
+          <div
+            className="relative w-[min(960px,92vw)] overflow-hidden rounded-[18px] border border-white/10 bg-[#1a1a1a] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowFullscreen(false)}
+              className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white/72 transition hover:bg-black/70 hover:text-white"
+              aria-label={t('common.close')}
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <video src={nodeData.videoUrl} controls autoPlay className="max-h-[82vh] w-full bg-black" />
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
