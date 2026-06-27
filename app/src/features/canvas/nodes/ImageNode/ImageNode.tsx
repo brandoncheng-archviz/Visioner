@@ -4,7 +4,7 @@ import { Check, Copy, Crop, Download, Image, Maximize2, Minimize2, Plus, Refresh
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
-import type { ImageRole, PromptContent, ReferenceInfo, LocalReferenceType } from '../../types/imageNode.types';
+import type { ImageRole, PromptContent, ReferenceInfo, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
 import type { ModelParams } from '../../types/canvas.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
@@ -44,7 +44,9 @@ import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
+import { ImageCropOverlay, type NormalizedCropRect } from './ImageCropOverlay';
 import { createImageNodeViewModel } from './imageNodeViewModel';
+import { cropCoverImage } from '../../utils/cropImage';
 
 const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或插入图片引用';
 
@@ -77,18 +79,19 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [editingName, setEditingName] = useState(false);
   const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [isCropMode, setIsCropMode] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
   /* ─── Point-pick mode for local reference ─── */
   const [isPointPickMode, setIsPointPickMode] = useState(false);
-  const [manualInputSignal, setManualInputSignal] = useState(0);
   const [pendingLightPanelOpen, setPendingLightPanelOpen] = useState(false);
   const [pointPickLoading, setPointPickLoading] = useState(false);
   const [pointPickResult, setPointPickResult] = useState<{ label: string; normalizedType?: string; confidence?: number } | null>(null);
   const [pointPickError, setPointPickError] = useState(false);
-  const [pointPickPosition, setPointPickPosition] = useState<{ x: number; y: number } | null>(null);
+  const [pointPickPosition, setPointPickPosition] = useState<LocalReferencePoint | null>(null);
   const [pointPickImageRect, setPointPickImageRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [isEditingPointPickLabel, setIsEditingPointPickLabel] = useState(false);
   const [pointPickEditLabel, setPointPickEditLabel] = useState('');
@@ -225,7 +228,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         prev.selectedIndex === next.selectedIndex &&
         prev.isExpanded === next.isExpanded &&
         prev.images.length === next.images.length &&
-        prev.images.every((image, index) => image.resultId === next.images[index]?.resultId)
+        prev.images.every((image, index) => (
+          image.resultId === next.images[index]?.resultId &&
+          image.imageUrl === next.images[index]?.imageUrl &&
+          image.width === next.images[index]?.width &&
+          image.height === next.images[index]?.height
+        ))
       ) {
         return prev;
       }
@@ -285,10 +293,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       const edgeCustomRoleLabel = edge.data?.customRoleLabel as string | undefined;
       const edgeLocalRefType = edge.data?.localReferenceType as LocalReferenceType | undefined;
       const edgeLocalRefLabel = edge.data?.localReferenceLabel as string | undefined;
+      const edgeLocalRefPoint = edge.data?.localReferencePoint as LocalReferencePoint | undefined;
       const sourceRole = (sourceNode?.data?.role as ImageRole | null) || null;
       const sourceCustomRoleLabel = sourceNode?.data?.customRoleLabel as string | undefined;
       const sourceLocalRefType = sourceNode?.data?.localReferenceType as LocalReferenceType | undefined;
       const sourceLocalRefLabel = sourceNode?.data?.localReferenceLabel as string | undefined;
+      const sourceLocalRefPoint = sourceNode?.data?.localReferencePoint as LocalReferencePoint | undefined;
       const referenceRole = edgeRole ?? sourceRole;
       const referenceCustomRoleLabel = edgeCustomRoleLabel ?? sourceCustomRoleLabel;
       const usageInfo = getReferenceUsageInfo(
@@ -307,6 +317,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         customRoleLabel: referenceCustomRoleLabel,
         localReferenceType: usageInfo.localReferenceType,
         localReferenceLabel: usageInfo.localReferenceLabel,
+        localReferencePoint: edgeLocalRefPoint ?? sourceLocalRefPoint,
         imageUrl,
         width: getNodeWidth(sourceNode?.data),
         height: getNodeHeight(sourceNode?.data),
@@ -338,6 +349,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       customRoleLabel: reference.customRoleLabel,
       localReferenceType: reference.localReferenceType,
       localReferenceLabel: reference.localReferenceLabel,
+      localReferencePoint: reference.localReferencePoint,
       imageUrl: reference.imageUrl,
       width: reference.width,
       height: reference.height,
@@ -372,6 +384,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               customUsageName: reference.customRoleLabel,
               localReferenceType: reference.localReferenceType,
               localReferenceLabel: reference.localReferenceLabel,
+              localReferencePoint: reference.localReferencePoint,
             })),
             referencesSignature,
           },
@@ -486,6 +499,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         usageKey: ref.usageKey,
         usageLabel: ref.usageLabel,
         customUsageName: ref.customUsageName,
+        localReferenceType: ref.localReferenceType,
+        localReferenceLabel: ref.localReferenceLabel,
+        localReferencePoint: ref.localReferencePoint,
         promptText: ref.promptText,
       })),
       modelParams: {
@@ -924,6 +940,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       }
     }
     const safeRole = nextRole ?? 'undefined_usage';
+    const roleData = getRoleData(safeRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel);
     setNodes((nds) =>
       nds.map((n) =>
         n.id === id
@@ -931,13 +948,16 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               ...n,
               data: {
                 ...n.data,
-                ...getRoleData(safeRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel),
+                ...roleData,
                 localReferencePoint: undefined,
               },
             }
           : n,
       ),
     );
+    setEdges((edges) => edges.map((edge) => edge.source === id
+      ? { ...edge, data: { ...edge.data, ...roleData, localReferencePoint: undefined } }
+      : edge));
   };
 
   const exitPointPickMode = useCallback(() => {
@@ -1011,7 +1031,18 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const normalizedX = (e.clientX - displayedRect.left) / displayedRect.width;
     const normalizedY = (e.clientY - displayedRect.top) / displayedRect.height;
 
-    setPointPickPosition({ x: normalizedX, y: normalizedY });
+    const displayX = e.clientX - displayedRect.left;
+    const displayY = e.clientY - displayedRect.top;
+    setPointPickPosition({
+      normalizedX,
+      normalizedY,
+      imageX: normalizedX * imgRef.current.naturalWidth,
+      imageY: normalizedY * imgRef.current.naturalHeight,
+      displayX,
+      displayY,
+      x: normalizedX,
+      y: normalizedY,
+    });
     setPointPickLoading(true);
     setPointPickError(false);
     setPointPickResult(null);
@@ -1031,7 +1062,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const applyPointPickResult = () => {
-    if (!pointPickResult) return;
+    if (!pointPickResult || !pointPickPosition) return;
     const isFixedType = pointPickResult.normalizedType && pointPickResult.normalizedType !== 'custom';
     const fixedItem = localReferenceOptions.find((opt) => opt.value === pointPickResult.normalizedType);
 
@@ -1047,6 +1078,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     }
 
     const safeRole: ImageRole = 'local_reference';
+    const roleData = getRoleData(safeRole, undefined, nextType, nextLabel);
     setNodes((nds) =>
       nds.map((n) =>
         n.id === id
@@ -1054,19 +1086,23 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               ...n,
               data: {
                 ...n.data,
-                ...getRoleData(safeRole, undefined, nextType, nextLabel),
+                ...roleData,
                 localReferencePoint: pointPickPosition,
               },
             }
           : n,
       ),
     );
+    setEdges((edges) => edges.map((edge) => edge.source === id
+      ? { ...edge, data: { ...edge.data, ...roleData, localReferencePoint: pointPickPosition } }
+      : edge));
     exitPointPickMode();
   };
 
   const applyEditedPointPickLabel = () => {
     if (!pointPickEditLabel.trim() || !pointPickPosition) return;
     const safeRole: ImageRole = 'local_reference';
+    const roleData = getRoleData(safeRole, undefined, 'custom', pointPickEditLabel.trim());
     setNodes((nds) =>
       nds.map((n) =>
         n.id === id
@@ -1074,20 +1110,17 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               ...n,
               data: {
                 ...n.data,
-                ...getRoleData(safeRole, undefined, 'custom', pointPickEditLabel.trim()),
+                ...roleData,
                 localReferencePoint: pointPickPosition,
               },
             }
           : n,
       ),
     );
+    setEdges((edges) => edges.map((edge) => edge.source === id
+      ? { ...edge, data: { ...edge.data, ...roleData, localReferencePoint: pointPickPosition } }
+      : edge));
     exitPointPickMode();
-  };
-
-  const openPointPickManualInput = () => {
-    exitPointPickMode();
-    handleRoleMenuOpenChange(true);
-    setManualInputSignal((s) => s + 1);
   };
 
   // Esc to exit point-pick mode
@@ -1228,7 +1261,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               <div className="mt-0.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
                 {t('reference.recognizeFailedHint', { defaultValue: '请重新点选，或手动输入参考元素' })}
               </div>
-              <div className="mt-2.5 flex items-center gap-2">
+              <div className="mt-2.5 flex items-center">
                 <button
                   type="button"
                   onClick={() => {
@@ -1236,18 +1269,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                     setPointPickError(false);
                     setPointPickPosition(null);
                   }}
-                  className="flex-1 rounded-md py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
+                  className="w-full rounded-md py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
                   style={{ color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.06)' }}
                 >
                   {t('reference.repick', { defaultValue: '重新点选' })}
-                </button>
-                <button
-                  type="button"
-                  onClick={openPointPickManualInput}
-                  className="flex-1 rounded-md py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
-                  style={{ color: '#2dd4bf', background: 'rgba(20,184,166,0.15)' }}
-                >
-                  {t('reference.manualInput', { defaultValue: '手动输入' })}
                 </button>
               </div>
             </div>
@@ -1433,12 +1458,107 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const handleDisplayImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = event.currentTarget;
     if (!naturalWidth || !naturalHeight) return;
+    setImageLoadFailed(false);
     setImgSize((prev) => (
       prev?.width === naturalWidth && prev?.height === naturalHeight
         ? prev
         : { width: naturalWidth, height: naturalHeight }
     ));
   }, []);
+
+  const cancelCrop = useCallback(() => {
+    setIsCropMode(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isCropMode) return;
+    let handled = false;
+    const handleEscape = (event: KeyboardEvent) => {
+      const isEscape = event.key === 'Escape' || event.key === 'Esc' || event.code === 'Escape';
+      if (!isEscape || handled) return;
+      handled = true;
+      event.preventDefault();
+      event.stopPropagation();
+      cancelCrop();
+    };
+    const resetHandled = () => {
+      handled = false;
+    };
+    document.addEventListener('keydown', handleEscape, true);
+    window.addEventListener('keyup', handleEscape, true);
+    window.addEventListener('blur', resetHandled);
+    return () => {
+      document.removeEventListener('keydown', handleEscape, true);
+      window.removeEventListener('keyup', handleEscape, true);
+      window.removeEventListener('blur', resetHandled);
+    };
+  }, [cancelCrop, isCropMode]);
+
+  const enterCropMode = useCallback(() => {
+    const image = imgRef.current;
+    if (!imageNodeViewModel.canUseToolbarActions || !image || !image.complete || !image.naturalWidth || imageLoadFailed) {
+      showToast(t('imageNode.cropLoadFailed'));
+      return;
+    }
+    setRoleMenuOpen(false);
+    setEditingName(false);
+    setIsCropMode(true);
+  }, [imageLoadFailed, imageNodeViewModel.canUseToolbarActions, showToast, t]);
+
+  const confirmCrop = useCallback(async (crop: NormalizedCropRect) => {
+    const image = imgRef.current;
+    if (!image || !image.complete || !image.naturalWidth) {
+      showToast(t('imageNode.cropLoadFailed'));
+      return;
+    }
+    try {
+      const imageRect = image.getBoundingClientRect();
+      const result = await cropCoverImage(image, imageRect.width, imageRect.height, crop);
+      const onRegisterObjectUrl = data.onRegisterObjectUrl as ((url: string) => void) | undefined;
+      onRegisterObjectUrl?.(result.url);
+      const aspectRatio = result.width / result.height;
+      const resolution = `${result.width}×${result.height}`;
+      setImgSize({ width: result.width, height: result.height });
+      setPreviewImage(result.url);
+      setCurrentResultSet((previous) => {
+        if (!previous) return previous;
+        return {
+          ...previous,
+          images: previous.images.map((item, index) => index === previous.selectedIndex
+            ? { ...item, imageUrl: result.url, width: result.width, height: result.height }
+            : item),
+        };
+      });
+      setNodes((nodes) => nodes.map((node) => {
+        if (node.id !== id) return node;
+        const resultSet = node.data.currentResultSet as CurrentResultSet | null | undefined;
+        const nextResultSet = resultSet ? {
+          ...resultSet,
+          images: resultSet.images.map((item, index) => index === resultSet.selectedIndex
+            ? { ...item, imageUrl: result.url, width: result.width, height: result.height }
+            : item),
+        } : resultSet;
+        return {
+          ...node,
+          selected: true,
+          data: {
+            ...node.data,
+            image: result.url,
+            currentImage: result.url,
+            currentResultSet: nextResultSet,
+            width: result.width,
+            height: result.height,
+            aspectRatio,
+            resolution,
+            fileSize: result.blobSize,
+          },
+        };
+      }));
+      setIsCropMode(false);
+    } catch {
+      showToast(t('imageNode.cropLoadFailed'));
+    }
+  }, [data.onRegisterObjectUrl, id, setNodes, showToast, t]);
 
   const handleDownload = useCallback(() => {
     if (!imageNodeViewModel.canDownload) return;
@@ -1502,8 +1622,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     {
       icon: Crop,
       label: t('common.crop'),
-      action: () => undefined,
-      disabled: true,
+      action: enterCropMode,
+      disabled: !imageNodeViewModel.canUseToolbarActions || imageLoadFailed || !imgSize,
     },
     {
       icon: Trash2,
@@ -1512,7 +1632,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       disabled: !imageNodeViewModel.canUseToolbarActions,
       danger: true,
     },
-  ], [handleDeleteNode, handleDownload, handleDuplicateNode, handlePreview, imageNodeViewModel.canUseToolbarActions, t]);
+  ], [enterCropMode, handleDeleteNode, handleDownload, handleDuplicateNode, handlePreview, imageLoadFailed, imageNodeViewModel.canUseToolbarActions, imgSize, t]);
 
   // Global modifier + G shortcut for generation
   useEffect(() => {
@@ -1530,11 +1650,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [imageNodeViewModel.showControlPanel, isOnlySelected, canGenerate, handleGenerate]);
 
   return (
-    <div className="relative group/image" style={{ zIndex: selected ? 100 : 1, width: displayCardWidth, cursor: 'default' }}>
+    <div
+      className={`relative group/image ${isCropMode ? 'nodrag nowheel' : ''}`}
+      onContextMenuCapture={isCropMode ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}
+      style={{ zIndex: selected ? 100 : 1, width: displayCardWidth, cursor: 'default' }}
+    >
       {pointPickModePortal}
       {pointPickResultPortal}
       {/* Toolbar — shown above title only when this node has a real image/result */}
-      {imageNodeViewModel.showTopToolbar && isOnlySelected && !isMultiResultExpanded && (
+      {imageNodeViewModel.showTopToolbar && isOnlySelected && !isMultiResultExpanded && !isCropMode && (
         <div className="absolute z-[80] flex justify-center" style={{ top: -80 / zoom, left: displayCardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
             actions={imageToolbarActions}
@@ -1554,13 +1678,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           width: displayCardWidth * zoom,
           transform: `scale(${inverseScale})`,
           transformOrigin: 'top left',
-          display: isMultiResultExpanded ? 'none' : undefined,
+          display: isMultiResultExpanded || isCropMode ? 'none' : undefined,
         }}
       >
         <div className="flex items-center justify-between overflow-hidden" style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, width: '100%' }}>
           <div className="flex flex-1 items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
             <Image className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
-            {imageNodeViewModel.showReferenceUsageControl && (
+            {imageNodeViewModel.showReferenceUsageControl && !isCropMode && (
               <span
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1599,7 +1723,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               />
             ) : (
               <span
-                onClick={() => setEditingName(true)}
+                onClick={() => { if (!isCropMode) setEditingName(true); }}
                 className="min-w-0 cursor-pointer truncate transition-colors hover:text-white nodrag"
                 style={{ fontSize: 11 }}
               >
@@ -1639,7 +1763,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 	        )}
         <input ref={replaceFileRef} type="file" accept="image/*" className="hidden" onChange={handleReplaceFileChange} />
 
-        {imageNodeViewModel.showReferenceUsageControl && (isOnlySelected || roleMenuOpen) && (
+        {imageNodeViewModel.showReferenceUsageControl && !isCropMode && (isOnlySelected || roleMenuOpen) && (
           <ImageRoleTag
             role={role}
             customRoleLabel={customRoleLabel}
@@ -1647,7 +1771,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             localReferenceLabel={localReferenceLabel}
             onChange={handleRoleChange}
             onStartPointPick={() => setIsPointPickMode(true)}
-            openManualInputSignal={manualInputSignal}
             open={roleMenuOpen && canEditRole}
             onOpenChange={handleRoleMenuOpenChange}
             disabled={!canEditRole}
@@ -1656,13 +1779,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
-          className="node-preview-card w-full rounded-[24px] flex items-center justify-center transition-colors relative overflow-hidden"
+          className={`node-preview-card w-full flex items-center justify-center transition-colors relative overflow-hidden ${isCropMode ? 'rounded-none' : 'rounded-[24px]'}`}
           style={{
             width: displayCardWidth,
             height: displayCardHeight,
             background: isMultiResultExpanded ? '#101014' : CANVAS_NODE_CARD_BACKGROUND,
             border: `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR}`,
-            borderRadius: CANVAS_NODE_CARD_RADIUS,
+            borderRadius: isCropMode ? 0 : CANVAS_NODE_CARD_RADIUS,
             boxSizing: 'border-box',
           }}
         >
@@ -1908,6 +2031,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 className="block w-full h-full object-cover"
                 draggable={false}
                 onLoad={handleDisplayImageLoad}
+                onError={() => setImageLoadFailed(true)}
                 onClick={handleImageClick}
                 onPointerDown={(event) => {
                   if (!isPointPickMode) return;
@@ -1932,8 +2056,17 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           )}
         </div>
 
+        {isCropMode && displayImage && (
+          <ImageCropOverlay
+            originalRatio={sourceWidth / sourceHeight}
+            zoom={zoom}
+            onCancel={cancelCrop}
+            onConfirm={confirmCrop}
+          />
+        )}
+
         {/* Left visual handle — Input */}
-        {shouldShowInputHandle && (
+        {shouldShowInputHandle && !isCropMode && (
           <div
             className="image-node-handle input-port"
             data-port-type="input"
@@ -1979,7 +2112,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         )}
 
         {/* Right visual handle — Output */}
-        <div
+        {!isCropMode && <div
           className="image-node-handle output-port"
           data-port-type="output"
           data-data-type="image"
@@ -2020,18 +2153,18 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           }}
         >
           <Plus style={{ width: 14, height: 14, color: 'white' }} />
-        </div>
+        </div>}
 
         {/* React Flow handles — positioned to overlap visual handles exactly */}
-        {shouldShowInputHandle && (
+        {shouldShowInputHandle && !isCropMode && (
           <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: resultHandleTop, pointerEvents: 'none' }} />
         )}
-        <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />
-        <Handle type="target" position={Position.Right} id="right-target" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />
+        {!isCropMode && <Handle type="source" position={Position.Right} id="right-source" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />}
+        {!isCropMode && <Handle type="target" position={Position.Right} id="right-target" style={{ opacity: 0, width: 28, height: 28, right: resultHandleRight, top: resultHandleTop, pointerEvents: 'none' }} />}
       </div>
 
       {/* Control panel — below the preview area */}
-      {isOnlySelected && !isMultiResultExpanded && imageNodeViewModel.showControlPanel && (
+      {isOnlySelected && !isMultiResultExpanded && imageNodeViewModel.showControlPanel && !isCropMode && (
         <>
           <div
             className="absolute z-30"

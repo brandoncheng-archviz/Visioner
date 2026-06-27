@@ -30,6 +30,7 @@ export function areReferencesEqual(a: ReferenceInfo, b: ReferenceInfo) {
     a.customRoleLabel === b.customRoleLabel &&
     a.localReferenceType === b.localReferenceType &&
     a.localReferenceLabel === b.localReferenceLabel &&
+    JSON.stringify(a.localReferencePoint) === JSON.stringify(b.localReferencePoint) &&
     a.imageUrl === b.imageUrl &&
     a.width === b.width &&
     a.height === b.height

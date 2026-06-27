@@ -58,7 +58,7 @@ export function ImageToolbar({
   return (
     <TooltipProvider delayDuration={120}>
       <div
-        className="flex items-center gap-1 px-2 py-1.5 rounded-full nodrag nowheel"
+        className="flex items-center gap-1 rounded-2xl px-2 py-1.5 nodrag nowheel"
         style={{
           background: '#252526',
           backdropFilter: 'blur(12px)',

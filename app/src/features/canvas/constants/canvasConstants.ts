@@ -80,6 +80,8 @@ export const COUNT_OPTIONS = ['1张', '2张', '4张'];
 
 export const MAX_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
 
+export const IMAGE_CROP_CANCEL_EVENT = 'visioner:cancel-image-crop';
+
 export const ACCEPTED_IMAGE_UPLOAD_TYPES = new Set([
   'image/png',
   'image/jpeg',

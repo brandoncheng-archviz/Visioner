@@ -21,16 +21,43 @@ export type LocalReferenceType =
   | 'sky'
   | 'seawater'
   | 'city'
+  | 'glass'
   | 'mist'
+  | 'paving'
   | 'custom'
   // Legacy values (read-only compatibility)
   | 'water'
-  | 'retail'
-  | 'paving';
+  | 'retail';
 
-export interface LocalReferencePoint {
-  x: number;
-  y: number;
+export type LocalReferencePoint =
+  | {
+      normalizedX: number;
+      normalizedY: number;
+      imageX?: number;
+      imageY?: number;
+      displayX?: number;
+      displayY?: number;
+      x?: number;
+      y?: number;
+    }
+  | {
+      /** Legacy normalized coordinates. */
+      x: number;
+      y: number;
+      normalizedX?: number;
+      normalizedY?: number;
+      imageX?: number;
+      imageY?: number;
+      displayX?: number;
+      displayY?: number;
+    };
+
+export interface ImageReferenceEdgeData {
+  role?: ImageRole | null;
+  customRoleLabel?: string;
+  localReferenceType?: LocalReferenceType;
+  localReferenceLabel?: string;
+  localReferencePoint?: LocalReferencePoint;
 }
 
 export interface PromptTemplate {

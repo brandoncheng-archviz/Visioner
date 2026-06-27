@@ -22,9 +22,9 @@ import { useTextNodeFloatingPanelPosition } from '../features/canvas/hooks/useTe
 import { useCanvasUndoRedo } from '../features/canvas/hooks/useCanvasUndoRedo';
 import { useCanvasImageImport } from '../features/canvas/hooks/useCanvasImageImport';
 import { useCanvasNodeClipboard } from '../features/canvas/hooks/useCanvasNodeClipboard';
-import type { ImageRole, PromptContent } from '../features/canvas/types/imageNode.types';
+import type { ImageRole, LocalReferencePoint, PromptContent } from '../features/canvas/types/imageNode.types';
 import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
-import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_CROP_CANCEL_EVENT, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
@@ -84,7 +84,7 @@ import {
 } from '../features/canvas/utils/canvasNodeFactories';
 import { ConnectionEngine } from '../features/canvas/connection/ConnectionEngine';
 import { buildConnectionValidationInput } from '../features/canvas/connection/buildConnectionValidationInput';
-import { validateConnectionRules } from '../features/canvas/connection/connectionRules';
+import { validateConnectionRules, type ConnectionRuleMessages } from '../features/canvas/connection/connectionRules';
 import type { ConnectionValidationResult } from '../features/canvas/connection/connectionTypes';
 
 function getHistoryBatchForImage(image: GeneratedImage, batches: ResultSetBatch[]): ResultSetBatch | undefined {
@@ -234,6 +234,32 @@ function FlowCanvas() {
   const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number; message: string } | null>(null);
   const isDrawingRef = useRef(false);
   const engine = useMemo(() => new ConnectionEngine(), []);
+  const connectionRuleMessages = useMemo<ConnectionRuleMessages>(() => ({
+    wrongPortDirection: t('error.wrongPortDirection'),
+    selfConnect: t('error.selfConnect'),
+    cannotConnect: t('canvas.cannotConnect'),
+    portTypeMismatch: t('error.portTypeMismatch'),
+    cycleDetected: t('error.cycleDetected'),
+    alreadyConnected: t('error.alreadyConnected'),
+    relightMaxOneImage: t('error.relightMaxOneImage'),
+    upscaleMaxOneImage: t('error.upscaleMaxOneImage'),
+    compareMaxTwoImages: t('error.compareMaxTwoImages'),
+    usageConflict: (role) => t('reference.usageConflict', { role: getImageRoleLabel(role) }),
+  }), [t]);
+
+  const validateImageProcessingEdge = useCallback((
+    graphNodes: Node[],
+    graphEdges: Edge[],
+    edge: Pick<Edge, 'source' | 'target' | 'sourceHandle' | 'targetHandle'>,
+  ) => validateConnectionRules(buildConnectionValidationInput({
+    nodes: graphNodes,
+    edges: graphEdges,
+    sourceNodeId: edge.source,
+    targetNodeId: edge.target,
+    sourceHandle: { id: edge.sourceHandle || 'right-source', type: 'source', dataType: 'image' },
+    targetHandle: { id: edge.targetHandle || 'left-target', type: 'target', dataType: 'image' },
+    messages: connectionRuleMessages,
+  })), [connectionRuleMessages]);
 
   const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
@@ -373,16 +399,7 @@ function FlowCanvas() {
           type: getHandleType(targetHandle),
           dataType: targetHandle.getAttribute('data-data-type'),
         },
-        messages: {
-          wrongPortDirection: t('error.wrongPortDirection'),
-          selfConnect: t('error.selfConnect'),
-          cannotConnect: t('canvas.cannotConnect'),
-          portTypeMismatch: t('error.portTypeMismatch'),
-          cycleDetected: t('error.cycleDetected'),
-          alreadyConnected: t('error.alreadyConnected'),
-          compareMaxTwoImages: t('error.compareMaxTwoImages'),
-          usageConflict: (role) => t('reference.usageConflict', { role: getImageRoleLabel(role) }),
-        },
+        messages: connectionRuleMessages,
       }));
     };
 
@@ -570,7 +587,7 @@ function FlowCanvas() {
 
     window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('pointerup', handleMouseUp);
-  }, [screenToFlowPosition, nodes, edges, engine]);
+  }, [screenToFlowPosition, nodes, edges, engine, connectionRuleMessages]);
 
   // Update edge styles when node selection changes (connected edges turn cyan)
   const selectedIdsRef = useRef('');
@@ -612,16 +629,16 @@ function FlowCanvas() {
     });
   }, []);
 
-  const assignReferenceEdgeRole = useCallback((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: import('../features/canvas/types/imageNode.types').LocalReferenceType, localReferenceLabel?: string) => {
+  const assignReferenceEdgeRole = useCallback((targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: import('../features/canvas/types/imageNode.types').LocalReferenceType, localReferenceLabel?: string, localReferencePoint?: LocalReferencePoint) => {
     const roleData = getRoleData(role, customRoleLabel, localReferenceType, localReferenceLabel);
     setEdges((eds) =>
       eds.map((edge) =>
         edge.source === sourceNodeId && edge.target === targetNodeId
-          ? { ...edge, data: { ...edge.data, ...roleData } }
+          ? { ...edge, data: { ...edge.data, ...roleData, localReferencePoint } }
           : edge,
       ),
     );
-    setNodes((nds) => nds.map((node) => (node.id === sourceNodeId ? { ...node, data: { ...node.data, ...roleData } } : node)));
+    setNodes((nds) => nds.map((node) => (node.id === sourceNodeId ? { ...node, data: { ...node.data, ...roleData, localReferencePoint } } : node)));
   }, []);
 
   const getAllNodeLabels = useCallback(
@@ -645,19 +662,22 @@ function FlowCanvas() {
       width,
       height,
     });
+    const newEdge: Edge = {
+      id: `e-${Date.now()}`,
+      source: sourceNodeId,
+      target: newNodeId,
+      sourceHandle: 'right-source',
+      targetHandle: 'left-target',
+      style: { stroke: '#555', strokeWidth: 1 },
+    };
+    const validation = validateImageProcessingEdge([...nodes, newNode], edges, newEdge);
+    if (!validation.valid) {
+      showToast(validation.reason || t('canvas.cannotConnect'));
+      return;
+    }
 
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
-    setEdges((eds) => [
-      ...eds,
-      {
-        id: `e-${Date.now()}`,
-        source: sourceNodeId,
-        target: newNodeId,
-        sourceHandle: 'right-source',
-        targetHandle: 'left-target',
-        style: { stroke: '#555', strokeWidth: 1 },
-      },
-    ]);
+    setEdges((eds) => [...eds, newEdge]);
 
     setTimeout(() => {
       fitView({
@@ -667,7 +687,7 @@ function FlowCanvas() {
         maxZoom: Math.min(getViewport().zoom, 1.2),
       });
     }, 50);
-  }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
+  }, [edges, nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels, showToast, validateImageProcessingEdge]);
 
   const createSunSkyNode = useCallback((sourceNodeId: string, inputImage: string, width: number, height: number) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
@@ -733,19 +753,22 @@ function FlowCanvas() {
       height,
       options,
     });
+    const newEdge: Edge = {
+      id: `e-${Date.now()}`,
+      source: sourceNodeId,
+      target: newNodeId,
+      sourceHandle: 'right-source',
+      targetHandle: 'left-target',
+      style: { stroke: '#555', strokeWidth: 1 },
+    };
+    const validation = validateImageProcessingEdge([...nodes, newNode], edges, newEdge);
+    if (!validation.valid) {
+      showToast(validation.reason || t('canvas.cannotConnect'));
+      return;
+    }
 
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
-    setEdges((eds) => [
-      ...eds,
-      {
-        id: `e-${Date.now()}`,
-        source: sourceNodeId,
-        target: newNodeId,
-        sourceHandle: 'right-source',
-        targetHandle: 'left-target',
-        style: { stroke: '#555', strokeWidth: 1 },
-      },
-    ]);
+    setEdges((eds) => [...eds, newEdge]);
 
     setTimeout(() => {
       fitView({
@@ -755,7 +778,7 @@ function FlowCanvas() {
         maxZoom: Math.min(getViewport().zoom, 1.2),
       });
     }, 50);
-  }, [nodes, setNodes, setEdges, fitView, getViewport, getAllNodeLabels]);
+  }, [edges, nodes, setNodes, setEdges, fitView, getViewport, getAllNodeLabels, showToast, t, validateImageProcessingEdge]);
 
   const createCompareNode = useCallback((sourceNodeId: string) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
@@ -785,17 +808,20 @@ function FlowCanvas() {
 
     if (pendingList.length > 0) {
       const targetCompare = pendingList[0].node;
-      setEdges((eds) => [
-        ...eds,
-        {
-          id: `e-${Date.now()}`,
-          source: sourceNodeId,
-          target: targetCompare.id,
-          sourceHandle: 'right-source',
-          targetHandle: 'left-target',
-          style: { stroke: '#555', strokeWidth: 1 },
-        },
-      ]);
+      const newEdge: Edge = {
+        id: `e-${Date.now()}`,
+        source: sourceNodeId,
+        target: targetCompare.id,
+        sourceHandle: 'right-source',
+        targetHandle: 'left-target',
+        style: { stroke: '#555', strokeWidth: 1 },
+      };
+      const validation = validateImageProcessingEdge(nodes, edges, newEdge);
+      if (!validation.valid) {
+        showToast(validation.reason || t('canvas.cannotConnect'));
+        return;
+      }
+      setEdges((eds) => [...eds, newEdge]);
       setTimeout(() => {
         fitView({
           nodes: [{ id: targetCompare.id }],
@@ -817,19 +843,22 @@ function FlowCanvas() {
       estimatedWidth,
       label,
     });
+    const newEdge: Edge = {
+      id: `e-${Date.now()}`,
+      source: sourceNodeId,
+      target: newNodeId,
+      sourceHandle: 'right-source',
+      targetHandle: 'left-target',
+      style: { stroke: '#555', strokeWidth: 1 },
+    };
+    const validation = validateImageProcessingEdge([...nodes, newNode], edges, newEdge);
+    if (!validation.valid) {
+      showToast(validation.reason || t('canvas.cannotConnect'));
+      return;
+    }
 
     setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
-    setEdges((eds) => [
-      ...eds,
-      {
-        id: `e-${Date.now()}`,
-        source: sourceNodeId,
-        target: newNodeId,
-        sourceHandle: 'right-source',
-        targetHandle: 'left-target',
-        style: { stroke: '#555', strokeWidth: 1 },
-      },
-    ]);
+    setEdges((eds) => [...eds, newEdge]);
 
     setTimeout(() => {
       fitView({
@@ -839,7 +868,7 @@ function FlowCanvas() {
         maxZoom: Math.min(getViewport().zoom, 1.2),
       });
     }, 50);
-  }, [nodes, edges, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
+  }, [nodes, edges, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels, showToast, validateImageProcessingEdge]);
 
   const focusCanvasNode = useCallback((nodeId: string) => {
     setNodes((currentNodes) =>
@@ -1159,6 +1188,11 @@ function FlowCanvas() {
     closeContextMenu();
     openNodeContextMenu(event.clientX, event.clientY, node.id);
   }, [closeContextMenu, closeNodeContextMenu, openNodeContextMenu]);
+
+  const handleCanvasPaneClick = useCallback(() => {
+    window.dispatchEvent(new Event(IMAGE_CROP_CANCEL_EVENT));
+    handlePaneClick();
+  }, [handlePaneClick]);
 
   // ─── Selection Marquee Pre-highlight ───
   const isSelectingRef = useRef(false);
@@ -1612,11 +1646,22 @@ function FlowCanvas() {
       targetHandle: startsFromSource ? 'left-target' : createMenu.sourceHandleId,
       style: { stroke: '#555', strokeWidth: 1 },
     };
+    const graphNodes = [...nodes, newNode];
+    const targetNode = graphNodes.find((node) => node.id === newEdge.target);
+    if (targetNode && ['relight', 'upscale', 'compare'].includes(targetNode.type || '')) {
+      const validation = validateImageProcessingEdge(graphNodes, edges, newEdge);
+      if (!validation.valid) {
+        showToast(validation.reason || t('canvas.cannotConnect'));
+        setCreateMenu(null);
+        setTempLine(null);
+        return;
+      }
+    }
     setNodes((nds) => [...nds, newNode]);
     setEdges((eds) => [...eds, newEdge]);
     setCreateMenu(null);
     setTempLine(null);
-  }, [createMenu, getAllNodeLabels, nodes, setNodes, setEdges]);
+  }, [createMenu, edges, getAllNodeLabels, nodes, setNodes, setEdges, showToast, t, validateImageProcessingEdge]);
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
@@ -1721,7 +1766,7 @@ function FlowCanvas() {
         onNodeContextMenu={onNodeContextMenu}
         onViewportChange={onViewportChange}
         onEdgeClick={handleEdgeClick}
-        onPaneClick={handlePaneClick}
+        onPaneClick={handleCanvasPaneClick}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}
         onDragOverCapture={handleDragOverCapture}

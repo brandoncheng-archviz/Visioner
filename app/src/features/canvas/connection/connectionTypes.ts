@@ -1,4 +1,4 @@
-import type { ImageRole } from '../types/imageNode.types';
+import type { ImageReferenceEdgeData, ImageRole } from '../types/imageNode.types';
 
 export type ConnectionRejectCode =
   | 'same_handle_side'
@@ -6,6 +6,8 @@ export type ConnectionRejectCode =
   | 'data_type_mismatch'
   | 'cycle'
   | 'duplicate'
+  | 'relight_input_limit'
+  | 'upscale_input_limit'
   | 'compare_input_limit'
   | 'reference_limit'
   | 'unique_reference_role_conflict'
@@ -60,8 +62,7 @@ export type ConnectionDecision =
 export type ConnectionRuleNode = {
   id: string;
   type?: string;
-  data?: {
-    role?: ImageRole | null;
+  data?: ImageReferenceEdgeData & {
     [key: string]: unknown;
   };
 };

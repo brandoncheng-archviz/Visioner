@@ -461,8 +461,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
             <img
               src={nodeData.outputImage}
               alt=""
-              className="block h-full w-full"
-              style={{ objectFit: 'fill' }}
+              className="block h-full w-full object-cover"
               draggable={false}
               onLoad={(event) => {
                 const { naturalWidth, naturalHeight } = event.currentTarget;
@@ -506,7 +505,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
                 <img
                   src={displayImage}
                   alt=""
-                  className="w-full h-full object-contain"
+                  className="block h-full w-full object-cover"
                   draggable={false}
                   onDoubleClick={(event) => {
                     event.stopPropagation();

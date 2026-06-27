@@ -13,6 +13,7 @@ export const SYSTEM_USAGE_LABELS = [
   '海水',
   '城市',
   '雾气',
+  '铺装',
   '未设置参考用途',
   '未定义用途',
   '手动输入其他元素',
@@ -89,10 +90,25 @@ export const localReferenceOptions: LocalReferenceOption[] = [
     color: '#64748B',
   },
   {
+    value: 'glass',
+    label: i18n.t('reference.localReferenceGlass'),
+    promptText: '参考该图中玻璃的通透度、反射、室内可见度、材质质感、光影关系和高级感，并自然融合到目标建筑画面中。',
+    color: '#67E8F9',
+  },
+];
+
+const legacyLocalReferenceOptions: LocalReferenceOption[] = [
+  {
     value: 'mist',
-    label: i18n.t('reference.localReferencePaving'),
+    label: i18n.t('reference.localReferenceMist'),
     promptText: '只参考该图中的雾气浓度、空气透视、远近虚实和朦胧氛围，不复制整体建筑体块与构图。',
     color: '#A78BFA',
+  },
+  {
+    value: 'paving',
+    label: i18n.t('reference.localReferencePaving'),
+    promptText: '只参考该图中的铺装材质、拼接方式、纹理尺度和地面细节，不复制整体建筑体块与构图。',
+    color: '#D6A76C',
   },
 ];
 
@@ -101,7 +117,6 @@ export const CUSTOM_LOCAL_REFERENCE_COLOR = '#94A3B8';
 const LOCAL_REFERENCE_TYPE_ALIASES: Partial<Record<string, LocalReferenceType>> = {
   water: 'seawater',
   retail: 'city',
-  paving: 'mist',
 };
 
 const LOCAL_REFERENCE_TYPE_VALUES = new Set<LocalReferenceType>([
@@ -110,7 +125,9 @@ const LOCAL_REFERENCE_TYPE_VALUES = new Set<LocalReferenceType>([
   'sky',
   'seawater',
   'city',
+  'glass',
   'mist',
+  'paving',
   'custom',
 ]);
 
@@ -173,7 +190,8 @@ export function getLocalReferenceOption(type: LocalReferenceType | undefined): L
   if (!type) return undefined;
   const normalized = normalizeLocalReferenceType(type);
   if (!normalized) return undefined;
-  return localReferenceOptions.find((o) => o.value === normalized);
+  return localReferenceOptions.find((o) => o.value === normalized)
+    ?? legacyLocalReferenceOptions.find((o) => o.value === normalized);
 }
 
 export function getLocalReferenceColor(type: LocalReferenceType | undefined) {

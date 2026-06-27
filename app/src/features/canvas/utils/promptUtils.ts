@@ -190,7 +190,9 @@ export function buildPromptSubmission(
     block.usage?.includes('天空') ||
     block.usage?.includes('海水') ||
     block.usage?.includes('城市') ||
+    block.usage?.includes('玻璃') ||
     block.usage?.includes('雾气') ||
+    block.usage?.includes('铺装') ||
     block.usage?.includes('局部');
 
   const sortBlocksByReferenceOrder = (blocks: ImageReferencePromptBlock[]) =>
@@ -243,7 +245,7 @@ export function buildPromptSubmission(
   });
 
   if (sortedNodeReferences.length) {
-    sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空、海水、城市、雾气等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
+    sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空、海水、城市、玻璃等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
   }
 
   return {
@@ -255,6 +257,8 @@ export function buildPromptSubmission(
       usageLabel: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
       customUsageName: reference.customRoleLabel,
       localReferenceType: reference.localReferenceType,
+      localReferenceLabel: reference.localReferenceLabel,
+      localReferencePoint: reference.localReferencePoint,
       promptText: getImageReferencePromptText(reference),
     })),
     promptBlocks: sortedPromptContent.map((block) =>
@@ -277,6 +281,8 @@ export function buildPromptSubmission(
       sourceNodeId: reference.nodeId,
       usage: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
       localReferenceType: reference.localReferenceType,
+      localReferenceLabel: reference.localReferenceLabel,
+      localReferencePoint: reference.localReferencePoint,
     })),
   };
 }

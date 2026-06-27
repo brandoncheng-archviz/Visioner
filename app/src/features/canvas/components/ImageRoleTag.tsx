@@ -7,7 +7,6 @@ import {
   getImageRoleLabel,
   localReferenceOptions,
   normalizeLocalReferenceType,
-  validateCustomReferenceLabel,
 } from '../constants/imageUsages';
 import { FLOATING_PANEL_BACKGROUND } from '../constants/canvasConstants';
 import type { ImageRole, LocalReferenceType } from '../types/imageNode.types';
@@ -19,7 +18,6 @@ export function ImageRoleTag({
   localReferenceLabel,
   onChange,
   onStartPointPick,
-  openManualInputSignal,
   open: controlledOpen,
   onOpenChange,
   rootClassName = 'absolute z-30 nodrag nowheel',
@@ -34,7 +32,6 @@ export function ImageRoleTag({
   localReferenceLabel?: string;
   onChange: (role: ImageRole | null, customRoleLabel?: string, localRefType?: LocalReferenceType, localRefLabel?: string) => void;
   onStartPointPick?: () => void;
-  openManualInputSignal?: number;
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
   rootClassName?: string;
@@ -50,9 +47,6 @@ export function ImageRoleTag({
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
   const [isTagHovered, setIsTagHovered] = useState(false);
   const [expandedLocalRef, setExpandedLocalRef] = useState(false);
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [customInput, setCustomInput] = useState('');
-  const customInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const displayLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
@@ -83,24 +77,10 @@ export function ImageRoleTag({
       const raf = requestAnimationFrame(() => {
         setHoveredRole(null);
         setExpandedLocalRef(false);
-        setShowCustomInput(false);
-        setCustomInput('');
       });
       return () => cancelAnimationFrame(raf);
     }
   }, [open]);
-
-  useEffect(() => {
-    if (disabled) return;
-    if (openManualInputSignal) {
-      const timer = setTimeout(() => {
-        setExpandedLocalRef(true);
-        setShowCustomInput(true);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled, openManualInputSignal]);
 
   useEffect(() => {
     if (!disabled) return;
@@ -109,15 +89,7 @@ export function ImageRoleTag({
     setIsTagHovered(false);
     setHoveredRole(null);
     setExpandedLocalRef(false);
-    setShowCustomInput(false);
-    setCustomInput('');
   }, [disabled, onOpenChange]);
-
-  useEffect(() => {
-    if (showCustomInput) {
-      customInputRef.current?.focus();
-    }
-  }, [showCustomInput]);
 
   const handleSelectPrimary = (nextRole: ImageRole) => {
     if (disabled) return;
@@ -132,21 +104,6 @@ export function ImageRoleTag({
   const handleSelectLocalType = (type: LocalReferenceType, label: string) => {
     if (disabled) return;
     onChange('local_reference', undefined, type, label);
-    setExpandedLocalRef(false);
-    handleOpenChange(false);
-  };
-
-  const submitCustomLocal = () => {
-    if (disabled) return;
-    const result = validateCustomReferenceLabel(customInput);
-    if (!result.ok) {
-      setCustomInput('');
-      setShowCustomInput(false);
-      return;
-    }
-    onChange('local_reference', undefined, 'custom', result.label);
-    setCustomInput('');
-    setShowCustomInput(false);
     setExpandedLocalRef(false);
     handleOpenChange(false);
   };
@@ -178,14 +135,8 @@ export function ImageRoleTag({
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (showCustomInput) {
-        setShowCustomInput(false);
-        setCustomInput('');
-        return;
-      }
       if (expandedLocalRef) {
         setExpandedLocalRef(false);
-        setCustomInput('');
         return;
       }
       handleOpenChange(false);
@@ -197,7 +148,7 @@ export function ImageRoleTag({
       document.removeEventListener('pointerdown', closeOnOutside, true);
       document.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [open, handleOpenChange, expandedLocalRef, showCustomInput]);
+  }, [open, handleOpenChange, expandedLocalRef]);
 
   return (
     <div
@@ -339,75 +290,6 @@ export function ImageRoleTag({
                       </button>
                     )}
 
-                    {/* Manual input entry (collapsed) */}
-                    {!showCustomInput && (
-                      <button
-                        type="button"
-                        onClick={() => setShowCustomInput(true)}
-                        className="mt-1.5 flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-white/5"
-                        style={{ color: 'rgba(255,255,255,0.55)' }}
-                      >
-                        {t('reference.manualInputTitle', { defaultValue: '手动输入其他元素' })}
-                      </button>
-                    )}
-
-                    {/* Manual input area (expanded) */}
-                    {showCustomInput && (
-                      <div className="mt-2">
-                        <div className="mb-1.5 text-[13px]" style={{ color: 'rgba(255,255,255,0.54)' }}>
-                          {t('reference.elementNameLabel', { defaultValue: '参考元素名称' })}
-                        </div>
-                        <input
-                          ref={customInputRef}
-                          value={customInput}
-                          onChange={(event) => setCustomInput(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault();
-                              if (customInput.trim()) submitCustomLocal();
-                            }
-                            if (event.key === 'Escape') {
-                              event.preventDefault();
-                              setShowCustomInput(false);
-                              setCustomInput('');
-                            }
-                          }}
-                          placeholder={t('reference.elementNamePlaceholder', { defaultValue: '例如：铺装 / 家具 / 灯具 / 栏杆' })}
-                          className="w-full rounded-[9px] px-2 py-1.5 text-[13px] outline-none"
-                          style={{
-                            background: 'rgba(255,255,255,0.08)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: 'rgba(255,255,255,0.9)',
-                          }}
-                        />
-                        <div className="mt-2 flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCustomInput(false);
-                              setCustomInput('');
-                            }}
-                            className="rounded-md px-2.5 py-1 text-[13px] transition-colors hover:bg-white/10"
-                            style={{ color: 'rgba(255,255,255,0.62)' }}
-                          >
-                            {t('common.cancel', { defaultValue: '取消' })}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={submitCustomLocal}
-                            disabled={!customInput.trim()}
-                            className="rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors"
-                            style={{
-                              color: customInput.trim() ? '#ffffff' : 'rgba(255,255,255,0.35)',
-                              background: customInput.trim() ? 'rgba(20,184,166,0.35)' : 'rgba(255,255,255,0.06)',
-                              cursor: customInput.trim() ? 'pointer' : 'not-allowed',
-                            }}
-                          >
-                            {t('common.apply', { defaultValue: '应用' })}
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

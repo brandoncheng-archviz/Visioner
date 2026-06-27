@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { IMAGE_CROP_CANCEL_EVENT } from '../constants/canvasConstants';
 
 type CanvasKeyboardShortcutCallbacks = {
   copyNodes: () => void | number;
@@ -82,7 +83,16 @@ export function useCanvasKeyboardShortcuts({
         console.debug('[CanvasShortcuts] keydown triggered', event.key);
       }
 
-      if (event.key === 'Escape') {
+      const isEscape = event.key === 'Escape' || event.key === 'Esc' || event.code === 'Escape';
+      if (isEscape && document.querySelector('[data-image-crop-active="true"]')) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        window.dispatchEvent(new Event(IMAGE_CROP_CANCEL_EVENT));
+        return;
+      }
+
+      if (isEscape) {
         if (isCreateMenuOpen) {
           event.preventDefault();
           callbacks.closeCreateMenu();
@@ -147,7 +157,7 @@ export function useCanvasKeyboardShortcuts({
         return;
       }
 
-      if (event.key === 'Escape') {
+      if (isEscape) {
         event.preventDefault();
         callbacks.deselectAll();
         return;

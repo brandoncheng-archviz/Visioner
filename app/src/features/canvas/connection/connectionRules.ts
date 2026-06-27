@@ -16,6 +16,8 @@ export type ConnectionRuleMessages = {
   portTypeMismatch: string;
   cycleDetected: string;
   alreadyConnected: string;
+  relightMaxOneImage: string;
+  upscaleMaxOneImage: string;
   compareMaxTwoImages: string;
   usageConflict: (role: ImageRole) => string;
 };
@@ -109,11 +111,23 @@ export function validateConnectionRules(input: ValidateConnectionRulesInput): Co
     return reject('duplicate', messages.alreadyConnected);
   }
 
-  if (targetNodeType === 'compare') {
+  if (targetNodeType === 'relight' || targetNodeType === 'upscale' || targetNodeType === 'compare') {
     const targetInputEdges = targetIncomingEdges ?? edges.filter((edge) => edge.target === targetNodeId);
-    if (targetInputEdges.length >= 2) {
-      return reject('compare_input_limit', messages.compareMaxTwoImages, {
+    const inputLimit = targetNodeType === 'compare' ? 2 : 1;
+    if (targetInputEdges.length >= inputLimit) {
+      const code = targetNodeType === 'relight'
+        ? 'relight_input_limit'
+        : targetNodeType === 'upscale'
+          ? 'upscale_input_limit'
+          : 'compare_input_limit';
+      const reason = targetNodeType === 'relight'
+        ? messages.relightMaxOneImage
+        : targetNodeType === 'upscale'
+          ? messages.upscaleMaxOneImage
+          : messages.compareMaxTwoImages;
+      return reject(code, reason, {
         currentInputCount: targetInputEdges.length,
+        maxInputCount: inputLimit,
       });
     }
   }

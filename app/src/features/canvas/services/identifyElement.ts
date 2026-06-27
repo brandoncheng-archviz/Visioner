@@ -26,7 +26,7 @@ const FIXED_TYPES = [
   { label: '天空', type: 'sky' },
   { label: '海水', type: 'seawater' },
   { label: '城市', type: 'city' },
-  { label: '雾气', type: 'mist' },
+  { label: '玻璃', type: 'glass' },
 ];
 
 const CUSTOM_LABELS = [
@@ -41,11 +41,8 @@ const CUSTOM_LABELS = [
   '街道',
   '街景',
   '天际线',
-  '雾气',
-  '薄雾',
-  '晨雾',
-  '山雾',
-  '空气感',
+  '玻璃幕墙',
+  '透明玻璃',
   '家具',
   '灯具',
   '栏杆',
@@ -68,11 +65,8 @@ const CUSTOM_LABEL_TO_TYPE: Record<string, string> = {
   街道: 'city',
   街景: 'city',
   天际线: 'city',
-  雾气: 'mist',
-  薄雾: 'mist',
-  晨雾: 'mist',
-  山雾: 'mist',
-  空气感: 'mist',
+  玻璃幕墙: 'glass',
+  透明玻璃: 'glass',
 };
 
 /**

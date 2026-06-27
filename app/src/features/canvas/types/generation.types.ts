@@ -1,4 +1,5 @@
 import type { ModelParams } from './canvas.types';
+import type { LocalReferencePoint, LocalReferenceType } from './imageNode.types';
 
 export type GenerationStatus = 'pending' | 'running' | 'success' | 'failed';
 
@@ -11,6 +12,9 @@ export interface GenerationInput {
     usageKey: string;
     usageLabel: string;
     customUsageName?: string;
+    localReferenceType?: LocalReferenceType;
+    localReferenceLabel?: string;
+    localReferencePoint?: LocalReferencePoint;
     promptText: string;
   }>;
   modelParams?: {

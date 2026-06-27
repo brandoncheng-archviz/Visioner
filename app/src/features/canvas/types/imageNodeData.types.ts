@@ -1,5 +1,5 @@
 import type { GenerationHistoryItem, GenerationTask } from './generation.types';
-import type { ImageRole, PromptContent } from './imageNode.types';
+import type { ImageRole, LocalReferencePoint, PromptContent } from './imageNode.types';
 import type { ConnectionHandleType, MarkItem, ModelParams } from './canvas.types';
 import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
@@ -38,10 +38,13 @@ export interface ImageNodeData {
   customRoleLabel?: string;
   localReferenceType?: import('./imageNode.types').LocalReferenceType;
   localReferenceLabel?: string;
-  localReferencePoint?: { x: number; y: number };
+  localReferencePoint?: LocalReferencePoint;
   autoOpenLightPreview?: boolean;
   width?: number;
   height?: number;
+  aspectRatio?: number;
+  resolution?: string;
+  fileSize?: number;
   finalPrompt?: string;
   userPrompt?: string;
   marks?: MarkItem[];
@@ -56,12 +59,21 @@ export interface ImageNodeData {
     sourceHandleType?: ConnectionHandleType,
   ) => void;
   onRemoveReferenceEdge?: (targetNodeId: string, sourceNodeId: string) => void;
-  onAssignReferenceEdgeRole?: (targetNodeId: string, sourceNodeId: string, role: ImageRole, customRoleLabel?: string, localReferenceType?: import('./imageNode.types').LocalReferenceType) => void;
+  onAssignReferenceEdgeRole?: (
+    targetNodeId: string,
+    sourceNodeId: string,
+    role: ImageRole,
+    customRoleLabel?: string,
+    localReferenceType?: import('./imageNode.types').LocalReferenceType,
+    localReferenceLabel?: string,
+    localReferencePoint?: LocalReferencePoint,
+  ) => void;
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateRelightNode?: (sourceNodeId: string, inputImage: string, width: number, height: number, options?: RelightCreationOptions) => void;
   onOpenNodeHistory?: (nodeId: string) => void;
+  onRegisterObjectUrl?: (url: string) => void;
   onFocusNode?: (nodeId: string) => void;
   onDuplicateNode?: (nodeId: string) => void;
   onDeleteNode?: (nodeId: string) => void;

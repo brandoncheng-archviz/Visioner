@@ -92,6 +92,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const taskCancelRef = useRef<(() => void) | null>(null);
   const taskRef = useRef<RelightTaskState | null>(nodeData.relightTask ?? null);
   const debounceRef = useRef<number | null>(null);
+  const relightRootRef = useRef<HTMLDivElement>(null);
 
   const connectedInput = useStore((state) => {
     const sourceIds = nodeData.sourceImageNodeIds ?? [];
@@ -321,6 +322,40 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     }
   }, [isRealtimePreviewActive, lightPreview, startPreviewTask, stopPreview]);
 
+  const exitRelightEditMode = useCallback(() => {
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setIsRealtimePreviewEnabled(false);
+    setShowAdvancedSettings(false);
+    setNodes((nodes) => nodes.map((node) => node.id === id && node.selected
+      ? { ...node, selected: false }
+      : node));
+  }, [id, setNodes]);
+
+  useEffect(() => {
+    if (!showControlPanel) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      const isEscape = event.key === 'Escape' || event.key === 'Esc' || event.code === 'Escape';
+      if (!isEscape) return;
+      event.preventDefault();
+      event.stopPropagation();
+      exitRelightEditMode();
+    };
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && relightRootRef.current?.contains(target)) return;
+      exitRelightEditMode();
+    };
+    document.addEventListener('keydown', handleEscape, true);
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    return () => {
+      document.removeEventListener('keydown', handleEscape, true);
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+    };
+  }, [exitRelightEditMode, showControlPanel]);
+
   const handleGenerate = useCallback(() => {
     if (!connectedInput || isGenerating) return;
 
@@ -504,7 +539,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   };
 
   return (
-    <div className="relative group/relight" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
+    <div ref={relightRootRef} className="relative group/relight" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
       {resultImage && isResultMode && isOnlySelected && (
         <div
           className="absolute z-20 flex justify-center"
