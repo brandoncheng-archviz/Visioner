@@ -84,6 +84,10 @@ export function useCanvasKeyboardShortcuts({
       }
 
       const isEscape = event.key === 'Escape' || event.key === 'Esc' || event.code === 'Escape';
+      if (isEscape && document.querySelector('[data-canvas-escape-layer="true"]')) {
+        event.preventDefault();
+        return;
+      }
       if (isEscape && document.querySelector('[data-image-crop-active="true"]')) {
         event.preventDefault();
         event.stopPropagation();

@@ -90,6 +90,10 @@ const enUS = {
     clearRight: "Clear right",
     left: "Left",
     right: "Right",
+    sideBySide: "Side by side",
+    sliderCompare: "Slider comparison",
+    exportUnsupported: "Comparison export is not supported yet",
+    imageLoadFailed: "Image failed to load",
   },
 
   imageNode: {

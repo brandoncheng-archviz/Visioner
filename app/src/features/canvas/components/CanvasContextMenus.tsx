@@ -1,4 +1,5 @@
 import { Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BASIC_NODE_DEFINITIONS,
@@ -9,6 +10,97 @@ import {
 import type { CreateConnectionMenuState } from '../types/canvas.types';
 import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
+
+const VIEWPORT_MENU_MARGIN = 16;
+
+function clampMenuPosition(x: number, y: number, width: number, height: number) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  return {
+    left: Math.max(VIEWPORT_MENU_MARGIN, Math.min(x, viewportWidth - width - VIEWPORT_MENU_MARGIN)),
+    top: Math.max(VIEWPORT_MENU_MARGIN, Math.min(y, viewportHeight - height - VIEWPORT_MENU_MARGIN)),
+  };
+}
+
+function ViewportMenuSurface({
+  x,
+  y,
+  width,
+  minWidth,
+  estimatedHeight,
+  className,
+  onContextMenu,
+  children,
+}: {
+  x: number;
+  y: number;
+  width?: number;
+  minWidth?: number;
+  estimatedHeight: number;
+  className: string;
+  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  children: ReactNode;
+}) {
+  const elementRef = useRef<HTMLDivElement | null>(null);
+  const initialWidth = width ?? minWidth ?? CREATE_NODE_MENU_WIDTH;
+  const initialHeight = Math.min(estimatedHeight, window.innerHeight - VIEWPORT_MENU_MARGIN * 2);
+  const initialPosition = clampMenuPosition(x, y, initialWidth, initialHeight);
+  const [measuredPosition, setMeasuredPosition] = useState<{
+    sourceX: number;
+    sourceY: number;
+    left: number;
+    top: number;
+  } | null>(null);
+  const position = measuredPosition?.sourceX === x && measuredPosition.sourceY === y
+    ? measuredPosition
+    : { sourceX: x, sourceY: y, ...initialPosition };
+
+  const measureAndPlace = useCallback(() => {
+    const element = elementRef.current;
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const availableHeight = window.innerHeight - VIEWPORT_MENU_MARGIN * 2;
+    const renderedHeight = Math.min(rect.height, availableHeight);
+    const next = clampMenuPosition(x, y, rect.width, renderedHeight);
+    setMeasuredPosition((current) => current && current.sourceX === x && current.sourceY === y && current.left === next.left && current.top === next.top
+      ? current
+      : { sourceX: x, sourceY: y, ...next });
+  }, [x, y]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(measureAndPlace);
+    window.addEventListener('resize', measureAndPlace);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', measureAndPlace);
+    };
+  }, [measureAndPlace]);
+
+  const style: CSSProperties = {
+    left: position.left,
+    top: position.top,
+    width,
+    minWidth,
+    maxHeight: `calc(100vh - ${VIEWPORT_MENU_MARGIN * 2}px)`,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    background: '#252526',
+    border: '1px solid #2a2a35',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
+  };
+
+  return (
+    <div
+      ref={elementRef}
+      className={className}
+      style={style}
+      onContextMenu={onContextMenu}
+      onWheelCapture={stopCanvasWheelPropagation}
+    >
+      {children}
+    </div>
+  );
+}
 
 function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
@@ -96,25 +188,20 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
 
   return (
     <>
-      <div
+      <ViewportMenuSurface
+        x={menu.x}
+        y={menu.y}
+        width={CREATE_NODE_MENU_WIDTH}
+        estimatedHeight={430}
         className="fixed z-50 py-2 rounded-xl"
-        style={{
-          left: menu.x,
-          top: menu.y,
-          background: '#252526',
-          border: '1px solid #2a2a35',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-          width: CREATE_NODE_MENU_WIDTH,
-        }}
         onContextMenu={(e) => {
           e.preventDefault();
           onReopen(e.clientX, e.clientY);
         }}
-        onWheelCapture={stopCanvasWheelPropagation}
       >
         <div className="px-5 py-2.5 text-[12px] font-medium uppercase tracking-wider text-white/[0.42]">{t('contextMenu.addNodeTitle')}</div>
         <BasicNodeMenuItems onSelect={(type, label) => onAddNode(type, label)} />
-      </div>
+      </ViewportMenuSurface>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
     </>
   );
@@ -134,21 +221,16 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
 
   return (
     <>
-      <div
+      <ViewportMenuSurface
+        x={menu.x}
+        y={menu.y}
+        width={CREATE_NODE_MENU_WIDTH}
+        estimatedHeight={430}
         className="fixed z-50 py-2 rounded-xl"
-        style={{
-          left: menu.x,
-          top: menu.y,
-          background: '#252526',
-          border: '1px solid #2a2a35',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-          width: CREATE_NODE_MENU_WIDTH,
-        }}
-        onWheelCapture={stopCanvasWheelPropagation}
       >
         <div className="px-5 py-2.5 text-[12px] font-medium uppercase tracking-wider text-white/[0.42]">{t('contextMenu.addNodeTitle')}</div>
         <BasicNodeMenuItems onSelect={(type) => onCreateAndConnect(type)} />
-      </div>
+      </ViewportMenuSurface>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
     </>
   );
@@ -197,20 +279,15 @@ export function NodeContextMenu({
 
   return (
     <>
-      <div
+      <ViewportMenuSurface
+        x={menu.x}
+        y={menu.y}
+        minWidth={200}
+        estimatedHeight={canCreateImageTools ? 520 : 360}
         className="fixed z-50 py-1.5 rounded-xl"
         onContextMenu={(e) => {
           e.preventDefault();
           onReopen(e.clientX, e.clientY);
-        }}
-        onWheelCapture={stopCanvasWheelPropagation}
-        style={{
-          left: menu.x,
-          top: menu.y,
-          background: '#252526',
-          border: '1px solid #2a2a35',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
-          minWidth: 200,
         }}
       >
         <button
@@ -288,7 +365,7 @@ export function NodeContextMenu({
         >
           <Bug className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.72)' }} /> {t('contextMenu.feedback')}
         </button>
-      </div>
+      </ViewportMenuSurface>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
     </>
   );

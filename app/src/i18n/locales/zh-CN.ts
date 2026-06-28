@@ -90,6 +90,10 @@ const zhCN = {
     clearRight: "清空右图",
     left: "左图",
     right: "右图",
+    sideBySide: "左右并排",
+    sliderCompare: "滑杆对比",
+    exportUnsupported: "暂不支持导出对比图",
+    imageLoadFailed: "图片加载失败",
   },
 
   imageNode: {

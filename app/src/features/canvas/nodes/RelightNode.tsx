@@ -77,7 +77,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const inverseScale = 1 / zoom;
 
   const nodeData = data as unknown as RelightNodeData;
-  const status = nodeData.status ?? 'empty';
+  const persistedStatus = nodeData.status ?? 'empty';
   const initialSettings = nodeData.relightSettings ?? DEFAULT_RELIGHT_SETTINGS;
   const initialLightPreview = nodeData.lightPreview ?? createRelightLightPreview(DEFAULT_RELIGHT_SUN, initialSettings);
 
@@ -85,8 +85,12 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const [azimuth, setAzimuth] = useState(initialLightPreview.sun.azimuth);
   const [relightSettings, setRelightSettings] = useState<RelightSettings>(initialSettings);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
-  const [isRealtimePreviewEnabled, setIsRealtimePreviewEnabled] = useState(status === 'previewing');
+  const [isRealtimePreviewEnabled, setIsRealtimePreviewEnabled] = useState(persistedStatus === 'previewing');
+  const [isPreviewExitSuppressed, setIsPreviewExitSuppressed] = useState(false);
   const [showResultPreview, setShowResultPreview] = useState(false);
+  const status: RelightStatus = isPreviewExitSuppressed && persistedStatus === 'previewing'
+    ? nodeData.previewImageUrl ? 'previewResult' : 'empty'
+    : persistedStatus;
 
   // Refs for task cancellation and debounce
   const taskCancelRef = useRef<(() => void) | null>(null);
@@ -229,6 +233,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const startPreviewTask = useCallback(
     (previewData: LightPreviewData = lightPreview) => {
       if (!connectedInput) return;
+      setIsPreviewExitSuppressed(false);
 
       // Cancel any existing task
       cancelRelightTask(taskCancelRef.current);
@@ -306,6 +311,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
       debounceRef.current = null;
     }
     setIsRealtimePreviewEnabled(false);
+    setIsPreviewExitSuppressed(false);
     updateData({
       status: hasPreviewResult ? 'previewResult' : 'empty',
       relightTask: cancelledTask,
@@ -317,17 +323,22 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     if (isRealtimePreviewActive) {
       stopPreview();
     } else {
+      setIsPreviewExitSuppressed(false);
       setIsRealtimePreviewEnabled(true);
       startPreviewTask(lightPreview);
     }
   }, [isRealtimePreviewActive, lightPreview, startPreviewTask, stopPreview]);
 
   const exitRelightEditMode = useCallback(() => {
+    cancelRelightTask(taskCancelRef.current);
+    taskCancelRef.current = null;
+    taskRef.current = null;
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
     setIsRealtimePreviewEnabled(false);
+    setIsPreviewExitSuppressed(true);
     setShowAdvancedSettings(false);
     setNodes((nodes) => nodes.map((node) => node.id === id && node.selected
       ? { ...node, selected: false }
@@ -364,6 +375,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
     taskCancelRef.current = null;
     taskRef.current = null;
     setIsRealtimePreviewEnabled(false);
+    setIsPreviewExitSuppressed(false);
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;

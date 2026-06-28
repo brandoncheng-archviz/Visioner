@@ -1,6 +1,7 @@
-import { useEffect, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { useCallback } from 'react';
 import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
+import { FullscreenCloseButton } from './FullscreenCloseButton';
+import { useFullscreenEscape } from '../hooks/useFullscreenEscape';
 
 export function ImagePreviewModal({
   imageUrl,
@@ -18,44 +19,17 @@ export function ImagePreviewModal({
     [onClose]
   );
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handler, true);
-    return () => document.removeEventListener('keydown', handler, true);
-  }, [onClose]);
+  useFullscreenEscape(true, onClose);
 
   return (
     <div
+      data-canvas-escape-layer="true"
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.88)' }}
       onClick={handleOverlayClick}
       onWheelCapture={stopCanvasWheelPropagation}
     >
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-6 right-6 z-10 flex items-center justify-center rounded-full transition-all hover:scale-105 hover:bg-white/18"
-        style={{
-          width: 44,
-          height: 44,
-          color: 'rgba(255,255,255,0.95)',
-          background: 'rgba(20,20,26,0.82)',
-          border: '1px solid rgba(255,255,255,0.22)',
-          boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-        }}
-        title="关闭"
-      >
-        <X className="w-6 h-6" strokeWidth={2.4} />
-      </button>
+      <FullscreenCloseButton onClose={onClose} />
 
       {/* Image */}
       <img

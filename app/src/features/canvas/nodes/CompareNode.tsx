@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Handle, Position, useStore, useReactFlow, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
-import { ArrowLeftRight, Columns2, Copy, Download, Maximize2, RotateCcw, Trash2, X } from 'lucide-react';
+import { ArrowLeftRight, Columns2, Maximize2, RotateCcw, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { resolveNodeImage } from '../utils/resolveNodeImage';
 import { ImageToolbar } from '../components/ImageToolbar';
+import { CompareFullscreenViewer } from '../components/CompareFullscreenViewer';
 import {
   CANVAS_NODE_CARD_BACKGROUND,
   CANVAS_NODE_CARD_BORDER_COLOR,
@@ -343,11 +343,6 @@ export function CompareNode({ id, data, selected }: NodeProps) {
     setSliderPosition(50);
   }, []);
 
-  const handleDuplicateNode = useCallback(() => {
-    const onDuplicateNode = data.onDuplicateNode as ((nodeId: string) => void) | undefined;
-    onDuplicateNode?.(id);
-  }, [data, id]);
-
   const handleDeleteNode = useCallback(() => {
     const onDeleteNode = data.onDeleteNode as ((nodeId: string) => void) | undefined;
     onDeleteNode?.(id);
@@ -470,8 +465,6 @@ export function CompareNode({ id, data, selected }: NodeProps) {
           <ImageToolbar
             actions={[
               { icon: Maximize2, label: t('imageNode.fullscreen'), action: () => setShowFullscreen(true), disabled: !hasBothImages },
-              { icon: Copy, label: t('common.createCopy'), action: handleDuplicateNode },
-              { icon: Download, label: t('common.download'), action: () => undefined, disabled: true },
               { icon: Trash2, label: t('common.delete'), action: handleDeleteNode, danger: true },
             ]}
           />
@@ -608,36 +601,12 @@ export function CompareNode({ id, data, selected }: NodeProps) {
 
         <Handle type="target" position={Position.Left} id="left-target" style={{ opacity: 0, width: 28, height: 28, left: 0, top: '50%' }} />
       </div>
-      {showFullscreen && hasBothImages && createPortal(
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-8"
-          onClick={() => setShowFullscreen(false)}
-        >
-          <div
-            className="relative overflow-hidden rounded-[18px] border border-white/10 bg-[#1a1a1a] p-4 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setShowFullscreen(false)}
-              className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white/72 transition hover:bg-black/70 hover:text-white"
-              aria-label={t('common.close')}
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <CompareImageArea
-              leftImage={leftImage}
-              rightImage={rightImage}
-              sliderPosition={sliderPosition}
-              width="min(86vw, 1120px)"
-              height="min(72vh, 680px)"
-              emptyContent={renderEmptyState()}
-              singleContent={renderSingleState()}
-              onSliderChange={setSliderPosition}
-            />
-          </div>
-        </div>,
-        document.body,
+      {showFullscreen && leftImage && rightImage && (
+        <CompareFullscreenViewer
+          leftImage={leftImage}
+          rightImage={rightImage}
+          onClose={() => setShowFullscreen(false)}
+        />
       )}
     </div>
   );

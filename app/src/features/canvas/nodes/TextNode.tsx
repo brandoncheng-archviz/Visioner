@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Clipboard, Copy, Download, FileText, ImagePlus, Maximize2, PenLine, Plus, Trash2, X } from 'lucide-react';
+import { Clipboard, Copy, Download, FileText, ImagePlus, Maximize2, PenLine, Plus, Trash2 } from 'lucide-react';
 import {
   Handle,
   NodeResizeControl,
@@ -24,6 +24,8 @@ import {
   CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
 } from '../constants/canvasConstants';
 import { ImageToolbar } from '../components/ImageToolbar';
+import { FullscreenCloseButton } from '../components/FullscreenCloseButton';
+import { useFullscreenEscape } from '../hooks/useFullscreenEscape';
 import type { TextNodeActionType, TextNodeData } from '../types/basicNode.types';
 import {
   getTextContent,
@@ -86,6 +88,8 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
   const inlineContent = nodeData.content ?? nodeData.text ?? '';
   const [isInlineEditing, setIsInlineEditing] = useState(false);
   const [showFullscreen, setShowFullscreen] = useState(false);
+  const closeFullscreen = useCallback(() => setShowFullscreen(false), [setShowFullscreen]);
+  useFullscreenEscape(showFullscreen, closeFullscreen);
   const [inlineEditorHeight, setInlineEditorHeight] = useState(TEXT_NODE_MIN_HEIGHT);
   const previewCardRef = useRef<HTMLDivElement>(null);
   const inlineTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -584,23 +588,17 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
       </div>
       {showFullscreen && hasTextContent && createPortal(
         <div
+          data-canvas-escape-layer="true"
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-8"
-          onClick={() => setShowFullscreen(false)}
+          onClick={closeFullscreen}
         >
+          <FullscreenCloseButton onClose={closeFullscreen} />
           <div
             className="max-h-[82vh] w-[min(820px,92vw)] overflow-hidden rounded-[18px] border border-white/10 bg-[#1a1a1a] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-3">
+            <div className="flex items-center border-b border-white/[0.08] px-5 py-3">
               <div className="truncate text-[14px] font-medium text-white/82">{title}</div>
-              <button
-                type="button"
-                onClick={() => setShowFullscreen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-white/62 transition hover:bg-white/[0.08] hover:text-white"
-                aria-label={t('common.close')}
-              >
-                <X className="h-4 w-4" />
-              </button>
             </div>
             <pre className="max-h-[72vh] overflow-auto whitespace-pre-wrap break-words px-5 py-4 text-[15px] leading-7 text-white/76">{content}</pre>
           </div>

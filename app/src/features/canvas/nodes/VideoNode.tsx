@@ -1,10 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Copy, Download, Film, Maximize2, Play, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react';
+import { Copy, Download, Film, Maximize2, Play, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { NodeShell } from '../components/NodeShell';
 import { ImageToolbar } from '../components/ImageToolbar';
+import { FullscreenCloseButton } from '../components/FullscreenCloseButton';
+import { useFullscreenEscape } from '../hooks/useFullscreenEscape';
 import type { VideoNodeData } from '../types/basicNode.types';
 
 function formatFileSize(bytes?: number): string {
@@ -20,6 +22,8 @@ export function VideoNode({ data, selected, id }: NodeProps) {
   const inverseScale = 1 / zoom;
   const inputRef = useRef<HTMLInputElement>(null);
   const [showFullscreen, setShowFullscreen] = useState(false);
+  const closeFullscreen = useCallback(() => setShowFullscreen(false), [setShowFullscreen]);
+  useFullscreenEscape(showFullscreen, closeFullscreen);
   const nodeData = data as VideoNodeData;
   const label = nodeData.label || t('canvas.nodeLabels.video');
 
@@ -263,21 +267,15 @@ export function VideoNode({ data, selected, id }: NodeProps) {
       />
       {showFullscreen && nodeData.videoUrl && createPortal(
         <div
+          data-canvas-escape-layer="true"
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-8"
-          onClick={() => setShowFullscreen(false)}
+          onClick={closeFullscreen}
         >
+          <FullscreenCloseButton onClose={closeFullscreen} />
           <div
             className="relative w-[min(960px,92vw)] overflow-hidden rounded-[18px] border border-white/10 bg-[#1a1a1a] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={() => setShowFullscreen(false)}
-              className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white/72 transition hover:bg-black/70 hover:text-white"
-              aria-label={t('common.close')}
-            >
-              <X className="h-4 w-4" />
-            </button>
             <video src={nodeData.videoUrl} controls autoPlay className="max-h-[82vh] w-full bg-black" />
           </div>
         </div>,
