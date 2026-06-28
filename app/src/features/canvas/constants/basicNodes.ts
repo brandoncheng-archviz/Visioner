@@ -1,4 +1,4 @@
-export const CREATE_NODE_MENU_WIDTH = 280;
+export const CREATE_NODE_MENU_WIDTH = 264;
 export const CREATE_NODE_MENU_TOP_OFFSET = 24;
 export const CREATE_NODE_MENU_VIEWPORT_PADDING = 12;
 

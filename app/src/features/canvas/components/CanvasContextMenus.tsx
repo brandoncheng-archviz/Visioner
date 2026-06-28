@@ -28,6 +28,7 @@ function ViewportMenuSurface({
   width,
   minWidth,
   estimatedHeight,
+  tone = 'default',
   className,
   onContextMenu,
   children,
@@ -37,6 +38,7 @@ function ViewportMenuSurface({
   width?: number;
   minWidth?: number;
   estimatedHeight: number;
+  tone?: 'default' | 'add-node';
   className: string;
   onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void;
   children: ReactNode;
@@ -84,9 +86,11 @@ function ViewportMenuSurface({
     maxHeight: `calc(100vh - ${VIEWPORT_MENU_MARGIN * 2}px)`,
     overflowY: 'auto',
     overscrollBehavior: 'contain',
-    background: '#252526',
-    border: '1px solid #2a2a35',
-    boxShadow: '0 12px 32px rgba(0,0,0,0.55)',
+    background: tone === 'add-node' ? 'rgba(32,32,34,0.97)' : '#252526',
+    border: tone === 'add-node' ? '1px solid rgba(255,255,255,0.09)' : '1px solid #2a2a35',
+    boxShadow: tone === 'add-node'
+      ? '0 18px 46px rgba(0,0,0,0.66), inset 0 1px 0 rgba(255,255,255,0.025)'
+      : '0 12px 32px rgba(0,0,0,0.55)',
   };
 
   return (
@@ -136,8 +140,8 @@ function BasicNodeMenuItems({
         if (items.length === 0) return null;
 
         return (
-          <div key={group.id} className={groupIndex > 0 ? 'mt-2 border-t border-white/[0.06] pt-2' : undefined}>
-            <div className="px-5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wider text-white/[0.42]">
+          <div key={group.id} className={groupIndex > 0 ? 'mt-1.5 border-t border-white/[0.06] pt-1.5' : undefined}>
+            <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-white/[0.48]">
               {t(group.labelKey)}
             </div>
             {items.map((item) => {
@@ -147,14 +151,14 @@ function BasicNodeMenuItems({
                 <button
                   key={item.type}
                   onClick={() => onSelect(item.type, label)}
-                  className="w-full flex items-center gap-3 px-5 py-3 text-left text-[15px] transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
-                  style={{ color: 'rgba(255,255,255,0.78)' }}
+                  className="flex h-14 w-full items-center gap-3 px-4 text-left text-[15px] font-medium transition-colors hover:bg-white/[0.07] active:bg-white/[0.10]"
+                  style={{ color: 'rgba(255,255,255,0.86)' }}
                 >
                   <span
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.035]"
-                    style={{ color: 'rgba(255,255,255,0.72)' }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06]"
+                    style={{ color: 'rgba(255,255,255,0.82)' }}
                   >
-                    <ItemIcon className="w-4 h-4" />
+                    <ItemIcon className="h-[18px] w-[18px]" />
                   </span>
                   <span className="min-w-0 truncate">{label}</span>
                 </button>
@@ -192,14 +196,15 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
         x={menu.x}
         y={menu.y}
         width={CREATE_NODE_MENU_WIDTH}
-        estimatedHeight={430}
-        className="fixed z-50 py-2 rounded-xl"
+        estimatedHeight={470}
+        tone="add-node"
+        className="fixed z-50 rounded-xl py-2"
         onContextMenu={(e) => {
           e.preventDefault();
           onReopen(e.clientX, e.clientY);
         }}
       >
-        <div className="px-5 py-2.5 text-[12px] font-medium uppercase tracking-wider text-white/[0.42]">{t('contextMenu.addNodeTitle')}</div>
+        <div className="px-4 pb-2 pt-2.5 text-[13px] font-semibold tracking-wide text-white/[0.86]">{t('contextMenu.addNodeTitle')}</div>
         <BasicNodeMenuItems onSelect={(type, label) => onAddNode(type, label)} />
       </ViewportMenuSurface>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
@@ -225,10 +230,11 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
         x={menu.x}
         y={menu.y}
         width={CREATE_NODE_MENU_WIDTH}
-        estimatedHeight={430}
-        className="fixed z-50 py-2 rounded-xl"
+        estimatedHeight={470}
+        tone="add-node"
+        className="fixed z-50 rounded-xl py-2"
       >
-        <div className="px-5 py-2.5 text-[12px] font-medium uppercase tracking-wider text-white/[0.42]">{t('contextMenu.addNodeTitle')}</div>
+        <div className="px-4 pb-2 pt-2.5 text-[13px] font-semibold tracking-wide text-white/[0.86]">{t('contextMenu.addNodeTitle')}</div>
         <BasicNodeMenuItems onSelect={(type) => onCreateAndConnect(type)} />
       </ViewportMenuSurface>
       <div className="fixed inset-0 z-40" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
