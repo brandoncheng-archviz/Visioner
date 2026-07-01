@@ -6,7 +6,6 @@ import {
   History,
   Wand2,
   Image,
-  Video,
   Sun,
   Sparkles,
   Columns2,
@@ -45,7 +44,6 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
   const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
     text: TextNodeIcon as unknown as typeof Image,
     image: Image,
-    video: Video,
     relight: Sun,
     upscale: Sparkles,
     compare: Columns2,

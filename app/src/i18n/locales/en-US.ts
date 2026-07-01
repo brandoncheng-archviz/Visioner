@@ -92,6 +92,7 @@ const enUS = {
     right: "Right",
     sideBySide: "Side by side",
     sliderCompare: "Slider comparison",
+    overlay: "Overlay",
     exportUnsupported: "Comparison export is not supported yet",
     imageLoadFailed: "Image failed to load",
   },

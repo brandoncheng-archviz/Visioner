@@ -86,6 +86,11 @@ import { ConnectionEngine } from '../features/canvas/connection/ConnectionEngine
 import { buildConnectionValidationInput } from '../features/canvas/connection/buildConnectionValidationInput';
 import { validateConnectionRules, type ConnectionRuleMessages } from '../features/canvas/connection/connectionRules';
 import type { ConnectionValidationResult } from '../features/canvas/connection/connectionTypes';
+import {
+  getCompareEdgesBySlot,
+  getNextCompareSlot,
+  normalizeCompareEdgeSlots,
+} from '../features/canvas/utils/compareSlots';
 
 function getHistoryBatchForImage(image: GeneratedImage, batches: ResultSetBatch[]): ResultSetBatch | undefined {
   return batches.find((batch) =>
@@ -234,6 +239,10 @@ function FlowCanvas() {
   const [rejectTooltip, setRejectTooltip] = useState<{ x: number; y: number; message: string } | null>(null);
   const isDrawingRef = useRef(false);
   const engine = useMemo(() => new ConnectionEngine(), []);
+
+  useEffect(() => {
+    setEdges((currentEdges) => normalizeCompareEdgeSlots(nodes, currentEdges));
+  }, [edges, nodes, setEdges]);
   const connectionRuleMessages = useMemo<ConnectionRuleMessages>(() => ({
     wrongPortDirection: t('error.wrongPortDirection'),
     selfConnect: t('error.selfConnect'),
@@ -573,14 +582,21 @@ function FlowCanvas() {
         fail();
         return;
       }
-      setEdges((eds) => [...eds, {
-        id: `e-${Date.now()}`,
-        source: connection.sourceId,
-        target: connection.targetId,
-        sourceHandle: connection.sourceHandleId,
-        targetHandle: connection.targetHandleId,
-        style: { stroke: '#555', strokeWidth: 1 },
-      }]);
+      setEdges((eds) => {
+        const targetNode = nodes.find((node) => node.id === connection.targetId);
+        const compareSlot = targetNode?.type === 'compare'
+          ? getNextCompareSlot(eds, connection.targetId)
+          : null;
+        return [...eds, {
+          id: `e-${Date.now()}`,
+          source: connection.sourceId,
+          target: connection.targetId,
+          sourceHandle: connection.sourceHandleId,
+          targetHandle: connection.targetHandleId,
+          data: compareSlot ? { compareSlot } : undefined,
+          style: { stroke: '#555', strokeWidth: 1 },
+        }];
+      });
       setTempLine(null);
       engine.reset();
     };
@@ -589,40 +605,23 @@ function FlowCanvas() {
     window.addEventListener('pointerup', handleMouseUp);
   }, [screenToFlowPosition, nodes, edges, engine, connectionRuleMessages]);
 
-  // Update edge styles when node selection changes (connected edges turn cyan)
-  const selectedIdsRef = useRef('');
-  useEffect(() => {
-    const ids = nodes.filter((n) => n.selected).map((n) => n.id).sort().join(',');
-    if (ids === selectedIdsRef.current) return;
-    selectedIdsRef.current = ids;
-
-    const selectedNodeIds = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
-    setEdges((eds) => eds.map((edge) => {
-      const isConnected = selectedNodeIds.has(edge.source) || selectedNodeIds.has(edge.target);
-      return {
-        ...edge,
-        selected: isConnected,
-        style: isConnected ? { stroke: '#00d4ff', strokeWidth: 1 } : { stroke: '#555', strokeWidth: 1 },
-      };
-    }));
-  }, [nodes]);
-
   const removeReferenceEdge = useCallback((targetNodeId: string, sourceNodeId: string) => {
     setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === targetNodeId)));
   }, []);
 
   const swapCompareInputs = useCallback((targetNodeId: string, leftSourceNodeId: string, rightSourceNodeId: string) => {
     setEdges((eds) => {
-      const leftEdge = eds.find((edge) => edge.target === targetNodeId && edge.source === leftSourceNodeId);
-      const rightEdge = eds.find((edge) => edge.target === targetNodeId && edge.source === rightSourceNodeId);
+      const bySlot = getCompareEdgesBySlot(eds, targetNodeId);
+      const leftEdge = bySlot.left?.source === leftSourceNodeId ? bySlot.left : undefined;
+      const rightEdge = bySlot.right?.source === rightSourceNodeId ? bySlot.right : undefined;
       if (!leftEdge || !rightEdge) return eds;
 
       return eds.map((edge) => {
         if (edge.id === leftEdge.id) {
-          return { ...edge, source: rightEdge.source, sourceHandle: rightEdge.sourceHandle };
+          return { ...edge, data: { ...edge.data, compareSlot: 'right' } };
         }
         if (edge.id === rightEdge.id) {
-          return { ...edge, source: leftEdge.source, sourceHandle: leftEdge.sourceHandle };
+          return { ...edge, data: { ...edge.data, compareSlot: 'left' } };
         }
         return edge;
       });
@@ -789,11 +788,12 @@ function FlowCanvas() {
     const pendingList = compareNodes
       .map((node) => {
         const inputEdges = edges.filter((e) => e.target === node.id);
-        return { node, inputEdges, inputCount: inputEdges.length };
+        const edgesBySlot = getCompareEdgesBySlot(edges, node.id);
+        const emptySlot = edgesBySlot.left ? (edgesBySlot.right ? null : 'right') : 'left';
+        return { node, inputEdges, emptySlot };
       })
-      .filter(({ inputCount, inputEdges }) => {
-        // Only nodes with exactly one image connected
-        if (inputCount !== 1) return false;
+      .filter(({ emptySlot, inputEdges }) => {
+        if (!emptySlot || inputEdges.length !== 1) return false;
         // Avoid re-connecting the same source node
         const alreadyConnected = inputEdges.some((e) => e.source === sourceNodeId);
         if (alreadyConnected) return false;
@@ -808,12 +808,14 @@ function FlowCanvas() {
 
     if (pendingList.length > 0) {
       const targetCompare = pendingList[0].node;
+      const compareSlot = pendingList[0].emptySlot;
       const newEdge: Edge = {
         id: `e-${Date.now()}`,
         source: sourceNodeId,
         target: targetCompare.id,
         sourceHandle: 'right-source',
         targetHandle: 'left-target',
+        data: { compareSlot },
         style: { stroke: '#555', strokeWidth: 1 },
       };
       const validation = validateImageProcessingEdge(nodes, edges, newEdge);
@@ -849,6 +851,7 @@ function FlowCanvas() {
       target: newNodeId,
       sourceHandle: 'right-source',
       targetHandle: 'left-target',
+      data: { compareSlot: 'left' },
       style: { stroke: '#555', strokeWidth: 1 },
     };
     const validation = validateImageProcessingEdge([...nodes, newNode], edges, newEdge);
@@ -1193,6 +1196,10 @@ function FlowCanvas() {
     window.dispatchEvent(new Event(IMAGE_CROP_CANCEL_EVENT));
     handlePaneClick();
   }, [handlePaneClick]);
+
+  const deleteEdgeById = useCallback((edgeId: string) => {
+    setEdges((currentEdges) => currentEdges.filter((edge) => edge.id !== edgeId));
+  }, [setEdges]);
 
   // ─── Selection Marquee Pre-highlight ───
   const isSelectingRef = useRef(false);
@@ -1644,6 +1651,7 @@ function FlowCanvas() {
       target: startsFromSource ? newNodeId : createMenu.sourceNodeId,
       sourceHandle: startsFromSource ? createMenu.sourceHandleId : 'right-source',
       targetHandle: startsFromSource ? 'left-target' : createMenu.sourceHandleId,
+      data: startsFromSource && type === 'compare' ? { compareSlot: 'left' } : undefined,
       style: { stroke: '#555', strokeWidth: 1 },
     };
     const graphNodes = [...nodes, newNode];
@@ -1766,6 +1774,7 @@ function FlowCanvas() {
         onNodeContextMenu={onNodeContextMenu}
         onViewportChange={onViewportChange}
         onEdgeClick={handleEdgeClick}
+        onDeleteEdge={deleteEdgeById}
         onPaneClick={handleCanvasPaneClick}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}

@@ -46,52 +46,44 @@
   fill: currentColor !important;
 }
 
-/* ReactFlow selected edge highlight */
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 1.5px !important;
-}
 .react-flow__edge .react-flow__edge-path {
-  transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+  filter: none !important;
+  transition: stroke 0.12s ease, stroke-width 0.12s ease, opacity 0.12s ease;
 }
 
 /* Connection line while dragging */
 .react-flow__connection .react-flow__connection-path {
   stroke-width: 2px !important;
-  filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
+  filter: none !important;
 }
 
 /* ── Typed port connection line colors ── */
 .react-flow__connection[data-porttype="IMAGE"] .react-flow__connection-path {
   stroke: #22d3ee !important;
-  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.5));
 }
 .react-flow__connection[data-porttype="PROMPT"] .react-flow__connection-path {
   stroke: #a855f7 !important;
-  filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.5));
 }
 .react-flow__connection[data-porttype="LATENT"] .react-flow__connection-path {
   stroke: #f59e0b !important;
-  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.5));
 }
 .react-flow__connection[data-porttype="MODEL"] .react-flow__connection-path {
   stroke: #3b82f6 !important;
-  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
 }
 .react-flow__connection[data-porttype="NUMBER"] .react-flow__connection-path {
   stroke: #22c55e !important;
-  filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.5));
 }
 
 /* Invalid connection line (type mismatch or cycle) */
 .react-flow__connection.invalid .react-flow__connection-path {
   stroke: #ef4444 !important;
-  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
 }
 
-/* Selection pre-highlight: preview card border turns cyan when marquee touches node boundary */
+/* Selection pre-highlight: match the persistent blue node selection without glow. */
 .react-flow__node.preselected .node-preview-card {
-  border-color: #00d4ff !important;
-  box-shadow: 0 0 12px rgba(0,212,255,0.35), 0 0 40px rgba(0,212,255,0.12) !important;
+  border-color: #2f6bff !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 
 /* Custom range input thumb */

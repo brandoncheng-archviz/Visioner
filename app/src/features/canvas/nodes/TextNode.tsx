@@ -26,6 +26,7 @@ import {
 import { ImageToolbar } from '../components/ImageToolbar';
 import { FullscreenCloseButton } from '../components/FullscreenCloseButton';
 import { useFullscreenEscape } from '../hooks/useFullscreenEscape';
+import { blockFullscreenWheel, stopFullscreenInteraction } from '../utils/canvasEvents';
 import type { TextNodeActionType, TextNodeData } from '../types/basicNode.types';
 import {
   getTextContent,
@@ -591,6 +592,15 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
           data-canvas-escape-layer="true"
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-8"
           onClick={closeFullscreen}
+          onWheel={blockFullscreenWheel}
+          onWheelCapture={blockFullscreenWheel}
+          onPointerDown={stopFullscreenInteraction}
+          onPointerMove={stopFullscreenInteraction}
+          onPointerUp={stopFullscreenInteraction}
+          onMouseDown={stopFullscreenInteraction}
+          onTouchStart={stopFullscreenInteraction}
+          onTouchMove={stopFullscreenInteraction}
+          onTouchEnd={stopFullscreenInteraction}
         >
           <FullscreenCloseButton onClose={closeFullscreen} />
           <div

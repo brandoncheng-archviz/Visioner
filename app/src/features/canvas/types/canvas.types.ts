@@ -23,16 +23,13 @@ export type UpscaleSliderProps = {
   onChange: (value: number) => void;
 };
 
-export interface CompareImageRef {
-  nodeId: string;
-  imageUrl: string;
-  label?: string;
-}
+export type CompareMode = 'slider' | 'sideBySide' | 'overlay';
 
 export interface CompareNodeData {
-  leftImage?: CompareImageRef;
-  rightImage?: CompareImageRef;
+  label?: string;
   sliderPosition: number;
+  compareMode?: CompareMode;
+  overlayOpacity?: number;
 }
 
 export type ConnectionHandleType = 'source' | 'target';

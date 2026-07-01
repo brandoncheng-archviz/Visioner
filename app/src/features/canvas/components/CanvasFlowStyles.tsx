@@ -36,15 +36,9 @@ export function CanvasFlowStyles() {
         border-color: rgba(0,212,255,0.62) !important;
         color: #ffffff !important;
       }
-      /* Edge colors — gray by default, cyan when selected */
+      /* Edge visuals are controlled by CanvasEdge. Keep every persistent edge free of filters/glow. */
       .react-flow__edge-path {
-        stroke: #555;
-        stroke-width: 1;
-      }
-      .react-flow__edge.selected .react-flow__edge-path {
-        stroke: #00d4ff !important;
-        stroke-width: 2px !important;
-        filter: drop-shadow(0 0 6px rgba(0,212,255,0.6));
+        filter: none !important;
       }
       /* Hide default edge markers if any */
       .react-flow__edge .react-flow__edge-interaction {

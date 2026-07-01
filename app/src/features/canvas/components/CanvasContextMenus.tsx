@@ -1,4 +1,4 @@
-import { Image, Video, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2 } from 'lucide-react';
+import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -120,7 +120,6 @@ function TextNodeIcon({ className, style }: { className?: string; style?: React.
 const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
   text: TextNodeIcon as unknown as typeof Image,
   image: Image,
-  video: Video,
   relight: Sun,
   upscale: Sparkles,
   compare: Columns2,

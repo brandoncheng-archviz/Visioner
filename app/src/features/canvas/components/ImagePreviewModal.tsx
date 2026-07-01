@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
+import { blockFullscreenWheel, stopFullscreenInteraction } from '../utils/canvasEvents';
 import { FullscreenCloseButton } from './FullscreenCloseButton';
 import { useFullscreenEscape } from '../hooks/useFullscreenEscape';
 
@@ -27,7 +27,15 @@ export function ImagePreviewModal({
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.88)' }}
       onClick={handleOverlayClick}
-      onWheelCapture={stopCanvasWheelPropagation}
+      onWheel={blockFullscreenWheel}
+      onWheelCapture={blockFullscreenWheel}
+      onPointerDown={stopFullscreenInteraction}
+      onPointerMove={stopFullscreenInteraction}
+      onPointerUp={stopFullscreenInteraction}
+      onMouseDown={stopFullscreenInteraction}
+      onTouchStart={stopFullscreenInteraction}
+      onTouchMove={stopFullscreenInteraction}
+      onTouchEnd={stopFullscreenInteraction}
     >
       <FullscreenCloseButton onClose={onClose} />
 

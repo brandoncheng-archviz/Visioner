@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, useStore, useReactFlow, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
-import { ArrowLeftRight, Columns2, Maximize2, RotateCcw, Trash2, X } from 'lucide-react';
+import { Columns2, Maximize2, Trash2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { resolveNodeImage } from '../utils/resolveNodeImage';
 import { ImageToolbar } from '../components/ImageToolbar';
 import { CompareFullscreenViewer } from '../components/CompareFullscreenViewer';
+import { CompareModeSwitcher } from '../components/CompareModeSwitcher';
+import { getCompareEdgesBySlot } from '../utils/compareSlots';
+import type { CompareMode } from '../types/canvas.types';
 import {
   CANVAS_NODE_CARD_BACKGROUND,
   CANVAS_NODE_CARD_BORDER_COLOR,
@@ -25,15 +28,25 @@ interface CompareImageAreaProps {
   leftImage: ConnectedImage | null;
   rightImage: ConnectedImage | null;
   sliderPosition: number;
+  overlayOpacity: number;
+  mode: CompareMode;
+  previewSide: PreviewSide;
   width: number | string;
   height: number | string;
   emptyContent: React.ReactNode;
   singleContent: React.ReactNode;
   onSliderChange: (value: number) => void;
+  onOverlayOpacityChange: (value: number) => void;
 }
+
+type PreviewSide = 'left' | 'right' | null;
 
 function stopNodeControlEvent(event: React.PointerEvent<HTMLElement> | React.MouseEvent<HTMLElement>) {
   event.preventDefault();
+  event.stopPropagation();
+}
+
+function stopNodeControlPropagation(event: React.SyntheticEvent<HTMLElement>) {
   event.stopPropagation();
 }
 
@@ -45,14 +58,10 @@ function preventNodeContextMenu(event: React.MouseEvent<HTMLElement>) {
 const DEFAULT_COMPARE_RATIO = 16 / 9;
 const CLOSE_RATIO_THRESHOLD = 0.15;
 const CARD_PADDING_X = 24;
-const MIN_IMAGE_WIDTH = 300;
-const MAX_IMAGE_WIDTH = 620;
-const MIN_IMAGE_HEIGHT = 220;
-const MAX_IMAGE_HEIGHT = 420;
-const MIN_NODE_WIDTH = 340;
-const MAX_NODE_WIDTH = 680;
-const EMPTY_IMAGE_WIDTH = 420;
-const SQUARE_IMAGE_SIZE = 420;
+const BASE_IMAGE_WIDTH = 400;
+const BASE_IMAGE_HEIGHT = 260;
+const IMAGE_WIDTH_ADJUSTMENT = 20;
+const IMAGE_HEIGHT_ADJUSTMENT = 20;
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -77,36 +86,20 @@ function getCompareAspectRatio(leftImage: ConnectedImage | null, rightImage: Con
 }
 
 function getCompareSize(aspectRatio: number) {
-  let imageWidth: number;
-  let imageHeight: number;
-
-  if (aspectRatio >= 0.9 && aspectRatio <= 1.1) {
-    imageWidth = SQUARE_IMAGE_SIZE;
-    imageHeight = SQUARE_IMAGE_SIZE;
-  } else if (aspectRatio >= 1) {
-    imageWidth = MAX_IMAGE_WIDTH;
-    imageHeight = imageWidth / aspectRatio;
-
-    if (imageHeight < MIN_IMAGE_HEIGHT) {
-      imageHeight = MIN_IMAGE_HEIGHT;
-      imageWidth = imageHeight * aspectRatio;
-    }
-  } else {
-    imageHeight = MAX_IMAGE_HEIGHT;
-    imageWidth = imageHeight * aspectRatio;
-
-    if (imageWidth < MIN_IMAGE_WIDTH) {
-      imageWidth = MIN_IMAGE_WIDTH;
-      imageHeight = imageWidth / aspectRatio;
-    }
-  }
-
-  imageWidth = Math.round(clamp(imageWidth, MIN_IMAGE_WIDTH, MAX_IMAGE_WIDTH));
-  imageHeight = Math.round(clamp(imageHeight, MIN_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT));
-
-  const nodeWidth = Math.round(clamp(imageWidth + CARD_PADDING_X, MIN_NODE_WIDTH, MAX_NODE_WIDTH));
-  const imageAreaWidth = nodeWidth - CARD_PADDING_X;
-  const imageAreaHeight = Math.round(clamp(imageAreaWidth / aspectRatio, MIN_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT));
+  const safeAspectRatio = clamp(aspectRatio, 0.5, 2.5);
+  const landscapeWeight = clamp((safeAspectRatio - 1) / 0.75, 0, 1);
+  const portraitWeight = clamp((1 - safeAspectRatio) / 0.5, 0, 1);
+  const imageAreaWidth = Math.round(
+    BASE_IMAGE_WIDTH
+      + IMAGE_WIDTH_ADJUSTMENT * landscapeWeight
+      - IMAGE_WIDTH_ADJUSTMENT * portraitWeight,
+  );
+  const imageAreaHeight = Math.round(
+    BASE_IMAGE_HEIGHT
+      - IMAGE_HEIGHT_ADJUSTMENT / 2 * landscapeWeight
+      + IMAGE_HEIGHT_ADJUSTMENT * portraitWeight,
+  );
+  const nodeWidth = imageAreaWidth + CARD_PADDING_X;
 
   return {
     imageAreaWidth,
@@ -119,13 +112,18 @@ function CompareImageArea({
   leftImage,
   rightImage,
   sliderPosition,
+  overlayOpacity,
+  mode,
+  previewSide,
   width,
   height,
   emptyContent,
   singleContent,
   onSliderChange,
+  onOverlayOpacityChange,
 }: CompareImageAreaProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isSliderHovered, setIsSliderHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasBothImages = Boolean(leftImage && rightImage);
 
@@ -173,10 +171,11 @@ function CompareImageArea({
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden"
+      className="relative isolate overflow-hidden"
       style={{
         width,
         height,
+        boxSizing: 'border-box',
         cursor: 'default',
         background: CANVAS_NODE_CARD_BACKGROUND,
       }}
@@ -185,13 +184,59 @@ function CompareImageArea({
 
       {(leftImage || rightImage) && !(leftImage && rightImage) && singleContent}
 
-      {hasBothImages && leftImage && rightImage && (
-        <>
+      {hasBothImages && leftImage && rightImage && previewSide && (
+        <img
+          src={(previewSide === 'left' ? leftImage : rightImage).imageUrl}
+          alt=""
+          className="absolute inset-0 block h-full w-full"
+          style={{ objectFit: 'contain', objectPosition: 'center center' }}
+          draggable={false}
+        />
+      )}
+
+      {hasBothImages && leftImage && rightImage && !previewSide && mode === 'sideBySide' && (
+        <div className="absolute inset-0 grid grid-cols-2 gap-px">
+          <div className="relative min-h-0 min-w-0 overflow-hidden">
+            <img
+              src={leftImage.imageUrl}
+              alt=""
+              className="absolute inset-0 block h-full w-full"
+              style={{ objectFit: 'contain', objectPosition: 'center center' }}
+              draggable={false}
+            />
+          </div>
+          <div className="relative min-h-0 min-w-0 overflow-hidden">
+            <img
+              src={rightImage.imageUrl}
+              alt=""
+              className="absolute inset-0 block h-full w-full"
+              style={{ objectFit: 'contain', objectPosition: 'center center' }}
+              draggable={false}
+            />
+          </div>
+        </div>
+      )}
+
+      {hasBothImages && leftImage && rightImage && !previewSide && mode === 'slider' && (
+        <div
+          className="nodrag nowheel absolute inset-0"
+          onPointerDown={stopNodeControlPropagation}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            updateSlider(event.clientX);
+          }}
+          onDoubleClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onSliderChange(50);
+          }}
+        >
           <img
             src={leftImage.imageUrl}
             alt=""
-            className="absolute inset-0 h-full w-full"
-            style={{ objectFit: 'contain' }}
+            className="absolute inset-0 block h-full w-full"
+            style={{ objectFit: 'contain', objectPosition: 'center center' }}
             draggable={false}
           />
           <div
@@ -201,8 +246,8 @@ function CompareImageArea({
             <img
               src={rightImage.imageUrl}
               alt=""
-              className="h-full w-full"
-              style={{ objectFit: 'contain' }}
+              className="absolute inset-0 block h-full w-full"
+              style={{ objectFit: 'contain', objectPosition: 'center center' }}
               draggable={false}
             />
           </div>
@@ -210,31 +255,29 @@ function CompareImageArea({
             className="pointer-events-none absolute top-0 bottom-0 w-px"
             style={{
               left: `${sliderPosition}%`,
-              background: 'rgba(255,255,255,0.82)',
-              boxShadow: '0 0 8px rgba(0,0,0,0.42)',
+              background: isDragging || isSliderHovered
+                ? 'rgba(255,255,255,0.96)'
+                : 'rgba(255,255,255,0.72)',
             }}
           />
           <div
             className="nodrag nowheel absolute top-0 bottom-0 z-10 w-8 -translate-x-1/2"
             style={{
               left: `${sliderPosition}%`,
-              cursor: isDragging ? 'col-resize' : 'ew-resize',
+              cursor: 'ew-resize',
             }}
+            onPointerEnter={() => setIsSliderHovered(true)}
+            onPointerLeave={() => setIsSliderHovered(false)}
             onPointerDown={handleSliderPointerDown}
             onPointerMove={handleSliderPointerMove}
             onPointerUp={handleSliderPointerEnd}
             onPointerCancel={handleSliderPointerEnd}
-          >
-            <div
-              className="pointer-events-none absolute top-1/2 left-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
-              style={{
-                background: 'rgba(255,255,255,0.92)',
-                boxShadow: '0 6px 18px rgba(0,0,0,0.34)',
-              }}
-            >
-              <ArrowLeftRight className="h-4 w-4" style={{ color: '#111' }} />
-            </div>
-          </div>
+            onDoubleClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onSliderChange(50);
+            }}
+          />
           <div
             className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-lg px-2.5 py-1 text-[12px]"
             style={{
@@ -245,6 +288,53 @@ function CompareImageArea({
             }}
           >
             {sliderPosition}%
+          </div>
+        </div>
+      )}
+
+      {hasBothImages && leftImage && rightImage && !previewSide && mode === 'overlay' && (
+        <>
+          <img
+            src={leftImage.imageUrl}
+            alt=""
+            className="absolute inset-0 block h-full w-full"
+            style={{
+              objectFit: 'contain',
+              objectPosition: 'center center',
+              opacity: overlayOpacity === 100 ? 0 : 1,
+            }}
+            draggable={false}
+          />
+          <img
+            src={rightImage.imageUrl}
+            alt=""
+            className="absolute inset-0 block h-full w-full"
+            style={{ objectFit: 'contain', objectPosition: 'center center', opacity: overlayOpacity / 100 }}
+            draggable={false}
+          />
+          <div
+            className="nodrag nopan nowheel absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg px-2.5 py-1.5"
+            style={{ background: 'rgba(20,20,26,0.76)', border: '1px solid rgba(255,255,255,0.08)' }}
+            onPointerDown={stopNodeControlPropagation}
+            onPointerMove={stopNodeControlPropagation}
+            onPointerUp={stopNodeControlPropagation}
+            onMouseDown={stopNodeControlPropagation}
+            onClick={stopNodeControlPropagation}
+          >
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={overlayOpacity}
+              onChange={(event) => onOverlayOpacityChange(Number(event.target.value))}
+              className="nodrag nopan nowheel h-1 w-20 cursor-ew-resize"
+              style={{ accentColor: '#8F929C' }}
+              onPointerDown={stopNodeControlPropagation}
+              onPointerMove={stopNodeControlPropagation}
+              onPointerUp={stopNodeControlPropagation}
+              aria-label={`${overlayOpacity}%`}
+            />
+            <span className="w-8 text-right text-[11px] text-white/75">{overlayOpacity}%</span>
           </div>
         </>
       )}
@@ -262,52 +352,80 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   const updateNodeInternals = useUpdateNodeInternals();
 
   const [sliderPosition, setSliderPosition] = useState<number>((data.sliderPosition as number) ?? 50);
+  const [overlayOpacity, setOverlayOpacity] = useState<number>((data.overlayOpacity as number) ?? 50);
+  const [compareMode, setCompareMode] = useState<CompareMode>(
+    data.compareMode === 'sideBySide' || data.compareMode === 'overlay' ? data.compareMode : 'slider',
+  );
+  const [previewSide, setPreviewSide] = useState<PreviewSide>(null);
   const [showFullscreen, setShowFullscreen] = useState(false);
 
-  const inputEdges = useMemo(() => allEdges.filter((edge) => edge.target === id), [allEdges, id]);
-  const connectedImages: ConnectedImage[] = useMemo(
-    () =>
-      inputEdges
-        .map((edge): ConnectedImage | null => {
-          const sourceNode = allNodes.find((node) => node.id === edge.source);
-          if (!sourceNode) return null;
-          const resolvedImage = resolveNodeImage(sourceNode.data);
-          if (!resolvedImage) return null;
-          return {
-            nodeId: sourceNode.id,
-            imageUrl: resolvedImage.imageUrl,
-            label: (sourceNode.data?.label as string) || sourceNode.id,
-            width: resolvedImage.width,
-            height: resolvedImage.height,
-          };
-        })
-        .filter((item): item is ConnectedImage => item !== null)
-        .slice(0, 2),
-    [allNodes, inputEdges],
+  const inputEdgesBySlot = useMemo(() => getCompareEdgesBySlot(allEdges, id), [allEdges, id]);
+  const connectedImages = useMemo(
+    () => {
+      const resolveEdgeImage = (edge: (typeof allEdges)[number] | undefined): ConnectedImage | null => {
+        if (!edge) return null;
+        const sourceNode = allNodes.find((node) => node.id === edge.source);
+        if (!sourceNode) return null;
+        const resolvedImage = resolveNodeImage(sourceNode.data);
+        if (!resolvedImage) return null;
+        return {
+          nodeId: sourceNode.id,
+          imageUrl: resolvedImage.imageUrl,
+          label: (sourceNode.data?.label as string) || sourceNode.id,
+          width: resolvedImage.width,
+          height: resolvedImage.height,
+        };
+      };
+      return {
+        left: resolveEdgeImage(inputEdgesBySlot.left),
+        right: resolveEdgeImage(inputEdgesBySlot.right),
+      };
+    },
+    [allNodes, inputEdgesBySlot],
   );
 
-  const leftImage = connectedImages[0] || null;
-  const rightImage = connectedImages[1] || null;
+  const leftImage = connectedImages.left;
+  const rightImage = connectedImages.right;
   const singleImage = leftImage || rightImage;
   const hasBothImages = Boolean(leftImage && rightImage);
+  const displayBalance = compareMode === 'overlay'
+    ? overlayOpacity
+    : compareMode === 'sideBySide'
+      ? 50
+      : sliderPosition;
+  const isLeftPrimary = previewSide === 'left' || (!previewSide && displayBalance <= 35);
+  const isRightPrimary = previewSide === 'right' || (!previewSide && displayBalance >= 65);
+  const leftDotOpacity = isLeftPrimary ? 1 : isRightPrimary ? 0.3 : 0.65;
+  const rightDotOpacity = isRightPrimary ? 1 : isLeftPrimary ? 0.3 : 0.65;
+  const leftDotColor = isLeftPrimary ? '#4298e8' : isRightPrimary ? '#747b82' : '#6f94b8';
+  const rightDotColor = isRightPrimary ? '#e38a45' : isLeftPrimary ? '#827870' : '#b88a68';
+  const leftLabelColor = isLeftPrimary
+    ? 'rgba(255,255,255,0.88)'
+    : isRightPrimary
+      ? 'rgba(255,255,255,0.38)'
+      : 'rgba(255,255,255,0.58)';
+  const rightLabelColor = isRightPrimary
+    ? 'rgba(255,255,255,0.88)'
+    : isLeftPrimary
+      ? 'rgba(255,255,255,0.38)'
+      : 'rgba(255,255,255,0.58)';
+  const leftFileColor = isLeftPrimary
+    ? 'rgba(255,255,255,0.52)'
+    : isRightPrimary
+      ? 'rgba(255,255,255,0.33)'
+      : 'rgba(255,255,255,0.45)';
+  const rightFileColor = isRightPrimary
+    ? 'rgba(255,255,255,0.52)'
+    : isLeftPrimary
+      ? 'rgba(255,255,255,0.33)'
+      : 'rgba(255,255,255,0.45)';
   const nodeTitle = (data.label as string) || t('canvas.nodeLabels.compare');
-  const compareSize = useMemo(() => {
-    if (!leftImage && !rightImage) {
-      return {
-        imageAreaWidth: EMPTY_IMAGE_WIDTH,
-        imageAreaHeight: Math.round(EMPTY_IMAGE_WIDTH / DEFAULT_COMPARE_RATIO),
-        nodeWidth: EMPTY_IMAGE_WIDTH + CARD_PADDING_X,
-      };
-    }
-
-    const aspectRatio = getCompareAspectRatio(leftImage, rightImage);
-    return getCompareSize(aspectRatio);
-  }, [leftImage, rightImage]);
+  const compareSize = useMemo(
+    () => getCompareSize(getCompareAspectRatio(leftImage, rightImage)),
+    [leftImage, rightImage],
+  );
   const { imageAreaWidth, imageAreaHeight, nodeWidth } = compareSize;
   const removeReferenceEdge = data.onRemoveReferenceEdge as ((targetNodeId: string, sourceNodeId: string) => void) | undefined;
-  const swapCompareInputs = data.onSwapCompareInputs as
-    | ((targetNodeId: string, leftSourceNodeId: string, rightSourceNodeId: string) => void)
-    | undefined;
 
   useEffect(() => {
     updateNodeInternals(id);
@@ -316,32 +434,18 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   useEffect(() => {
     setNodes((nodes) =>
       nodes.map((node) =>
-        node.id === id ? { ...node, data: { ...node.data, sliderPosition } } : node,
+        node.id === id ? { ...node, data: { ...node.data, sliderPosition, overlayOpacity, compareMode } } : node,
       ),
     );
-  }, [sliderPosition, id, setNodes]);
+  }, [compareMode, overlayOpacity, sliderPosition, id, setNodes]);
 
-  const handleSwap = useCallback(() => {
-    if (!leftImage || !rightImage) return;
-    if (swapCompareInputs) {
-      swapCompareInputs(id, leftImage.nodeId, rightImage.nodeId);
-      return;
-    }
-    const leftEdge = inputEdges[0];
-    const rightEdge = inputEdges[1];
-    if (!leftEdge || !rightEdge) return;
-    setEdges((edges) =>
-      edges.map((edge) => {
-        if (edge.id === leftEdge.id) return { ...edge, source: rightEdge.source };
-        if (edge.id === rightEdge.id) return { ...edge, source: leftEdge.source };
-        return edge;
-      }),
-    );
-  }, [id, inputEdges, leftImage, rightImage, setEdges, swapCompareInputs]);
-
-  const handleReset = useCallback(() => {
-    setSliderPosition(50);
-  }, []);
+  const handleModeChange = useCallback((nextMode: CompareMode) => {
+    if (nextMode === compareMode) return;
+    setPreviewSide(null);
+    if (nextMode === 'slider') setSliderPosition(50);
+    if (nextMode === 'overlay') setOverlayOpacity(50);
+    setCompareMode(nextMode);
+  }, [compareMode]);
 
   const handleDeleteNode = useCallback(() => {
     const onDeleteNode = data.onDeleteNode as ((nodeId: string) => void) | undefined;
@@ -367,10 +471,10 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   }, [id, removeReferenceEdge, rightImage, setEdges]);
 
   const renderEmptyState = () => (
-    <div className="grid h-full w-full grid-cols-2 gap-2 p-3">
-      {[t('compare.left'), t('compare.right')].map((label) => (
+    <div className="absolute inset-0 grid grid-cols-2 gap-2 p-3">
+      {[0, 1].map((slotIndex) => (
         <div
-          key={label}
+          key={slotIndex}
           className="flex flex-col items-center justify-center gap-2 rounded-[18px] border border-dashed"
           style={{
             background: 'rgba(255,255,255,0.025)',
@@ -381,25 +485,19 @@ export function CompareNode({ id, data, selected }: NodeProps) {
           <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/55">
             <Columns2 className="h-4 w-4" />
           </span>
-          <span className="text-[13px] font-medium">{label}</span>
         </div>
       ))}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-[13px] font-medium"
-        style={{ color: 'rgba(255,255,255,0.5)' }}
-      >
-        {t('compare.connectTwoImages')}
-      </div>
     </div>
   );
 
   const renderSingleState = () => (
-    <div className="relative h-full w-full">
+    <div className="absolute inset-0">
       {singleImage && (
         <img
           src={singleImage.imageUrl}
           alt=""
-          className="absolute inset-0 h-full w-full object-contain"
+          className="absolute inset-0 block h-full w-full"
+          style={{ objectFit: 'contain', objectPosition: 'center center' }}
           draggable={false}
         />
       )}
@@ -416,34 +514,6 @@ export function CompareNode({ id, data, selected }: NodeProps) {
         <span className="whitespace-nowrap">{t('compare.connectSecondImage')}</span>
       </div>
     </div>
-  );
-
-  const nodeActionButton = (
-    icon: React.ReactNode,
-    label: string,
-    onClick: (event: React.MouseEvent<HTMLButtonElement>) => void,
-    disabled = false,
-  ) => (
-    <button
-      type="button"
-      onPointerDown={stopNodeControlEvent}
-      onClick={(event) => {
-        stopNodeControlEvent(event);
-        onClick(event);
-      }}
-      disabled={disabled}
-      className="nodrag nowheel flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] transition disabled:cursor-not-allowed disabled:opacity-30"
-      style={{
-        color: 'rgba(255,255,255,0.62)',
-        background: 'rgba(255,255,255,0.035)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-      }}
-      title={label}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
   );
 
   return (
@@ -498,23 +568,28 @@ export function CompareNode({ id, data, selected }: NodeProps) {
             boxSizing: 'border-box',
           }}
         >
-          <div className="px-3 pt-3">
+          <div className="flex justify-center px-3 pt-2">
+            <CompareModeSwitcher mode={compareMode} onModeChange={handleModeChange} />
+          </div>
+
+          <div className="px-3 pt-2">
             <div
-              className="mx-auto overflow-hidden rounded-[18px]"
-              style={{
-                width: imageAreaWidth,
-                border: '1px solid rgba(255,255,255,0.08)',
-              }}
+              className="mx-auto"
+              style={{ width: imageAreaWidth }}
             >
               <CompareImageArea
                 leftImage={leftImage}
                 rightImage={rightImage}
                 sliderPosition={sliderPosition}
+                overlayOpacity={overlayOpacity}
+                mode={compareMode}
+                previewSide={previewSide}
                 width={imageAreaWidth}
                 height={imageAreaHeight}
                 emptyContent={renderEmptyState()}
                 singleContent={renderSingleState()}
                 onSliderChange={setSliderPosition}
+                onOverlayOpacityChange={setOverlayOpacity}
               />
             </div>
           </div>
@@ -522,9 +597,18 @@ export function CompareNode({ id, data, selected }: NodeProps) {
           <div className="px-4 pb-3 pt-2">
             {/* Compact source labels row */}
             <div className="flex items-center gap-2 text-[11px]">
-              <div className="flex min-w-0 flex-1 items-center gap-1">
-                <span className="flex-shrink-0" style={{ color: 'rgba(255,255,255,0.42)' }}>{t('compare.left')}:</span>
-                <span className="min-w-0 truncate" style={{ color: 'rgba(255,255,255,0.62)' }}>{leftImage?.label || '-'}</span>
+              <div
+                className="nodrag nowheel flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded transition-colors hover:bg-white/[0.035]"
+                style={{ background: isLeftPrimary ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+                onPointerDown={stopNodeControlEvent}
+                onClick={(event) => {
+                  stopNodeControlEvent(event);
+                  if (hasBothImages && leftImage) setPreviewSide((current) => current === 'left' ? null : 'left');
+                }}
+              >
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full transition-all" style={{ background: leftDotColor, opacity: leftDotOpacity }} />
+                <span className="flex-shrink-0 transition-colors" style={{ color: leftLabelColor }}>{t('compare.left')}:</span>
+                <span className="min-w-0 truncate transition-colors" style={{ color: leftFileColor }}>{leftImage?.label || '-'}</span>
                 {leftImage && (
                   <button
                     type="button"
@@ -542,9 +626,18 @@ export function CompareNode({ id, data, selected }: NodeProps) {
                 )}
               </div>
               <span className="flex-shrink-0" style={{ color: 'rgba(255,255,255,0.18)' }}>|</span>
-              <div className="flex min-w-0 flex-1 items-center gap-1">
-                <span className="flex-shrink-0" style={{ color: 'rgba(255,255,255,0.42)' }}>{t('compare.right')}:</span>
-                <span className="min-w-0 truncate" style={{ color: 'rgba(255,255,255,0.62)' }}>{rightImage?.label || '-'}</span>
+              <div
+                className="nodrag nowheel flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded transition-colors hover:bg-white/[0.035]"
+                style={{ background: isRightPrimary ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+                onPointerDown={stopNodeControlEvent}
+                onClick={(event) => {
+                  stopNodeControlEvent(event);
+                  if (hasBothImages && rightImage) setPreviewSide((current) => current === 'right' ? null : 'right');
+                }}
+              >
+                <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full transition-all" style={{ background: rightDotColor, opacity: rightDotOpacity }} />
+                <span className="flex-shrink-0 transition-colors" style={{ color: rightLabelColor }}>{t('compare.right')}:</span>
+                <span className="min-w-0 truncate transition-colors" style={{ color: rightFileColor }}>{rightImage?.label || '-'}</span>
                 {rightImage && (
                   <button
                     type="button"
@@ -563,14 +656,6 @@ export function CompareNode({ id, data, selected }: NodeProps) {
               </div>
             </div>
 
-            <div className="mt-2 flex items-center justify-center gap-2">
-              {nodeActionButton(<ArrowLeftRight className="h-4 w-4" />, t('compare.swap'), () => {
-                  handleSwap();
-                }, !hasBothImages)}
-              {nodeActionButton(<RotateCcw className="h-4 w-4" />, t('compare.reset'), () => {
-                  handleReset();
-                })}
-            </div>
           </div>
         </div>
 
@@ -605,6 +690,12 @@ export function CompareNode({ id, data, selected }: NodeProps) {
         <CompareFullscreenViewer
           leftImage={leftImage}
           rightImage={rightImage}
+          mode={compareMode}
+          sliderPosition={sliderPosition}
+          overlayOpacity={overlayOpacity}
+          onModeChange={handleModeChange}
+          onSliderChange={setSliderPosition}
+          onOverlayOpacityChange={setOverlayOpacity}
           onClose={() => setShowFullscreen(false)}
         />
       )}

@@ -12,8 +12,9 @@ import {
   type OnNodeDrag,
   type Viewport,
 } from '@xyflow/react';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import CanvasEdge from '@/components/CanvasEdge';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
 import { AudioNode } from '../nodes/AudioNode';
@@ -41,6 +42,10 @@ const nodeTypes = {
   relight: RelightNode,
 };
 
+const edgeTypes = {
+  canvas: CanvasEdge,
+};
+
 export interface CanvasStageProps {
   tempLine: TempConnectionState | null;
   isDragOver: boolean;
@@ -60,6 +65,7 @@ export interface CanvasStageProps {
   onNodeContextMenu: (event: React.MouseEvent, node: Node) => void;
   onViewportChange: (viewport: Viewport) => void;
   onEdgeClick: (event: React.MouseEvent, edge: Edge) => void;
+  onDeleteEdge: (edgeId: string) => void;
   onPaneClick: () => void;
   onSelectionStart: () => void;
   onSelectionEnd: () => void;
@@ -86,6 +92,7 @@ export function CanvasStage({
   onNodeContextMenu,
   onViewportChange,
   onEdgeClick,
+  onDeleteEdge,
   onPaneClick,
   onSelectionStart,
   onSelectionEnd,
@@ -94,6 +101,13 @@ export function CanvasStage({
 }: CanvasStageProps) {
   const { t } = useTranslation();
   const { getViewport, setViewport } = useReactFlow();
+  const edgesWithCallbacks = useMemo(
+    () => edges.map((edge) => ({
+      ...edge,
+      data: { ...edge.data, onDeleteEdge },
+    })),
+    [edges, onDeleteEdge],
+  );
 
   const handleWheel = useCallback(
     (event: WheelEvent) => {
@@ -135,6 +149,11 @@ export function CanvasStage({
   const handleWheelCapture = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
       const target = event.target as HTMLElement;
+      if (target.closest('[data-canvas-escape-layer="true"]')) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (target.closest('.nowheel')) return;
 
       event.preventDefault();
@@ -191,7 +210,7 @@ export function CanvasStage({
       <ReactFlow
         className="h-full w-full"
         nodes={nodesWithCallbacks}
-        edges={edges}
+        edges={edgesWithCallbacks}
         onNodesChange={onNodesChange}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
@@ -204,6 +223,8 @@ export function CanvasStage({
         onDragOverCapture={onDragOverCapture}
         onDropCapture={onDropCapture}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: 'canvas' }}
         snapToGrid={snapGrid}
         snapGrid={[24, 24]}
         selectionOnDrag

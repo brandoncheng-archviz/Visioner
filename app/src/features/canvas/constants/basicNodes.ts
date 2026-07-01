@@ -16,12 +16,6 @@ export const BASIC_NODE_DEFINITIONS = [
     group: 'content',
   },
   {
-    type: 'video',
-    labelKey: 'canvas.createMenuVideoNode',
-    color: '#60a5fa',
-    group: 'content',
-  },
-  {
     type: 'relight',
     labelKey: 'canvas.createMenuRelightNode',
     color: '#facc15',

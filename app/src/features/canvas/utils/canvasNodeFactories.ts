@@ -221,6 +221,8 @@ export function createCompareNodeData(label: string) {
   return {
     label,
     sliderPosition: 50,
+    overlayOpacity: 50,
+    compareMode: 'slider' as const,
   };
 }
 
