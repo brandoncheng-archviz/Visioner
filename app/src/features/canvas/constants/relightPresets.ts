@@ -58,11 +58,11 @@ export const RELIGHT_PRESETS: RelightPreset[] = [
   },
   {
     id: 'clear-noon',
-    name: '正午清晰',
-    description: '短阴影与清透天空',
-    elevation: 69,
+    name: '日落余晖',
+    description: '低位柔光与安静暮色',
+    elevation: 3,
     azimuth: 55,
-    cloudAmount: 'clear',
-    fogLevel: 'none',
+    cloudAmount: 'fewClouds',
+    fogLevel: 'light',
   },
 ];

@@ -68,15 +68,26 @@ export function createRelightLightPreview(
   const baseDerived = resolveSunSkyDerived({ elevation, azimuth });
   const atmosphereLabel = resolveRelightAtmosphereLabel(settings);
   const atmospherePrompt = resolveAtmospherePrompt(settings);
+  const isSunsetAfterglow = settings.lightingPresetId === 'clear-noon';
+
+  const derived = isSunsetAfterglow
+    ? {
+        ...baseDerived,
+        timeLabel: '日落余晖',
+        skyLabel: '柔和暮色天空 + 低饱和暖色地平线',
+        summary: `${baseDerived.directionLabel}极低角度日落余晖，天空柔和并略带暮色，${atmosphereLabel}，${baseDerived.shadowLengthLabel}、${baseDerived.shadowBlurLabel}阴影，氛围低缓安静。`,
+        promptText: `late sunset afterglow, very low ${baseDerived.directionLabel === '右前方光' ? 'right-front light' : 'natural directional light'}, soft dusky sky, subdued warm horizon, quiet low-intensity illumination, ${baseDerived.shadowLengthLabel === '超长阴影' ? 'very long' : 'long'} soft shadows, ${atmospherePrompt}, realistic architectural visualization`,
+      }
+    : {
+        ...baseDerived,
+        summary: `${baseDerived.timeLabel} · ${baseDerived.directionLabel}，${atmosphereLabel}，${baseDerived.shadowLengthLabel}、${baseDerived.shadowBlurLabel}阴影，适合建筑可视化。`,
+        promptText: `${baseDerived.promptText}, ${atmospherePrompt}`,
+      };
 
   return {
     enabled: true,
     sun: { elevation, azimuth },
     settings: { ...settings },
-    derived: {
-      ...baseDerived,
-      summary: `${baseDerived.timeLabel} · ${baseDerived.directionLabel}，${atmosphereLabel}，${baseDerived.shadowLengthLabel}、${baseDerived.shadowBlurLabel}阴影，适合建筑可视化。`,
-      promptText: `${baseDerived.promptText}, ${atmospherePrompt}`,
-    },
+    derived,
   };
 }
