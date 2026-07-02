@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
-import { ChevronDown, Check, Building2, MousePointerClick } from 'lucide-react';
+import { ChevronDown, Check, Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   imageRoleOptions,
   getImageRoleOption,
   getImageRoleLabel,
-  localReferenceOptions,
-  normalizeLocalReferenceType,
 } from '../constants/imageUsages';
 import { FLOATING_PANEL_BACKGROUND } from '../constants/canvasConstants';
 import type { ImageRole, LocalReferenceType } from '../types/imageNode.types';
@@ -17,7 +15,6 @@ export function ImageRoleTag({
   localReferenceType,
   localReferenceLabel,
   onChange,
-  onStartPointPick,
   open: controlledOpen,
   onOpenChange,
   rootClassName = 'absolute z-30 nodrag nowheel',
@@ -31,7 +28,6 @@ export function ImageRoleTag({
   localReferenceType?: LocalReferenceType;
   localReferenceLabel?: string;
   onChange: (role: ImageRole | null, customRoleLabel?: string, localRefType?: LocalReferenceType, localRefLabel?: string) => void;
-  onStartPointPick?: () => void;
   open?: boolean;
   onOpenChange?: (v: boolean) => void;
   rootClassName?: string;
@@ -46,11 +42,9 @@ export function ImageRoleTag({
   const open = disabled ? false : rawOpen;
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
   const [isTagHovered, setIsTagHovered] = useState(false);
-  const [expandedLocalRef, setExpandedLocalRef] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const displayLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
-  const normalizedLocalReferenceType = normalizeLocalReferenceType(localReferenceType);
   const selectedOption = getImageRoleOption(role, customRoleLabel);
   const previewOption = getImageRoleOption(hoveredRole || role);
   const DisplayIcon = selectedOption?.Icon || Building2;
@@ -76,7 +70,6 @@ export function ImageRoleTag({
     if (!open) {
       const raf = requestAnimationFrame(() => {
         setHoveredRole(null);
-        setExpandedLocalRef(false);
       });
       return () => cancelAnimationFrame(raf);
     }
@@ -84,27 +77,18 @@ export function ImageRoleTag({
 
   useEffect(() => {
     if (!disabled) return;
-    setInternalOpen(false);
-    onOpenChange?.(false);
-    setIsTagHovered(false);
-    setHoveredRole(null);
-    setExpandedLocalRef(false);
+    const raf = requestAnimationFrame(() => {
+      setInternalOpen(false);
+      onOpenChange?.(false);
+      setIsTagHovered(false);
+      setHoveredRole(null);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [disabled, onOpenChange]);
 
   const handleSelectPrimary = (nextRole: ImageRole) => {
     if (disabled) return;
-    if (nextRole === 'local_reference') {
-      setExpandedLocalRef(true);
-      return;
-    }
     onChange(nextRole);
-    handleOpenChange(false);
-  };
-
-  const handleSelectLocalType = (type: LocalReferenceType, label: string) => {
-    if (disabled) return;
-    onChange('local_reference', undefined, type, label);
-    setExpandedLocalRef(false);
     handleOpenChange(false);
   };
 
@@ -112,14 +96,6 @@ export function ImageRoleTag({
     if (disabled) return;
     onChange('undefined_usage', undefined, undefined, undefined);
     handleOpenChange(false);
-  };
-
-  const handleStartPointPick = () => {
-    if (disabled) return;
-    if (onStartPointPick) {
-      onStartPointPick();
-      handleOpenChange(false);
-    }
   };
 
   useEffect(() => {
@@ -135,10 +111,6 @@ export function ImageRoleTag({
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (expandedLocalRef) {
-        setExpandedLocalRef(false);
-        return;
-      }
       handleOpenChange(false);
     };
 
@@ -148,7 +120,7 @@ export function ImageRoleTag({
       document.removeEventListener('pointerdown', closeOnOutside, true);
       document.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [open, handleOpenChange, expandedLocalRef]);
+  }, [open, handleOpenChange]);
 
   return (
     <div
@@ -225,7 +197,6 @@ export function ImageRoleTag({
           {imageRoleOptions.map((option) => {
             const active = option.value === role;
             const hovered = hoveredRole === option.value;
-            const isLocalRef = option.value === 'local_reference';
             return (
               <div key={option.value}>
                 <button
@@ -241,62 +212,13 @@ export function ImageRoleTag({
                 >
                   <option.Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />
                   <span className="flex-1 font-medium">{option.label}</span>
-                  {active && !isLocalRef && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
-                  {active && isLocalRef && !expandedLocalRef && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
+                  {active && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
                 </button>
-                {isLocalRef && expandedLocalRef && (
-                  <div className="mx-1.5 mb-1.5 mt-0.5 rounded-[10px] p-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    {/* Section title */}
-                    <div className="mb-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.54)' }}>
-                      {t('reference.selectLocalElement', { defaultValue: '选择参考元素' })}
-                    </div>
-
-                    {/* Fixed chips */}
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {localReferenceOptions.map((sub) => (
-                        <button
-                          key={sub.value}
-                          type="button"
-                          onClick={() => handleSelectLocalType(sub.value, sub.label)}
-                          className="rounded-lg px-1.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-white/10"
-                          style={{
-                            background: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? 'rgba(20,184,166,0.18)' : 'rgba(255,255,255,0.045)',
-                            border: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? '1px solid rgba(20,184,166,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                            color: normalizedLocalReferenceType === sub.value && !localReferenceLabel ? '#2dd4bf' : 'rgba(255,255,255,0.75)',
-                          }}
-                        >
-                          {sub.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Point-pick entry */}
-                    {onStartPointPick && (
-                      <button
-                        type="button"
-                        onClick={handleStartPointPick}
-                        className="mt-2.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5"
-                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
-                      >
-                        <MousePointerClick className="h-3.5 w-3.5 flex-shrink-0" style={{ color: '#2dd4bf' }} />
-                        <div className="flex-1">
-                          <div className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.84)' }}>
-                            {t('reference.pointPickTitle', { defaultValue: '点选参考元素' })}
-                          </div>
-                          <div className="mt-0.5 text-[12px] leading-5" style={{ color: 'rgba(255,255,255,0.52)' }}>
-                            {t('reference.pointPickHint', { defaultValue: '点击图片中的目标区域，选择要参考的局部内容' })}
-                          </div>
-                        </div>
-                      </button>
-                    )}
-
-                  </div>
-                )}
               </div>
             );
           })}
 
-          {hasActiveRole && !expandedLocalRef && (
+          {hasActiveRole && (
             <div className="mx-1.5 mt-1.5 border-t pt-2 pb-1" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
               <button
                 type="button"
@@ -309,8 +231,7 @@ export function ImageRoleTag({
             </div>
           )}
 
-          {!expandedLocalRef && (
-            <div
+          <div
               className="mx-1.5 mt-2 border-t px-1 pt-3 pb-1.5 text-[14px] leading-relaxed"
               style={{
                 borderColor: 'rgba(255,255,255,0.08)',
@@ -336,7 +257,6 @@ export function ImageRoleTag({
                 </div>
               )}
             </div>
-          )}
         </div>
       )}
     </div>

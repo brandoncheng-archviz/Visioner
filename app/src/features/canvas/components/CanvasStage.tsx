@@ -151,7 +151,6 @@ export function CanvasStage({
       const target = event.target as HTMLElement;
       if (target.closest('[data-canvas-escape-layer="true"]')) {
         event.preventDefault();
-        event.stopPropagation();
         return;
       }
       if (target.closest('.nowheel')) return;

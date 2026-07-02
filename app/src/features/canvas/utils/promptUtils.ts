@@ -102,6 +102,18 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
   if (normalizedRole === 'atmosphere_reference' || reference.role === 'overall_reference' || reference.roleLabel.includes('氛围')) {
     return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
   }
+  if (reference.role === 'material_reference' || reference.roleLabel.includes('材质')) {
+    return '参考该图片中的材质类型、表面纹理、反射关系、粗糙度和细节质感。';
+  }
+  if (reference.role === 'landscape_reference' || reference.roleLabel.includes('景观')) {
+    return '参考该图片中的景观布局、植物配置、地形关系、铺装与室外空间氛围。';
+  }
+  if (reference.role === 'lighting_reference' || reference.roleLabel.includes('照明') || reference.roleLabel.includes('灯光')) {
+    return '参考该图片中的灯具语言、光色、照明强度、明暗层次和光线分布。';
+  }
+  if (reference.role === 'interior_reference' || reference.roleLabel.includes('室内')) {
+    return '参考该图片中的室内空间布局、家具陈设、室内材质和整体氛围。';
+  }
   if (normalizedRole === 'local_reference') {
     const type = normalizeLocalReferenceType(reference.localReferenceType) || getLocalReferenceTypeFromRole(reference.role);
     const label = getLocalReferenceLabel(reference.role, reference.localReferenceType, reference.localReferenceLabel, reference.customRoleLabel);
@@ -126,12 +138,6 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
   }
   if (reference.role === 'undefined_usage') {
     return '该图片尚未明确控制维度，仅作为中性视觉参考处理。';
-  }
-  if (reference.role === 'material_reference' || reference.roleLabel.includes('材质')) {
-    return '参考该图片中的材质纹理、反射关系和细节质感。';
-  }
-  if (reference.role === 'lighting_reference' || reference.roleLabel.includes('灯光')) {
-    return '参考该图片中的时间段、光照强弱和明暗关系。';
   }
   return '参考该图片中的关键视觉信息。';
 }
@@ -206,8 +212,12 @@ export function buildPromptSubmission(
     });
 
   const primaryBuilding = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'primary_building' || block.usage?.includes('主体建筑')));
-  const localRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter(isLocalReferenceBlock));
   const atmosphereRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围')));
+  const materialRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'material_reference' || block.usage?.includes('材质')));
+  const landscapeRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'landscape_reference' || block.usage?.includes('景观')));
+  const lightingRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'lighting_reference' || block.usage?.includes('照明') || block.usage?.includes('灯光')));
+  const interiorRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'interior_reference' || block.usage?.includes('室内')));
+  const localRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter(isLocalReferenceBlock));
   const undefinedRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未设置参考用途' || block.usage === '未定义用途'));
 
   const selectedPresetsList = selectedPresetIds
@@ -225,7 +235,11 @@ export function buildPromptSubmission(
   if (trimmedUserText) sections.push(trimmedUserText);
   if (primaryBuilding.length) sections.push(`主体建筑约束：${primaryBuilding.map((block) => block.promptText).join('；')}`);
   if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((block) => block.promptText).join('；')}`);
-  if (localRefs.length) sections.push(`局部参考：${localRefs.map((block) => block.promptText).join('；')}`);
+  if (materialRefs.length) sections.push(`材质参考：${materialRefs.map((block) => block.promptText).join('；')}`);
+  if (landscapeRefs.length) sections.push(`景观参考：${landscapeRefs.map((block) => block.promptText).join('；')}`);
+  if (lightingRefs.length) sections.push(`照明参考：${lightingRefs.map((block) => block.promptText).join('；')}`);
+  if (interiorRefs.length) sections.push(`室内参考：${interiorRefs.map((block) => block.promptText).join('；')}`);
+  if (localRefs.length) sections.push(`旧版局部参考：${localRefs.map((block) => block.promptText).join('；')}`);
   if (undefinedRefs.length) sections.push(`未定义参考：${undefinedRefs.map((block) => block.promptText).join('；')}`);
   if (selectedStyle) {
     sections.push(`最终全局 Look / LUT / 视觉语言：${serializeStylePrompt(selectedStyle)}`);
@@ -245,7 +259,7 @@ export function buildPromptSubmission(
   });
 
   if (sortedNodeReferences.length) {
-    sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、植物、人物、天空、海水、城市、玻璃等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
+    sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、氛围、材质、景观、照明和室内空间等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
   }
 
   return {

@@ -24,7 +24,7 @@ export function CompareModeSwitcher({
   return (
     <TooltipProvider delayDuration={120}>
       <div
-        className={`nodrag nopan nowheel flex items-center gap-1 ${isFullscreen ? 'rounded-xl border border-white/[0.08] p-1 backdrop-blur-md' : ''}`}
+        className={`nodrag nopan flex items-center gap-1 ${isFullscreen ? 'rounded-xl border border-white/[0.08] p-1 backdrop-blur-md' : ''}`}
         style={isFullscreen ? { background: 'rgba(20,20,24,0.36)' } : undefined}
         onPointerDown={(event) => event.stopPropagation()}
       >

@@ -1,17 +1,5 @@
 import type { ImageRole, ReferenceInfo } from '../types/imageNode.types';
-import {
-  MAX_LOCAL_REFERENCES_PER_NODE,
-  MAX_REFERENCE_IMAGES_PER_NODE,
-} from '../constants/canvasConstants';
-
-const LOCAL_REFERENCE_ROLES: ImageRole[] = [
-  'local_reference',
-  'vegetation_reference',
-  'plant_reference',
-  'people_reference',
-  'sky_reference',
-  'custom_reference',
-];
+import { MAX_REFERENCE_IMAGES_PER_NODE } from '../constants/canvasConstants';
 
 export type ReferenceLimitIssue = {
   title: string;
@@ -22,10 +10,6 @@ export const REFERENCE_LIMIT_MESSAGES = {
   maxReferences: {
     title: '参考图已达上限',
     message: `当前节点最多接入 ${MAX_REFERENCE_IMAGES_PER_NODE} 张图片，请删除部分引用后再添加。`,
-  },
-  maxLocalReferences: {
-    title: '局部参考已达上限',
-    message: `当前节点最多接入 ${MAX_LOCAL_REFERENCES_PER_NODE} 张局部参考，请删除部分局部参考后再添加。`,
   },
   maxReferencesForGenerate: {
     title: '参考图数量超过上限',
@@ -38,7 +22,7 @@ export function formatReferenceLimitIssue(issue: ReferenceLimitIssue): string {
 }
 
 export function isLocalReferenceRole(role: ImageRole | null | undefined): boolean {
-  return Boolean(role && LOCAL_REFERENCE_ROLES.includes(role));
+  return role === 'local_reference' || role === 'custom_reference' || role === 'vegetation_reference' || role === 'plant_reference' || role === 'people_reference' || role === 'sky_reference';
 }
 
 export function countLocalReferences(references: Array<Pick<ReferenceInfo, 'role'>>): number {
@@ -47,17 +31,13 @@ export function countLocalReferences(references: Array<Pick<ReferenceInfo, 'role
 
 export function getReferenceLimitIssueForAdd(
   references: Array<Pick<ReferenceInfo, 'nodeId' | 'role'>>,
-  nextRole?: ImageRole | null,
+  _nextRole?: ImageRole | null,
   replacingNodeId?: string,
 ): ReferenceLimitIssue | null {
   const currentReferences = references.filter((reference) => reference.nodeId !== replacingNodeId);
 
   if (!replacingNodeId && currentReferences.length >= MAX_REFERENCE_IMAGES_PER_NODE) {
     return REFERENCE_LIMIT_MESSAGES.maxReferences;
-  }
-
-  if (isLocalReferenceRole(nextRole) && countLocalReferences(currentReferences) >= MAX_LOCAL_REFERENCES_PER_NODE) {
-    return REFERENCE_LIMIT_MESSAGES.maxLocalReferences;
   }
 
   return null;
@@ -68,10 +48,6 @@ export function getReferenceLimitIssueForGenerate(
 ): ReferenceLimitIssue | null {
   if (references.length > MAX_REFERENCE_IMAGES_PER_NODE) {
     return REFERENCE_LIMIT_MESSAGES.maxReferencesForGenerate;
-  }
-
-  if (countLocalReferences(references) > MAX_LOCAL_REFERENCES_PER_NODE) {
-    return REFERENCE_LIMIT_MESSAGES.maxLocalReferences;
   }
 
   return null;

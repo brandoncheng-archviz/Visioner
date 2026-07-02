@@ -10,7 +10,7 @@ function isDefinedUsageValue(value: unknown) {
 }
 
 export function hasDefinedUsage(reference: ReferenceInfo) {
-  if (reference.role === 'undefined_usage') return true;
+  if (reference.role === 'undefined_usage') return false;
   if (!isDefinedUsageValue(reference.role)) return false;
   if (reference.role === 'local_reference') {
     return isDefinedUsageValue(reference.localReferenceType) || isDefinedUsageValue(reference.localReferenceLabel);
@@ -51,6 +51,18 @@ export function getReferenceUsageSortRank(reference: Pick<ReferenceInfo, 'role' 
   if (reference.role === 'atmosphere_reference' || reference.role === 'overall_reference' || roleLabel.includes('氛围')) {
     return { group: 1 };
   }
+  if (reference.role === 'material_reference' || roleLabel.includes('材质')) {
+    return { group: 2 };
+  }
+  if (reference.role === 'landscape_reference' || roleLabel.includes('景观')) {
+    return { group: 3 };
+  }
+  if (reference.role === 'lighting_reference' || roleLabel.includes('照明') || roleLabel.includes('灯光')) {
+    return { group: 4 };
+  }
+  if (reference.role === 'interior_reference' || roleLabel.includes('室内')) {
+    return { group: 5 };
+  }
   if (
     reference.role === 'local_reference' ||
     reference.role === 'custom_reference' ||
@@ -58,15 +70,13 @@ export function getReferenceUsageSortRank(reference: Pick<ReferenceInfo, 'role' 
     reference.role === 'plant_reference' ||
     reference.role === 'people_reference' ||
     reference.role === 'sky_reference' ||
-    reference.role === 'material_reference' ||
-    reference.role === 'lighting_reference' ||
     normalizedLocalReferenceType ||
     reference.localReferenceLabel ||
     reference.customRoleLabel
   ) {
-    return { group: 2 };
+    return { group: 6 };
   }
-  return { group: 3 };
+  return { group: 7 };
 }
 
 export function getReferenceUsageGroup(reference: Pick<ReferenceInfo, 'role' | 'roleLabel' | 'localReferenceType' | 'localReferenceLabel' | 'customRoleLabel'>) {

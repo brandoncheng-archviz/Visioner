@@ -1770,7 +1770,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             localReferenceType={localReferenceType}
             localReferenceLabel={localReferenceLabel}
             onChange={handleRoleChange}
-            onStartPointPick={() => setIsPointPickMode(true)}
             open={roleMenuOpen && canEditRole}
             onOpenChange={handleRoleMenuOpenChange}
             disabled={!canEditRole}

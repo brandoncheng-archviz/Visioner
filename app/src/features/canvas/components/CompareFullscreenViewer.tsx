@@ -1,11 +1,18 @@
-import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
+} from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FullscreenCloseButton } from './FullscreenCloseButton';
 import { CompareModeSwitcher } from './CompareModeSwitcher';
 import { useFullscreenEscape } from '../hooks/useFullscreenEscape';
-import { blockFullscreenWheel, stopFullscreenInteraction } from '../utils/canvasEvents';
+import { stopFullscreenInteraction } from '../utils/canvasEvents';
 import type { CompareMode } from '../types/canvas.types';
 
 type FullscreenCompareImage = {
@@ -13,7 +20,18 @@ type FullscreenCompareImage = {
   label: string;
 };
 
-function ViewerImage({ image }: { image: FullscreenCompareImage }) {
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
+
+type ViewState = {
+  zoom: number;
+  panX: number;
+  panY: number;
+};
+
+const DEFAULT_VIEW: ViewState = { zoom: 1, panX: 0, panY: 0 };
+
+function ViewerImage({ image, transformStyle }: { image: FullscreenCompareImage; transformStyle: CSSProperties }) {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
 
@@ -29,6 +47,7 @@ function ViewerImage({ image }: { image: FullscreenCompareImage }) {
           src={image.imageUrl}
           alt={image.label}
           className="block h-full w-full object-contain"
+          style={transformStyle}
           draggable={false}
           onError={() => setFailed(true)}
         />
@@ -60,10 +79,22 @@ export function CompareFullscreenViewer({
 }) {
   const { t } = useTranslation();
   const sliderAreaRef = useRef<HTMLDivElement>(null);
+  const viewerAreaRef = useRef<HTMLDivElement>(null);
+  const panDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
+  const ignoreNextSliderClickRef = useRef(false);
   const [leftFailed, setLeftFailed] = useState(false);
   const [rightFailed, setRightFailed] = useState(false);
   const [isSliderHovered, setIsSliderHovered] = useState(false);
   const [isSliderDragging, setIsSliderDragging] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const [view, setView] = useState<ViewState>(DEFAULT_VIEW);
 
   useFullscreenEscape(true, onClose);
 
@@ -99,6 +130,99 @@ export function CompareFullscreenViewer({
     }
   }, [isSliderDragging]);
 
+  const resetView = useCallback(() => {
+    panDragRef.current = null;
+    setIsPanning(false);
+    setView(DEFAULT_VIEW);
+  }, []);
+
+  const handleFullscreenWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = viewerAreaRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const normalizedDeltaY = event.deltaMode === 1
+      ? event.deltaY * 16
+      : event.deltaMode === 2
+        ? event.deltaY * 800
+        : event.deltaY;
+    const isMouseWheel = Math.abs(normalizedDeltaY) >= 50;
+    const zoomSpeed = isMouseWheel ? 0.1 : 0.01;
+    const rawFactor = Math.exp(-normalizedDeltaY * zoomSpeed);
+    const factor = Math.min(1.08, Math.max(0.92, rawFactor));
+
+    setView((current) => {
+      const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current.zoom * factor));
+      if (Math.abs(nextZoom - MIN_ZOOM) < 0.001) return DEFAULT_VIEW;
+      if (Math.abs(nextZoom - current.zoom) < 0.001) return current;
+
+      const mouseX = event.clientX - (rect.left + rect.width / 2);
+      const mouseY = event.clientY - (rect.top + rect.height / 2);
+      const zoomRatio = nextZoom / current.zoom;
+      return {
+        zoom: nextZoom,
+        panX: mouseX - (mouseX - current.panX) * zoomRatio,
+        panY: mouseY - (mouseY - current.panY) * zoomRatio,
+      };
+    });
+  }, []);
+
+  const handlePanPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    if (view.zoom <= MIN_ZOOM || event.button !== 0) return;
+    event.preventDefault();
+    panDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: view.panX,
+      originY: view.panY,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsPanning(true);
+  }, [view]);
+
+  const handlePanPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = panDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) drag.moved = true;
+    setView((current) => ({
+      ...current,
+      panX: drag.originX + deltaX,
+      panY: drag.originY + deltaY,
+    }));
+  }, []);
+
+  const handlePanPointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = panDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    ignoreNextSliderClickRef.current = drag.moved;
+    if (drag.moved) {
+      window.setTimeout(() => {
+        ignoreNextSliderClickRef.current = false;
+      }, 0);
+    }
+    panDragRef.current = null;
+    setIsPanning(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
+  const imageTransformStyle: CSSProperties = {
+    transform: `translate3d(${view.panX}px, ${view.panY}px, 0) scale(${view.zoom})`,
+    transformOrigin: 'center center',
+    willChange: view.zoom > MIN_ZOOM ? 'transform' : undefined,
+  };
+
   return createPortal(
     <div
       data-canvas-escape-layer="true"
@@ -113,22 +237,40 @@ export function CompareFullscreenViewer({
       onTouchStart={stopFullscreenInteraction}
       onTouchMove={stopFullscreenInteraction}
       onTouchEnd={stopFullscreenInteraction}
-      onWheel={blockFullscreenWheel}
-      onWheelCapture={blockFullscreenWheel}
+      onWheelCapture={handleFullscreenWheel}
     >
       <FullscreenCloseButton onClose={onClose} transparent />
-      <div className="absolute left-1/2 top-5 z-[490] -translate-x-1/2">
+      <div className="absolute left-1/2 top-5 z-[490] flex -translate-x-1/2 items-center gap-2">
         <CompareModeSwitcher mode={mode} onModeChange={onModeChange} variant="fullscreen" />
+        <button
+          type="button"
+          className="nodrag nopan flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-black/30 text-white/55 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white disabled:cursor-default disabled:opacity-30"
+          disabled={view.zoom === MIN_ZOOM && view.panX === 0 && view.panY === 0}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            resetView();
+          }}
+          aria-label="重置视图"
+          title="重置视图"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
       </div>
 
       <div
+        ref={viewerAreaRef}
         className="relative mx-auto h-full w-full max-w-[1500px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0b0e]"
-        onPointerDown={(event) => event.stopPropagation()}
+        style={{ cursor: view.zoom > MIN_ZOOM ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+        onPointerDown={handlePanPointerDown}
+        onPointerMove={handlePanPointerMove}
+        onPointerUp={handlePanPointerEnd}
+        onPointerCancel={handlePanPointerEnd}
       >
         {mode === 'sideBySide' && (
           <div className="flex h-full w-full min-h-0 gap-px">
-            <ViewerImage image={leftImage} />
-            <ViewerImage image={rightImage} />
+            <ViewerImage image={leftImage} transformStyle={imageTransformStyle} />
+            <ViewerImage image={rightImage} transformStyle={imageTransformStyle} />
           </div>
         )}
 
@@ -136,10 +278,13 @@ export function CompareFullscreenViewer({
           <div
             ref={sliderAreaRef}
             className="relative h-full w-full overflow-hidden"
-            onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
+              if (ignoreNextSliderClickRef.current) {
+                ignoreNextSliderClickRef.current = false;
+                return;
+              }
               updateSlider(event.clientX);
             }}
             onDoubleClick={(event) => {
@@ -151,13 +296,13 @@ export function CompareFullscreenViewer({
             {leftFailed ? (
               <div className="absolute inset-0 flex items-center justify-center text-sm text-white/45">{t('compare.imageLoadFailed')}</div>
             ) : (
-              <img src={leftImage.imageUrl} alt={leftImage.label} className="absolute inset-0 block h-full w-full object-contain" draggable={false} onError={() => setLeftFailed(true)} />
+              <img src={leftImage.imageUrl} alt={leftImage.label} className="absolute inset-0 block h-full w-full object-contain" style={imageTransformStyle} draggable={false} onError={() => setLeftFailed(true)} />
             )}
             <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}>
               {rightFailed ? (
                 <div className="flex h-full w-full items-center justify-center text-sm text-white/45">{t('compare.imageLoadFailed')}</div>
               ) : (
-                <img src={rightImage.imageUrl} alt={rightImage.label} className="absolute inset-0 block h-full w-full object-contain" draggable={false} onError={() => setRightFailed(true)} />
+                <img src={rightImage.imageUrl} alt={rightImage.label} className="absolute inset-0 block h-full w-full object-contain" style={imageTransformStyle} draggable={false} onError={() => setRightFailed(true)} />
               )}
             </div>
             <div
@@ -194,14 +339,14 @@ export function CompareFullscreenViewer({
               src={leftImage.imageUrl}
               alt={leftImage.label}
               className="absolute inset-0 block h-full w-full object-contain"
-              style={{ opacity: overlayOpacity === 100 ? 0 : 1 }}
+              style={{ ...imageTransformStyle, opacity: overlayOpacity === 100 ? 0 : 1 }}
               draggable={false}
             />
             <img
               src={rightImage.imageUrl}
               alt={rightImage.label}
               className="absolute inset-0 block h-full w-full object-contain"
-              style={{ opacity: overlayOpacity / 100 }}
+              style={{ ...imageTransformStyle, opacity: overlayOpacity / 100 }}
               draggable={false}
             />
             <div

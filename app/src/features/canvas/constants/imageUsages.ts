@@ -1,4 +1,4 @@
-import { Building2, Layers, Focus } from 'lucide-react';
+import { Armchair, Building2, LampCeiling, Layers, Mountain, SwatchBook } from 'lucide-react';
 import i18n from '@/i18n';
 import type { ImageRole, ImageRoleOption, LocalReferenceType } from '../types/imageNode.types';
 
@@ -6,6 +6,10 @@ import type { ImageRole, ImageRoleOption, LocalReferenceType } from '../types/im
 export const SYSTEM_USAGE_LABELS = [
   '主体建筑',
   '氛围参考',
+  '材质参考',
+  '景观参考',
+  '照明参考',
+  '室内参考',
   '局部参考',
   '植物',
   '人物',
@@ -40,13 +44,40 @@ export const imageRoleOptions: ImageRoleOption[] = [
     color: '#8B5CF6',
   },
   {
-    value: 'local_reference',
-    label: i18n.t('reference.localReference'),
-    description: i18n.t('reference.localReference'),
-    detail: i18n.t('reference.localReferenceDetail'),
-    constraints: ['userDefinedContent'],
-    Icon: Focus,
-    color: '#14B8A6',
+    value: 'material_reference',
+    label: i18n.t('reference.materialReference'),
+    description: i18n.t('reference.materialReference'),
+    detail: i18n.t('reference.materialReferenceDetail'),
+    constraints: ['materialTexture', 'surfaceFinish', 'reflection', 'detailQuality'],
+    Icon: SwatchBook,
+    color: '#94A3B8',
+  },
+  {
+    value: 'landscape_reference',
+    label: i18n.t('reference.landscapeReference'),
+    description: i18n.t('reference.landscapeReference'),
+    detail: i18n.t('reference.landscapeReferenceDetail'),
+    constraints: ['landscapeLayout', 'planting', 'terrain', 'outdoorAtmosphere'],
+    Icon: Mountain,
+    color: '#22C55E',
+  },
+  {
+    value: 'lighting_reference',
+    label: i18n.t('reference.lightingReference'),
+    description: i18n.t('reference.lightingReference'),
+    detail: i18n.t('reference.lightingReferenceDetail'),
+    constraints: ['fixtureLanguage', 'lightColor', 'lightIntensity', 'lightDistribution'],
+    Icon: LampCeiling,
+    color: '#F59E0B',
+  },
+  {
+    value: 'interior_reference',
+    label: i18n.t('reference.interiorReference'),
+    description: i18n.t('reference.interiorReference'),
+    detail: i18n.t('reference.interiorReferenceDetail'),
+    constraints: ['interiorLayout', 'furniture', 'interiorMaterial', 'interiorMood'],
+    Icon: Armchair,
+    color: '#F97316',
   },
 ];
 
@@ -135,13 +166,15 @@ const LOCAL_REFERENCE_TYPE_VALUES = new Set<LocalReferenceType>([
 export const roleColorMap: Record<ImageRole | 'null' | 'local_reference', string> = {
   primary_building: '#3B82F6',
   atmosphere_reference: '#8B5CF6',
+  material_reference: '#94A3B8',
+  landscape_reference: '#22C55E',
+  lighting_reference: '#F59E0B',
+  interior_reference: '#F97316',
   local_reference: '#14B8A6',
   custom_reference: '#EF4444',
   undefined_usage: '#9CA3AF',
   overall_reference: '#8B5CF6',
   plant_reference: '#22C55E',
-  material_reference: '#EF4444',
-  lighting_reference: '#EF4444',
   // Legacy roles that map to local_reference
   vegetation_reference: '#22C55E',
   people_reference: '#F97316',
@@ -162,6 +195,7 @@ export function getNormalizedRole(role: ImageRole | null | undefined): ImageRole
   if (role === 'people_reference') return 'local_reference';
   if (role === 'sky_reference') return 'local_reference';
   if (role === 'custom_reference') return 'local_reference';
+  if (role === 'overall_reference') return 'atmosphere_reference';
   if (role === 'undefined_usage') return null;
   return role;
 }

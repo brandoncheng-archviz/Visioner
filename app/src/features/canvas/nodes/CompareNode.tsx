@@ -219,7 +219,7 @@ function CompareImageArea({
 
       {hasBothImages && leftImage && rightImage && !previewSide && mode === 'slider' && (
         <div
-          className="nodrag nowheel absolute inset-0"
+          className="nodrag absolute inset-0"
           onPointerDown={stopNodeControlPropagation}
           onClick={(event) => {
             event.preventDefault();
@@ -261,7 +261,7 @@ function CompareImageArea({
             }}
           />
           <div
-            className="nodrag nowheel absolute top-0 bottom-0 z-10 w-8 -translate-x-1/2"
+            className="nodrag absolute top-0 bottom-0 z-10 w-8 -translate-x-1/2"
             style={{
               left: `${sliderPosition}%`,
               cursor: 'ew-resize',
@@ -313,7 +313,7 @@ function CompareImageArea({
             draggable={false}
           />
           <div
-            className="nodrag nopan nowheel absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg px-2.5 py-1.5"
+            className="nodrag nopan absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg px-2.5 py-1.5"
             style={{ background: 'rgba(20,20,26,0.76)', border: '1px solid rgba(255,255,255,0.08)' }}
             onPointerDown={stopNodeControlPropagation}
             onPointerMove={stopNodeControlPropagation}
@@ -327,7 +327,7 @@ function CompareImageArea({
               max={100}
               value={overlayOpacity}
               onChange={(event) => onOverlayOpacityChange(Number(event.target.value))}
-              className="nodrag nopan nowheel h-1 w-20 cursor-ew-resize"
+              className="nodrag nopan h-1 w-20 cursor-ew-resize"
               style={{ accentColor: '#8F929C' }}
               onPointerDown={stopNodeControlPropagation}
               onPointerMove={stopNodeControlPropagation}
@@ -598,7 +598,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
             {/* Compact source labels row */}
             <div className="flex items-center gap-2 text-[11px]">
               <div
-                className="nodrag nowheel flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded transition-colors hover:bg-white/[0.035]"
+                className="nodrag flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded transition-colors hover:bg-white/[0.035]"
                 style={{ background: isLeftPrimary ? 'rgba(255,255,255,0.05)' : 'transparent' }}
                 onPointerDown={stopNodeControlEvent}
                 onClick={(event) => {
@@ -617,7 +617,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
                       stopNodeControlEvent(event);
                       handleClearLeft();
                     }}
-                    className="nodrag nowheel flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
+                    className="nodrag flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
                     style={{ color: 'rgba(255,255,255,0.34)' }}
                     title={t('common.remove')}
                   >
@@ -627,7 +627,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
               </div>
               <span className="flex-shrink-0" style={{ color: 'rgba(255,255,255,0.18)' }}>|</span>
               <div
-                className="nodrag nowheel flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded transition-colors hover:bg-white/[0.035]"
+                className="nodrag flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded transition-colors hover:bg-white/[0.035]"
                 style={{ background: isRightPrimary ? 'rgba(255,255,255,0.05)' : 'transparent' }}
                 onPointerDown={stopNodeControlEvent}
                 onClick={(event) => {
@@ -646,7 +646,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
                       stopNodeControlEvent(event);
                       handleClearRight();
                     }}
-                    className="nodrag nowheel flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
+                    className="nodrag flex h-4 w-4 flex-shrink-0 items-center justify-center rounded transition hover:bg-white/[0.08] hover:text-white"
                     style={{ color: 'rgba(255,255,255,0.34)' }}
                     title={t('common.remove')}
                   >

@@ -3,11 +3,14 @@ import type { Building2 } from 'lucide-react';
 export type ImageRole =
   | 'primary_building'
   | 'atmosphere_reference'
+  | 'material_reference'
+  | 'landscape_reference'
+  | 'lighting_reference'
+  | 'interior_reference'
+  | 'undefined_usage'
+  // Legacy roles kept for persisted data compatibility
   | 'local_reference'
   | 'custom_reference'
-  | 'undefined_usage'
-  | 'material_reference'
-  | 'lighting_reference'
   | 'overall_reference'
   // Legacy roles (read-only compatibility, mapped to local_reference)
   | 'vegetation_reference'
