@@ -788,6 +788,21 @@ const zhCN = {
     constraint: "约束",
   },
 
+  imageMark: {
+    button: "标记",
+    modeTitle: "元素选择模式",
+    modeHint: "点击图片选择局部元素",
+    backToNode: "返回节点",
+    exit: "退出",
+    identifying: "正在识别元素...",
+    recognizeFailed: "未能识别该区域",
+    repick: "重新点选",
+    confidence: "置信度",
+    deleteMark: "删除标记",
+    removeChip: "移除标记引用",
+    unknown: "未识别元素",
+  },
+
   upscale: {
     title: "高清细节",
     subtitle: "提升分辨率、清晰度与材质表现",

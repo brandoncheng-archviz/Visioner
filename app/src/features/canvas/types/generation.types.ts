@@ -1,5 +1,5 @@
 import type { ModelParams } from './canvas.types';
-import type { LocalReferencePoint, LocalReferenceType } from './imageNode.types';
+import type { ImageMarkBox, ImageMarkCandidate, ImageMarkPoint, LocalReferencePoint, LocalReferenceType } from './imageNode.types';
 
 export type GenerationStatus = 'pending' | 'running' | 'success' | 'failed';
 
@@ -15,6 +15,19 @@ export interface GenerationInput {
     localReferenceType?: LocalReferenceType;
     localReferenceLabel?: string;
     localReferencePoint?: LocalReferencePoint;
+    promptText: string;
+  }>;
+  markRefs?: Array<{
+    markId: string;
+    sourceNodeId: string;
+    usageKey: string;
+    usageLabel: string;
+    markType: 'box';
+    markPoint: ImageMarkPoint;
+    markBox: ImageMarkBox;
+    candidates: ImageMarkCandidate[];
+    selectedCandidateId: string;
+    markLabel: string;
     promptText: string;
   }>;
   modelParams?: {
@@ -44,6 +57,7 @@ export interface GenerationTask {
   progress: number; // 0 ~ 100
   prompt: string;
   inputRefs: GenerationInput['inputRefs'];
+  markRefs?: GenerationInput['markRefs'];
   result: GenerationResult | null;
   errorMessage: string | null;
   createdAt: number;
@@ -58,6 +72,7 @@ export interface GenerationHistoryItem {
   prompt: string;
   userPrompt: string;
   inputRefs: GenerationInput['inputRefs'];
+  markRefs?: GenerationInput['markRefs'];
   presetIds: string[];
   styleId: string | null;
   modelParams: ModelParams;

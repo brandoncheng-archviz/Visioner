@@ -190,7 +190,7 @@ function isProcessingImageNode(node: Node) {
 function getPromptReferenceSourceNodeIds(data: Node['data']) {
   const promptContent = Array.isArray(data.promptContent) ? (data.promptContent as PromptContent[]) : [];
   return promptContent.flatMap((block) => (
-    block.type === 'image_reference' && block.sourceNodeId
+    (block.type === 'image_reference' || block.type === 'image_mark_reference') && block.sourceNodeId
       ? [block.sourceNodeId]
       : []
   ));

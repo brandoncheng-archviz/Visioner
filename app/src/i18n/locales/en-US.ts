@@ -788,6 +788,21 @@ const enUS = {
     constraint: "Constraint",
   },
 
+  imageMark: {
+    button: "Mark",
+    modeTitle: "Element Selection Mode",
+    modeHint: "Click an image element to select it",
+    backToNode: "Back to Node",
+    exit: "Exit",
+    identifying: "Identifying element...",
+    recognizeFailed: "Unable to identify this area",
+    repick: "Pick Again",
+    confidence: "Confidence",
+    deleteMark: "Delete Mark",
+    removeChip: "Remove Mark Reference",
+    unknown: "Unidentified Element",
+  },
+
   upscale: {
     title: "HD Detail",
     subtitle: "Enhance resolution, clarity, and material quality",

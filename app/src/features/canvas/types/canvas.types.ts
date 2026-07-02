@@ -1,5 +1,6 @@
 export type MarkAction = 'reference' | 'keep' | 'enhance' | 'weaken' | 'replace' | 'delete' | 'constraint';
 
+/** Legacy action annotation. Image element recognition marks use ImageMark. */
 export interface MarkItem {
   id: string;
   name: string;

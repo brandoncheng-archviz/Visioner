@@ -32,6 +32,7 @@ export function createGenerationTask(input: GenerationInput): GenerationTask {
     progress: 0,
     prompt: input.prompt,
     inputRefs: input.inputRefs,
+    markRefs: input.markRefs,
     result: null,
     errorMessage: null,
     createdAt: now,

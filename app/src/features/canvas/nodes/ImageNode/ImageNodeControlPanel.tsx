@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
+  Check,
   X,
   Bookmark,
   Sun,
@@ -10,11 +11,13 @@ import {
   ChevronDown,
   ArrowUp,
   Maximize2,
+  ScanSearch,
   Zap,
 } from 'lucide-react';
 import type {
   PromptContent,
   ImageReferencePromptBlock,
+  ImageMarkReferencePromptBlock,
   ReferenceInfo,
   PresetItem,
 } from '../../types/imageNode.types';
@@ -134,6 +137,8 @@ export function ImageNodeControlPanel({
   canEditLighting,
   canEditModel,
   canDeleteReference,
+  canCreateMarks,
+  canEditMarks,
   isGenerating,
   generationTask,
   textReferences,
@@ -141,6 +146,8 @@ export function ImageNodeControlPanel({
   references,
   onRemoveReference,
   onUseReference,
+  onStartMarkMode,
+  onUpdateMarkCandidate,
   showToast,
   autoOpenLightPanel,
   onAcknowledgeAutoOpen,
@@ -166,6 +173,8 @@ export function ImageNodeControlPanel({
   canEditLighting: boolean;
   canEditModel: boolean;
   canDeleteReference: boolean;
+  canCreateMarks: boolean;
+  canEditMarks: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   textReferences: TextReferenceInfo[];
@@ -175,9 +184,12 @@ export function ImageNodeControlPanel({
   references: ReferenceInfo[];
   onRemoveReference: (nodeId: string) => void;
   onUseReference: (reference: ReferenceInfo) => void;
+  onStartMarkMode: () => void;
+  onUpdateMarkCandidate: (markId: string, candidateId: string) => void;
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
+  const [activeMarkChipId, setActiveMarkChipId] = useState<string | null>(null);
   const formatGenerationCount = useCallback(
     (count: string) => {
       const countValue = Number.parseInt(count, 10);
@@ -400,6 +412,9 @@ export function ImageNodeControlPanel({
       references,
     ) as ImageReferencePromptBlock[],
     [promptContent, references],
+  );
+  const imageMarkReferenceBlocks = promptContent.filter(
+    (block): block is ImageMarkReferencePromptBlock => block.type === 'image_mark_reference',
   );
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
@@ -904,7 +919,7 @@ export function ImageNodeControlPanel({
     >
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {/* Preset */}
           <div className="relative">
             <button
@@ -1083,6 +1098,32 @@ export function ImageNodeControlPanel({
               )}
             </button>
           </div>
+          {/* Element mark */}
+          <div className="relative">
+            <button
+              type="button"
+              disabled={!canCreateMarks}
+              onClick={() => {
+                if (!canCreateMarks) return;
+                setShowPresetModal(false);
+                setShowLightPreview(false);
+                setShowStylePicker(false);
+                onStartMarkMode();
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canCreateMarks ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
+              style={{
+                width: 54,
+                height: 50,
+                padding: '4px',
+                opacity: canCreateMarks ? 1 : 0.45,
+                cursor: canCreateMarks ? 'pointer' : 'not-allowed',
+              }}
+              title={t('imageMark.button', { defaultValue: '标记' })}
+            >
+              <ScanSearch className="h-4 w-4" />
+              <span style={{ fontSize: 14 }}>{t('imageMark.button', { defaultValue: '标记' })}</span>
+            </button>
+          </div>
           {(textReferences.length > 0 || sortedReferences.length > 0) && (
             <div
               aria-hidden="true"
@@ -1091,7 +1132,7 @@ export function ImageNodeControlPanel({
             />
           )}
           {/* Reference thumbnails */}
-          <div className="relative flex items-center gap-2">
+          <div className="relative flex min-w-0 items-center gap-2 overflow-x-auto">
             {textReferences.map(renderTextReference)}
             {sortedReferences.map((ref) => renderReferenceThumbnail(ref))}
           </div>
@@ -1126,9 +1167,79 @@ export function ImageNodeControlPanel({
 
       {/* Prompt input */}
       <div style={{ padding: '4px 14px 12px' }} onWheel={stopControlEvent} onWheelCapture={stopControlEvent}>
-        <div className="relative" onPointerDown={stopControlEvent} onMouseDown={stopControlEvent}>
+        <div className="relative flex flex-col" onPointerDown={stopControlEvent} onMouseDown={stopControlEvent}>
+          {imageMarkReferenceBlocks.length > 0 && (
+            <div className="order-2 mb-2 flex flex-wrap gap-1.5">
+              {imageMarkReferenceBlocks.map((block) => {
+                const selectedCandidate = block.candidates.find((candidate) => candidate.id === block.selectedCandidateId)
+                  ?? block.candidates[0];
+                const menuOpen = activeMarkChipId === block.id;
+                return (
+                  <div key={block.id} className="group/mark-chip relative">
+                    <button
+                      type="button"
+                      className="flex h-7 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.045] pl-2.5 pr-1.5 text-[12px] text-white/78 transition-colors hover:bg-white/[0.08]"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!canEditMarks) return;
+                        setActiveMarkChipId((current) => current === block.id ? null : block.id);
+                      }}
+                    >
+                      <span>{block.markLabel}</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                    <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[300px] rounded-xl border border-white/10 bg-[#252526] p-3 text-left shadow-[0_14px_32px_rgba(0,0,0,0.48)] group-hover/mark-chip:block">
+                      <div className="flex items-center gap-2">
+                        <img src={block.thumbnailUrl} alt="" className="h-9 w-9 flex-shrink-0 rounded object-cover" />
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-medium text-white/88">{block.markLabel}</div>
+                          <div className="mt-1 text-[11px] text-white/45">{block.usageLabel} · {selectedCandidate?.level || '-'}</div>
+                        </div>
+                      </div>
+                      {selectedCandidate?.confidence !== undefined && (
+                        <div className="mt-0.5 text-[11px] text-white/40">{t('imageMark.confidence', { defaultValue: '置信度' })} {Math.round(selectedCandidate.confidence * 100)}%</div>
+                      )}
+                      <div className="mt-2 text-[12px] leading-5 text-white/65">{block.promptText}</div>
+                    </div>
+                    {menuOpen && canEditMarks && (
+                      <div className="absolute left-0 top-full z-[60] mt-1 w-[210px] overflow-hidden rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]">
+                        {block.candidates.map((candidate) => (
+                          <button
+                            key={candidate.id}
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-white/78 hover:bg-white/[0.08]"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onUpdateMarkCandidate(block.markId, candidate.id);
+                              setActiveMarkChipId(null);
+                            }}
+                          >
+                            <span className="truncate">{candidate.label}</span>
+                            {candidate.id === block.selectedCandidateId && <Check className="h-3 w-3" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {canEditMarks && (
+                      <button
+                        type="button"
+                        className="absolute -right-1.5 -top-1.5 hidden h-4 w-4 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white/65 group-hover/mark-chip:flex"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onPromptContentChange(promptContent.filter((item) => !('id' in item) || item.id !== block.id));
+                        }}
+                        title={t('imageMark.removeChip', { defaultValue: '移除标记引用' })}
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {sortedImageReferenceBlocks.length > 0 && (
-            <div className="mb-2 flex w-full flex-col gap-1.5">
+            <div className="order-1 mb-2 flex w-full flex-col gap-1.5">
               {sortedImageReferenceBlocks.map((block) => {
                 const reference = references.find((item) => item.nodeId === block.sourceNodeId);
                 const previewImage = reference?.imageUrl || block.thumbnailUrl;
@@ -1291,7 +1402,7 @@ export function ImageNodeControlPanel({
             onKeyDown={handlePromptKeyDown}
             readOnly={!canEditPrompt}
             placeholder={t('imageNode.promptPlaceholder')}
-            className="w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
+            className="order-3 w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
             style={{
               color: 'rgba(255,255,255,0.94)',
               fontSize: 15,

@@ -1,5 +1,5 @@
 import type { GenerationHistoryItem, GenerationTask } from './generation.types';
-import type { ImageRole, LocalReferencePoint, PromptContent } from './imageNode.types';
+import type { ImageMark, ImageRole, LocalReferencePoint, PromptContent } from './imageNode.types';
 import type { ConnectionHandleType, MarkItem, ModelParams } from './canvas.types';
 import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
@@ -48,6 +48,13 @@ export interface ImageNodeData {
   finalPrompt?: string;
   userPrompt?: string;
   marks?: MarkItem[];
+  imageMarks?: ImageMark[];
+  /** Transient canvas-local request used to open mark mode on a stable source image. */
+  markSessionRequest?: {
+    requestId: string;
+    targetNodeId: string;
+    sourceImageUrl: string;
+  };
   modelParams?: ModelParams;
   referencesSignature?: string;
   // Edge-related callbacks injected by CanvasPage

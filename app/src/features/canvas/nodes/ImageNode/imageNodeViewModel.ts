@@ -42,6 +42,8 @@ export type ImageNodeViewModel = {
   canEditPrompt: boolean;
   canEditPromptReferences: boolean;
   canEditReferenceUsage: boolean;
+  canCreateMarks: boolean;
+  canEditMarks: boolean;
   canEditPreset: boolean;
   canEditStyle: boolean;
   canEditLighting: boolean;
@@ -94,6 +96,7 @@ export function createImageNodeViewModel(
     viewKind === 'processing'
   );
   const canEditReferenceUsage = hasImage && !isProcessing && !isReferenceLocked && (viewKind === 'resource' || viewKind === 'editor');
+  const canEditMarks = hasImage && !isProcessing && !isReferenceLocked && (viewKind === 'resource' || viewKind === 'editor');
   const canUseToolbarActions = hasImage && !isProcessing;
 
   return {
@@ -118,6 +121,8 @@ export function createImageNodeViewModel(
     canEditPrompt: canEditEditorControls,
     canEditPromptReferences,
     canEditReferenceUsage,
+    canCreateMarks: canEditMarks,
+    canEditMarks,
     canEditPreset: canEditEditorControls,
     canEditStyle: canEditEditorControls,
     canEditLighting: canEditEditorControls,

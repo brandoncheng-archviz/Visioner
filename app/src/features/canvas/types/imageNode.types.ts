@@ -55,6 +55,45 @@ export type LocalReferencePoint =
       displayY?: number;
     };
 
+export type ImageMarkLevel = 'category' | 'object' | 'part';
+
+export interface ImageMarkCandidate {
+  id: string;
+  label: string;
+  type: string;
+  level: ImageMarkLevel;
+  confidence?: number;
+  promptText: string;
+}
+
+export interface ImageMarkPoint {
+  normalizedX: number;
+  normalizedY: number;
+  imageX?: number;
+  imageY?: number;
+}
+
+export interface ImageMarkBox {
+  normalizedX: number;
+  normalizedY: number;
+  normalizedWidth: number;
+  normalizedHeight: number;
+}
+
+export interface ImageMark {
+  id: string;
+  sourceNodeId: string;
+  sourceImageUrl: string;
+  usageKey: ImageRole | 'undefined_usage';
+  usageLabel: string;
+  markType: 'box';
+  point: ImageMarkPoint;
+  box: ImageMarkBox;
+  candidates: ImageMarkCandidate[];
+  selectedCandidateId: string;
+  createdAt: number;
+}
+
 export interface ImageReferenceEdgeData {
   role?: ImageRole | null;
   customRoleLabel?: string;
@@ -140,6 +179,24 @@ export type PromptContent =
       promptTextEdited?: boolean;
     }
   | {
+      type: 'image_mark_reference';
+      id: string;
+      markId: string;
+      imageId: string;
+      sourceNodeId: string;
+      usageKey: ImageRole | 'undefined_usage';
+      usageLabel: string;
+      thumbnailUrl: string;
+      markType: 'box';
+      markPoint: ImageMarkPoint;
+      markBox: ImageMarkBox;
+      candidates: ImageMarkCandidate[];
+      selectedCandidateId: string;
+      markLabel: string;
+      promptText: string;
+      promptTextEdited?: boolean;
+    }
+  | {
       type: 'preset';
       id: string;
       title: string;
@@ -153,6 +210,7 @@ export type PromptContent =
     };
 
 export type ImageReferencePromptBlock = Extract<PromptContent, { type: 'image_reference' }>;
+export type ImageMarkReferencePromptBlock = Extract<PromptContent, { type: 'image_mark_reference' }>;
 
 export interface ReferenceInfo {
   nodeId: string;

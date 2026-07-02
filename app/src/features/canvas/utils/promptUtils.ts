@@ -1,4 +1,4 @@
-import type { ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition } from '../types/imageNode.types';
+import type { ImageMark, ImageMarkReferencePromptBlock, ImageReferencePromptBlock, PromptContent, ReferenceInfo, StyleDefinition } from '../types/imageNode.types';
 import {
   getNormalizedRole,
   getLocalReferenceTypeFromRole,
@@ -154,6 +154,28 @@ export function createImageReferenceBlock(reference: ReferenceInfo): ImageRefere
   };
 }
 
+export function createImageMarkReferenceBlock(mark: ImageMark): ImageMarkReferencePromptBlock {
+  const selectedCandidate = mark.candidates.find((candidate) => candidate.id === mark.selectedCandidateId)
+    ?? mark.candidates[0];
+  return {
+    type: 'image_mark_reference',
+    id: `image-mark-ref-${mark.id}`,
+    markId: mark.id,
+    imageId: mark.sourceNodeId,
+    sourceNodeId: mark.sourceNodeId,
+    usageKey: mark.usageKey,
+    usageLabel: mark.usageLabel,
+    thumbnailUrl: mark.sourceImageUrl,
+    markType: mark.markType,
+    markPoint: mark.point,
+    markBox: mark.box,
+    candidates: mark.candidates,
+    selectedCandidateId: selectedCandidate?.id ?? '',
+    markLabel: selectedCandidate?.label ?? '',
+    promptText: selectedCandidate?.promptText ?? '',
+  };
+}
+
 function getPresetType(preset: PresetItem): 'enhancement' | 'modifier' {
   if (preset.presetType) return preset.presetType;
   return preset.category === 'realism' || preset.category === 'perspective' || preset.category === 'style'
@@ -177,6 +199,9 @@ export function buildPromptSubmission(
       ...block,
       promptText: stripReferencePromptMetadata(block.promptText),
     }));
+  const imageMarkBlocks = promptContent.filter(
+    (block): block is ImageMarkReferencePromptBlock => block.type === 'image_mark_reference',
+  );
 
   const referenceById = new Map(sortedNodeReferences.map((reference) => [reference.nodeId, reference]));
   const sortedReferenceIndex = new Map(sortedNodeReferences.map((reference, index) => [reference.nodeId, index]));
@@ -241,6 +266,11 @@ export function buildPromptSubmission(
   if (interiorRefs.length) sections.push(`室内参考：${interiorRefs.map((block) => block.promptText).join('；')}`);
   if (localRefs.length) sections.push(`旧版局部参考：${localRefs.map((block) => block.promptText).join('；')}`);
   if (undefinedRefs.length) sections.push(`未定义参考：${undefinedRefs.map((block) => block.promptText).join('；')}`);
+  if (imageMarkBlocks.length) {
+    sections.push(`元素标记参考：\n${imageMarkBlocks.map((block) => (
+      `图${Math.max(1, (sortedReferenceIndex.get(block.sourceNodeId) ?? 0) + 1)} · ${block.usageLabel} · ${block.markLabel}：${stripReferencePromptMetadata(block.promptText)}`
+    )).join('\n')}`);
+  }
   if (selectedStyle) {
     sections.push(`最终全局 Look / LUT / 视觉语言：${serializeStylePrompt(selectedStyle)}`);
   }
@@ -274,6 +304,19 @@ export function buildPromptSubmission(
       localReferenceLabel: reference.localReferenceLabel,
       localReferencePoint: reference.localReferencePoint,
       promptText: getImageReferencePromptText(reference),
+    })),
+    markReferences: imageMarkBlocks.map((block) => ({
+      markId: block.markId,
+      sourceNodeId: block.sourceNodeId,
+      usageKey: block.usageKey,
+      usageLabel: block.usageLabel,
+      markType: block.markType,
+      markPoint: block.markPoint,
+      markBox: block.markBox,
+      candidates: block.candidates,
+      selectedCandidateId: block.selectedCandidateId,
+      markLabel: block.markLabel,
+      promptText: stripReferencePromptMetadata(block.promptText),
     })),
     promptBlocks: sortedPromptContent.map((block) =>
       block.type === 'image_reference'
