@@ -55,6 +55,9 @@ export interface ImageNodeData {
     targetNodeId: string;
     sourceImageUrl: string;
   };
+  activeImageMarkTargetNodeId?: string | null;
+  activeImageMarkSourceNodeId?: string | null;
+  activeImageMarkSessionId?: string | null;
   modelParams?: ModelParams;
   referencesSignature?: string;
   // Edge-related callbacks injected by CanvasPage
@@ -82,6 +85,9 @@ export interface ImageNodeData {
   onOpenNodeHistory?: (nodeId: string) => void;
   onRegisterObjectUrl?: (url: string) => void;
   onFocusNode?: (nodeId: string) => void;
+  onStartCanvasImageMarkSelection?: (targetNodeId: string) => void;
+  onSelectCanvasImageMarkSource?: (sourceNodeId: string) => void;
+  onExitCanvasImageMarkSelection?: () => void;
   onDuplicateNode?: (nodeId: string) => void;
   onDeleteNode?: (nodeId: string) => void;
   lightPreview?: LightPreviewData;

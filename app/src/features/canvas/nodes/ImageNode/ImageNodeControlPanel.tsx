@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
-  Check,
   X,
   Bookmark,
   Sun,
@@ -189,7 +188,6 @@ export function ImageNodeControlPanel({
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
-  const [activeMarkChipId, setActiveMarkChipId] = useState<string | null>(null);
   const formatGenerationCount = useCallback(
     (count: string) => {
       const countValue = Number.parseInt(count, 10);
@@ -218,6 +216,8 @@ export function ImageNodeControlPanel({
   const [showCountMenu, setShowCountMenu] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [showReferenceMenu, setShowReferenceMenu] = useState(false);
+  const [activeMarkCandidateBlockId, setActiveMarkCandidateBlockId] = useState<string | null>(null);
+  const [markCandidateMenuPosition, setMarkCandidateMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
@@ -235,6 +235,7 @@ export function ImageNodeControlPanel({
     maxHeight: number;
   } | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
+  const markCandidateMenuRef = useRef<HTMLDivElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -270,31 +271,6 @@ export function ImageNodeControlPanel({
         opacity: canEditPromptReferences ? 1 : 0.72,
       }}
     >
-      {ref.imageUrl && canEditPromptReferences && (
-        <div
-          className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden -translate-x-1/2 rounded-xl group-hover/ref:block"
-          style={{
-            background: FLOATING_PANEL_BACKGROUND,
-            border: FLOATING_PANEL_BORDER,
-            boxShadow: '0 14px 32px rgba(0,0,0,0.48)',
-          }}
-        >
-          <img
-            src={ref.imageUrl}
-            alt=""
-            className="block rounded-t-xl"
-            style={{
-              width: 'auto',
-              height: 'auto',
-              maxWidth: 220,
-              maxHeight: 200,
-            }}
-          />
-          <div className="px-2 py-1.5 text-[12px] text-center" style={{ color: 'rgba(255,255,255,0.75)' }}>
-            {ref.roleLabel || t('imageNode.undefinedUsage')}
-          </div>
-        </div>
-      )}
       <div
         className="relative h-full w-full overflow-hidden rounded-lg"
         style={{
@@ -416,6 +392,64 @@ export function ImageNodeControlPanel({
   const imageMarkReferenceBlocks = promptContent.filter(
     (block): block is ImageMarkReferencePromptBlock => block.type === 'image_mark_reference',
   );
+  const activeMarkCandidateBlock = imageMarkReferenceBlocks.find((block) => block.id === activeMarkCandidateBlockId);
+  useEffect(() => {
+    if (!activeMarkCandidateBlockId) return;
+    if (!canEditMarks || !activeMarkCandidateBlock) return;
+
+    const closeMarkCandidateMenu = () => {
+      setActiveMarkCandidateBlockId(null);
+      setMarkCandidateMenuPosition(null);
+    };
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (markCandidateMenuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-mark-candidate-trigger]')) return;
+      closeMarkCandidateMenu();
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeMarkCandidateMenu();
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    document.addEventListener('keydown', handleEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      document.removeEventListener('keydown', handleEscape, true);
+    };
+  }, [activeMarkCandidateBlock, activeMarkCandidateBlockId, canEditMarks]);
+  const markCandidateMenuPortal = activeMarkCandidateBlock && markCandidateMenuPosition && canEditMarks
+    ? createPortal(
+        <div
+          ref={markCandidateMenuRef}
+          className="fixed z-[4200] w-[180px] overflow-hidden rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]"
+          style={{ left: markCandidateMenuPosition.left, top: markCandidateMenuPosition.top }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          {activeMarkCandidateBlock.candidates.map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              className="flex h-7 w-full items-center rounded-md px-2 text-left text-[15px] text-white/75 transition-colors hover:bg-white/[0.08]"
+              onClick={(event) => {
+                event.stopPropagation();
+                onUpdateMarkCandidate(activeMarkCandidateBlock.markId, candidate.id);
+                setActiveMarkCandidateBlockId(null);
+                setMarkCandidateMenuPosition(null);
+              }}
+            >
+              <span className="truncate">{candidate.label}</span>
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )
+    : null;
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
   const selectedStyle = getStylePresetById(selectedStyleId);
@@ -917,6 +951,7 @@ export function ImageNodeControlPanel({
       onWheel={stopControlEvent}
       onWheelCapture={stopControlEvent}
     >
+      {markCandidateMenuPortal}
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1169,61 +1204,80 @@ export function ImageNodeControlPanel({
       <div style={{ padding: '4px 14px 12px' }} onWheel={stopControlEvent} onWheelCapture={stopControlEvent}>
         <div className="relative flex flex-col" onPointerDown={stopControlEvent} onMouseDown={stopControlEvent}>
           {imageMarkReferenceBlocks.length > 0 && (
-            <div className="order-2 mb-2 flex flex-wrap gap-1.5">
+            <div className="order-2 mb-2 flex w-full flex-col gap-1.5">
               {imageMarkReferenceBlocks.map((block) => {
                 const selectedCandidate = block.candidates.find((candidate) => candidate.id === block.selectedCandidateId)
                   ?? block.candidates[0];
-                const menuOpen = activeMarkChipId === block.id;
+                const markUsageColor = getImageRoleColor(block.usageKey === 'undefined_usage' ? null : block.usageKey);
                 return (
-                  <div key={block.id} className="group/mark-chip relative">
-                    <button
-                      type="button"
-                      className="flex h-7 items-center gap-1 rounded-full border border-white/[0.12] bg-white/[0.045] pl-2.5 pr-1.5 text-[12px] text-white/78 transition-colors hover:bg-white/[0.08]"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (!canEditMarks) return;
-                        setActiveMarkChipId((current) => current === block.id ? null : block.id);
-                      }}
-                    >
-                      <span>{block.markLabel}</span>
-                      <ChevronDown className="h-3 w-3" />
-                    </button>
-                    <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[300px] rounded-xl border border-white/10 bg-[#252526] p-3 text-left shadow-[0_14px_32px_rgba(0,0,0,0.48)] group-hover/mark-chip:block">
-                      <div className="flex items-center gap-2">
-                        <img src={block.thumbnailUrl} alt="" className="h-9 w-9 flex-shrink-0 rounded object-cover" />
-                        <div className="min-w-0">
-                          <div className="truncate text-[13px] font-medium text-white/88">{block.markLabel}</div>
-                          <div className="mt-1 text-[11px] text-white/45">{block.usageLabel} · {selectedCandidate?.level || '-'}</div>
-                        </div>
-                      </div>
-                      {selectedCandidate?.confidence !== undefined && (
-                        <div className="mt-0.5 text-[11px] text-white/40">{t('imageMark.confidence', { defaultValue: '置信度' })} {Math.round(selectedCandidate.confidence * 100)}%</div>
-                      )}
-                      <div className="mt-2 text-[12px] leading-5 text-white/65">{block.promptText}</div>
+                  <div
+                    key={block.id}
+                    className="group/mark-ref relative flex w-full items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.035] px-1.5 py-1 text-[15px]"
+                  >
+                    <div className="relative h-6 w-6 flex-shrink-0">
+                      <img
+                        src={block.thumbnailUrl}
+                        alt=""
+                        draggable={false}
+                        className="h-6 w-6 rounded object-cover"
+                        style={{ border: `1px solid ${markUsageColor}` }}
+                      />
+                      <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full border border-white/15 bg-[#252526] text-teal-300/80">
+                        <ScanSearch className="h-2 w-2" />
+                      </span>
                     </div>
-                    {menuOpen && canEditMarks && (
-                      <div className="absolute left-0 top-full z-[60] mt-1 w-[210px] overflow-hidden rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]">
-                        {block.candidates.map((candidate) => (
+                    <div className="flex min-w-0 w-[150px] flex-shrink-0 items-center">
+                        {block.candidates.length > 1 ? (
                           <button
-                            key={candidate.id}
+                            data-mark-candidate-trigger={block.id}
                             type="button"
-                            className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-white/78 hover:bg-white/[0.08]"
+                            disabled={!canEditMarks}
+                            onPointerDown={(event) => event.stopPropagation()}
                             onClick={(event) => {
                               event.stopPropagation();
-                              onUpdateMarkCandidate(block.markId, candidate.id);
-                              setActiveMarkChipId(null);
+                              if (activeMarkCandidateBlockId === block.id) {
+                                setActiveMarkCandidateBlockId(null);
+                                setMarkCandidateMenuPosition(null);
+                                return;
+                              }
+                              const rect = event.currentTarget.getBoundingClientRect();
+                              setActiveMarkCandidateBlockId(block.id);
+                              setMarkCandidateMenuPosition({
+                                left: Math.max(8, Math.min(window.innerWidth - 188, rect.left)),
+                                top: rect.bottom + 4,
+                              });
                             }}
+                            className="nodrag flex h-6 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded border border-white/10 bg-white/[0.045] px-1.5 text-[15px] font-medium text-white/80 outline-none disabled:cursor-default disabled:opacity-70"
+                            title={block.markLabel}
                           >
-                            <span className="truncate">{candidate.label}</span>
-                            {candidate.id === block.selectedCandidateId && <Check className="h-3 w-3" />}
+                            <span className="min-w-0 flex-1 truncate text-left">{selectedCandidate?.label || block.markLabel}</span>
+                            <ChevronDown className="h-3 w-3 flex-shrink-0 text-white/40" />
                           </button>
-                        ))}
-                      </div>
-                    )}
+                        ) : (
+                          <span className="truncate rounded border border-white/10 bg-white/[0.045] px-1.5 py-0.5 text-[15px] font-medium leading-none text-white/80" title={selectedCandidate?.label || block.markLabel}>
+                            {selectedCandidate?.label || block.markLabel}
+                          </span>
+                        )}
+                    </div>
+                      <input
+                        type="text"
+                        value={block.promptText}
+                        disabled={!canEditMarks}
+                        onChange={(event) => {
+                          const nextPromptText = event.target.value;
+                          onPromptContentChange(promptContent.map((item) => item.type === 'image_mark_reference' && item.id === block.id
+                            ? { ...item, promptText: nextPromptText, promptTextEdited: true }
+                            : item));
+                        }}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        className="nodrag nowheel h-6 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 text-[15px] text-white/65 outline-none transition-colors hover:border-white/[0.08] focus:border-white/[0.14] focus:bg-black/10 disabled:opacity-70"
+                        placeholder="补充标记元素的参考说明"
+                      />
                     {canEditMarks && (
                       <button
                         type="button"
-                        className="absolute -right-1.5 -top-1.5 hidden h-4 w-4 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white/65 group-hover/mark-chip:flex"
+                        className="ml-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full opacity-0 transition-colors hover:bg-white/15 group-hover/mark-ref:opacity-100"
+                        style={{ color: 'rgba(255,255,255,0.58)' }}
                         onClick={(event) => {
                           event.stopPropagation();
                           onPromptContentChange(promptContent.filter((item) => !('id' in item) || item.id !== block.id));
@@ -1233,6 +1287,7 @@ export function ImageNodeControlPanel({
                         <X className="h-2.5 w-2.5" />
                       </button>
                     )}
+                    {!canEditMarks && <span className="ml-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />}
                   </div>
                 );
               })}

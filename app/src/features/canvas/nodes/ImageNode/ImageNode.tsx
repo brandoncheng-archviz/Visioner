@@ -40,6 +40,7 @@ import { resolveImageNodeSize } from '../../utils/imageNodeSizing';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { getTextContent } from '../../utils/textNodeUtils';
 import { identifyImageElement } from '../../services/identifyElement';
+import { registerImageMarkCaptureEntry } from '../../utils/imageMarkCaptureRegistry';
 import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
@@ -89,14 +90,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const markLabelButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const [activeMarkMenuId, setActiveMarkMenuId] = useState<string | null>(null);
   const [markTargetNodeId, setMarkTargetNodeId] = useState(id);
-  const [lastMarkReferenceNodeId, setLastMarkReferenceNodeId] = useState<string | null>(null);
+  const [visibleSessionMarks, setVisibleSessionMarks] = useState<{ sessionId: string | null; ids: Set<string> }>(() => ({ sessionId: null, ids: new Set() }));
 
   /* ─── Point-pick mode for local reference ─── */
   const [isPointPickMode, setIsPointPickMode] = useState(false);
   const [pendingLightPanelOpen, setPendingLightPanelOpen] = useState(false);
   const [pointPickLoading, setPointPickLoading] = useState(false);
   const [pointPickError, setPointPickError] = useState(false);
-  const [pointPickImageRect, setPointPickImageRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const [pointPickFeedbackPoint, setPointPickFeedbackPoint] = useState<{ normalizedX: number; normalizedY: number } | null>(null);
   const { setNodes, setEdges } = useReactFlow();
 
   /* ─── Extended node state ─── */
@@ -427,15 +428,22 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const canGenerate = imageNodeViewModel.canGenerate;
   const shouldShowInputHandle = imageNodeViewModel.contentKind !== 'uploaded' && imageNodeViewModel.contentKind !== 'external';
   const canEditRole = imageNodeViewModel.canEditReferenceUsage;
-  const markableReferences = useMemo(() => references.filter((reference) => {
-    const sourceNode = allNodes.find((node) => node.id === reference.nodeId);
-    if (!sourceNode || sourceNode.type !== 'image' || !reference.imageUrl) return false;
-    const sourceTask = sourceNode.data.generationTask as GenerationTask | null | undefined;
-    return sourceTask?.status !== 'running' && !sourceNode.data.isGenerating && !sourceNode.data.isProcessing;
-  }), [allNodes, references]);
-  const canMarkOwnImage = imageNodeViewModel.canCreateMarks && imageNodeViewModel.contentKind !== 'generated';
-  const canStartMarking = !imageNodeViewModel.isProcessing && (markableReferences.length > 0 || canMarkOwnImage);
+  const activeImageMarkTargetNodeId = data.activeImageMarkTargetNodeId as string | null | undefined;
+  const activeImageMarkSourceNodeId = data.activeImageMarkSourceNodeId as string | null | undefined;
+  const activeImageMarkSessionId = data.activeImageMarkSessionId as string | null | undefined;
+  const canvasMarkableNodes = useMemo(() => allNodes.filter((node) => {
+    if (node.type !== 'image' || !getCurrentImage(node.data)) return false;
+    const sourceTask = node.data.generationTask as GenerationTask | null | undefined;
+    if (sourceTask?.status === 'running' || node.data.isGenerating || node.data.isProcessing) return false;
+    return true;
+  }), [allNodes]);
+  const canStartMarking = !imageNodeViewModel.isProcessing && canvasMarkableNodes.length > 0;
   const canManageMarkReferences = !imageNodeViewModel.isProcessing;
+  const isCanvasMarkSelectionMode = Boolean(activeImageMarkTargetNodeId);
+  const isCanvasMarkSelectable = isCanvasMarkSelectionMode
+    && Boolean(displayImage)
+    && !imageNodeViewModel.isProcessing
+    && !imageNodeViewModel.isReferenceLocked;
 
   useEffect(() => {
     if (imageNodeViewModel.canEditMarks) return;
@@ -447,6 +455,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     });
     return () => cancelAnimationFrame(raf);
   }, [imageNodeViewModel.canEditMarks]);
+
+  useEffect(() => {
+    if (activeImageMarkTargetNodeId !== id || !imageNodeViewModel.isProcessing) return;
+    const onExitSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
+    onExitSelection?.();
+  }, [activeImageMarkTargetNodeId, data.onExitCanvasImageMarkSelection, id, imageNodeViewModel.isProcessing]);
 
   const handleRoleMenuOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -864,7 +878,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   };
 
   const handleUseReference = (reference: ReferenceInfo) => {
-    setLastMarkReferenceNodeId(reference.nodeId);
+    void reference;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1003,9 +1017,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setIsPointPickMode(false);
     setPointPickLoading(false);
     setPointPickError(false);
-    setPointPickImageRect(null);
+    setPointPickFeedbackPoint(null);
     setActiveMarkMenuId(null);
   }, []);
+
+  useEffect(() => {
+    if (!isPointPickMode || activeImageMarkSourceNodeId === id) return;
+    exitPointPickMode();
+  }, [activeImageMarkSourceNodeId, exitPointPickMode, id, isPointPickMode]);
 
   const enterOwnMarkMode = useCallback((targetNodeId: string) => {
     if (!imageNodeViewModel.canCreateMarks || !displayImage) return;
@@ -1063,37 +1082,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const startMarkMode = useCallback(() => {
     if (!canStartMarking) return;
-    const preferredReference = markableReferences.find((reference) => reference.nodeId === lastMarkReferenceNodeId)
-      ?? markableReferences[0];
-    if (preferredReference) {
-      const requestId = `mark-session-${id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      setNodes((nodes) => nodes.map((node) => node.id === preferredReference.nodeId
-        ? {
-            ...node,
-            data: {
-              ...node.data,
-              markSessionRequest: {
-                requestId,
-                targetNodeId: id,
-                sourceImageUrl: preferredReference.imageUrl,
-              },
-            },
-          }
-        : node));
-      const onFocusNode = data.onFocusNode as ((targetNodeId: string) => void) | undefined;
-      onFocusNode?.(preferredReference.nodeId);
-      return;
-    }
-    if (canMarkOwnImage) enterOwnMarkMode(id);
-  }, [canMarkOwnImage, canStartMarking, data.onFocusNode, enterOwnMarkMode, id, lastMarkReferenceNodeId, markableReferences, setNodes]);
-
-  const startToolbarMarkMode = useCallback(() => {
-    if (canMarkOwnImage) {
-      enterOwnMarkMode(id);
-      return;
-    }
-    startMarkMode();
-  }, [canMarkOwnImage, enterOwnMarkMode, id, startMarkMode]);
+    const onStartSelection = data.onStartCanvasImageMarkSelection as ((targetNodeId: string) => void) | undefined;
+    onStartSelection?.(id);
+  }, [canStartMarking, data.onStartCanvasImageMarkSelection, id]);
 
   const resolveCoverGeometry = useCallback(() => {
     const img = imgRef.current;
@@ -1111,47 +1102,28 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     };
   }, []);
 
-  const resolveDisplayedImageRect = useCallback(() => {
-    const geometry = resolveCoverGeometry();
-    if (!geometry) return null;
-    return {
-      left: geometry.rect.left,
-      top: geometry.rect.top,
-      width: geometry.rect.width,
-      height: geometry.rect.height,
+  const startIdentifyMark = useCallback(async (e: React.PointerEvent<HTMLElement> | PointerEvent, explicitTargetNodeId?: string) => {
+    if (e.button !== 0) return;
+    const eventTarget = e.target as HTMLElement;
+    if (eventTarget.closest('button, input, select, textarea')) return;
+    const consumePointerEvent = () => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e instanceof PointerEvent) e.stopImmediatePropagation();
     };
-  }, [resolveCoverGeometry]);
-
-  useEffect(() => {
-    if (!isPointPickMode || !displayImage) return;
-
-    let frameId = 0;
-    const updateRect = () => {
-      const nextRect = resolveDisplayedImageRect();
-      setPointPickImageRect((prev) => {
-        if (
-          prev &&
-          nextRect &&
-          Math.abs(prev.left - nextRect.left) < 0.5 &&
-          Math.abs(prev.top - nextRect.top) < 0.5 &&
-          Math.abs(prev.width - nextRect.width) < 0.5 &&
-          Math.abs(prev.height - nextRect.height) < 0.5
-        ) {
-          return prev;
-        }
-        return nextRect;
-      });
-      frameId = requestAnimationFrame(updateRect);
-    };
-
-    updateRect();
-    return () => cancelAnimationFrame(frameId);
-  }, [displayImage, isPointPickMode, resolveDisplayedImageRect]);
-
-  const handleImageClick = async (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!isPointPickMode || pointPickLoading || !imageNodeViewModel.canCreateMarks || !displayImage || !imgRef.current) return;
-    e.preventDefault();
-    e.stopPropagation();
+    const requestedTargetNodeId = explicitTargetNodeId ?? activeImageMarkTargetNodeId;
+    const isSelectingSource = Boolean(requestedTargetNodeId) && !isPointPickMode;
+    let identifyTargetNodeId = explicitTargetNodeId ?? markTargetNodeId;
+    if (isSelectingSource) {
+      if (!isCanvasMarkSelectable || !requestedTargetNodeId) return;
+      consumePointerEvent();
+      const onSelectSource = data.onSelectCanvasImageMarkSource as ((sourceNodeId: string) => void) | undefined;
+      onSelectSource?.(id);
+      enterOwnMarkMode(requestedTargetNodeId);
+      identifyTargetNodeId = requestedTargetNodeId;
+    }
+    if ((!isPointPickMode && !isSelectingSource) || !imageNodeViewModel.canCreateMarks || !displayImage || !imgRef.current) return;
+    consumePointerEvent();
 
     const geometry = resolveCoverGeometry();
     if (!geometry) return;
@@ -1169,9 +1141,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const normalizedX = Math.max(0, Math.min(1, (e.clientX - rect.left - offsetX) / renderedWidth));
     const normalizedY = Math.max(0, Math.min(1, (e.clientY - rect.top - offsetY) / renderedHeight));
 
+    markRequestIdRef.current += 1;
+    const requestId = markRequestIdRef.current;
     setPointPickLoading(true);
     setPointPickError(false);
-    const requestId = ++markRequestIdRef.current;
+    setPointPickFeedbackPoint({ normalizedX, normalizedY });
 
     try {
       const result = await identifyImageElement({
@@ -1180,7 +1154,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       });
       if (
         requestId !== markRequestIdRef.current ||
-        !isPointPickMode ||
         !imageNodeViewModel.canCreateMarks ||
         getCurrentImage(data) !== displayImage
       ) return;
@@ -1208,7 +1181,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       setImageMarks(nextMarks);
       setNodes((nodes) => nodes.map((node) => {
         const isSource = node.id === id;
-        const isTarget = node.id === markTargetNodeId;
+        const isTarget = node.id === identifyTargetNodeId;
         if (!isSource && !isTarget) return node;
         const nodePromptContent = Array.isArray(node.data.promptContent) ? node.data.promptContent as PromptContent[] : [];
         const nextPromptContent = isTarget && !nodePromptContent.some((block) => block.type === 'image_mark_reference' && block.markId === mark.id)
@@ -1223,14 +1196,39 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           },
         };
       }));
-      setActiveMarkMenuId(mark.id);
+      setVisibleSessionMarks((current) => {
+        const ids = current.sessionId === activeImageMarkSessionId ? new Set(current.ids) : new Set<string>();
+        ids.add(mark.id);
+        return { sessionId: activeImageMarkSessionId ?? null, ids };
+      });
+      setActiveMarkMenuId(null);
     } catch {
       if (requestId !== markRequestIdRef.current) return;
       setPointPickError(true);
     } finally {
       if (requestId === markRequestIdRef.current) setPointPickLoading(false);
     }
+  }, [activeImageMarkSessionId, activeImageMarkTargetNodeId, customRoleLabel, data, displayImage, enterOwnMarkMode, id, imageMarks, imageNodeViewModel.canCreateMarks, isCanvasMarkSelectable, isPointPickMode, localReferenceLabel, localReferenceType, markTargetNodeId, resolveCoverGeometry, role, setNodes]);
+
+  const blockMarkImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
+    if (!isCanvasMarkSelectionMode) return;
+    event.preventDefault();
+    event.stopPropagation();
   };
+
+  useEffect(() => {
+    const element = imgRef.current;
+    if (!element || !displayImage) return;
+    return registerImageMarkCaptureEntry({
+      nodeId: id,
+      imageUrl: displayImage,
+      element,
+      canMark: () => imageNodeViewModel.canCreateMarks,
+      startIdentify: (event, targetNodeId) => {
+        void startIdentifyMark(event, targetNodeId);
+      },
+    });
+  }, [currentResultSet?.isExpanded, displayImage, id, imageNodeViewModel.canCreateMarks, startIdentifyMark]);
 
   const updateMarkCandidate = useCallback((markId: string, candidateId: string) => {
     if (imageNodeViewModel.isProcessing) return;
@@ -1288,118 +1286,71 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   // Esc to exit point-pick mode
   useEffect(() => {
-    if (!isPointPickMode) return;
+    if (!isPointPickMode && activeImageMarkTargetNodeId !== id) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        exitPointPickMode();
+        if (isPointPickMode) exitPointPickMode();
+        const onExitSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
+        onExitSelection?.();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isPointPickMode, exitPointPickMode]);
+  }, [activeImageMarkTargetNodeId, data.onExitCanvasImageMarkSelection, exitPointPickMode, id, isPointPickMode]);
 
-  const stopPointPickOverlayEvent = useCallback((event: SyntheticEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-  }, []);
-
-  const pointPickCardWidth = imgRef.current?.getBoundingClientRect().width ?? pointPickImageRect?.width ?? 280;
-  const pointPickResultPanelWidth = Math.min(320, Math.max(180, pointPickCardWidth));
-  const pointPickResultPanelLeft = pointPickImageRect
-    ? Math.min(
-        Math.max(16, pointPickImageRect.left + pointPickImageRect.width / 2 - pointPickResultPanelWidth / 2),
-        Math.max(16, window.innerWidth - pointPickResultPanelWidth - 16),
-      )
-    : 16;
-  const pointPickResultPanelTop = pointPickImageRect
-    ? pointPickImageRect.top + pointPickImageRect.height + 14
-    : 16;
-  const pointPickModeBarWidth = Math.min(420, window.innerWidth - 32);
-  const pointPickModePortal = isPointPickMode && pointPickImageRect
+  const pointPickFeedbackGeometry = pointPickFeedbackPoint ? resolveCoverGeometry() : null;
+  const pointPickFeedbackWidth = pointPickError ? 176 : 104;
+  const pointPickFeedbackHeight = pointPickError ? 48 : 30;
+  const pointPickFeedbackPosition = pointPickFeedbackGeometry && pointPickFeedbackPoint
+    ? (() => {
+        const { rect, offsetX, offsetY, renderedWidth, renderedHeight } = pointPickFeedbackGeometry;
+        const anchorX = rect.left + offsetX + pointPickFeedbackPoint.normalizedX * renderedWidth;
+        const anchorY = rect.top + offsetY + pointPickFeedbackPoint.normalizedY * renderedHeight;
+        const left = Math.max(rect.left + 6, Math.min(rect.right - pointPickFeedbackWidth - 6, anchorX + 10));
+        const preferredTop = anchorY + 10;
+        const top = preferredTop + pointPickFeedbackHeight <= rect.bottom - 6
+          ? preferredTop
+          : Math.max(rect.top + 6, anchorY - pointPickFeedbackHeight - 10);
+        return { left, top };
+      })()
+    : null;
+  const canvasMarkSelectionPortal = activeImageMarkTargetNodeId === id
     ? createPortal(
-        <>
-          {[
-            { left: 0, top: 0, width: '100vw', height: pointPickImageRect.top },
-            { left: 0, top: pointPickImageRect.top + pointPickImageRect.height, width: '100vw', height: `calc(100vh - ${pointPickImageRect.top + pointPickImageRect.height}px)` },
-            { left: 0, top: pointPickImageRect.top, width: pointPickImageRect.left, height: pointPickImageRect.height },
-            { left: pointPickImageRect.left + pointPickImageRect.width, top: pointPickImageRect.top, width: `calc(100vw - ${pointPickImageRect.left + pointPickImageRect.width}px)`, height: pointPickImageRect.height },
-          ].map((rect, index) => (
-            <div
-              key={index}
-              className="fixed z-[80] cursor-default"
-              style={{
-                left: rect.left,
-                top: rect.top,
-                width: rect.width,
-                height: rect.height,
-                background: 'rgba(0,0,0,0.74)',
-                backdropFilter: 'brightness(0.42)',
-                WebkitBackdropFilter: 'brightness(0.42)',
-              }}
-              onClick={stopPointPickOverlayEvent}
-              onDoubleClick={stopPointPickOverlayEvent}
-              onPointerDown={stopPointPickOverlayEvent}
-              onPointerMove={stopPointPickOverlayEvent}
-              onMouseDown={stopPointPickOverlayEvent}
-              onWheel={stopPointPickOverlayEvent}
-              onContextMenu={stopPointPickOverlayEvent}
-            />
-          ))}
-          <div
-            className="fixed z-[120] flex items-center gap-3 rounded-full px-4 py-2 text-[12px] shadow-[0_12px_34px_rgba(0,0,0,0.45)]"
-            style={{
-              left: Math.max(16, window.innerWidth / 2 - pointPickModeBarWidth / 2),
-              top: 72,
-              width: pointPickModeBarWidth,
-              background: 'rgba(37,37,38,0.96)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: 'rgba(255,255,255,0.86)',
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
+        <div
+          className="fixed left-1/2 top-[54px] z-[4100] flex w-auto -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] shadow-[0_10px_26px_rgba(0,0,0,0.3)]"
+          style={{
+            background: 'rgba(37,37,38,0.9)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.86)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}
+        >
+          <ScanSearch className="h-4 w-4 flex-shrink-0 text-teal-300/85" />
+          <span className="font-medium text-white/75">{t('imageMark.canvasModeHint', { defaultValue: '点击图片选择局部元素' })}</span>
+          <button
+            type="button"
+            className="shrink-0 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/55 transition-colors hover:bg-white/[0.10] hover:text-white/80"
+            onClick={(event) => {
+              event.stopPropagation();
+              const onExitSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
+              onExitSelection?.();
             }}
-            onPointerDown={stopPointPickOverlayEvent}
-            onClick={stopPointPickOverlayEvent}
-            onWheel={stopPointPickOverlayEvent}
           >
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="h-2 w-2 rounded-full" style={{ background: '#2dd4bf', boxShadow: '0 0 10px rgba(45,212,191,0.72)' }} />
-              <span className="shrink-0 font-semibold">{t('imageMark.modeTitle', { defaultValue: '元素选择模式' })}</span>
-              <span className="min-w-0 truncate" style={{ color: 'rgba(255,255,255,0.58)' }}>
-                {t('imageMark.modeHint', { defaultValue: '点击图片选择局部元素' })}
-              </span>
-              <button
-                type="button"
-                className="shrink-0 rounded-full px-2 py-1 text-[11px] transition-colors hover:bg-white/10"
-                style={{ color: 'rgba(255,255,255,0.58)' }}
-                onClick={(event) => {
-                  stopPointPickOverlayEvent(event);
-                  exitPointPickMode();
-                }}
-              >
-                {t('imageMark.backToNode', { defaultValue: '返回节点' })}
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={(event) => {
-                stopPointPickOverlayEvent(event);
-                exitPointPickMode();
-              }}
-              className="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-white/10"
-              style={{ color: 'rgba(255,255,255,0.72)', background: 'rgba(255,255,255,0.06)' }}
-            >
-              {t('imageMark.exit', { defaultValue: '退出' })}
-            </button>
-          </div>
-        </>,
+            ESC · {t('imageMark.exit', { defaultValue: '退出' })}
+          </button>
+        </div>,
         document.body,
       )
     : null;
-  const pointPickResultPortal = isPointPickMode && pointPickImageRect && (pointPickLoading || pointPickError)
+  const pointPickResultPortal = isPointPickMode && pointPickFeedbackPosition && (pointPickLoading || pointPickError)
     ? createPortal(
         <div
-          className="fixed z-[130] rounded-xl p-3 nodrag nowheel shadow-[0_14px_36px_rgba(0,0,0,0.46)]"
+          className="fixed z-[4100] nodrag nowheel rounded-md px-2 py-1.5 shadow-[0_8px_20px_rgba(0,0,0,0.38)]"
           onClick={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
@@ -1410,10 +1361,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           onTouchMove={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.stopPropagation()}
           style={{
-            left: pointPickResultPanelLeft,
-            top: pointPickResultPanelTop,
-            width: pointPickResultPanelWidth,
-            background: 'rgba(10,10,15,0.94)',
+            left: pointPickFeedbackPosition.left,
+            top: pointPickFeedbackPosition.top,
+            width: pointPickFeedbackWidth,
+            minHeight: pointPickFeedbackHeight,
+            background: 'rgba(10,10,15,0.9)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
             border: '1px solid rgba(255,255,255,0.12)',
@@ -1427,25 +1379,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           )}
 
           {pointPickError && (
-            <div>
-              <div className="text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                {t('imageMark.recognizeFailed', { defaultValue: '未能识别该区域' })}
-              </div>
-              <div className="mt-0.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                {t('reference.recognizeFailedHint', { defaultValue: '请重新点选，或手动输入参考元素' })}
-              </div>
-              <div className="mt-2.5 flex items-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPointPickError(false);
-                  }}
-                  className="w-full rounded-md py-1.5 text-[11px] font-medium transition-colors hover:bg-white/10"
-                  style={{ color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.06)' }}
-                >
-                {t('imageMark.repick', { defaultValue: '重新点选' })}
-                </button>
-              </div>
+            <div className="text-[11px] leading-4 text-white/65">
+              {t('imageMark.recognizeFailed', { defaultValue: '识别失败，请重新点击' })}
             </div>
           )}
 
@@ -1475,11 +1410,17 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const sourceWidth = imgSize?.width || getNodeWidth(data) || 1;
   const sourceHeight = imgSize?.height || getNodeHeight(data) || 1;
+  const markImageCursor = isCanvasMarkSelectionMode
+    ? isCanvasMarkSelectable ? 'crosshair' : 'not-allowed'
+    : isPointPickMode ? 'crosshair' : 'default';
   const renderImageMarkOverlays = () => {
-    if (!isPointPickMode || !imageNodeViewModel.canEditMarks) return null;
+    if (!isCanvasMarkSelectionMode) return null;
     const geometry = resolveCoverGeometry();
     if (!geometry) return null;
-    const currentMarks = imageMarks.filter((mark) => mark.sourceImageUrl === displayImage);
+    const visibleMarkIds = visibleSessionMarks.sessionId === activeImageMarkSessionId
+      ? visibleSessionMarks.ids
+      : new Set<string>();
+    const currentMarks = imageMarks.filter((mark) => mark.sourceImageUrl === displayImage && visibleMarkIds.has(mark.id));
 
     return currentMarks.map((mark) => {
       const selectedCandidate = mark.candidates.find((candidate) => candidate.id === mark.selectedCandidateId)
@@ -1542,7 +1483,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const activeMarkCandidatePortal = activeImageMark && activeMarkButtonRect && imageNodeViewModel.canEditMarks
     ? createPortal(
         <div
-          className="fixed z-[2200] w-[210px] overflow-hidden rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]"
+          className="fixed z-[4200] w-[210px] overflow-hidden rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]"
           style={{
             left: Math.max(8, Math.min(window.innerWidth - 218, activeMarkButtonRect.left)),
             top: activeMarkButtonRect.bottom + 8 + 190 > window.innerHeight
@@ -1758,12 +1699,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const imageToolbarActions = useMemo(() => [
     {
-      icon: ScanSearch,
-      label: t('imageMark.button', { defaultValue: '标记' }),
-      action: startToolbarMarkMode,
-      disabled: !canStartMarking,
-    },
-    {
       icon: Maximize2,
       label: t('imageNode.fullscreen'),
       action: handlePreview,
@@ -1810,7 +1745,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       disabled: !imageNodeViewModel.canUseToolbarActions,
       danger: true,
     },
-  ], [canStartMarking, enterCropMode, handleDeleteNode, handleDownload, handleDuplicateNode, handlePreview, imageLoadFailed, imageNodeViewModel.canUseToolbarActions, imgSize, startToolbarMarkMode, t]);
+  ], [enterCropMode, handleDeleteNode, handleDownload, handleDuplicateNode, handlePreview, imageLoadFailed, imageNodeViewModel.canUseToolbarActions, imgSize, t]);
 
   // Global modifier + G shortcut for generation
   useEffect(() => {
@@ -1833,7 +1768,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       onContextMenuCapture={isCropMode ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}
       style={{ zIndex: selected ? 100 : 1, width: displayCardWidth, cursor: 'default' }}
     >
-      {pointPickModePortal}
+      {canvasMarkSelectionPortal}
       {pointPickResultPortal}
       {activeMarkCandidatePortal}
       {/* Toolbar — shown above title only when this node has a real image/result */}
@@ -1958,6 +1893,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
           className={`node-preview-card w-full flex items-center justify-center transition-colors relative overflow-hidden ${isCropMode ? 'rounded-none' : 'rounded-[24px]'}`}
+          data-image-node-id={id}
           style={{
             width: displayCardWidth,
             height: displayCardHeight,
@@ -2065,7 +2001,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                     background: '#101014',
                   }}
                 >
-                  <img ref={imgRef} src={displayImage} alt="" className="block h-full w-full object-cover" draggable={false} onLoad={handleDisplayImageLoad} />
+                  <img ref={imgRef} src={displayImage} alt="" className="block h-full w-full object-cover" draggable={false} onLoad={handleDisplayImageLoad} onClick={blockMarkImageClick} style={{ cursor: markImageCursor }} />
                 </div>
                 <button
                   type="button"
@@ -2117,8 +2053,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   className="block w-full h-full object-cover"
                   draggable={false}
                   onLoad={handleDisplayImageLoad}
-                  onClick={handleImageClick}
-                  style={{ cursor: isPointPickMode ? 'crosshair' : 'default' }}
+                  onClick={blockMarkImageClick}
+                  style={{ cursor: markImageCursor }}
                 />
                 {renderImageMarkOverlays()}
               </div>
@@ -2211,16 +2147,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 draggable={false}
                 onLoad={handleDisplayImageLoad}
                 onError={() => setImageLoadFailed(true)}
-                onClick={handleImageClick}
-                onPointerDown={(event) => {
-                  if (!isPointPickMode) return;
-                  event.stopPropagation();
-                }}
+                onClick={blockMarkImageClick}
                 onMouseDown={(event) => {
                   if (!isPointPickMode) return;
                   event.stopPropagation();
                 }}
-                style={{ cursor: isPointPickMode ? 'crosshair' : 'default' }}
+                style={{ cursor: markImageCursor }}
               />
               {renderImageMarkOverlays()}
             </div>

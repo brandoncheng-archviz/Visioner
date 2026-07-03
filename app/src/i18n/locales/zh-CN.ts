@@ -790,11 +790,13 @@ const zhCN = {
 
   imageMark: {
     button: "标记",
+    canvasModeTitle: "选择要标记的参考图",
+    canvasModeHint: "点击图片选择局部元素",
     modeTitle: "元素选择模式",
     modeHint: "点击图片选择局部元素",
     backToNode: "返回节点",
     exit: "退出",
-    identifying: "正在识别元素...",
+    identifying: "识别中…",
     recognizeFailed: "未能识别该区域",
     repick: "重新点选",
     confidence: "置信度",

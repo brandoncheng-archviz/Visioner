@@ -790,11 +790,13 @@ const enUS = {
 
   imageMark: {
     button: "Mark",
+    canvasModeTitle: "Choose a reference image to mark",
+    canvasModeHint: "Click an image to select a local element",
     modeTitle: "Element Selection Mode",
     modeHint: "Click an image element to select it",
     backToNode: "Back to Node",
     exit: "Exit",
-    identifying: "Identifying element...",
+    identifying: "Identifying…",
     recognizeFailed: "Unable to identify this area",
     repick: "Pick Again",
     confidence: "Confidence",

@@ -6,6 +6,7 @@ import {
   ReactFlowProvider,
   type Node,
   type Edge,
+  type NodeChange,
   type OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -45,6 +46,7 @@ import type {
 } from '../features/canvas/types/canvas.types';
 import { GlobalDropForwarder } from '../features/canvas/components/GlobalDropForwarder';
 import { CanvasStage } from '../features/canvas/components/CanvasStage';
+import { CanvasImageMarkCaptureLayer } from '../features/canvas/components/CanvasImageMarkCaptureLayer';
 import { CanvasSidebar } from '../features/canvas/components/CanvasSidebar';
 import { CanvasContextMenus } from '../features/canvas/components/CanvasContextMenus';
 import { CanvasToolbar } from '../features/canvas/components/CanvasToolbar';
@@ -226,7 +228,24 @@ function FlowCanvas() {
     historyPanelNodeId, openHistoryPanel, closeHistoryPanel,
   } = useCanvasUiPanels();
   const [textFocusRequestId, setTextFocusRequestId] = useState(0);
+  const [activeImageMarkTargetNodeId, setActiveImageMarkTargetNodeId] = useState<string | null>(null);
+  const [activeImageMarkSourceNodeId, setActiveImageMarkSourceNodeId] = useState<string | null>(null);
+  const [activeImageMarkSessionId, setActiveImageMarkSessionId] = useState<string | null>(null);
+  const handleCanvasNodesChange = useCallback((changes: NodeChange[]) => {
+    const effectiveChanges = activeImageMarkTargetNodeId
+      ? changes.filter((change) => change.type !== 'select')
+      : changes;
+    onNodesChange(effectiveChanges);
+  }, [activeImageMarkTargetNodeId, onNodesChange]);
   const runningTextTaskIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (activeImageMarkTargetNodeId && !nodes.some((node) => node.id === activeImageMarkTargetNodeId)) {
+      setActiveImageMarkTargetNodeId(null);
+      setActiveImageMarkSourceNodeId(null);
+      setActiveImageMarkSessionId(null);
+    }
+  }, [activeImageMarkTargetNodeId, nodes]);
   const submitTextNodeRef = useRef<(
     nodeId: string,
     dataOverride?: Partial<TextNodeData>,
@@ -1129,11 +1148,25 @@ function FlowCanvas() {
         onCreateRelightNode: n.type === 'image' || n.type === 'relight' ? createRelightNode : undefined,
         onTextAction: n.type === 'text' ? handleTextAction : undefined,
         onFocusNode: n.type === 'image' ? focusCanvasNode : undefined,
+        activeImageMarkTargetNodeId: n.type === 'image' ? activeImageMarkTargetNodeId : undefined,
+        activeImageMarkSourceNodeId: n.type === 'image' ? activeImageMarkSourceNodeId : undefined,
+        activeImageMarkSessionId: n.type === 'image' ? activeImageMarkSessionId : undefined,
+        onStartCanvasImageMarkSelection: n.type === 'image' ? (targetNodeId: string) => {
+          setActiveImageMarkTargetNodeId(targetNodeId);
+          setActiveImageMarkSourceNodeId(null);
+          setActiveImageMarkSessionId(`mark-session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+        } : undefined,
+        onSelectCanvasImageMarkSource: n.type === 'image' ? setActiveImageMarkSourceNodeId : undefined,
+        onExitCanvasImageMarkSelection: n.type === 'image' ? () => {
+          setActiveImageMarkTargetNodeId(null);
+          setActiveImageMarkSourceNodeId(null);
+          setActiveImageMarkSessionId(null);
+        } : undefined,
         onOpenNodeHistory: n.type === 'image' ? openHistoryPanel : undefined,
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {
@@ -1768,7 +1801,7 @@ function FlowCanvas() {
         onDragOver={handleCanvasDragOver}
         onDragLeave={handleCanvasDragLeave}
         onDrop={handleCanvasDrop}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleCanvasNodesChange}
         onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
@@ -1781,6 +1814,8 @@ function FlowCanvas() {
         onDragOverCapture={handleDragOverCapture}
         onDropCapture={handleDropCapture}
       />
+
+      <CanvasImageMarkCaptureLayer targetNodeId={activeImageMarkTargetNodeId} />
 
       <CanvasSidebar
         activePanel={activePanel}

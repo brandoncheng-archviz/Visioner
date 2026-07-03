@@ -42,7 +42,7 @@ const CANDIDATE_GROUPS: IdentifyElementResult['candidates'][] = [
     { id: 'sky-sunset', label: '晚霞天空', type: 'sunset_sky', level: 'part', confidence: 0.92, promptText: '重点参考标记框选区域内的晚霞色彩、云层边缘、渐变层次和真实感。' },
   ],
   [
-    { id: 'plant-category', label: '植物', type: 'vegetation', level: 'category', confidence: 0.8, promptText: '重点参考标记框选区域内的植物类型、体量和绿化氛围。' },
+    { id: 'plant-category', label: '植物', type: 'vegetation', level: 'category', confidence: 0.8, promptText: '重点参考标记框选区域内的植物类型、层次关系和真实感。' },
     { id: 'plant-palm', label: '棕榈树', type: 'palm_tree', level: 'object', confidence: 0.88, promptText: '重点参考标记框选区域内的棕榈树形态、树冠比例和生长姿态。' },
     { id: 'plant-palm-leaf', label: '棕榈树的叶子', type: 'palm_leaf', level: 'part', confidence: 0.94, promptText: '重点参考标记框选区域内的叶片形态、层次、边缘细节和真实感。' },
   ],
@@ -72,7 +72,7 @@ export async function identifyImageElement(
   req: IdentifyElementRequest,
 ): Promise<IdentifyElementResult> {
   // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 600 + Math.random() * 800));
+  await new Promise((resolve) => setTimeout(resolve, 800));
 
   // Deterministic pseudo-random based on point coordinates
   const seed = Math.round((req.point.x * 1000 + req.point.y * 1000) % 1000);
