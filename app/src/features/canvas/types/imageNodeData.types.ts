@@ -49,12 +49,6 @@ export interface ImageNodeData {
   userPrompt?: string;
   marks?: MarkItem[];
   imageMarks?: ImageMark[];
-  /** Transient canvas-local request used to open mark mode on a stable source image. */
-  markSessionRequest?: {
-    requestId: string;
-    targetNodeId: string;
-    sourceImageUrl: string;
-  };
   activeImageMarkTargetNodeId?: string | null;
   activeImageMarkSourceNodeId?: string | null;
   activeImageMarkSessionId?: string | null;

@@ -86,7 +86,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const markRequestIdRef = useRef(0);
-  const consumedMarkSessionRequestRef = useRef<string | null>(null);
+  const pendingMarkSourceActivationRef = useRef<string | null>(null);
   const markLabelButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const [activeMarkMenuId, setActiveMarkMenuId] = useState<string | null>(null);
   const [markTargetNodeId, setMarkTargetNodeId] = useState(id);
@@ -1014,6 +1014,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const exitPointPickMode = useCallback(() => {
     markRequestIdRef.current += 1;
+    pendingMarkSourceActivationRef.current = null;
     setIsPointPickMode(false);
     setPointPickLoading(false);
     setPointPickError(false);
@@ -1022,9 +1023,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, []);
 
   useEffect(() => {
-    if (!isPointPickMode || activeImageMarkSourceNodeId === id) return;
+    if (!isPointPickMode) return;
+    if (activeImageMarkSourceNodeId === id) {
+      pendingMarkSourceActivationRef.current = null;
+      return;
+    }
+    if (isCanvasMarkSelectionMode && pendingMarkSourceActivationRef.current === id) return;
     exitPointPickMode();
-  }, [activeImageMarkSourceNodeId, exitPointPickMode, id, isPointPickMode]);
+  }, [activeImageMarkSourceNodeId, exitPointPickMode, id, isCanvasMarkSelectionMode, isPointPickMode]);
 
   const enterOwnMarkMode = useCallback((targetNodeId: string) => {
     if (!imageNodeViewModel.canCreateMarks || !displayImage) return;
@@ -1035,26 +1041,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setPointPickError(false);
     setActiveMarkMenuId(null);
   }, [displayImage, imageNodeViewModel.canCreateMarks]);
-
-  const markSessionRequest = data.markSessionRequest as {
-    requestId: string;
-    targetNodeId: string;
-    sourceImageUrl: string;
-  } | undefined;
-
-  useEffect(() => {
-    if (!markSessionRequest || consumedMarkSessionRequestRef.current === markSessionRequest.requestId) return;
-    consumedMarkSessionRequestRef.current = markSessionRequest.requestId;
-    const raf = requestAnimationFrame(() => {
-      if (markSessionRequest.sourceImageUrl === displayImage && imageNodeViewModel.canCreateMarks) {
-        enterOwnMarkMode(markSessionRequest.targetNodeId);
-      }
-      setNodes((nodes) => nodes.map((node) => node.id === id
-        ? { ...node, data: { ...node.data, markSessionRequest: undefined } }
-        : node));
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [displayImage, enterOwnMarkMode, id, imageNodeViewModel.canCreateMarks, markSessionRequest, setNodes]);
 
   useEffect(() => {
     if (markSourceImageRef.current === displayImage) return;
@@ -1117,6 +1103,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (isSelectingSource) {
       if (!isCanvasMarkSelectable || !requestedTargetNodeId) return;
       consumePointerEvent();
+      pendingMarkSourceActivationRef.current = id;
       const onSelectSource = data.onSelectCanvasImageMarkSource as ((sourceNodeId: string) => void) | undefined;
       onSelectSource?.(id);
       enterOwnMarkMode(requestedTargetNodeId);
@@ -1209,12 +1196,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       if (requestId === markRequestIdRef.current) setPointPickLoading(false);
     }
   }, [activeImageMarkSessionId, activeImageMarkTargetNodeId, customRoleLabel, data, displayImage, enterOwnMarkMode, id, imageMarks, imageNodeViewModel.canCreateMarks, isCanvasMarkSelectable, isPointPickMode, localReferenceLabel, localReferenceType, markTargetNodeId, resolveCoverGeometry, role, setNodes]);
-
-  const blockMarkImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
-    if (!isCanvasMarkSelectionMode) return;
-    event.preventDefault();
-    event.stopPropagation();
-  };
 
   useEffect(() => {
     const element = imgRef.current;
@@ -1893,7 +1874,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         {/* Main card — aspect ratio adapts to uploaded image */}
         <div
           className={`node-preview-card w-full flex items-center justify-center transition-colors relative overflow-hidden ${isCropMode ? 'rounded-none' : 'rounded-[24px]'}`}
-          data-image-node-id={id}
           style={{
             width: displayCardWidth,
             height: displayCardHeight,
@@ -2001,7 +1981,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                     background: '#101014',
                   }}
                 >
-                  <img ref={imgRef} src={displayImage} alt="" className="block h-full w-full object-cover" draggable={false} onLoad={handleDisplayImageLoad} onClick={blockMarkImageClick} style={{ cursor: markImageCursor }} />
+                  <img ref={imgRef} src={displayImage} alt="" className="block h-full w-full object-cover" draggable={false} onLoad={handleDisplayImageLoad} style={{ cursor: markImageCursor }} />
                 </div>
                 <button
                   type="button"
@@ -2053,7 +2033,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   className="block w-full h-full object-cover"
                   draggable={false}
                   onLoad={handleDisplayImageLoad}
-                  onClick={blockMarkImageClick}
                   style={{ cursor: markImageCursor }}
                 />
                 {renderImageMarkOverlays()}
@@ -2147,11 +2126,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 draggable={false}
                 onLoad={handleDisplayImageLoad}
                 onError={() => setImageLoadFailed(true)}
-                onClick={blockMarkImageClick}
-                onMouseDown={(event) => {
-                  if (!isPointPickMode) return;
-                  event.stopPropagation();
-                }}
                 style={{ cursor: markImageCursor }}
               />
               {renderImageMarkOverlays()}
