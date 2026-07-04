@@ -4,6 +4,7 @@ import type { ConnectionHandleType, MarkItem, ModelParams } from './canvas.types
 import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
 import type { RelightCreationOptions } from './relight.types';
+import type { ImageControllerState } from './imageController.types';
 
 /**
  * Typed data shape for an ImageNode.
@@ -34,6 +35,7 @@ export interface ImageNodeData {
   promptContent?: PromptContent[];
   selectedPresets?: string[];
   selectedStyleId?: string | null;
+  controller?: ImageControllerState;
   role?: ImageRole;
   customRoleLabel?: string;
   localReferenceType?: import('./imageNode.types').LocalReferenceType;

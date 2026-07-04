@@ -1,6 +1,7 @@
 import type { GenerationInput } from './generation.types';
 import type { ModelParams } from './canvas.types';
 import type { LightPreviewData } from './lightPreview.types';
+import type { ImageControllerState } from './imageController.types';
 
 export interface GeneratedImage {
   resultId: string;
@@ -23,6 +24,7 @@ export interface ResultSetBatch {
   presetIds: string[];
   styleId: string | null;
   lightPreview?: LightPreviewData | null;
+  controller?: ImageControllerState;
   modelParams: ModelParams;
   createdAt: number;
 }

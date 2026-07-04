@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,6 +9,7 @@ import {
 } from '../constants/imageUsages';
 import { FLOATING_PANEL_BACKGROUND } from '../constants/canvasConstants';
 import type { ImageRole, LocalReferenceType } from '../types/imageNode.types';
+import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 
 export function ImageRoleTag({
   role,
@@ -20,7 +22,6 @@ export function ImageRoleTag({
   rootClassName = 'absolute z-30 nodrag nowheel',
   rootStyle,
   hideTrigger = false,
-  popoverTop = 28,
   disabled = false,
 }: {
   role: ImageRole | null;
@@ -42,7 +43,8 @@ export function ImageRoleTag({
   const open = disabled ? false : rawOpen;
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
   const [isTagHovered, setIsTagHovered] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [rootElement, setRootElement] = useState<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const displayLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
   const selectedOption = getImageRoleOption(role, customRoleLabel);
@@ -103,7 +105,7 @@ export function ImageRoleTag({
 
     const closeOnOutside = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Node && rootRef.current?.contains(target)) {
+      if (target instanceof Node && (rootElement?.contains(target) || menuRef.current?.contains(target))) {
         return;
       }
       handleOpenChange(false);
@@ -120,11 +122,24 @@ export function ImageRoleTag({
       document.removeEventListener('pointerdown', closeOnOutside, true);
       document.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [open, handleOpenChange]);
+  }, [open, handleOpenChange, rootElement]);
+
+  const anchorRect = open ? rootElement?.getBoundingClientRect() : null;
+  const menuWidth = Math.min(330, window.innerWidth - 24);
+  const estimatedHeight = 430;
+  const availableBelow = anchorRect ? window.innerHeight - anchorRect.bottom - 20 : 0;
+  const availableAbove = anchorRect ? anchorRect.top - 20 : 0;
+  const openBelow = availableBelow >= Math.min(estimatedHeight, 280) || availableBelow >= availableAbove;
+  const menuLeft = anchorRect
+    ? Math.min(Math.max(12, anchorRect.left), window.innerWidth - menuWidth - 12)
+    : 12;
+  const menuTop = anchorRect ? (openBelow ? anchorRect.bottom + 8 : anchorRect.top - 8) : 12;
+  const menuMaxHeight = Math.max(140, openBelow ? availableBelow : availableAbove);
 
   return (
-    <div
-      ref={rootRef}
+    <>
+      <div
+      ref={setRootElement}
       className={rootClassName}
       style={rootStyle || { top: 9, left: 9 }}
       onPointerDown={(event) => event.stopPropagation()}
@@ -179,14 +194,20 @@ export function ImageRoleTag({
         </div>
       )}
 
-      {open && (
+      </div>
+
+      {open && anchorRect && createPortal(
         <div
-          className="absolute left-0 overflow-hidden rounded-[14px] p-1.5"
+          ref={menuRef}
+          className="fixed z-[4200] overflow-y-auto overscroll-contain rounded-[14px] p-1.5"
           onMouseLeave={() => setHoveredRole(null)}
+          onWheelCapture={stopCanvasWheelPropagation}
           style={{
-            top: popoverTop,
-            width: 330,
-            maxWidth: 'calc(100vw - 32px)',
+            left: menuLeft,
+            top: menuTop,
+            transform: openBelow ? undefined : 'translateY(-100%)',
+            width: menuWidth,
+            maxHeight: menuMaxHeight,
             background: FLOATING_PANEL_BACKGROUND,
             backdropFilter: 'blur(18px)',
             WebkitBackdropFilter: 'blur(18px)',
@@ -257,8 +278,9 @@ export function ImageRoleTag({
                 </div>
               )}
             </div>
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }

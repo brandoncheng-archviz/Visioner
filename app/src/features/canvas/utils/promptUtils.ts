@@ -11,6 +11,15 @@ import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
 import { sortReferencesByUsage } from './referenceUtils';
 import i18n from '@/i18n';
+import type { ImageControllerState } from '../types/imageController.types';
+import {
+  LIGHT_DIRECTION_OPTIONS,
+  SEASON_OPTIONS,
+  STYLE_OPTIONS,
+  TIME_OPTIONS,
+  TOGGLE_OPTIONS,
+  WEATHER_OPTIONS,
+} from '../constants/imageController';
 
 const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
 
@@ -65,6 +74,36 @@ function serializeStylePrompt(style: StyleDefinition): string {
     `人物与配景：${template.entourage}`,
     `避免：${template.avoid}`,
   ].join('\n');
+}
+
+export interface ImageControllerPromptFragment {
+  key: string;
+  label: string;
+  prompt: string;
+  source: 'controller';
+}
+
+export function serializeImageControllerPrompt(controller?: ImageControllerState | null) {
+  const fragments: ImageControllerPromptFragment[] = [];
+  if (!controller) return { promptText: '', fragments };
+
+  const addOption = <T extends string>(key: string, id: T | null, options: Array<{ id: T; label: string; prompt: string }>) => {
+    const option = id ? options.find((item) => item.id === id) : undefined;
+    if (option) fragments.push({ key, label: option.label, prompt: option.prompt, source: 'controller' });
+  };
+
+  addOption('style', controller.style, STYLE_OPTIONS);
+  addOption('time', controller.time, TIME_OPTIONS);
+  addOption('lightDirection', controller.lightDirection, LIGHT_DIRECTION_OPTIONS);
+  addOption('weather', controller.weather, WEATHER_OPTIONS);
+  addOption('season', controller.season, SEASON_OPTIONS);
+  TOGGLE_OPTIONS.forEach((option) => {
+    if (controller.toggles[option.id]) {
+      fragments.push({ key: `toggles.${option.id}`, label: option.label, prompt: option.prompt, source: 'controller' });
+    }
+  });
+
+  return { promptText: fragments.map((fragment) => fragment.prompt).join('\n'), fragments };
 }
 
 export function stripReferencePromptMetadata(promptText: string) {
@@ -190,6 +229,7 @@ export function buildPromptSubmission(
   selectedStyle: StyleDefinition | null,
   nodeReferences: ReferenceInfo[] = [],
   lightPreview?: LightPreviewData | null,
+  controller?: ImageControllerState | null,
 ) {
   const trimmedUserText = userText.trim();
   const sortedNodeReferences = sortReferencesByUsage(nodeReferences);
@@ -277,6 +317,10 @@ export function buildPromptSubmission(
   if (lightPreview?.enabled && lightPreview.derived?.promptText) {
     sections.push(`光影控制：${lightPreview.derived.promptText}`);
   }
+  const controllerPrompt = serializeImageControllerPrompt(controller);
+  if (controllerPrompt.promptText) {
+    sections.push(`生成控制器：\n${controllerPrompt.promptText}`);
+  }
 
   const sortedImageRefBlocks = sortBlocksByReferenceOrder(imageRefBlocks);
   let imageBlockIndex = 0;
@@ -341,5 +385,12 @@ export function buildPromptSubmission(
       localReferenceLabel: reference.localReferenceLabel,
       localReferencePoint: reference.localReferencePoint,
     })),
+    controller: controller
+      ? {
+          state: structuredClone(controller),
+          labels: controllerPrompt.fragments.map((fragment) => fragment.label),
+          promptFragments: controllerPrompt.fragments.map(({ key, label, prompt }) => ({ key, label, prompt })),
+        }
+      : null,
   };
 }

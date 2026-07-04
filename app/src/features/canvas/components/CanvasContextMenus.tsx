@@ -1,5 +1,6 @@
 import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   BASIC_NODE_DEFINITIONS,
@@ -16,9 +17,13 @@ const VIEWPORT_MENU_MARGIN = 16;
 function clampMenuPosition(x: number, y: number, width: number, height: number) {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
+  const availableBelow = viewportHeight - y - VIEWPORT_MENU_MARGIN;
+  const availableAbove = y - VIEWPORT_MENU_MARGIN;
+  const openBelow = availableBelow >= Math.min(height, 240) || availableBelow >= availableAbove;
+  const preferredTop = openBelow ? y : y - height;
   return {
     left: Math.max(VIEWPORT_MENU_MARGIN, Math.min(x, viewportWidth - width - VIEWPORT_MENU_MARGIN)),
-    top: Math.max(VIEWPORT_MENU_MARGIN, Math.min(y, viewportHeight - height - VIEWPORT_MENU_MARGIN)),
+    top: Math.max(VIEWPORT_MENU_MARGIN, Math.min(preferredTop, viewportHeight - height - VIEWPORT_MENU_MARGIN)),
   };
 }
 
@@ -417,7 +422,7 @@ export function CanvasContextMenus({
   onNodeDelete,
   onNodeCopy,
 }: CanvasContextMenusProps) {
-  return (
+  return createPortal(
     <>
       <CanvasContextMenu
         menu={contextMenu}
@@ -441,6 +446,7 @@ export function CanvasContextMenus({
         onDelete={onNodeDelete}
         onCopy={onNodeCopy}
       />
-    </>
+    </>,
+    document.body,
   );
 }

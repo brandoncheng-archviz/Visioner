@@ -10,6 +10,7 @@ import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
 import type { CurrentResultSet, ResultSetBatch, GeneratedImage } from '../../types/history.types';
 import type { TextReferenceInfo, TextNodeData } from '../../types/basicNode.types';
+import type { ImageControllerState } from '../../types/imageController.types';
 import {
   normalizeGeneratedImages,
   getCurrentImage,
@@ -32,7 +33,7 @@ import {
   DEFAULT_MODEL_PARAMS,
 } from '../../constants/canvasConstants';
 import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole, getLocalReferenceLabel, getReferenceUsageInfo, normalizeLocalReferenceType } from '../../constants/imageUsages';
-import { getStylePresetById, getPresetById } from '../../constants/presets';
+import { getStylePresetById } from '../../constants/presets';
 import { buildPromptSubmission, createImageMarkReferenceBlock } from '../../utils/promptUtils';
 import { getRoleData } from '../../utils/referenceUtils';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
@@ -48,8 +49,9 @@ import { ImageNodeControlPanel } from './ImageNodeControlPanel';
 import { ImageCropOverlay, type NormalizedCropRect } from './ImageCropOverlay';
 import { createImageNodeViewModel } from './imageNodeViewModel';
 import { cropCoverImage } from '../../utils/cropImage';
+import { DEFAULT_IMAGE_CONTROLLER_STATE, hasActiveImageController } from '../../constants/imageController';
 
-const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或插入图片引用';
+const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词、设置氛围或插入图片引用';
 
 function hasValidPromptContentInput(promptContent: PromptContent[]) {
   return promptContent.some((block) => {
@@ -105,8 +107,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [promptContent, setPromptContent] = useState<PromptContent[]>((data.promptContent as PromptContent[]) || []);
   const [imageMarks, setImageMarks] = useState<ImageMark[]>((data.imageMarks as ImageMark[] | undefined) || []);
   const [lightPreview, setLightPreview] = useState<LightPreviewData | null>((data.lightPreview as LightPreviewData | null | undefined) ?? null);
-  const [selectedPresets, setSelectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
-  const [selectedStyleId, setSelectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
+  const [selectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
+  const [selectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
+  const [controller, setController] = useState<ImageControllerState>(() =>
+    (data.controller as ImageControllerState | undefined) ?? DEFAULT_IMAGE_CONTROLLER_STATE,
+  );
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
   const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
@@ -193,6 +198,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const nextContent = (data.promptContent as PromptContent[] | undefined) ?? [];
     setPromptContent((current) => JSON.stringify(current) === JSON.stringify(nextContent) ? current : nextContent);
   }, [data.promptContent]);
+
+  useEffect(() => {
+    const next = (data.controller as ImageControllerState | undefined) ?? DEFAULT_IMAGE_CONTROLLER_STATE;
+    setController((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+  }, [data.controller]);
 
   useEffect(() => {
     const next = (data.lightPreview as LightPreviewData | null | undefined) ?? null;
@@ -415,7 +425,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     .join('\n\n');
   const hasGenerationIntent = (
     promptText.trim().length > 0 ||
-    hasValidPromptContentInput(promptContent)
+    hasValidPromptContentInput(promptContent) ||
+    (hasActiveImageController(controller) && (Boolean(displayImage) || references.length > 0))
   );
   const imageNodeViewModel = createImageNodeViewModel(data, {
     displayImage,
@@ -514,11 +525,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         presetIds: firstHistoryItem?.presetIds || selectedPresets,
         styleId: firstHistoryItem?.styleId ?? selectedStyleId,
         lightPreview,
+        controller: firstHistoryItem?.controller ?? controller,
         modelParams: firstHistoryItem?.modelParams || { ...modelParams },
         createdAt: firstHistoryItem?.createdAt || Date.now(),
       };
     },
-    [generatedImages, id, lightPreview, modelParams, selectedPresets, selectedStyleId],
+    [controller, generatedImages, id, lightPreview, modelParams, selectedPresets, selectedStyleId],
   );
 
   const runGeneration = useCallback(async () => {
@@ -536,7 +548,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const promptWithTextReferences = [textReferencePrompt, promptText]
       .filter((value) => value.trim().length > 0)
       .join('\n\n');
-    const { textPrompt, imageReferences, referenceImages, markReferences, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview);
+    const { textPrompt, imageReferences, referenceImages, markReferences, promptBlocks, userPrompt, globalStyle, presets, controller: controllerSubmission } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview, controller);
 
     let task = createGenerationTask({
       sourceNodeId: id,
@@ -635,8 +647,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     }
 
     abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+    const generationAbortController = new AbortController();
+    abortControllerRef.current = generationAbortController;
 
     try {
       const count = parseCount(modelParams.count);
@@ -661,7 +673,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress: overall, updatedAt: Date.now() } : prev));
             },
           },
-          controller.signal,
+          generationAbortController.signal,
         );
         results.push(result);
       }
@@ -727,6 +739,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         markRefs: task.markRefs,
         presetIds: selectedPresets,
         styleId: selectedStyleId,
+        controller: structuredClone(controller),
         modelParams: { ...modelParams },
         seed: result.seed,
         width: result.width,
@@ -745,6 +758,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         presetIds: selectedPresets,
         styleId: selectedStyleId,
         lightPreview,
+        controller: structuredClone(controller),
         modelParams: { ...modelParams },
         createdAt: Date.now(),
       });
@@ -784,6 +798,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   userPrompt,
                   globalStyle,
                   presets,
+                  controllerSubmission,
+                  controller: structuredClone(controller),
                   promptContent,
                   generatedImages: nextGeneratedImages,
                   generationTask: { ...task, status: 'success', progress: 100, result: results[0], updatedAt: Date.now() },
@@ -815,7 +831,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
+  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, controller, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
 
   const handleGenerate = useCallback(() => {
     if (!canGenerate) {
@@ -843,17 +859,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, lightPreview: data } } : n)));
   };
 
-  const handlePresetsChange = (presets: string[]) => {
-    if (!imageNodeViewModel.canEditPreset) return;
-    const presetOnly = presets.filter((presetId) => getPresetById(presetId)?.category !== 'style');
-    setSelectedPresets(presetOnly);
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, selectedPresets: presetOnly } } : n)));
-  };
-
-  const handleStyleChange = (styleId: string | null) => {
-    if (!imageNodeViewModel.canEditStyle) return;
-    setSelectedStyleId(styleId);
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, selectedStyleId: styleId } } : n)));
+  const handleControllerChange = (nextController: ImageControllerState) => {
+    if (imageNodeViewModel.isProcessing) return;
+    setController(nextController);
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, controller: nextController } } : n)));
   };
 
   const handleModelParamsChange = (params: ModelParams) => {
@@ -2269,10 +2278,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onPromptContentChange={handlePromptContentChange}
               lightPreview={lightPreview}
               onLightPreviewChange={handleLightPreviewChange}
-              selectedPresets={selectedPresets}
-              onPresetsChange={handlePresetsChange}
-              selectedStyleId={selectedStyleId}
-              onStyleChange={handleStyleChange}
+              controller={controller}
+              onControllerChange={handleControllerChange}
               modelParams={modelParams}
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
@@ -2280,7 +2287,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canEditPrompt={imageNodeViewModel.canEditPrompt}
               canEditPromptReferences={imageNodeViewModel.canEditPromptReferences}
               canEditPreset={imageNodeViewModel.canEditPreset}
-              canEditStyle={imageNodeViewModel.canEditStyle}
               canEditLighting={imageNodeViewModel.canEditLighting}
               canEditModel={imageNodeViewModel.canEditModel}
               canDeleteReference={imageNodeViewModel.canDeleteReference}

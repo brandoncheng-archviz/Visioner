@@ -5,8 +5,7 @@ import {
   Image,
   X,
   Bookmark,
-  Sun,
-  Palette,
+  SlidersHorizontal,
   ChevronDown,
   ArrowUp,
   Maximize2,
@@ -23,6 +22,7 @@ import type {
 import type { ModelParams } from '../../types/canvas.types';
 import type { TextReferenceInfo } from '../../types/basicNode.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
+import type { ImageControllerState } from '../../types/imageController.types';
 import {
   FLOATING_PANEL_BACKGROUND,
   FLOATING_PANEL_BORDER,
@@ -41,7 +41,6 @@ import {
   PRESET_DATA,
   PRESET_TABS,
   getPresetById,
-  getStylePresetById,
   isPresetVisibleInLibrary,
 } from '../../constants/presets';
 import { createImageReferenceBlock, getPresetPromptText, stripReferencePromptMetadata } from '../../utils/promptUtils';
@@ -50,18 +49,20 @@ import {
   sortReferencesByUsage,
 } from '../../utils/referenceUtils';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
-import { StylePickerModal } from '../../components/StylePickerModal';
-import { PresetPickerModal } from '../../components/PresetPickerModal';
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
+import { ImageControllerPanel } from '../../components/ImageControllerPanel';
+import { hasActiveImageController, LIGHT_DIRECTION_OPTIONS, STYLE_OPTIONS, TIME_OPTIONS, TOGGLE_OPTIONS, WEATHER_OPTIONS } from '../../constants/imageController';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
 const GENERATION_CONTROL_BUTTON_DISABLED_CLASS =
   'border-[rgba(148,163,184,0.14)] bg-transparent text-[rgba(203,213,225,0.62)]';
-const GENERATION_CONTROL_BUTTON_SELECTED_CLASS =
-  'border-[#94A3B8] bg-[rgba(148,163,184,0.12)] text-[#E2E8F0] shadow-none';
 const GENERATION_CREDIT_COST = 14;
-const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词或选择预设 / 风格 / 光影';
+const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词、设置氛围或插入图片引用';
+const ADVANCED_SLASH_PRESET_IDS = new Set([
+  'clean_up', 'view_to_render', 'make_sketch', 'axonometry', 'design_board', 'moodboard',
+  'macro_closeup', 'object_closeup', 'activity_closeup', 'unfinished', 'mockup', 'blueprints',
+]);
 
 function TextReferenceIcon() {
   return (
@@ -121,10 +122,8 @@ export function ImageNodeControlPanel({
   onPromptContentChange,
   lightPreview,
   onLightPreviewChange,
-  selectedPresets,
-  onPresetsChange,
-  selectedStyleId,
-  onStyleChange,
+  controller,
+  onControllerChange,
   modelParams,
   onModelParamsChange,
   onGenerate,
@@ -132,7 +131,6 @@ export function ImageNodeControlPanel({
   canEditPrompt,
   canEditPromptReferences,
   canEditPreset,
-  canEditStyle,
   canEditLighting,
   canEditModel,
   canDeleteReference,
@@ -157,10 +155,8 @@ export function ImageNodeControlPanel({
   onPromptContentChange: (content: PromptContent[]) => void;
   lightPreview?: LightPreviewData | null;
   onLightPreviewChange: (data: LightPreviewData | null) => void;
-  selectedPresets: string[];
-  onPresetsChange: (presets: string[]) => void;
-  selectedStyleId: string | null;
-  onStyleChange: (styleId: string | null) => void;
+  controller: ImageControllerState;
+  onControllerChange: (controller: ImageControllerState) => void;
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void | Promise<void>;
@@ -168,7 +164,6 @@ export function ImageNodeControlPanel({
   canEditPrompt: boolean;
   canEditPromptReferences: boolean;
   canEditPreset: boolean;
-  canEditStyle: boolean;
   canEditLighting: boolean;
   canEditModel: boolean;
   canDeleteReference: boolean;
@@ -209,8 +204,7 @@ export function ImageNodeControlPanel({
       return () => clearTimeout(timer);
     }
   }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
-  const [showPresetModal, setShowPresetModal] = useState(false);
-  const [showStylePicker, setShowStylePicker] = useState(false);
+  const [showController, setShowController] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [showCountMenu, setShowCountMenu] = useState(false);
@@ -235,6 +229,7 @@ export function ImageNodeControlPanel({
     maxHeight: number;
   } | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
+  const [atmosphereButtonElement, setAtmosphereButtonElement] = useState<HTMLButtonElement | null>(null);
   const markCandidateMenuRef = useRef<HTMLDivElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -452,7 +447,21 @@ export function ImageNodeControlPanel({
     : null;
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
-  const selectedStyle = getStylePresetById(selectedStyleId);
+  const controllerLabels = [
+    ...TOGGLE_OPTIONS.filter((option) => controller.toggles[option.id]).map((option) => option.label),
+    ...([
+      ['time', TIME_OPTIONS],
+      ['lightDirection', LIGHT_DIRECTION_OPTIONS],
+      ['weather', WEATHER_OPTIONS],
+      ['style', STYLE_OPTIONS],
+    ] as const).flatMap(([key, options]) => {
+      const value = controller[key];
+      const option = value ? options.find((item) => item.id === value) : undefined;
+      if (!option) return [];
+      return [option.label];
+    }),
+  ];
+  const controllerSettingCount = controllerLabels.length;
   const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
   const hasManyReferences = sortedReferences.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
 
@@ -468,6 +477,7 @@ export function ImageNodeControlPanel({
     const query = slashQuery.trim().toLowerCase();
     const presetPool = PRESET_DATA.filter((preset) => {
       if (!isPresetVisibleInLibrary(preset) || preset.category === 'style' || preset.tabs.length === 0) return false;
+      if (!ADVANCED_SLASH_PRESET_IDS.has(preset.id)) return false;
       if (slashActiveTab === '我的收藏') return false;
       return preset.tabs.includes(slashActiveTab);
     });
@@ -513,27 +523,6 @@ export function ImageNodeControlPanel({
     return `【${preset.title || preset.name}】\n${prompt}`;
   };
 
-  const appendPresetPromptBlocks = (presetIds: string[], appliedPresets?: PresetItem[]) => {
-    if (!canEditPreset || !canEditPrompt) return;
-    const appliedPresetMap = new Map((appliedPresets || []).map((preset) => [preset.id, preset]));
-    const blocks = presetIds
-      .map((presetId) => appliedPresetMap.get(presetId) || getPresetById(presetId))
-      .filter((preset): preset is PresetItem => Boolean(preset))
-      .map((preset) => buildPresetTextBlock(preset, true))
-      .filter(Boolean);
-    if (!blocks.length) return;
-
-    const separator = promptText.trim() ? '\n\n' : '';
-    onPromptChange(`${promptText}${separator}${blocks.join('\n\n')}`);
-  };
-
-  const handlePresetModalApply = (presetIds: string[], appliedPresets?: PresetItem[]) => {
-    if (!canEditPreset) return;
-    const newlySelectedPresetIds = presetIds.filter((presetId) => !selectedPresets.includes(presetId));
-    const idsToInsert = newlySelectedPresetIds.length > 0 ? newlySelectedPresetIds : presetIds;
-    appendPresetPromptBlocks(idsToInsert, appliedPresets);
-    onPresetsChange(presetIds);
-  };
 
   const handleGenerateClick = () => {
     if (!canGenerate) {
@@ -955,183 +944,52 @@ export function ImageNodeControlPanel({
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {/* Preset */}
-          <div className="relative">
+          {/* Atmosphere */}
+          <div className="group/atmosphere relative">
             <button
-              disabled={!canEditPreset}
+              ref={setAtmosphereButtonElement}
+              type="button"
+              disabled={isGenerating}
               onClick={() => {
-                if (!canEditPreset) return;
-                setShowPresetModal(true);
+                if (isGenerating) return;
+                setShowController((open) => !open);
                 setShowLightPreview(false);
-                setShowStylePicker(false);
               }}
-              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canEditPreset ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${showController || hasActiveImageController(controller) ? 'border-[#3b82f6]/60 bg-[#3b82f6]/[0.07] text-[#bfdbfe]' : isGenerating ? GENERATION_CONTROL_BUTTON_DISABLED_CLASS : GENERATION_CONTROL_BUTTON_CLASS}`}
               style={{
                 width: 54,
                 height: 50,
                 padding: '4px',
-                opacity: canEditPreset ? 1 : 0.45,
-                cursor: canEditPreset ? 'pointer' : 'not-allowed',
+                opacity: isGenerating ? 0.45 : 1,
+                cursor: isGenerating ? 'not-allowed' : 'pointer',
               }}
             >
-              <Bookmark className="w-4 h-4" />
-              <span style={{ fontSize: 14 }}>{t('imageNode.preset')}</span>
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="flex items-center gap-1" style={{ fontSize: 14 }}>
+                氛围
+                {controllerSettingCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[#60a5fa]" />}
+              </span>
             </button>
-            {canEditPreset && showPresetModal && (
-              <PresetPickerModal
-                open={showPresetModal}
-                selectedPresetIds={selectedPresets}
-                onApply={handlePresetModalApply}
-                onClose={() => setShowPresetModal(false)}
-              />
-            )}
-          </div>
-          {/* Light Preview */}
-          <div className="relative">
-            {lightPreview?.enabled ? (
-              <div className="group/light-btn relative" style={{ width: 54, height: 50 }}>
-                <button
-                  type="button"
-                  disabled={!canEditLighting}
-                  onClick={() => {
-                    if (!canEditLighting) return;
-                    setShowLightPreview(true);
-                    setShowPresetModal(false);
-                    setShowStylePicker(false);
-                  }}
-                  className={`relative flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border p-0 transition-colors ${canEditLighting ? GENERATION_CONTROL_BUTTON_SELECTED_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
-                  style={{
-                    opacity: canEditLighting ? 1 : 0.45,
-                    cursor: canEditLighting ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  <img
-                    src={lightPreview.derived.previewImagePath}
-                    alt=""
-                    className="pointer-events-none h-full w-full object-cover"
-                    draggable={false}
-                  />
-                </button>
-                <button
-                  type="button"
-                  onPointerDownCapture={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  onClickCapture={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (!canEditLighting) return;
-                    onLightPreviewChange(null);
-                    setShowLightPreview(false);
-                  }}
-                  className={`nodrag nowheel absolute right-0 top-0 z-30 items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black ${canEditLighting ? 'hidden group-hover/light-btn:flex' : 'hidden'}`}
-                  style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-                  title="清除光影设置"
-                  aria-label="清除光影设置"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
-                {/* Hover tooltip */}
-                {canEditLighting && (
-                  <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[220px] rounded-xl p-2.5 text-left group-hover/light-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
-                    <div className="text-[14px] font-medium text-white/90">光影</div>
-                    <div className="mt-1 text-[13px] text-white/55">{lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}</div>
-                    <div className="mt-1.5 space-y-0.5 text-[13px] text-white/48">
-                      <div>太阳高度：{lightPreview.sun.elevation}°</div>
-                      <div>太阳方位：{lightPreview.sun.azimuth}°</div>
-                      <div>天空：{lightPreview.derived.skyLabel}</div>
-                      <div>阴影：{lightPreview.derived.shadowLengthLabel} · {lightPreview.derived.shadowBlurLabel}</div>
-                    </div>
-                    <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.72)' }}>点击可重新设置</div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                disabled={!canEditLighting}
-                onClick={() => {
-                  if (!canEditLighting) return;
-                  setShowLightPreview(true);
-                  setShowPresetModal(false);
-                  setShowStylePicker(false);
-                }}
-                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canEditLighting ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
-                style={{
-                  width: 54,
-                  height: 50,
-                  padding: '4px',
-                  opacity: canEditLighting ? 1 : 0.45,
-                  cursor: canEditLighting ? 'pointer' : 'not-allowed',
-                }}
-              >
-                <Sun className="w-4 h-4" />
-                <span style={{ fontSize: 14 }}>光影</span>
-              </button>
-            )}
-            {canEditLighting && showLightPreview && (
-              <LightPreviewPanel
-                initialSun={lightPreview?.sun}
-                initialSettings={lightPreview?.settings}
-                onApply={(data) => {
-                  if (!canEditLighting) return;
-                  onLightPreviewChange(data);
-                  setShowLightPreview(false);
-                }}
-                onClose={() => setShowLightPreview(false)}
-              />
-            )}
-          </div>
-          {/* Style */}
-          <div className="relative">
-            <button
-              disabled={!canEditStyle}
-              onClick={() => {
-                if (!canEditStyle) return;
-                setShowStylePicker(true);
-                setShowPresetModal(false);
-                setShowLightPreview(false);
-              }}
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                e.stopPropagation();
-                if (!canEditStyle) return;
-                setShowStylePicker(true);
-                setShowPresetModal(false);
-                setShowLightPreview(false);
-              }}
-              className={`group/style-btn relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
-                selectedStyle
-                  ? GENERATION_CONTROL_BUTTON_SELECTED_CLASS
-                  : canEditStyle ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS
-              }`}
-              style={{
-                width: 54,
-                height: 50,
-                padding: selectedStyle ? 0 : '4px',
-                opacity: canEditStyle ? 1 : 0.45,
-                cursor: canEditStyle ? 'pointer' : 'not-allowed',
-              }}
-              title={t('style.selectStyle')}
-            >
-              {selectedStyle ? (
-                <span className="pointer-events-none h-full w-full overflow-hidden rounded-lg">
-                  <img src={selectedStyle.coverImage} alt="" className="h-full w-full object-cover opacity-95" draggable={false} />
-                </span>
-              ) : (
-                <>
-                  <Palette className="w-4 h-4" />
-                  <span style={{ fontSize: 14 }}>{t('imageNode.style')}</span>
-                </>
-              )}
-              {selectedStyle && canEditStyle && (
-                <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-xl p-2.5 text-left group-hover/style-btn:block" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 14px 32px rgba(0,0,0,0.46)' }}>
-                  <div className="text-[14px] font-medium text-white/90">{selectedStyle.title}</div>
-                  <div className="mt-1 text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.56)' }}>{selectedStyle.shortDescription}</div>
-                  <div className="mt-2 text-[13px]" style={{ color: 'rgba(255,255,255,0.72)' }}>{t('imageNode.clickToChangeStyle')}</div>
+            {!showController && (
+              <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[230px] rounded-lg border border-white/[0.09] bg-[#222224] p-2.5 text-left shadow-[0_12px_30px_rgba(0,0,0,0.46)] group-hover/atmosphere:block">
+                <div className="text-[12px] font-medium text-white/88">氛围控制</div>
+                <div className="mt-1 text-[11px] text-white/45">
+                  {controllerSettingCount > 0 ? `已设置 ${controllerSettingCount} 项` : '未选择'}
                 </div>
-              )}
-            </button>
+                <div className="mt-1 text-[11px] leading-5 text-white/34">
+                  {controllerSettingCount > 0 ? controllerLabels.join('、') : '点击设置生成氛围'}
+                </div>
+              </div>
+            )}
+            {showController && (
+              <ImageControllerPanel
+                anchorElement={atmosphereButtonElement}
+                controller={controller}
+                disabled={isGenerating}
+                onChange={onControllerChange}
+                onClose={() => setShowController(false)}
+              />
+            )}
           </div>
           {/* Element mark */}
           <div className="relative">
@@ -1140,9 +998,8 @@ export function ImageNodeControlPanel({
               disabled={!canCreateMarks}
               onClick={() => {
                 if (!canCreateMarks) return;
-                setShowPresetModal(false);
                 setShowLightPreview(false);
-                setShowStylePicker(false);
+                setShowController(false);
                 onStartMarkMode();
               }}
               className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canCreateMarks ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
@@ -1714,15 +1571,18 @@ export function ImageNodeControlPanel({
           )}
         </div>
       </div>
-      <StylePickerModal
-        open={canEditStyle && showStylePicker}
-        selectedStyleId={selectedStyleId}
-        onApply={(styleId) => {
-          if (!canEditStyle) return;
-          onStyleChange(styleId);
-        }}
-        onClose={() => setShowStylePicker(false)}
-      />
+      {canEditLighting && showLightPreview && (
+        <LightPreviewPanel
+          initialSun={lightPreview?.sun}
+          initialSettings={lightPreview?.settings}
+          onApply={(data) => {
+            if (!canEditLighting) return;
+            onLightPreviewChange(data);
+            setShowLightPreview(false);
+          }}
+          onClose={() => setShowLightPreview(false)}
+        />
+      )}
       {slashMenuPortal}
     </div>
   );

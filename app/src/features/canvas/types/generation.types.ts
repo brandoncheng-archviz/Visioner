@@ -1,5 +1,6 @@
 import type { ModelParams } from './canvas.types';
 import type { ImageMarkBox, ImageMarkCandidate, ImageMarkPoint, LocalReferencePoint, LocalReferenceType } from './imageNode.types';
+import type { ImageControllerState } from './imageController.types';
 
 export type GenerationStatus = 'pending' | 'running' | 'success' | 'failed';
 
@@ -75,6 +76,7 @@ export interface GenerationHistoryItem {
   markRefs?: GenerationInput['markRefs'];
   presetIds: string[];
   styleId: string | null;
+  controller?: ImageControllerState;
   modelParams: ModelParams;
   seed: number;
   width: number;
