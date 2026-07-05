@@ -251,15 +251,17 @@ function CompareImageArea({
               draggable={false}
             />
           </div>
-          <div
-            className="pointer-events-none absolute top-0 bottom-0 w-px"
-            style={{
-              left: `${sliderPosition}%`,
-              background: isDragging || isSliderHovered
-                ? 'rgba(255,255,255,0.96)'
-                : 'rgba(255,255,255,0.72)',
-            }}
-          />
+          {sliderPosition > 1 && sliderPosition < 99 && (
+            <div
+              className="pointer-events-none absolute top-0 bottom-0 w-px"
+              style={{
+                left: `${sliderPosition}%`,
+                background: isDragging || isSliderHovered
+                  ? 'rgba(255,255,255,0.96)'
+                  : 'rgba(255,255,255,0.72)',
+              }}
+            />
+          )}
           <div
             className="nodrag absolute top-0 bottom-0 z-10 w-8 -translate-x-1/2"
             style={{

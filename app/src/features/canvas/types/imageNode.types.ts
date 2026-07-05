@@ -176,6 +176,7 @@ export type PromptContent =
       usage: string;
       thumbnailUrl: string;
       promptText: string;
+      /** True only after the user actually changes the reference description. */
       promptTextEdited?: boolean;
     }
   | {

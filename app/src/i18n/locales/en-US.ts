@@ -98,6 +98,15 @@ const enUS = {
   },
 
   imageNode: {
+    atmosphereLight: "Light",
+    followAtmosphereReference: "Follow Reference",
+    atmosphereLightOptions: {
+      front_light: "Front Light",
+      back_light: "Backlight",
+      left_side_light: "Left Light",
+      right_side_light: "Right Light",
+      diffused_light: "Soft Skylight",
+    },
     definePurpose: "Set Reference Purpose",
     uploadImage: "Upload Image",
     replaceImage: "Replace Image",

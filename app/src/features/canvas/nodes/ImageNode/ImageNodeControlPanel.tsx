@@ -57,6 +57,25 @@ const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
 const GENERATION_CONTROL_BUTTON_DISABLED_CLASS =
   'border-[rgba(148,163,184,0.14)] bg-transparent text-[rgba(203,213,225,0.62)]';
+const resizePromptReferenceTextarea = (element: HTMLTextAreaElement) => {
+  const oneLineHeight = 24;
+  const twoLineHeight = 44;
+  const computedStyle = window.getComputedStyle(element);
+  const lineHeight = Number.parseFloat(computedStyle.lineHeight) || 20;
+  const verticalPadding = Number.parseFloat(computedStyle.paddingTop) + Number.parseFloat(computedStyle.paddingBottom);
+  const oneLineContentHeight = lineHeight + verticalPadding;
+
+  element.style.minHeight = '0px';
+  element.style.maxHeight = 'none';
+  element.style.height = '0px';
+  const contentHeight = element.scrollHeight;
+  const nextHeight = contentHeight > oneLineContentHeight + 1 ? twoLineHeight : oneLineHeight;
+
+  element.style.minHeight = `${oneLineHeight}px`;
+  element.style.maxHeight = `${twoLineHeight}px`;
+  element.style.height = `${nextHeight}px`;
+  element.style.overflowY = contentHeight > element.clientHeight ? 'auto' : 'hidden';
+};
 const GENERATION_CREDIT_COST = 14;
 const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词、设置氛围或插入图片引用';
 const ADVANCED_SLASH_PRESET_IDS = new Set([
@@ -136,6 +155,7 @@ export function ImageNodeControlPanel({
   canDeleteReference,
   canCreateMarks,
   canEditMarks,
+  isMarkModeActive,
   isGenerating,
   generationTask,
   textReferences,
@@ -169,6 +189,7 @@ export function ImageNodeControlPanel({
   canDeleteReference: boolean;
   canCreateMarks: boolean;
   canEditMarks: boolean;
+  isMarkModeActive: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   textReferences: TextReferenceInfo[];
@@ -211,12 +232,17 @@ export function ImageNodeControlPanel({
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [showReferenceMenu, setShowReferenceMenu] = useState(false);
   const [activeMarkCandidateBlockId, setActiveMarkCandidateBlockId] = useState<string | null>(null);
-  const [markCandidateMenuPosition, setMarkCandidateMenuPosition] = useState<{ left: number; top: number } | null>(null);
+  const [markCandidateAnchorElement, setMarkCandidateAnchorElement] = useState<HTMLElement | null>(null);
+  const [markCandidateAnchorRect, setMarkCandidateAnchorRect] = useState<DOMRect | null>(null);
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
   const [editingPromptBlockId, setEditingPromptBlockId] = useState<string | null>(null);
+  const [editingMarkReferenceBlockId, setEditingMarkReferenceBlockId] = useState<string | null>(null);
+  const [editingMarkPromptText, setEditingMarkPromptText] = useState('');
+  const [editingMarkPromptInitialText, setEditingMarkPromptInitialText] = useState('');
   const [editingPromptText, setEditingPromptText] = useState('');
+  const [editingPromptInitialText, setEditingPromptInitialText] = useState('');
 
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
@@ -238,6 +264,9 @@ export function ImageNodeControlPanel({
   const sortedReferences = useMemo(
     () => sortReferencesByUsage(references),
     [references],
+  );
+  const hasAtmosphereReference = sortedReferences.some(
+    (reference) => getReferenceUsageSortRank(reference).group === 1,
   );
 
   const handleThumbnailClick = (ref: ReferenceInfo) => {
@@ -394,7 +423,8 @@ export function ImageNodeControlPanel({
 
     const closeMarkCandidateMenu = () => {
       setActiveMarkCandidateBlockId(null);
-      setMarkCandidateMenuPosition(null);
+      setMarkCandidateAnchorElement(null);
+      setMarkCandidateAnchorRect(null);
     };
     const handleOutsidePointerDown = (event: PointerEvent) => {
       const target = event.target;
@@ -417,14 +447,54 @@ export function ImageNodeControlPanel({
       document.removeEventListener('keydown', handleEscape, true);
     };
   }, [activeMarkCandidateBlock, activeMarkCandidateBlockId, canEditMarks]);
-  const markCandidateMenuPortal = activeMarkCandidateBlock && markCandidateMenuPosition && canEditMarks
+
+  useEffect(() => {
+    if (!activeMarkCandidateBlock || !markCandidateAnchorElement || !canEditMarks) {
+      const frame = requestAnimationFrame(() => setMarkCandidateAnchorRect(null));
+      return () => cancelAnimationFrame(frame);
+    }
+    let frame = 0;
+    const updateAnchorRect = () => {
+      const nextRect = markCandidateAnchorElement.getBoundingClientRect();
+      setMarkCandidateAnchorRect((currentRect) => {
+        if (
+          currentRect
+          && Math.abs(currentRect.left - nextRect.left) < 0.25
+          && Math.abs(currentRect.top - nextRect.top) < 0.25
+          && Math.abs(currentRect.width - nextRect.width) < 0.25
+          && Math.abs(currentRect.height - nextRect.height) < 0.25
+        ) return currentRect;
+        return nextRect;
+      });
+      frame = requestAnimationFrame(updateAnchorRect);
+    };
+    updateAnchorRect();
+    return () => cancelAnimationFrame(frame);
+  }, [activeMarkCandidateBlock, canEditMarks, markCandidateAnchorElement]);
+
+  const markCandidateMenuMargin = 12;
+  const markCandidateMenuWidth = Math.min(180, Math.max(0, window.innerWidth - markCandidateMenuMargin * 2));
+  const markCandidateMenuGap = 6;
+  const markCandidateMenuEstimatedHeight = Math.min(280, (activeMarkCandidateBlock?.candidates.length ?? 0) * 28 + 8);
+  const markCandidateSpaceBelow = markCandidateAnchorRect ? window.innerHeight - markCandidateAnchorRect.bottom - markCandidateMenuMargin - markCandidateMenuGap : 0;
+  const markCandidateSpaceAbove = markCandidateAnchorRect ? markCandidateAnchorRect.top - markCandidateMenuMargin - markCandidateMenuGap : 0;
+  const markCandidateOpenBelow = markCandidateSpaceBelow >= markCandidateMenuEstimatedHeight || markCandidateSpaceBelow >= markCandidateSpaceAbove;
+  const markCandidateMenuLeft = markCandidateAnchorRect
+    ? Math.min(Math.max(markCandidateMenuMargin, markCandidateAnchorRect.left), window.innerWidth - markCandidateMenuWidth - markCandidateMenuMargin)
+    : markCandidateMenuMargin;
+  const markCandidateMenuTop = markCandidateAnchorRect
+    ? (markCandidateOpenBelow ? markCandidateAnchorRect.bottom + markCandidateMenuGap : markCandidateAnchorRect.top - markCandidateMenuGap)
+    : markCandidateMenuMargin;
+  const markCandidateMenuMaxHeight = Math.max(0, markCandidateOpenBelow ? markCandidateSpaceBelow : markCandidateSpaceAbove);
+  const markCandidateMenuPortal = activeMarkCandidateBlock && markCandidateAnchorRect && canEditMarks
     ? createPortal(
         <div
           ref={markCandidateMenuRef}
-          className="fixed z-[4200] w-[180px] overflow-hidden rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]"
-          style={{ left: markCandidateMenuPosition.left, top: markCandidateMenuPosition.top }}
+          className="nodrag nopan nowheel fixed z-[4200] overflow-y-auto overscroll-contain rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]"
+          style={{ left: markCandidateMenuLeft, top: markCandidateMenuTop, width: markCandidateMenuWidth, transform: markCandidateOpenBelow ? undefined : 'translateY(-100%)', maxHeight: markCandidateMenuMaxHeight }}
           onPointerDown={(event) => event.stopPropagation()}
           onMouseDown={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}
         >
           {activeMarkCandidateBlock.candidates.map((candidate) => (
             <button
@@ -435,7 +505,8 @@ export function ImageNodeControlPanel({
                 event.stopPropagation();
                 onUpdateMarkCandidate(activeMarkCandidateBlock.markId, candidate.id);
                 setActiveMarkCandidateBlockId(null);
-                setMarkCandidateMenuPosition(null);
+                setMarkCandidateAnchorElement(null);
+                setMarkCandidateAnchorRect(null);
               }}
             >
               <span className="truncate">{candidate.label}</span>
@@ -447,21 +518,22 @@ export function ImageNodeControlPanel({
     : null;
 
   const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
-  const controllerLabels = [
+  const controllerSummaryLines = [
     ...TOGGLE_OPTIONS.filter((option) => controller.toggles[option.id]).map((option) => option.label),
     ...([
-      ['time', TIME_OPTIONS],
-      ['lightDirection', LIGHT_DIRECTION_OPTIONS],
-      ['weather', WEATHER_OPTIONS],
-      ['style', STYLE_OPTIONS],
-    ] as const).flatMap(([key, options]) => {
+      ['time', '时间', TIME_OPTIONS],
+      ['lightDirection', t('imageNode.atmosphereLight'), LIGHT_DIRECTION_OPTIONS],
+      ['weather', '天气', WEATHER_OPTIONS],
+      ['style', '风格', STYLE_OPTIONS],
+    ] as const).flatMap(([key, label, options]) => {
       const value = controller[key];
       const option = value ? options.find((item) => item.id === value) : undefined;
       if (!option) return [];
-      return [option.label];
+      return [`${label}：${option.label}`];
     }),
   ];
-  const controllerSettingCount = controllerLabels.length;
+  const controllerSettingCount = controllerSummaryLines.length;
+  const hasAtmosphereSettings = hasActiveImageController(controller);
   const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
   const hasManyReferences = sortedReferences.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
 
@@ -622,31 +694,54 @@ export function ImageNodeControlPanel({
     if (editingPromptBlockId === blockId) {
       setEditingPromptBlockId(null);
       setEditingPromptText('');
+      setEditingPromptInitialText('');
     }
   };
 
   const startEditPromptReferenceBlock = (block: ImageReferencePromptBlock) => {
     if (!canEditPromptReferences) return;
+    const promptText = stripReferencePromptMetadata(block.promptText);
     setEditingPromptBlockId(block.id);
-    setEditingPromptText(stripReferencePromptMetadata(block.promptText));
+    setEditingPromptText(promptText);
+    setEditingPromptInitialText(promptText);
   };
 
   const savePromptReferenceBlock = (blockId: string) => {
     if (!canEditPromptReferences) return;
     const nextPromptText = stripReferencePromptMetadata(editingPromptText);
+    const promptTextChanged = nextPromptText !== editingPromptInitialText;
     onPromptContentChange(
       promptContent.map((item) =>
         item.type === 'image_reference' && item.id === blockId
           ? {
               ...item,
               promptText: nextPromptText,
-              promptTextEdited: true,
+              promptTextEdited: item.promptTextEdited === true || promptTextChanged,
             }
           : item,
       ),
     );
     setEditingPromptBlockId(null);
     setEditingPromptText('');
+    setEditingPromptInitialText('');
+  };
+
+  const startEditMarkReferenceBlock = (block: ImageMarkReferencePromptBlock) => {
+    if (!canEditMarks) return;
+    setEditingMarkReferenceBlockId(block.id);
+    setEditingMarkPromptText(block.promptText);
+    setEditingMarkPromptInitialText(block.promptText);
+  };
+
+  const saveMarkReferenceBlock = (blockId: string) => {
+    if (!canEditMarks) return;
+    const promptTextChanged = editingMarkPromptText !== editingMarkPromptInitialText;
+    onPromptContentChange(promptContent.map((item) => item.type === 'image_mark_reference' && item.id === blockId
+      ? { ...item, promptText: editingMarkPromptText, promptTextEdited: item.promptTextEdited === true || promptTextChanged }
+      : item));
+    setEditingMarkReferenceBlockId(null);
+    setEditingMarkPromptText('');
+    setEditingMarkPromptInitialText('');
   };
 
   const requestReferenceInsert = (reference: ReferenceInfo) => {
@@ -955,7 +1050,17 @@ export function ImageNodeControlPanel({
                 setShowController((open) => !open);
                 setShowLightPreview(false);
               }}
-              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${showController || hasActiveImageController(controller) ? 'border-[#3b82f6]/60 bg-[#3b82f6]/[0.07] text-[#bfdbfe]' : isGenerating ? GENERATION_CONTROL_BUTTON_DISABLED_CLASS : GENERATION_CONTROL_BUTTON_CLASS}`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
+                isGenerating
+                  ? GENERATION_CONTROL_BUTTON_DISABLED_CLASS
+                  : showController
+                    ? hasAtmosphereSettings
+                      ? 'border-[rgba(170,120,255,0.95)] bg-[rgba(150,100,255,0.16)] text-[rgba(255,255,255,0.92)] hover:border-[rgba(185,145,255,1)] hover:bg-[rgba(150,100,255,0.19)]'
+                      : 'border-[rgba(170,120,255,0.95)] bg-[rgba(150,100,255,0.05)] text-[rgba(255,255,255,0.78)] hover:border-[rgba(185,145,255,1)] hover:bg-[rgba(150,100,255,0.08)]'
+                    : hasAtmosphereSettings
+                      ? 'border-[rgba(148,163,184,0.28)] bg-[rgba(150,100,255,0.10)] text-[rgba(225,225,232,0.78)] hover:border-[rgba(148,163,184,0.48)] hover:bg-[rgba(150,100,255,0.13)]'
+                      : GENERATION_CONTROL_BUTTON_CLASS
+              }`}
               style={{
                 width: 54,
                 height: 50,
@@ -965,26 +1070,30 @@ export function ImageNodeControlPanel({
               }}
             >
               <SlidersHorizontal className="h-4 w-4" />
-              <span className="flex items-center gap-1" style={{ fontSize: 14 }}>
-                氛围
-                {controllerSettingCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[#60a5fa]" />}
-              </span>
+              <span style={{ fontSize: 14 }}>氛围</span>
             </button>
-            {!showController && (
-              <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[230px] rounded-lg border border-white/[0.09] bg-[#222224] p-2.5 text-left shadow-[0_12px_30px_rgba(0,0,0,0.46)] group-hover/atmosphere:block">
-                <div className="text-[12px] font-medium text-white/88">氛围控制</div>
-                <div className="mt-1 text-[11px] text-white/45">
-                  {controllerSettingCount > 0 ? `已设置 ${controllerSettingCount} 项` : '未选择'}
-                </div>
-                <div className="mt-1 text-[11px] leading-5 text-white/34">
-                  {controllerSettingCount > 0 ? controllerLabels.join('、') : '点击设置生成氛围'}
-                </div>
+            {!showController && (controllerSettingCount > 0 || hasAtmosphereReference) && (
+              <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-lg border border-white/[0.09] bg-[#222224] px-2.5 py-2 text-left shadow-[0_12px_30px_rgba(0,0,0,0.46)] group-hover/atmosphere:block">
+                {controllerSettingCount > 0 ? (
+                  <>
+                    <div className="text-[12px] font-medium text-white/82">氛围已设置</div>
+                    <div className="mt-1 space-y-0.5 text-[11px] leading-4 text-white/42">
+                      {controllerSummaryLines.map((line) => <div key={line}>{line}</div>)}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[12px] font-medium text-white/66">跟随氛围参考</div>
+                    <div className="mt-1 text-[11px] leading-4 text-white/42">时间、天气、光线将参考氛围图</div>
+                  </>
+                )}
               </div>
             )}
             {showController && (
               <ImageControllerPanel
                 anchorElement={atmosphereButtonElement}
                 controller={controller}
+                hasAtmosphereReference={hasAtmosphereReference}
                 disabled={isGenerating}
                 onChange={onControllerChange}
                 onClose={() => setShowController(false)}
@@ -996,13 +1105,14 @@ export function ImageNodeControlPanel({
             <button
               type="button"
               disabled={!canCreateMarks}
+              aria-pressed={isMarkModeActive}
               onClick={() => {
                 if (!canCreateMarks) return;
                 setShowLightPreview(false);
                 setShowController(false);
                 onStartMarkMode();
               }}
-              className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canCreateMarks ? GENERATION_CONTROL_BUTTON_CLASS : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canCreateMarks ? (isMarkModeActive ? 'border-cyan-400/90 bg-cyan-400/[0.08] text-cyan-100/90 hover:border-cyan-300 hover:bg-cyan-400/[0.11]' : GENERATION_CONTROL_BUTTON_CLASS) : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
               style={{
                 width: 54,
                 height: 50,
@@ -1066,12 +1176,18 @@ export function ImageNodeControlPanel({
                 const selectedCandidate = block.candidates.find((candidate) => candidate.id === block.selectedCandidateId)
                   ?? block.candidates[0];
                 const markUsageColor = getImageRoleColor(block.usageKey === 'undefined_usage' ? null : block.usageKey);
+                const isEditing = canEditMarks && editingMarkReferenceBlockId === block.id;
                 return (
                   <div
                     key={block.id}
-                    className="group/mark-ref relative flex w-full items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.035] px-1.5 py-1 text-[15px]"
+                    onClick={(event) => {
+                      if (isEditing) return;
+                      event.stopPropagation();
+                      startEditMarkReferenceBlock(block);
+                    }}
+                    className="group/mark-ref relative flex w-[95%] max-w-[95%] self-start items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.035] px-1.5 py-1 text-[15px]"
                   >
-                    <div className="relative h-6 w-6 flex-shrink-0">
+                    <div className="group/mark-thumb relative h-6 w-6 flex-shrink-0">
                       <img
                         src={block.thumbnailUrl}
                         alt=""
@@ -1082,8 +1198,16 @@ export function ImageNodeControlPanel({
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full border border-white/15 bg-[#252526] text-teal-300/80">
                         <ScanSearch className="h-2 w-2" />
                       </span>
+                      {!isEditing && (
+                        <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[184px] overflow-hidden rounded-lg border border-white/10 bg-[#222224] p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.48)] group-hover/mark-thumb:block">
+                          <img src={block.thumbnailUrl} alt="" draggable={false} className="h-[116px] w-full rounded-md object-cover" />
+                          <div className="truncate px-1 pb-0.5 pt-1.5 text-[12px] font-medium" style={{ color: markUsageColor }}>
+                            {selectedCandidate?.label || block.markLabel}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex min-w-0 w-[150px] flex-shrink-0 items-center">
+                    <div className="flex min-w-0 max-w-[150px] flex-shrink items-center">
                         {block.candidates.length > 1 ? (
                           <button
                             data-mark-candidate-trigger={block.id}
@@ -1094,15 +1218,12 @@ export function ImageNodeControlPanel({
                               event.stopPropagation();
                               if (activeMarkCandidateBlockId === block.id) {
                                 setActiveMarkCandidateBlockId(null);
-                                setMarkCandidateMenuPosition(null);
+                                setMarkCandidateAnchorElement(null);
+                                setMarkCandidateAnchorRect(null);
                                 return;
                               }
-                              const rect = event.currentTarget.getBoundingClientRect();
                               setActiveMarkCandidateBlockId(block.id);
-                              setMarkCandidateMenuPosition({
-                                left: Math.max(8, Math.min(window.innerWidth - 188, rect.left)),
-                                top: rect.bottom + 4,
-                              });
+                              setMarkCandidateAnchorElement(event.currentTarget);
                             }}
                             className="nodrag flex h-6 min-w-0 flex-1 cursor-pointer items-center gap-1 rounded border border-white/10 bg-white/[0.045] px-1.5 text-[15px] font-medium text-white/80 outline-none disabled:cursor-default disabled:opacity-70"
                             title={block.markLabel}
@@ -1116,35 +1237,56 @@ export function ImageNodeControlPanel({
                           </span>
                         )}
                     </div>
-                      <input
-                        type="text"
-                        value={block.promptText}
-                        disabled={!canEditMarks}
-                        onChange={(event) => {
-                          const nextPromptText = event.target.value;
-                          onPromptContentChange(promptContent.map((item) => item.type === 'image_mark_reference' && item.id === block.id
-                            ? { ...item, promptText: nextPromptText, promptTextEdited: true }
-                            : item));
+                    {isEditing ? (
+                      <textarea
+                        autoFocus
+                        ref={(element) => {
+                          if (!element) return;
+                          requestAnimationFrame(() => {
+                            element.focus();
+                            const end = element.value.length;
+                            element.setSelectionRange(end, end);
+                            resizePromptReferenceTextarea(element);
+                          });
                         }}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        className="nodrag nowheel h-6 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 text-[15px] text-white/65 outline-none transition-colors hover:border-white/[0.08] focus:border-white/[0.14] focus:bg-black/10 disabled:opacity-70"
-                        placeholder="补充标记元素的参考说明"
+                        value={editingMarkPromptText}
+                        onChange={(event) => {
+                          setEditingMarkPromptText(event.target.value);
+                          resizePromptReferenceTextarea(event.currentTarget);
+                        }}
+                        onBlur={() => saveMarkReferenceBlock(block.id)}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            saveMarkReferenceBlock(block.id);
+                          }
+                        }}
+                        onPointerDown={stopControlEvent}
+                        onMouseDown={stopControlEvent}
+                        onWheel={stopControlEvent}
+                        onWheelCapture={stopControlEvent}
+                        className="nodrag nowheel min-w-0 flex-1 resize-none overflow-y-auto bg-transparent text-[15px] leading-5 outline-none"
+                        style={{ minHeight: 24, maxHeight: 44, color: 'rgba(255,255,255,0.82)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 6, padding: '1px 6px' }}
                       />
-                    {canEditMarks && (
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate px-1.5 text-[15px] leading-5 text-white/65">{block.promptText}</span>
+                    )}
+                    {canEditMarks && !isEditing ? (
                       <button
                         type="button"
-                        className="ml-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full opacity-0 transition-colors hover:bg-white/15 group-hover/mark-ref:opacity-100"
-                        style={{ color: 'rgba(255,255,255,0.58)' }}
+                        className="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-black/25 text-white/70 opacity-0 transition-all hover:bg-red-500/20 hover:text-red-200 group-hover/mark-ref:opacity-100"
                         onClick={(event) => {
                           event.stopPropagation();
                           onPromptContentChange(promptContent.filter((item) => !('id' in item) || item.id !== block.id));
                         }}
                         title={t('imageMark.removeChip', { defaultValue: '移除标记引用' })}
                       >
-                        <X className="h-2.5 w-2.5" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
+                    ) : (
+                      <span className="ml-auto h-5 w-5 flex-shrink-0" aria-hidden="true" />
                     )}
-                    {!canEditMarks && <span className="ml-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />}
                   </div>
                 );
               })}
@@ -1157,9 +1299,9 @@ export function ImageNodeControlPanel({
                 const previewImage = reference?.imageUrl || block.thumbnailUrl;
                 const highlighted = highlightedPromptBlockId === block.id;
                 const isPromptBlockHovered = hoveredPromptBlockId === block.id;
-                const hovered = canEditPromptReferences && isPromptBlockHovered;
                 const usageColor = getImageRoleColor(reference?.role ?? null, reference?.localReferenceType);
                 const isEditing = canEditPromptReferences && editingPromptBlockId === block.id;
+                const hovered = canEditPromptReferences && !isEditing && isPromptBlockHovered;
                 const displayPromptText = stripReferencePromptMetadata(block.promptText);
                 const displayUsage = reference?.roleLabel || block.usage;
 
@@ -1175,11 +1317,12 @@ export function ImageNodeControlPanel({
                     }}
                     onMouseEnter={() => setHoveredPromptBlockId(block.id)}
                     onMouseLeave={() => setHoveredPromptBlockId((currentId) => (currentId === block.id ? null : currentId))}
-                    onDoubleClick={(event) => {
+                    onClick={(event) => {
+                      if (isEditing) return;
                       event.stopPropagation();
                       startEditPromptReferenceBlock(block);
                     }}
-                    className="group/prompt-ref relative flex w-full items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[15px] transition-all"
+                    className="group/prompt-ref relative flex w-[95%] max-w-[95%] self-start items-center gap-1.5 rounded-lg border px-1.5 py-1 text-[15px] transition-all"
                     style={{
                       background: hovered || highlighted ? 'rgba(255,255,255,0.052)' : 'rgba(255,255,255,0.035)',
                       borderColor: highlighted ? `${usageColor}66` : hovered ? `${usageColor}52` : 'rgba(255,255,255,0.10)',
@@ -1188,56 +1331,21 @@ export function ImageNodeControlPanel({
                       opacity: canEditPromptReferences ? 1 : 0.82,
                     }}
                     >
-                    {!isEditing && isPromptBlockHovered && (
-                      <div
-                        className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-[320px] rounded-xl p-3 text-left"
-                        style={{
-                          background: FLOATING_PANEL_BACKGROUND,
-                          border: FLOATING_PANEL_BORDER,
-                          boxShadow: '0 14px 32px rgba(0,0,0,0.46)',
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          {previewImage ? (
-                            <img
-                              src={previewImage}
-                              alt=""
-                              className="h-7 w-7 flex-shrink-0 rounded object-cover"
-                              draggable={false}
-                              style={{ border: `1px solid ${usageColor}` }}
-                            />
-                          ) : (
-                            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${usageColor}` }}>
-                              <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
-                            </span>
-                          )}
-                          <div className="min-w-0">
-                            <div className="truncate text-[14px] font-medium" style={{ color: 'rgba(255,255,255,0.86)' }}>
-                              {displayUsage}
-                            </div>
-                            <div className="mt-0.5 text-[12px]" style={{ color: 'rgba(255,255,255,0.46)' }}>
-                              双击编辑引用说明
-                            </div>
-                          </div>
+                    <div className="group/reference-thumb relative h-6 w-6 flex-shrink-0">
+                      {previewImage ? (
+                        <img src={previewImage} alt="" className="h-6 w-6 rounded object-cover" draggable={false} style={{ border: `1px solid ${usageColor}` }} />
+                      ) : (
+                        <span className="flex h-6 w-6 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${usageColor}` }}>
+                          <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
+                        </span>
+                      )}
+                      {!isEditing && previewImage && (
+                        <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[184px] overflow-hidden rounded-lg border border-white/10 bg-[#222224] p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.48)] group-hover/reference-thumb:block">
+                          <img src={previewImage} alt="" draggable={false} className="h-[116px] w-full rounded-md object-cover" />
+                          <div className="truncate px-1 pb-0.5 pt-1.5 text-[12px] font-medium" style={{ color: usageColor }}>{displayUsage}</div>
                         </div>
-                        <div className="mt-2 whitespace-pre-wrap break-words text-[13px] leading-5" style={{ color: 'rgba(255,255,255,0.68)' }}>
-                          {displayPromptText || '暂无用途说明'}
-                        </div>
-                      </div>
-                    )}
-                    {previewImage ? (
-                      <img
-                        src={previewImage}
-                        alt=""
-                        className="h-6 w-6 flex-shrink-0 rounded object-cover"
-                        draggable={false}
-                        style={{ border: `1px solid ${usageColor}` }}
-                      />
-                    ) : (
-                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${usageColor}` }}>
-                        <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
-                      </span>
-                    )}
+                      )}
+                    </div>
                     <span
                       className="flex-shrink-0 rounded px-1.5 py-0.5 font-medium leading-none"
                       style={{
@@ -1257,10 +1365,14 @@ export function ImageNodeControlPanel({
                             element.focus();
                             const end = element.value.length;
                             element.setSelectionRange(end, end);
+                            resizePromptReferenceTextarea(element);
                           });
                         }}
                         value={editingPromptText}
-                        onChange={(event) => setEditingPromptText(event.target.value)}
+                        onChange={(event) => {
+                          setEditingPromptText(event.target.value);
+                          resizePromptReferenceTextarea(event.currentTarget);
+                        }}
                         onBlur={() => savePromptReferenceBlock(block.id)}
                         onKeyDown={(event) => {
                           event.stopPropagation();
@@ -1275,13 +1387,14 @@ export function ImageNodeControlPanel({
                         onWheelCapture={stopControlEvent}
                         className="nodrag nowheel min-w-0 flex-1 resize-none overflow-y-auto bg-transparent text-[15px] leading-5 outline-none"
                         style={{
-                          height: 76,
+                          minHeight: 24,
+                          maxHeight: 44,
                           color: 'rgba(255,255,255,0.82)',
                           whiteSpace: 'pre-wrap',
                           overflowWrap: 'anywhere',
                           border: '1px solid rgba(255,255,255,0.14)',
                           borderRadius: 6,
-                          padding: '4px 6px',
+                          padding: '1px 6px',
                         }}
                       />
                     ) : (
@@ -1294,11 +1407,10 @@ export function ImageNodeControlPanel({
                           event.stopPropagation();
                           removePromptReferenceBlock(block.id);
                         }}
-                        className="ml-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full opacity-0 transition-colors hover:bg-white/15 group-hover/prompt-ref:opacity-100"
-                        style={{ color: 'rgba(255,255,255,0.58)' }}
+                        className="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-black/25 text-white/70 opacity-0 transition-all hover:bg-red-500/20 hover:text-red-200 group-hover/prompt-ref:opacity-100"
                         title={t('imageNode.removeReferencePrompt')}
                       >
-                        <X className="h-2.5 w-2.5" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     )}
                     {(!canEditPromptReferences || isEditing) && <span className="ml-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />}

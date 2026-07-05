@@ -98,6 +98,15 @@ const zhCN = {
   },
 
   imageNode: {
+    atmosphereLight: "光线",
+    followAtmosphereReference: "跟随参考",
+    atmosphereLightOptions: {
+      front_light: "顺光",
+      back_light: "逆光",
+      left_side_light: "左侧光",
+      right_side_light: "右侧光",
+      diffused_light: "柔和天光",
+    },
     definePurpose: "设置参考用途",
     uploadImage: "上传图片",
     replaceImage: "替换图片",

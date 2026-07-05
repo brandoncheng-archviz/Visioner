@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Copy, Crop, Download, Image, Maximize2, Minimize2, Plus, RefreshCw, ScanSearch, Trash2, Upload } from 'lucide-react';
+import { Check, ChevronDown, Copy, Crop, Download, Image, Maximize2, Minimize2, Plus, ScanSearch, Trash2, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
@@ -66,7 +66,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const { show: showToast } = useToast();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
-  const hasInputConnection = useStore((state) => state.edges.some((e) => e.target === id));
 
   const currentImage = getCurrentImage(data);
   const rawRole = (data.role as ImageRole | null | undefined) ?? null;
@@ -91,6 +90,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const pendingMarkSourceActivationRef = useRef<string | null>(null);
   const markLabelButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const [activeMarkMenuId, setActiveMarkMenuId] = useState<string | null>(null);
+  const [activeMarkButtonRect, setActiveMarkButtonRect] = useState<DOMRect | null>(null);
   const [markTargetNodeId, setMarkTargetNodeId] = useState(id);
   const [visibleSessionMarks, setVisibleSessionMarks] = useState<{ sessionId: string | null; ids: Set<string> }>(() => ({ sessionId: null, ids: new Set() }));
 
@@ -449,7 +449,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     return true;
   }), [allNodes]);
   const canStartMarking = !imageNodeViewModel.isProcessing && canvasMarkableNodes.length > 0;
-  const canManageMarkReferences = !imageNodeViewModel.isProcessing;
   const isCanvasMarkSelectionMode = Boolean(activeImageMarkTargetNodeId);
   const isCanvasMarkSelectable = isCanvasMarkSelectionMode
     && Boolean(displayImage)
@@ -1076,10 +1075,16 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [displayImage, exitPointPickMode, id, imageMarks, setNodes]);
 
   const startMarkMode = useCallback(() => {
+    if (activeImageMarkTargetNodeId === id) {
+      exitPointPickMode();
+      const onExitSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
+      onExitSelection?.();
+      return;
+    }
     if (!canStartMarking) return;
     const onStartSelection = data.onStartCanvasImageMarkSelection as ((targetNodeId: string) => void) | undefined;
     onStartSelection?.(id);
-  }, [canStartMarking, data.onStartCanvasImageMarkSelection, id]);
+  }, [activeImageMarkTargetNodeId, canStartMarking, data.onExitCanvasImageMarkSelection, data.onStartCanvasImageMarkSelection, exitPointPickMode, id]);
 
   const resolveCoverGeometry = useCallback(() => {
     const img = imgRef.current;
@@ -1467,18 +1472,56 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     });
   };
   const activeImageMark = imageMarks.find((mark) => mark.id === activeMarkMenuId && mark.sourceImageUrl === displayImage);
-  const activeMarkButtonRect = activeMarkMenuId
-    ? markLabelButtonRefs.current.get(activeMarkMenuId)?.getBoundingClientRect()
-    : undefined;
+
+  useEffect(() => {
+    const anchorElement = activeMarkMenuId ? markLabelButtonRefs.current.get(activeMarkMenuId) : null;
+    if (!activeImageMark || !anchorElement || !imageNodeViewModel.canEditMarks) {
+      const frame = requestAnimationFrame(() => setActiveMarkButtonRect(null));
+      return () => cancelAnimationFrame(frame);
+    }
+    let frame = 0;
+    const updateAnchorRect = () => {
+      const nextRect = anchorElement.getBoundingClientRect();
+      setActiveMarkButtonRect((currentRect) => {
+        if (
+          currentRect
+          && Math.abs(currentRect.left - nextRect.left) < 0.25
+          && Math.abs(currentRect.top - nextRect.top) < 0.25
+          && Math.abs(currentRect.width - nextRect.width) < 0.25
+          && Math.abs(currentRect.height - nextRect.height) < 0.25
+        ) return currentRect;
+        return nextRect;
+      });
+      frame = requestAnimationFrame(updateAnchorRect);
+    };
+    updateAnchorRect();
+    return () => cancelAnimationFrame(frame);
+  }, [activeImageMark, activeMarkMenuId, imageNodeViewModel.canEditMarks]);
+
+  const activeMarkMenuMargin = 12;
+  const activeMarkMenuWidth = Math.min(210, Math.max(0, window.innerWidth - activeMarkMenuMargin * 2));
+  const activeMarkMenuGap = 8;
+  const activeMarkMenuEstimatedHeight = Math.min(320, (activeImageMark?.candidates.length ?? 0) * 30 + 44);
+  const activeMarkSpaceBelow = activeMarkButtonRect ? window.innerHeight - activeMarkButtonRect.bottom - activeMarkMenuMargin - activeMarkMenuGap : 0;
+  const activeMarkSpaceAbove = activeMarkButtonRect ? activeMarkButtonRect.top - activeMarkMenuMargin - activeMarkMenuGap : 0;
+  const activeMarkOpenBelow = activeMarkSpaceBelow >= activeMarkMenuEstimatedHeight || activeMarkSpaceBelow >= activeMarkSpaceAbove;
+  const activeMarkMenuLeft = activeMarkButtonRect
+    ? Math.min(Math.max(activeMarkMenuMargin, activeMarkButtonRect.left), window.innerWidth - activeMarkMenuWidth - activeMarkMenuMargin)
+    : activeMarkMenuMargin;
+  const activeMarkMenuTop = activeMarkButtonRect
+    ? (activeMarkOpenBelow ? activeMarkButtonRect.bottom + activeMarkMenuGap : activeMarkButtonRect.top - activeMarkMenuGap)
+    : activeMarkMenuMargin;
+  const activeMarkMenuMaxHeight = Math.max(0, activeMarkOpenBelow ? activeMarkSpaceBelow : activeMarkSpaceAbove);
   const activeMarkCandidatePortal = activeImageMark && activeMarkButtonRect && imageNodeViewModel.canEditMarks
     ? createPortal(
         <div
-          className="fixed z-[4200] w-[210px] overflow-hidden rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]"
+          className="nodrag nopan nowheel fixed z-[4200] overflow-y-auto overscroll-contain rounded-lg border border-white/10 bg-[#252526] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.5)]"
           style={{
-            left: Math.max(8, Math.min(window.innerWidth - 218, activeMarkButtonRect.left)),
-            top: activeMarkButtonRect.bottom + 8 + 190 > window.innerHeight
-              ? Math.max(8, activeMarkButtonRect.top - 198)
-              : activeMarkButtonRect.bottom + 8,
+            left: activeMarkMenuLeft,
+            top: activeMarkMenuTop,
+            width: activeMarkMenuWidth,
+            transform: activeMarkOpenBelow ? undefined : 'translateY(-100%)',
+            maxHeight: activeMarkMenuMaxHeight,
           }}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
@@ -1707,7 +1750,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       disabled: !imageNodeViewModel.canUseToolbarActions,
     },
     {
-      icon: RefreshCw,
+      icon: Upload,
       label: t('common.replace'),
       disabled: !imageNodeViewModel.canUseToolbarActions,
       menuItems: [
@@ -1737,6 +1780,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     },
   ], [enterCropMode, handleDeleteNode, handleDownload, handleDuplicateNode, handlePreview, imageLoadFailed, imageNodeViewModel.canUseToolbarActions, imgSize, t]);
 
+  const emptyImageToolbarActions = useMemo(() => [
+    {
+      icon: Upload,
+      label: t('common.uploadFromDevice'),
+      action: () => fileRef.current?.click(),
+      disabled: !imageNodeViewModel.canUpload,
+    },
+  ], [imageNodeViewModel.canUpload, t]);
+
   // Global modifier + G shortcut for generation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1761,11 +1813,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       {canvasMarkSelectionPortal}
       {pointPickResultPortal}
       {activeMarkCandidatePortal}
-      {/* Toolbar — shown above title only when this node has a real image/result */}
-      {imageNodeViewModel.showTopToolbar && isOnlySelected && !isMultiResultExpanded && !isCropMode && (
+      {/* Toolbar — empty nodes expose upload only; image nodes keep their existing actions. */}
+      {(imageNodeViewModel.showTopToolbar || imageNodeViewModel.canUpload) && isOnlySelected && !isMultiResultExpanded && !isCropMode && (
         <div className="absolute z-[80] flex justify-center" style={{ top: -80 / zoom, left: displayCardWidth / 2, transform: `translateX(-50%) scale(${inverseScale})`, transformOrigin: 'top center' }}>
           <ImageToolbar
-            actions={imageToolbarActions}
+            actions={imageNodeViewModel.canUpload ? emptyImageToolbarActions : imageToolbarActions}
           />
         </div>
       )}
@@ -1845,26 +1897,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
       {/* Image card wrapper — relative for handles/upload positioning */}
       <div className="relative" style={{ width: displayCardWidth }}>
-        {/* Upload icon — inside card top-right, hidden when node has input connection */}
-        {isOnlySelected && !hasInputConnection && imageNodeViewModel.canUpload && (
-          <>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="absolute z-20 flex items-center justify-center rounded-lg transition-colors cursor-pointer"
-              style={{
-                top: 8,
-                right: 8,
-                width: 22,
-                height: 22,
-                background: 'rgba(37,37,48,0.9)',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
-            >
-              <Upload style={{ width: 11, height: 11, color: 'rgba(255,255,255,0.7)' }} />
-            </button>
-	            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-	          </>
-	        )}
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
         <input ref={replaceFileRef} type="file" accept="image/*" className="hidden" onChange={handleReplaceFileChange} />
 
         {imageNodeViewModel.showReferenceUsageControl && !isCropMode && (isOnlySelected || roleMenuOpen) && (
@@ -2291,7 +2324,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canEditModel={imageNodeViewModel.canEditModel}
               canDeleteReference={imageNodeViewModel.canDeleteReference}
               canCreateMarks={canStartMarking}
-              canEditMarks={canManageMarkReferences}
+              canEditMarks={imageNodeViewModel.canEditMarks}
+              isMarkModeActive={activeImageMarkTargetNodeId === id}
               isGenerating={isGenerating}
               generationTask={generationTask}
               textReferences={textReferences}

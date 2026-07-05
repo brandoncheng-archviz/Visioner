@@ -14,7 +14,6 @@ import i18n from '@/i18n';
 import type { ImageControllerState } from '../types/imageController.types';
 import {
   LIGHT_DIRECTION_OPTIONS,
-  SEASON_OPTIONS,
   STYLE_OPTIONS,
   TIME_OPTIONS,
   TOGGLE_OPTIONS,
@@ -96,7 +95,6 @@ export function serializeImageControllerPrompt(controller?: ImageControllerState
   addOption('time', controller.time, TIME_OPTIONS);
   addOption('lightDirection', controller.lightDirection, LIGHT_DIRECTION_OPTIONS);
   addOption('weather', controller.weather, WEATHER_OPTIONS);
-  addOption('season', controller.season, SEASON_OPTIONS);
   TOGGLE_OPTIONS.forEach((option) => {
     if (controller.toggles[option.id]) {
       fragments.push({ key: `toggles.${option.id}`, label: option.label, prompt: option.prompt, source: 'controller' });
@@ -136,7 +134,7 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
   const normalizedRole = getNormalizedRole(reference.role);
 
   if (normalizedRole === 'primary_building' || reference.roleLabel.includes('主体建筑')) {
-    return '保持建筑结构、体块比例、立面关系、相机角度和构图比例不变。';
+    return '默认保护主体建筑，保持建筑结构、体块比例、立面关系、相机角度和构图比例稳定；如果用户明确要求调整，则以用户显式意图为准。';
   }
   if (normalizedRole === 'atmosphere_reference' || reference.role === 'overall_reference' || reference.roleLabel.includes('氛围')) {
     return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
@@ -190,6 +188,7 @@ export function createImageReferenceBlock(reference: ReferenceInfo): ImageRefere
     usage: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
     thumbnailUrl: reference.imageUrl,
     promptText: stripReferencePromptMetadata(getImageReferencePromptText(reference)),
+    promptTextEdited: false,
   };
 }
 
@@ -241,6 +240,9 @@ export function buildPromptSubmission(
     }));
   const imageMarkBlocks = promptContent.filter(
     (block): block is ImageMarkReferencePromptBlock => block.type === 'image_mark_reference',
+  );
+  const imageRefBlockBySourceNodeId = new Map(
+    imageRefBlocks.map((block) => [block.sourceNodeId, block]),
   );
 
   const referenceById = new Map(sortedNodeReferences.map((reference) => [reference.nodeId, reference]));
@@ -298,7 +300,7 @@ export function buildPromptSubmission(
 
   const sections: string[] = [];
   if (trimmedUserText) sections.push(trimmedUserText);
-  if (primaryBuilding.length) sections.push(`主体建筑约束：${primaryBuilding.map((block) => block.promptText).join('；')}`);
+  if (primaryBuilding.length) sections.push(`主体建筑默认保护：${primaryBuilding.map((block) => block.promptText).join('；')}`);
   if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((block) => block.promptText).join('；')}`);
   if (materialRefs.length) sections.push(`材质参考：${materialRefs.map((block) => block.promptText).join('；')}`);
   if (landscapeRefs.length) sections.push(`景观参考：${landscapeRefs.map((block) => block.promptText).join('；')}`);
@@ -335,6 +337,9 @@ export function buildPromptSubmission(
   if (sortedNodeReferences.length) {
     sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、氛围、材质、景观、照明和室内空间等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
   }
+  if (trimmedUserText || primaryBuilding.length || atmosphereRefs.length || imageMarkBlocks.length || controllerPrompt.fragments.length) {
+    sections.push('最终规则：用户手写提示词为最高优先级；用户修改过的参考说明、标记说明和手动设置的氛围控制均属于用户显式意图，优先于系统默认。主体建筑仅做默认保护，默认保持结构、体块比例、立面关系、相机角度和构图比例稳定；如果用户显式要求改变建筑，则以用户显式意图为准。标记属于局部指令，在其标记区域内优先于全局氛围控制和氛围参考；全局增强开关关闭不禁止局部标记指令。氛围控制器只覆盖用户主动选择或开启的对应维度，未设置或跟随参考的维度不生成额外覆盖约束。');
+  }
 
   return {
     textPrompt: sections.join('\n\n'),
@@ -347,7 +352,8 @@ export function buildPromptSubmission(
       localReferenceType: reference.localReferenceType,
       localReferenceLabel: reference.localReferenceLabel,
       localReferencePoint: reference.localReferencePoint,
-      promptText: getImageReferencePromptText(reference),
+      promptText: imageRefBlockBySourceNodeId.get(reference.nodeId)?.promptText
+        ?? getImageReferencePromptText(reference),
     })),
     markReferences: imageMarkBlocks.map((block) => ({
       markId: block.markId,

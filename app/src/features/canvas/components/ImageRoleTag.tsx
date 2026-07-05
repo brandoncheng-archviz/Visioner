@@ -19,7 +19,7 @@ export function ImageRoleTag({
   onChange,
   open: controlledOpen,
   onOpenChange,
-  rootClassName = 'absolute z-30 nodrag nowheel',
+  rootClassName = 'absolute z-30 nodrag nopan nowheel',
   rootStyle,
   hideTrigger = false,
   disabled = false,
@@ -44,6 +44,7 @@ export function ImageRoleTag({
   const [hoveredRole, setHoveredRole] = useState<ImageRole | null>(null);
   const [isTagHovered, setIsTagHovered] = useState(false);
   const [rootElement, setRootElement] = useState<HTMLDivElement | null>(null);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const displayLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
@@ -124,7 +125,33 @@ export function ImageRoleTag({
     };
   }, [open, handleOpenChange, rootElement]);
 
-  const anchorRect = open ? rootElement?.getBoundingClientRect() : null;
+  useEffect(() => {
+    if (!open || !rootElement) {
+      const frame = requestAnimationFrame(() => setAnchorRect(null));
+      return () => cancelAnimationFrame(frame);
+    }
+
+    let frame = 0;
+    const updateAnchorRect = () => {
+      const nextRect = rootElement.getBoundingClientRect();
+      setAnchorRect((currentRect) => {
+        if (
+          currentRect
+          && Math.abs(currentRect.left - nextRect.left) < 0.25
+          && Math.abs(currentRect.top - nextRect.top) < 0.25
+          && Math.abs(currentRect.width - nextRect.width) < 0.25
+          && Math.abs(currentRect.height - nextRect.height) < 0.25
+        ) {
+          return currentRect;
+        }
+        return nextRect;
+      });
+      frame = requestAnimationFrame(updateAnchorRect);
+    };
+    updateAnchorRect();
+    return () => cancelAnimationFrame(frame);
+  }, [open, rootElement]);
+
   const menuWidth = Math.min(330, window.innerWidth - 24);
   const estimatedHeight = 430;
   const availableBelow = anchorRect ? window.innerHeight - anchorRect.bottom - 20 : 0;
@@ -199,8 +226,12 @@ export function ImageRoleTag({
       {open && anchorRect && createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[4200] overflow-y-auto overscroll-contain rounded-[14px] p-1.5"
+          className="nodrag nopan nowheel fixed z-[4200] overflow-y-auto overscroll-contain rounded-[14px] p-1.5"
           onMouseLeave={() => setHoveredRole(null)}
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}
           onWheelCapture={stopCanvasWheelPropagation}
           style={{
             left: menuLeft,

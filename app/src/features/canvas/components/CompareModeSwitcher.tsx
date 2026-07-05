@@ -1,12 +1,41 @@
-import { Columns2, Layers, SlidersHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { CompareMode } from '../types/canvas.types';
 
+function SideBySideCompareIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="2" y="4" width="6.5" height="12" rx="1.25" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="11.5" y="4" width="6.5" height="12" rx="1.25" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 4.5V15.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" opacity="0.62" />
+    </svg>
+  );
+}
+
+function SliderCompareIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="2" y="4" width="16" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 4.75V15.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="10" cy="10" r="2" fill="currentColor" />
+      <circle cx="10" cy="10" r="0.75" fill="currentColor" opacity="0.35" />
+    </svg>
+  );
+}
+
+function OverlayCompareIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="5" y="3" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5" opacity="0.62" />
+      <rect x="2" y="6" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 const MODE_ITEMS = [
-  { mode: 'sideBySide' as const, labelKey: 'compare.sideBySide' as const, Icon: Columns2 },
-  { mode: 'slider' as const, labelKey: 'compare.sliderCompare' as const, Icon: SlidersHorizontal },
-  { mode: 'overlay' as const, labelKey: 'compare.overlay' as const, Icon: Layers },
+  { mode: 'sideBySide' as const, labelKey: 'compare.sideBySide' as const, Icon: SideBySideCompareIcon },
+  { mode: 'slider' as const, labelKey: 'compare.sliderCompare' as const, Icon: SliderCompareIcon },
+  { mode: 'overlay' as const, labelKey: 'compare.overlay' as const, Icon: OverlayCompareIcon },
 ];
 
 export function CompareModeSwitcher({

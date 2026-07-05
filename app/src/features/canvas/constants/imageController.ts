@@ -27,7 +27,7 @@ export interface ControllerToggleOption {
 }
 
 export const DEFAULT_IMAGE_CONTROLLER_STATE: ImageControllerState = {
-  toggles: { addEnvironment: true, addPeople: true, indoorLighting: true, motionBlur: false },
+  toggles: { addEnvironment: false, addPeople: false, indoorLighting: false, motionBlur: false },
   time: null,
   lightDirection: null,
   weather: null,
@@ -53,10 +53,10 @@ export const TIME_OPTIONS: ControllerOption<TimePreferenceId>[] = [
 
 export const LIGHT_DIRECTION_OPTIONS: ControllerOption<LightDirectionPreferenceId>[] = [
   { id: 'front_light', label: '顺光', description: '正面照亮建筑，画面清晰直接', prompt: '采用顺光关系，主要光线从画面正面或相机方向照向建筑，使建筑立面清晰可读，阴影关系自然克制。' },
+  { id: 'back_light', label: '逆光', description: '强调轮廓、边缘高光和氛围', prompt: '采用逆光关系，光源位于建筑后方或画面远端，强调建筑轮廓、边缘高光和空间氛围，同时保持主体可读。' },
   { id: 'left_side_light', label: '左侧光', description: '从画面左侧入射，增强体块层次', prompt: '阳光从画面左侧进入，形成自然侧光和体块阴影，增强建筑立面、材质和空间层次。' },
   { id: 'right_side_light', label: '右侧光', description: '从画面右侧入射，增强体块层次', prompt: '阳光从画面右侧进入，形成自然侧光和体块阴影，增强建筑立面、材质和空间层次。' },
-  { id: 'back_light', label: '逆光', description: '强调轮廓、边缘高光和氛围', prompt: '采用逆光关系，光源位于建筑后方或画面远端，强调建筑轮廓、边缘高光和空间氛围，同时保持主体可读。' },
-  { id: 'diffused_light', label: '漫射光', description: '柔和均匀、弱阴影、低对比', prompt: '采用漫射光关系，光线柔和均匀，阴影较弱，对比克制，整体接近阴天或云层过滤后的自然光感，同时保持建筑材质和空间层次清楚。' },
+  { id: 'diffused_light', label: '柔和天光', description: '柔和均匀、弱阴影、低对比', prompt: '采用漫射光关系，光线柔和均匀，阴影较弱，对比克制，整体接近阴天或云层过滤后的自然光感，同时保持建筑材质和空间层次清楚。' },
 ];
 
 export const WEATHER_OPTIONS: ControllerOption<WeatherPreferenceId>[] = [
@@ -84,5 +84,5 @@ export const STYLE_OPTIONS: ControllerOption<StylePreferenceId>[] = [
 
 export function hasActiveImageController(controller: ImageControllerState): boolean {
   return Object.values(controller.toggles).some(Boolean)
-    || Boolean(controller.time || controller.lightDirection || controller.weather || controller.season || controller.style);
+    || Boolean(controller.time || controller.lightDirection || controller.weather || controller.style);
 }

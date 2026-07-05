@@ -305,15 +305,17 @@ export function CompareFullscreenViewer({
                 <img src={rightImage.imageUrl} alt={rightImage.label} className="absolute inset-0 block h-full w-full object-contain" style={imageTransformStyle} draggable={false} onError={() => setRightFailed(true)} />
               )}
             </div>
-            <div
-              className="pointer-events-none absolute inset-y-0 w-px"
-              style={{
-                left: `${sliderPosition}%`,
-                background: isSliderHovered || isSliderDragging
-                  ? 'rgba(255,255,255,0.96)'
-                  : 'rgba(255,255,255,0.72)',
-              }}
-            />
+            {sliderPosition > 1 && sliderPosition < 99 && (
+              <div
+                className="pointer-events-none absolute inset-y-0 w-px"
+                style={{
+                  left: `${sliderPosition}%`,
+                  background: isSliderHovered || isSliderDragging
+                    ? 'rgba(255,255,255,0.96)'
+                    : 'rgba(255,255,255,0.72)',
+                }}
+              />
+            )}
             <div
               className="absolute inset-y-0 z-10 w-6 -translate-x-1/2"
               style={{ left: `${sliderPosition}%`, cursor: 'ew-resize' }}
