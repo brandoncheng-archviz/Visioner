@@ -144,7 +144,7 @@ const enUS = {
     removeReferencePrompt: "Remove reference prompt",
     expandPrompt: "Expand prompt box",
     collapsePrompt: "Collapse prompt box",
-    promptPlaceholder: "Describe the image you want to create, type / to add quick commands, @ to reference materials",
+    promptPlaceholder: "Describe the image you want to generate, @ to reference materials",
     selectImagePurpose: "Select image purpose",
     customPurposePlaceholder: "What does this image mainly reference? E.g.: paving / furniture / lighting / railing",
     customPurposeInputPlaceholder: "What should this image mainly reference?",

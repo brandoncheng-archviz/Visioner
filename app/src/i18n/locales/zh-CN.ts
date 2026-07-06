@@ -144,7 +144,7 @@ const zhCN = {
     removeReferencePrompt: "删除图片引用",
     expandPrompt: "展开提示词框",
     collapsePrompt: "收起提示词框",
-    promptPlaceholder: "描述你想要创作的画面内容，输入 / 添加快捷指令，@引用素材",
+    promptPlaceholder: "描述你想要生成的画面，@引用素材",
     selectImagePurpose: "选择图片用途",
     customPurposePlaceholder: "这张图主要参考什么？例如：铺装 / 家具 / 灯具 / 栏杆",
     customPurposeInputPlaceholder: "这张图主要参考什么？",

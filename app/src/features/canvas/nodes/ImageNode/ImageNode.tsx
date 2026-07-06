@@ -35,6 +35,7 @@ import {
 import { UNIQUE_USAGES, getImageRoleOption, getImageRoleLabel, getImageRoleColor, getLocalReferenceTypeFromRole, getLocalReferenceLabel, getReferenceUsageInfo, normalizeLocalReferenceType } from '../../constants/imageUsages';
 import { getStylePresetById } from '../../constants/presets';
 import { buildPromptSubmission, createImageMarkReferenceBlock } from '../../utils/promptUtils';
+import { buildImageGenerationRequest } from '../../utils/imageGenerationRequest';
 import { getRoleData } from '../../utils/referenceUtils';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
 import { resolveImageNodeSize } from '../../utils/imageNodeSizing';
@@ -77,10 +78,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const replaceFileRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [nodeName, setNodeName] = useState((data.label as string) || t('canvas.nodeLabels.image', { defaultValue: '图片' }));
-  const [previewImage, setPreviewImage] = useState(currentImage);
+  const [localDisplayImage, setLocalDisplayImage] = useState(currentImage);
   const [editingName, setEditingName] = useState(false);
   const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [isFullscreenPreviewOpen, setIsFullscreenPreviewOpen] = useState(false);
   const [isCropMode, setIsCropMode] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
@@ -118,12 +119,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   /* ─── Current Result Set ─── */
   const { addBatch } = useHistory();
-  const parseCount = useCallback((count: string): number => {
-    if (count === '1张') return 1;
-    if (count === '2张') return 2;
-    if (count === '4张') return 4;
-    return 1;
-  }, []);
 
   const legacyCurrentResultSet = useMemo((): CurrentResultSet | null => {
     const legacy = normalizeGeneratedImages(data.generatedImages);
@@ -152,7 +147,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const selectedResultImage = currentResultSet?.images[currentResultSet.selectedIndex] || null;
   const displayImage = currentResultSet
     ? selectedResultImage?.imageUrl
-    : previewImage || currentImage;
+    : localDisplayImage || currentImage;
   const markSourceImageRef = useRef(displayImage);
   const resultImageCount = currentResultSet?.images.length ?? 0;
   const isMultiResultSet = resultImageCount > 1;
@@ -186,7 +181,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   useEffect(() => {
     const nextCurrent = getCurrentImage(data);
-    setPreviewImage((prev) => (prev === nextCurrent ? prev : nextCurrent));
+    setLocalDisplayImage((prev) => (prev === nextCurrent ? prev : nextCurrent));
   }, [data.currentImage, data.image, data.inputImage]);
 
   useEffect(() => {
@@ -650,20 +645,31 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     abortControllerRef.current = generationAbortController;
 
     try {
-      const count = parseCount(modelParams.count);
+      const generationRequest = buildImageGenerationRequest({
+        nodeId: id,
+        prompt: safePrompt,
+        userPrompt,
+        inputRefs: task.inputRefs,
+        markRefs: task.markRefs,
+        modelParams,
+        controller: controllerSubmission,
+        style: globalStyle,
+        presets: selectedPresets,
+      });
+      const count = generationRequest.modelParams.count;
       const results: import('../../types/generation.types').GenerationResult[] = [];
 
       for (let i = 0; i < count; i++) {
         const result = await simulateGeneration(
           {
-            sourceNodeId: id,
-            prompt: safePrompt,
+            sourceNodeId: generationRequest.nodeId,
+            prompt: generationRequest.prompt,
             inputRefs: task.inputRefs,
             markRefs: task.markRefs,
             modelParams: {
-              model: modelParams.model,
-              ratio: modelParams.ratio,
-              resolution: modelParams.resolution,
+              model: generationRequest.modelParams.model,
+              ratio: generationRequest.modelParams.aspectRatio,
+              resolution: generationRequest.modelParams.resolution,
             },
           },
           {
@@ -762,7 +768,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         createdAt: Date.now(),
       });
       setCurrentResultSet(newResultSet);
-      setPreviewImage(generatedImageItems[0]?.imageUrl || '');
+      setLocalDisplayImage(generatedImageItems[0]?.imageUrl || '');
       setGeneratedImages(nextGeneratedImages);
 
       const firstImage = new window.Image();
@@ -830,7 +836,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, controller, currentResultSet, addBatch, parseCount, buildHistoryBatchFromCurrentResultSet]);
+  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, controller, currentResultSet, addBatch, buildHistoryBatchFromCurrentResultSet]);
 
   const handleGenerate = useCallback(() => {
     if (!canGenerate) {
@@ -930,7 +936,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     imgEl.src = url;
 
     setNodeName(name);
-    setPreviewImage(url);
+    setLocalDisplayImage(url);
   };
 
   const handleReplaceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -972,7 +978,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       );
     };
     imgEl.src = url;
-    setPreviewImage(url);
+    setLocalDisplayImage(url);
   };
 
   const handleNameSave = () => {
@@ -1596,9 +1602,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (!imageNodeViewModel.canPreview) return;
     const resolved = resolveNodeImage(data);
     if (!resolved) return;
-    setPreviewImage(resolved.imageUrl);
+    setLocalDisplayImage(resolved.imageUrl);
     setImgSize({ width: resolved.width, height: resolved.height });
-    setShowPreview(true);
+    setIsFullscreenPreviewOpen(true);
   }, [data, imageNodeViewModel.canPreview]);
 
   const handleDisplayImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
@@ -1665,7 +1671,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       const aspectRatio = result.width / result.height;
       const resolution = `${result.width}×${result.height}`;
       setImgSize({ width: result.width, height: result.height });
-      setPreviewImage(result.url);
+      setLocalDisplayImage(result.url);
       setCurrentResultSet((previous) => {
         if (!previous) return previous;
         return {
@@ -2045,119 +2051,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 </button>
               </div>
             )
-          ) : displayImage && currentResultSet && currentResultSet.images.length > 1 && !currentResultSet.isExpanded ? (
-            <div className="relative w-full h-full">
-              {currentResultSet.images
-                .filter((_, imageIndex) => imageIndex !== currentResultSet.selectedIndex)
-                .slice(0, 2)
-                .map((img, idx) => (
-                <div
-                  key={img.resultId}
-                  className="absolute rounded-[18px] overflow-hidden"
-                  style={{
-                    top: 4 + idx * 3,
-                    left: 4 + idx * 3,
-                    right: 4 - idx * 3,
-                    bottom: 4 - idx * 3,
-                    opacity: 0.35 - idx * 0.1,
-                    transform: `scale(${0.96 - idx * 0.02})`,
-                    zIndex: 1 + idx,
-                  }}
-                >
-                  <img src={img.imageUrl} alt="" className="block w-full h-full object-cover" draggable={false} />
-                </div>
-              ))}
-              <div className="absolute inset-0 z-10">
-                <img
-                  ref={imgRef}
-                  src={displayImage}
-                  alt=""
-                  className="block w-full h-full object-cover"
-                  draggable={false}
-                  onLoad={handleDisplayImageLoad}
-                  style={{ cursor: markImageCursor }}
-                />
-                {renderImageMarkOverlays()}
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentResultSet((prev) => prev ? { ...prev, isExpanded: true } : prev);
-                }}
-                className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-white/15"
-                style={{ background: 'rgba(0,0,0,0.55)', color: 'rgba(255,255,255,0.82)', border: '1px solid rgba(255,255,255,0.12)' }}
-              >
-                <span>{currentResultSet.images.length}张</span>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.7 }}>
-                  <path d="M2 4L5 7L8 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          ) : displayImage && currentResultSet && currentResultSet.images.length > 1 && currentResultSet.isExpanded ? (
-            <div className="relative w-full h-full">
-              <div
-                className={currentResultSet.images.length === 2 ? 'flex h-full gap-2' : 'grid h-full gap-2'}
-                style={{
-                  gridTemplateColumns: currentResultSet.images.length === 2 ? undefined : '1fr 1fr',
-                  gridTemplateRows: currentResultSet.images.length <= 2 ? undefined : '1fr 1fr',
-                }}
-              >
-                {currentResultSet.images.map((img, idx) => (
-                  <div
-                    key={img.resultId}
-                    className="group/result relative h-full min-w-0 flex-1 overflow-hidden"
-                    style={{
-                      background: 'rgba(255,255,255,0.035)',
-                    }}
-                  >
-                    <img src={img.imageUrl} alt="" className="block h-full w-full object-cover" draggable={false} />
-                    <div className="absolute right-1.5 top-1.5 flex gap-1">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          downloadResultImage(img);
-                        }}
-                        className="flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-white/20"
-                        style={{ background: 'rgba(0,0,0,0.56)', color: 'rgba(255,255,255,0.82)', border: '1px solid rgba(255,255,255,0.12)' }}
-                        title="下载"
-                      >
-                        <Download className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          selectResultImage(idx);
-                        }}
-                        className="h-6 rounded-md px-2 text-[11px] font-medium transition-colors hover:bg-white/20"
-                        style={{
-                          background: idx === currentResultSet.selectedIndex ? 'rgba(0,212,255,0.24)' : 'rgba(0,0,0,0.56)',
-                          color: idx === currentResultSet.selectedIndex ? '#bff4ff' : 'rgba(255,255,255,0.84)',
-                          border: idx === currentResultSet.selectedIndex ? '1px solid rgba(0,212,255,0.36)' : '1px solid rgba(255,255,255,0.12)',
-                        }}
-                      >
-                        {idx === currentResultSet.selectedIndex ? '主图' : '设为主图'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentResultSet((prev) => prev ? { ...prev, isExpanded: false } : prev);
-                }}
-                className="absolute top-2 right-2 z-20 flex items-center justify-center rounded-md transition-colors hover:bg-white/15"
-                style={{ width: 24, height: 24, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.12)' }}
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.8 }}>
-                  <path d="M2 6L5 3L8 6" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
           ) : displayImage ? (
             <div className="relative w-full h-full">
               <img
@@ -2319,7 +2212,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canGenerate={canGenerate}
               canEditPrompt={imageNodeViewModel.canEditPrompt}
               canEditPromptReferences={imageNodeViewModel.canEditPromptReferences}
-              canEditPreset={imageNodeViewModel.canEditPreset}
               canEditLighting={imageNodeViewModel.canEditLighting}
               canEditModel={imageNodeViewModel.canEditModel}
               canDeleteReference={imageNodeViewModel.canDeleteReference}
@@ -2349,10 +2241,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       )}
 
       {/* Fullscreen preview modal — rendered via portal to escape node bounds */}
-      {showPreview && displayImage && createPortal(
+      {isFullscreenPreviewOpen && displayImage && createPortal(
         <ImagePreviewModal
           imageUrl={displayImage}
-          onClose={() => setShowPreview(false)}
+          onClose={() => setIsFullscreenPreviewOpen(false)}
         />,
         document.body,
       )}

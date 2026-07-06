@@ -38,6 +38,38 @@ export interface GenerationInput {
   };
 }
 
+export type ImageGenerationCount = 1 | 2 | 4;
+
+export interface ImageGenerationRequest {
+  nodeId: string;
+  prompt: string;
+  userPrompt: string;
+  inputRefs: Array<{
+    sourceNodeId: string;
+    imageUrl: string;
+    role: string;
+    promptText: string;
+  }>;
+  markRefs?: Array<{
+    sourceNodeId: string;
+    label: string;
+    region?: {
+      point?: ImageMarkPoint;
+      box?: ImageMarkBox;
+    };
+    promptText: string;
+  }>;
+  modelParams: {
+    model: string;
+    aspectRatio: string;
+    resolution: string;
+    count: ImageGenerationCount;
+  };
+  controller?: unknown;
+  style?: unknown;
+  presets?: string[];
+}
+
 export interface GenerationResult {
   taskId: string;
   imageUrl: string;

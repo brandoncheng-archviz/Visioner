@@ -1,10 +1,9 @@
-import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
   X,
-  Bookmark,
   SlidersHorizontal,
   ChevronDown,
   ArrowUp,
@@ -17,7 +16,6 @@ import type {
   ImageReferencePromptBlock,
   ImageMarkReferencePromptBlock,
   ReferenceInfo,
-  PresetItem,
 } from '../../types/imageNode.types';
 import type { ModelParams } from '../../types/canvas.types';
 import type { TextReferenceInfo } from '../../types/basicNode.types';
@@ -37,13 +35,7 @@ import {
   COUNT_OPTIONS,
 } from '../../constants/canvasConstants';
 import { getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
-import {
-  PRESET_DATA,
-  PRESET_TABS,
-  getPresetById,
-  isPresetVisibleInLibrary,
-} from '../../constants/presets';
-import { createImageReferenceBlock, getPresetPromptText, stripReferencePromptMetadata } from '../../utils/promptUtils';
+import { createImageReferenceBlock, stripReferencePromptMetadata } from '../../utils/promptUtils';
 import {
   getReferenceUsageSortRank,
   sortReferencesByUsage,
@@ -78,10 +70,6 @@ const resizePromptReferenceTextarea = (element: HTMLTextAreaElement) => {
 };
 const GENERATION_CREDIT_COST = 14;
 const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词、设置氛围或插入图片引用';
-const ADVANCED_SLASH_PRESET_IDS = new Set([
-  'clean_up', 'view_to_render', 'make_sketch', 'axonometry', 'design_board', 'moodboard',
-  'macro_closeup', 'object_closeup', 'activity_closeup', 'unfinished', 'mockup', 'blueprints',
-]);
 
 function TextReferenceIcon() {
   return (
@@ -149,7 +137,6 @@ export function ImageNodeControlPanel({
   canGenerate,
   canEditPrompt,
   canEditPromptReferences,
-  canEditPreset,
   canEditLighting,
   canEditModel,
   canDeleteReference,
@@ -183,7 +170,6 @@ export function ImageNodeControlPanel({
   canGenerate: boolean;
   canEditPrompt: boolean;
   canEditPromptReferences: boolean;
-  canEditPreset: boolean;
   canEditLighting: boolean;
   canEditModel: boolean;
   canDeleteReference: boolean;
@@ -244,20 +230,9 @@ export function ImageNodeControlPanel({
   const [editingPromptText, setEditingPromptText] = useState('');
   const [editingPromptInitialText, setEditingPromptInitialText] = useState('');
 
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [slashQuery, setSlashQuery] = useState('');
-  const [slashIndex, setSlashIndex] = useState(0);
-  const [slashActiveTab, setSlashActiveTab] = useState<(typeof PRESET_TABS)[number]>('真实增强');
-  const [slashMenuStyle, setSlashMenuStyle] = useState<{
-    top: number;
-    left: number;
-    width: number;
-    maxHeight: number;
-  } | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const [atmosphereButtonElement, setAtmosphereButtonElement] = useState<HTMLButtonElement | null>(null);
   const markCandidateMenuRef = useRef<HTMLDivElement>(null);
-  const slashMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   /* ─── Reference thumbnails ─── */
@@ -537,64 +512,6 @@ export function ImageNodeControlPanel({
   const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
   const hasManyReferences = sortedReferences.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
 
-  const getSlashPresetName = (preset: PresetItem) =>
-    t(`preset.${preset.id}.name`, { defaultValue: preset.title || preset.name });
-
-  const getSlashPresetDescription = (preset: PresetItem) =>
-    t(`preset.${preset.id}.shortDescription`, {
-      defaultValue: preset.shortDescription || preset.description || '',
-    });
-
-  const slashFilteredPresets = useMemo(() => {
-    const query = slashQuery.trim().toLowerCase();
-    const presetPool = PRESET_DATA.filter((preset) => {
-      if (!isPresetVisibleInLibrary(preset) || preset.category === 'style' || preset.tabs.length === 0) return false;
-      if (!ADVANCED_SLASH_PRESET_IDS.has(preset.id)) return false;
-      if (slashActiveTab === '我的收藏') return false;
-      return preset.tabs.includes(slashActiveTab);
-    });
-    if (!query) return presetPool;
-
-    return presetPool.filter(
-      (preset) =>
-        preset.name.toLowerCase().includes(query) ||
-        preset.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-        (preset.shortDescription || '').toLowerCase().includes(query),
-    );
-  }, [slashActiveTab, slashQuery]);
-
-  const handleSlashTabChange = (tab: (typeof PRESET_TABS)[number]) => {
-    setSlashActiveTab(tab);
-    setSlashIndex(0);
-  };
-
-  const updateSlashMenuPosition = useCallback(() => {
-    const input = promptInputRef.current;
-    if (!input) return;
-
-    const rect = input.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const margin = 16;
-    const gap = 8;
-    const width = Math.min(720, Math.max(520, Math.min(viewportWidth - margin * 2, rect.width)));
-    const left = Math.min(Math.max(margin, rect.left), Math.max(margin, viewportWidth - width - margin));
-    const spaceBelow = viewportHeight - rect.bottom - margin;
-    const spaceAbove = rect.top - margin;
-    const openAbove = spaceBelow < 360 && spaceAbove > spaceBelow;
-    const availableHeight = openAbove ? spaceAbove - gap : spaceBelow - gap;
-    const maxHeight = Math.min(480, Math.max(240, availableHeight));
-    const top = openAbove ? Math.max(margin, rect.top - maxHeight - gap) : Math.min(rect.bottom + gap, viewportHeight - maxHeight - margin);
-
-    setSlashMenuStyle({ top, left, width, maxHeight });
-  }, []);
-
-  const buildPresetTextBlock = (preset: PresetItem, includeTitle: boolean) => {
-    const prompt = getPresetPromptText(preset);
-    if (!includeTitle) return prompt;
-    return `【${preset.title || preset.name}】\n${prompt}`;
-  };
-
 
   const handleGenerateClick = () => {
     if (!canGenerate) {
@@ -754,40 +671,6 @@ export function ImageNodeControlPanel({
     if (!canEditPrompt) return;
     if (event.nativeEvent.isComposing) return;
 
-    if (showSlashMenu) {
-      if (slashFilteredPresets.length === 0) {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          closeSlashMenu();
-        }
-        return;
-      }
-
-      if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        setSlashIndex((index) => (index + 1) % slashFilteredPresets.length);
-        return;
-      }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        setSlashIndex((index) => (index - 1 + slashFilteredPresets.length) % slashFilteredPresets.length);
-        return;
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        const preset = slashFilteredPresets[slashIndex];
-        if (preset) {
-          insertSlashPreset(preset.id);
-        }
-        return;
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeSlashMenu();
-        return;
-      }
-    }
-
     if (showReferenceMenu && sortedReferences.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
@@ -812,7 +695,7 @@ export function ImageNodeControlPanel({
     }
 
     // Prompt input line break shortcuts (when no menu is open)
-    if (!showSlashMenu && !showReferenceMenu) {
+    if (!showReferenceMenu) {
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || event.shiftKey)) {
         event.preventDefault();
         const input = promptInputRef.current;
@@ -829,98 +712,11 @@ export function ImageNodeControlPanel({
     }
   };
 
-  const closeSlashMenu = () => {
-    setShowSlashMenu(false);
-    setSlashQuery('');
-    setSlashIndex(0);
-  };
-
-  useEffect(() => {
-    if (!showSlashMenu || !canEditPrompt) return;
-
-    updateSlashMenuPosition();
-
-    const closeOnOutside = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (slashMenuRef.current?.contains(target)) {
-        return;
-      }
-      closeSlashMenu();
-    };
-    const updatePosition = () => updateSlashMenuPosition();
-
-    document.addEventListener('pointerdown', closeOnOutside, true);
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutside, true);
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [canEditPrompt, showSlashMenu, updateSlashMenuPosition]);
-
-  useLayoutEffect(() => {
-    if (!showSlashMenu || !canEditPrompt) return;
-    updateSlashMenuPosition();
-  }, [canEditPrompt, showSlashMenu, slashActiveTab, slashQuery, updateSlashMenuPosition]);
-
-  const insertSlashPreset = (presetId: string) => {
-    if (!canEditPrompt || !canEditPreset) return;
-    const preset = getPresetById(presetId);
-    if (!preset) {
-      closeSlashMenu();
-      return;
-    }
-
-    const input = promptInputRef.current;
-    const cursor = input?.selectionStart ?? promptText.length;
-    const textBefore = promptText.slice(0, cursor);
-    const textAfter = promptText.slice(cursor);
-    const lastSlashIndex = textBefore.lastIndexOf('/');
-    if (lastSlashIndex >= 0) {
-      const beforeSlash = promptText.slice(0, lastSlashIndex);
-      const insertText = buildPresetTextBlock(preset, false);
-      const prefix = beforeSlash && !beforeSlash.endsWith('\n') ? '\n\n' : '';
-      const suffix = textAfter && !textAfter.startsWith('\n') ? '\n\n' : '';
-      const newCursor = beforeSlash.length + prefix.length + insertText.length;
-      const newText = `${beforeSlash}${prefix}${insertText}${suffix}${textAfter}`;
-      onPromptChange(newText);
-      closeSlashMenu();
-      requestAnimationFrame(() => {
-        promptInputRef.current?.focus();
-        promptInputRef.current?.setSelectionRange(newCursor, newCursor);
-      });
-      return;
-    }
-
-    closeSlashMenu();
-  };
-
   const handlePromptChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (!canEditPrompt) return;
     const nextText = event.target.value;
     const cursor = event.target.selectionStart;
     onPromptChange(nextText);
-
-    // Detect /
-    const textBeforeCursor = nextText.slice(0, cursor);
-    const lastSlash = textBeforeCursor.lastIndexOf('/');
-    const lastAt = textBeforeCursor.lastIndexOf('@');
-    const lastNewline = textBeforeCursor.lastIndexOf('\n');
-
-    if (lastSlash >= 0 && lastSlash > lastAt && lastSlash > lastNewline) {
-      const query = textBeforeCursor.slice(lastSlash + 1);
-      if (!query.includes(' ') && !query.includes('\n')) {
-        setSlashQuery(query);
-        setSlashIndex(0);
-        setShowSlashMenu(true);
-      } else {
-        closeSlashMenu();
-      }
-    } else {
-      closeSlashMenu();
-    }
 
     if (nextText[cursor - 1] === '@' && sortedReferences.length > 0) {
       setActiveReferenceIndex(0);
@@ -940,82 +736,6 @@ export function ImageNodeControlPanel({
   const stopControlEvent = (event: React.SyntheticEvent) => {
     event.stopPropagation();
   };
-
-  const slashMenuPortal = canEditPrompt && showSlashMenu && slashMenuStyle
-    ? createPortal(
-      <div
-        ref={slashMenuRef}
-        className="nodrag nopan nowheel fixed overflow-hidden rounded-xl"
-        style={{
-          top: slashMenuStyle.top,
-          left: slashMenuStyle.left,
-          width: slashMenuStyle.width,
-          maxHeight: slashMenuStyle.maxHeight,
-          zIndex: 2000,
-          background: FLOATING_PANEL_BACKGROUND,
-          border: FLOATING_PANEL_BORDER,
-          boxShadow: '0 20px 48px rgba(0,0,0,0.58)',
-        }}
-        onPointerDown={(event) => event.stopPropagation()}
-        onPointerMove={(event) => event.stopPropagation()}
-        onWheel={(event) => event.stopPropagation()}
-        onWheelCapture={(event) => event.stopPropagation()}
-      >
-        <div className="border-b px-3 py-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          <div className="text-[12px] font-medium text-white/72">快捷指令</div>
-          <div className="mt-2 flex gap-1 overflow-x-auto overscroll-contain pb-1">
-            {PRESET_TABS.map((tab) => {
-              const active = tab === slashActiveTab;
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => handleSlashTabChange(tab)}
-                  className="shrink-0 rounded-md px-2.5 py-1 text-[11px] transition-colors"
-                  style={{
-                    background: active ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.04)',
-                    color: active ? 'rgba(255,255,255,0.94)' : 'rgba(255,255,255,0.52)',
-                  }}
-                >
-                  {tab}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="overflow-y-auto py-1" style={{ maxHeight: Math.max(160, slashMenuStyle.maxHeight - 74) }}>
-          {slashFilteredPresets.length === 0 ? (
-            <div className="px-3 py-3 text-[13px] text-white/40">{t('imageNode.noMatchingPreset')}</div>
-          ) : (
-            slashFilteredPresets.map((preset, index) => (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => insertSlashPreset(preset.id)}
-                onMouseEnter={() => setSlashIndex(index)}
-                className={`nodrag nopan nowheel flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${index === slashIndex ? 'bg-white/8' : 'hover:bg-white/5'}`}
-              >
-                <span className="flex h-9 w-9 shrink-0 overflow-hidden rounded-md border border-white/[0.10] bg-white/[0.04]">
-                  {preset.thumbnail ? (
-                    <img src={preset.thumbnail} alt="" className="h-full w-full object-cover" draggable={false} />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center">
-                      <Bookmark className="h-4 w-4 text-white/30" />
-                    </span>
-                  )}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-white/90">{getSlashPresetName(preset)}</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-white/40">{getSlashPresetDescription(preset)}</span>
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>,
-      document.body,
-    )
-    : null;
 
   return (
     <div
@@ -1695,7 +1415,6 @@ export function ImageNodeControlPanel({
           onClose={() => setShowLightPreview(false)}
         />
       )}
-      {slashMenuPortal}
     </div>
   );
 }

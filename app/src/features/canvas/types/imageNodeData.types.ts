@@ -24,6 +24,7 @@ export interface ImageNodeData {
   generationStatus?: 'completed' | string;
   generationMode?: 'relight' | string;
   sourceImageNodeIds?: string[];
+  /** @deprecated previewing/previewResult are retained only for legacy node-data compatibility. */
   status?: 'empty' | 'previewing' | 'previewResult' | 'generating' | 'result' | string;
   currentResultSource?: 'history' | string;
   generatedImages?: GenerationHistoryItem[] | string[];
