@@ -159,7 +159,7 @@ const zhCN = {
     actionDescPlaceholder: "动作描述",
     add: "添加",
     resolution: "分辨率",
-    ratio: "比例",
+    ratio: "画幅比",
     generate: "生成",
     generating: "生成中...",
     retry: "重试",
@@ -172,7 +172,7 @@ const zhCN = {
       "2": "2张",
       "4": "4张",
     },
-    creditCost: "消耗 {{count}} 积分",
+    creditCost: "本次预计消耗 {{count}} 点",
     usageConflictTitle: "已有一张「{{role}}」，该用途同一目标节点最多 1 张。",
     changeUsage: "改用途",
     customSuggestions: {

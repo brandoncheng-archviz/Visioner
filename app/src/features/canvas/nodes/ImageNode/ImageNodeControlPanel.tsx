@@ -10,6 +10,9 @@ import {
   Maximize2,
   ScanSearch,
   Zap,
+  Check,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import type {
   PromptContent,
@@ -29,11 +32,8 @@ import {
   IMAGE_NODE_CONTROL_EXPANDED_HEIGHT,
   MAX_REFERENCE_IMAGES_PER_NODE,
   RECOMMENDED_REFERENCE_IMAGES_PER_NODE,
-  MODEL_OPTIONS,
-  RESOLUTION_OPTIONS,
-  RATIO_OPTIONS,
-  COUNT_OPTIONS,
 } from '../../constants/canvasConstants';
+import { IMAGE_MODEL_OPTIONS, getImageModelOption, type ImageModelResolution } from '../../constants/imageModelOptions';
 import { getImageRoleLabel, getImageRoleColor } from '../../constants/imageUsages';
 import { createImageReferenceBlock, stripReferencePromptMetadata } from '../../utils/promptUtils';
 import {
@@ -70,6 +70,62 @@ const resizePromptReferenceTextarea = (element: HTMLTextAreaElement) => {
 };
 const GENERATION_CREDIT_COST = 14;
 const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词、设置氛围或插入图片引用';
+const COMMON_FRAME_RATIO_OPTIONS = [
+  { value: 'adaptive', label: '自适应' },
+  { value: '1:1', label: '1:1' },
+  { value: '4:3', label: '4:3' },
+  { value: '3:2', label: '3:2' },
+  { value: '16:9', label: '16:9' },
+  { value: '9:16', label: '9:16' },
+] as const;
+const STANDARD_FRAME_RATIO_VALUES = new Set<string>(COMMON_FRAME_RATIO_OPTIONS.map((option) => option.value).filter((value) => value !== 'adaptive'));
+
+function parseFrameRatio(value: string | undefined): { width: number; height: number } | null {
+  if (!value) return null;
+  const normalized = value.trim().replace('×', ':').replace('x', ':');
+  const match = normalized.match(/^(\d+):(\d+)$/);
+  if (!match) return null;
+  const width = Number.parseInt(match[1], 10);
+  const height = Number.parseInt(match[2], 10);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+function formatFrameRatioLabel(value: string | undefined) {
+  if (!value) return '1:1';
+  if (value === '自适应') return '自适应';
+  const parsed = parseFrameRatio(value);
+  if (!parsed) return value;
+  if (STANDARD_FRAME_RATIO_VALUES.has(`${parsed.width}:${parsed.height}`)) return `${parsed.width}:${parsed.height}`;
+  return `${parsed.width}×${parsed.height}`;
+}
+
+function isValidFrameRatio(width: number, height: number) {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return false;
+  const ratio = width / height;
+  return ratio >= 1 / 8 && ratio <= 8;
+}
+
+function AspectFrameIcon({ ratio }: { ratio: number }) {
+  const isPortrait = ratio < 0.82;
+  const isSquare = ratio >= 0.82 && ratio <= 1.18;
+  const width = isSquare ? 13 : isPortrait ? 10 : 16;
+  const height = isSquare ? 13 : isPortrait ? 16 : 10;
+
+  return (
+    <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect
+        x={(20 - width) / 2}
+        y={(20 - height) / 2}
+        width={width}
+        height={height}
+        rx="1.8"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
 
 function TextReferenceIcon() {
   return (
@@ -147,6 +203,7 @@ export function ImageNodeControlPanel({
   generationTask,
   textReferences,
   onFocusTextReference,
+  currentImageSize,
   references,
   onRemoveReference,
   onUseReference,
@@ -180,6 +237,7 @@ export function ImageNodeControlPanel({
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   textReferences: TextReferenceInfo[];
   onFocusTextReference: (nodeId: string) => void;
+  currentImageSize?: { width?: number; height?: number } | null;
   autoOpenLightPanel?: boolean;
   onAcknowledgeAutoOpen?: () => void;
   references: ReferenceInfo[];
@@ -190,16 +248,6 @@ export function ImageNodeControlPanel({
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
-  const formatGenerationCount = useCallback(
-    (count: string) => {
-      const countValue = Number.parseInt(count, 10);
-      return t(`imageNode.countValue.${countValue}`, {
-        count: countValue,
-        defaultValue: count,
-      });
-    },
-    [t],
-  );
   const [showLightPreview, setShowLightPreview] = useState(false);
 
   useEffect(() => {
@@ -214,7 +262,10 @@ export function ImageNodeControlPanel({
   const [showController, setShowController] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
-  const [showCountMenu, setShowCountMenu] = useState(false);
+  const [customFrameWidth, setCustomFrameWidth] = useState('1');
+  const [customFrameHeight, setCustomFrameHeight] = useState('1');
+  const [isFrameRatioLocked, setIsFrameRatioLocked] = useState(true);
+  const [frameRatioMode, setFrameRatioMode] = useState<'adaptive' | 'preset' | 'custom'>('preset');
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [showReferenceMenu, setShowReferenceMenu] = useState(false);
   const [activeMarkCandidateBlockId, setActiveMarkCandidateBlockId] = useState<string | null>(null);
@@ -232,6 +283,10 @@ export function ImageNodeControlPanel({
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const [atmosphereButtonElement, setAtmosphereButtonElement] = useState<HTMLButtonElement | null>(null);
+  const modelButtonRef = useRef<HTMLButtonElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+  const frameRatioButtonRef = useRef<HTMLButtonElement>(null);
+  const frameRatioPanelRef = useRef<HTMLDivElement>(null);
   const markCandidateMenuRef = useRef<HTMLDivElement>(null);
   const promptBlockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -492,7 +547,110 @@ export function ImageNodeControlPanel({
       )
     : null;
 
-  const selectedModel = MODEL_OPTIONS.find((m) => m.name === modelParams.model) || MODEL_OPTIONS[0];
+  const selectedModel = getImageModelOption(modelParams.model);
+  const primaryReference = sortedReferences.find((reference) => getReferenceUsageSortRank(reference).group === 0);
+  const adaptiveFrameRatioSource =
+    (primaryReference?.width && primaryReference?.height
+      ? { width: primaryReference.width, height: primaryReference.height }
+      : null) ??
+    (currentImageSize?.width && currentImageSize?.height
+      ? { width: currentImageSize.width, height: currentImageSize.height }
+      : null);
+  const adaptiveFrameRatio = adaptiveFrameRatioSource && isValidFrameRatio(adaptiveFrameRatioSource.width, adaptiveFrameRatioSource.height)
+    ? `${adaptiveFrameRatioSource.width}:${adaptiveFrameRatioSource.height}`
+    : '1:1';
+  const displayFrameRatio = modelParams.ratio === '自适应' ? adaptiveFrameRatio : modelParams.ratio;
+  const displayFrameRatioLabel = formatFrameRatioLabel(displayFrameRatio);
+  const selectedFrameRatioDimensions = parseFrameRatio(displayFrameRatio) ?? parseFrameRatio(adaptiveFrameRatio) ?? { width: 1, height: 1 };
+
+  const commitCustomFrameRatio = useCallback((widthValue: string, heightValue: string, options?: { showError?: boolean }) => {
+    const width = Number(widthValue);
+    const height = Number(heightValue);
+    if (!isValidFrameRatio(width, height)) {
+      if (options?.showError) showToast?.('请输入 1:8 到 8:1 范围内的正整数画幅比');
+      return false;
+    }
+    setFrameRatioMode('custom');
+    onModelParamsChange({ ...modelParams, ratio: `${width}:${height}` });
+    return true;
+  }, [modelParams, onModelParamsChange, showToast]);
+
+  const handleCustomFrameWidthChange = (value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    setCustomFrameWidth(value);
+    if (!value) return;
+    let nextHeight = customFrameHeight;
+    const width = Number(value);
+    const currentHeight = Number(customFrameHeight);
+    if (isFrameRatioLocked && width > 0 && currentHeight > 0) {
+      const ratio = selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height;
+      nextHeight = String(Math.max(1, Math.round(width / ratio)));
+      setCustomFrameHeight(nextHeight);
+    }
+    commitCustomFrameRatio(value, nextHeight);
+  };
+
+  const handleCustomFrameHeightChange = (value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    setCustomFrameHeight(value);
+    if (!value) return;
+    let nextWidth = customFrameWidth;
+    const height = Number(value);
+    const currentWidth = Number(customFrameWidth);
+    if (isFrameRatioLocked && height > 0 && currentWidth > 0) {
+      const ratio = selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height;
+      nextWidth = String(Math.max(1, Math.round(height * ratio)));
+      setCustomFrameWidth(nextWidth);
+    }
+    commitCustomFrameRatio(nextWidth, value);
+  };
+
+  const handleCustomFrameInputCommit = () => {
+    commitCustomFrameRatio(customFrameWidth, customFrameHeight, { showError: true });
+  };
+
+  const closeGenerationParamMenus = useCallback(() => {
+    setShowModelMenu(false);
+    setShowRatioMenu(false);
+  }, []);
+
+  useEffect(() => {
+    if (!showModelMenu && !showRatioMenu) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      const interactiveElements = [
+        modelButtonRef.current,
+        modelMenuRef.current,
+        frameRatioButtonRef.current,
+        frameRatioPanelRef.current,
+      ];
+      if (interactiveElements.some((element) => element?.contains(target))) return;
+      closeGenerationParamMenus();
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeGenerationParamMenus();
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    document.addEventListener('keydown', handleEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      document.removeEventListener('keydown', handleEscape, true);
+    };
+  }, [closeGenerationParamMenus, showModelMenu, showRatioMenu]);
+
+  const openRatioMenu = () => {
+    setCustomFrameWidth(String(selectedFrameRatioDimensions.width));
+    setCustomFrameHeight(String(selectedFrameRatioDimensions.height));
+    setShowRatioMenu(true);
+    setShowModelMenu(false);
+  };
+
   const controllerSummaryLines = [
     ...TOGGLE_OPTIONS.filter((option) => controller.toggles[option.id]).map((option) => option.label),
     ...([
@@ -1203,35 +1361,58 @@ export function ImageNodeControlPanel({
           {/* Model */}
           <div className="relative">
             <button
+              ref={modelButtonRef}
               disabled={!canEditModel}
               onClick={() => {
                 if (!canEditModel) return;
-                setShowModelMenu(!showModelMenu);
+                setShowModelMenu((value) => !value);
                 setShowRatioMenu(false);
-                setShowCountMenu(false);
               }}
               className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
               style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
             >
-              <span style={{ color: 'rgba(255,255,255,0.72)' }}>×</span>
-              <span className="truncate" style={{ maxWidth: 150 }}>{selectedModel.name}</span>
+              <span
+                className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-[9px] font-semibold tracking-[-0.02em] text-white/90"
+                style={{ background: selectedModel.iconBg }}
+                aria-hidden="true"
+              >
+                {selectedModel.iconText}
+              </span>
+              <span className="truncate" style={{ maxWidth: 168 }}>{selectedModel.label}</span>
               <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
             </button>
             {canEditModel && showModelMenu && (
-              <div className="absolute bottom-full left-0 mb-1 py-1 rounded-lg z-30 overflow-hidden" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 190 }}>
-                {MODEL_OPTIONS.map((m) => (
+              <div
+                ref={modelMenuRef}
+                className="absolute bottom-full left-0 mb-1 py-1 rounded-lg z-30 overflow-hidden"
+                style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 248 }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                onWheel={(event) => event.stopPropagation()}
+              >
+                {IMAGE_MODEL_OPTIONS.map((m) => (
                   <button
-                    key={m.name}
+                    key={m.id}
                     disabled={!canEditModel}
                     onClick={() => {
                       if (!canEditModel) return;
-                      onModelParamsChange({ ...modelParams, model: m.name });
+                      onModelParamsChange({
+                        ...modelParams,
+                        model: m.id,
+                        resolution: m.resolutions.includes(modelParams.resolution as ImageModelResolution)
+                          ? modelParams.resolution
+                          : m.defaultResolution,
+                      });
                       setShowModelMenu(false);
                     }}
-                    className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left transition-colors ${modelParams.model === m.name ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-left transition-colors ${modelParams.model === m.id ? 'bg-white/10' : 'hover:bg-white/5'}`}
                   >
-                    <span className="flex-shrink-0 flex items-center justify-center rounded text-[10px] font-bold text-white" style={{ width: 20, height: 20, background: m.iconBg }}>{m.icon}</span>
-                    <span className="text-[15px] text-white/85">{m.name}</span>
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold text-white/90" style={{ background: m.iconBg }}>{m.iconText}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-medium text-white/85">{m.label}</span>
+                      <span className="block truncate text-[12px] text-white/42">{m.description} · 默认 {m.defaultResolution}</span>
+                    </span>
+                    {modelParams.model === m.id && <Check className="h-4 w-4 flex-shrink-0 text-white/70" />}
                   </button>
                 ))}
               </div>
@@ -1240,26 +1421,134 @@ export function ImageNodeControlPanel({
           {/* Ratio · Resolution */}
           <div className="relative">
             <button
+              ref={frameRatioButtonRef}
               disabled={!canEditModel}
               onClick={() => {
                 if (!canEditModel) return;
-                setShowRatioMenu(!showRatioMenu);
-                setShowModelMenu(false);
-                setShowCountMenu(false);
+                if (showRatioMenu) {
+                  setShowRatioMenu(false);
+                  return;
+                }
+                openRatioMenu();
               }}
               className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
               style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
             >
-              <Maximize2 className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.68)' }} />
-              <span>{modelParams.ratio} · {modelParams.resolution}</span>
+              <span style={{ color: 'rgba(255,255,255,0.58)' }}>
+                <AspectFrameIcon ratio={selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height} />
+              </span>
+              <span>{displayFrameRatioLabel} · {modelParams.resolution}</span>
               <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
             </button>
             {canEditModel && showRatioMenu && (
-              <div className="absolute bottom-full left-0 mb-2 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 16px 34px rgba(0,0,0,0.48)', width: 326, padding: 8 }}>
-                <div className="pb-2">
-                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('imageNode.resolution')}</div>
+              <div
+                ref={frameRatioPanelRef}
+                className="absolute bottom-full left-0 z-30 rounded-xl"
+                style={{
+                  marginBottom: 8,
+                  width: 440,
+                  padding: 10,
+                  background: FLOATING_PANEL_BACKGROUND,
+                  border: FLOATING_PANEL_BORDER,
+                  boxShadow: '0 14px 30px rgba(0,0,0,0.42)',
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                onWheel={(event) => event.stopPropagation()}
+              >
+                <div>
+                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>画幅比</div>
                   <div className="grid grid-cols-3 gap-2">
-                    {RESOLUTION_OPTIONS.map((r) => (
+                    {COMMON_FRAME_RATIO_OPTIONS.map((ar) => {
+                      const optionValue = ar.value === 'adaptive' ? adaptiveFrameRatio : ar.value;
+                      const isSelected = ar.value === 'adaptive'
+                        ? frameRatioMode === 'adaptive' && displayFrameRatio === adaptiveFrameRatio
+                        : frameRatioMode !== 'adaptive' && displayFrameRatio === ar.value;
+                      return (
+                        <button
+                          key={ar.value}
+                          disabled={!canEditModel}
+                          onClick={() => {
+                            if (!canEditModel) return;
+                            setFrameRatioMode(ar.value === 'adaptive' ? 'adaptive' : 'preset');
+                            onModelParamsChange({ ...modelParams, ratio: optionValue });
+                          }}
+                          className="flex h-9 items-center justify-center rounded-md text-[14px] font-medium transition-colors hover:bg-white/[0.065]"
+                          style={{
+                            color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.58)',
+                            background: isSelected ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
+                            border: isSelected ? '1px solid rgba(255,255,255,0.62)' : '1px solid rgba(255,255,255,0.075)',
+                          }}
+                        >
+                          {ar.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-3 border-t border-white/[0.045] pt-3">
+                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>自定义画幅比</div>
+                  <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto 1fr 40px' }}>
+                    <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
+                      <span className="text-[12px] text-white/38">宽</span>
+                      <input
+                        className="nodrag nopan nowheel min-w-0 flex-1 bg-transparent text-[14px] font-medium text-white/82 outline-none"
+                        value={customFrameWidth}
+                        inputMode="numeric"
+                        disabled={!canEditModel}
+                        onChange={(event) => handleCustomFrameWidthChange(event.target.value)}
+                        onBlur={handleCustomFrameInputCommit}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleCustomFrameInputCommit();
+                            event.currentTarget.blur();
+                          }
+                        }}
+                      />
+                    </label>
+                    <span className="flex h-9 items-center justify-center text-[13px] text-white/32">×</span>
+                    <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
+                      <span className="text-[12px] text-white/38">高</span>
+                      <input
+                        className="nodrag nopan nowheel min-w-0 flex-1 bg-transparent text-[14px] font-medium text-white/82 outline-none"
+                        value={customFrameHeight}
+                        inputMode="numeric"
+                        disabled={!canEditModel}
+                        onChange={(event) => handleCustomFrameHeightChange(event.target.value)}
+                        onBlur={handleCustomFrameInputCommit}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleCustomFrameInputCommit();
+                            event.currentTarget.blur();
+                          }
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={!canEditModel}
+                      onClick={() => setIsFrameRatioLocked((value) => !value)}
+                      className="flex h-9 w-10 flex-shrink-0 items-center justify-center rounded-md transition-colors hover:border-white/[0.16] hover:bg-white/[0.07] hover:text-white/82"
+                      style={{
+                        color: isFrameRatioLocked ? 'rgba(255,255,255,0.86)' : 'rgba(255,255,255,0.48)',
+                        background: isFrameRatioLocked ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
+                        border: isFrameRatioLocked ? '1px solid rgba(255,255,255,0.58)' : '1px solid rgba(255,255,255,0.075)',
+                      }}
+                      title={isFrameRatioLocked ? '锁定画幅比' : '自由输入画幅比'}
+                    >
+                      {isFrameRatioLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <div className="mt-2 text-[12px] leading-snug text-white/30">画幅比只用于锁定构图比例，不代表最终输出像素。</div>
+                </div>
+
+                <div className="mt-3 border-t border-white/[0.045] pt-3">
+                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('imageNode.resolution')}</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {selectedModel.resolutions.map((r) => (
                       <button
                         key={r}
                         disabled={!canEditModel}
@@ -1267,39 +1556,14 @@ export function ImageNodeControlPanel({
                           if (!canEditModel) return;
                           onModelParamsChange({ ...modelParams, resolution: r });
                         }}
-                        className="h-9 rounded-md text-[14px] font-medium transition-colors"
+                        className="h-9 rounded-md text-[14px] font-medium transition-colors hover:bg-white/[0.065]"
                         style={{
                           color: modelParams.resolution === r ? '#ffffff' : 'rgba(255,255,255,0.54)',
-                          background: 'rgba(255,255,255,0.035)',
-                          border: modelParams.resolution === r ? '1px solid rgba(255,255,255,0.9)' : FLOATING_PANEL_BORDER,
+                          background: modelParams.resolution === r ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
+                          border: modelParams.resolution === r ? '1px solid rgba(255,255,255,0.62)' : '1px solid rgba(255,255,255,0.075)',
                         }}
                       >
                         {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="pt-1">
-                  <div className="text-[14px] font-medium mb-2" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('imageNode.ratio')}</div>
-                  <div className="grid grid-cols-5 gap-2">
-                    {RATIO_OPTIONS.map((ar) => (
-                      <button
-                        key={ar.value}
-                        disabled={!canEditModel}
-                        onClick={() => {
-                          if (!canEditModel) return;
-                          onModelParamsChange({ ...modelParams, ratio: ar.value });
-                          setShowRatioMenu(false);
-                        }}
-                        className="flex h-[64px] flex-col items-center justify-center gap-2 rounded-md transition-colors"
-                        style={{
-                          color: modelParams.ratio === ar.value ? '#ffffff' : 'rgba(255,255,255,0.58)',
-                          background: 'rgba(255,255,255,0.035)',
-                          border: modelParams.ratio === ar.value ? '1px solid rgba(255,255,255,0.9)' : FLOATING_PANEL_BORDER,
-                        }}
-                      >
-                        <div className="border border-current rounded-[2px]" style={{ width: ar.icon === 'portrait' ? 9 : ar.icon === 'landscape' ? 14 : ar.icon === 'ultrawide' ? 17 : 11, height: ar.icon === 'portrait' ? 15 : ar.icon === 'landscape' ? 8 : ar.icon === 'ultrawide' ? 5 : 11, opacity: 0.78 }} />
-                        <span className="text-[13px]">{t(`imageNode.ratioValue.${ar.value}`, { defaultValue: ar.value })}</span>
                       </button>
                     ))}
                   </div>
@@ -1308,46 +1572,12 @@ export function ImageNodeControlPanel({
             )}
           </div>
         </div>
-        {/* Generate button */}
-        <div className="relative flex items-center rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: FLOATING_PANEL_BORDER, padding: '5px 6px 5px 12px', gap: 8 }}>
-          <button
-            disabled={!canEditModel}
-            onClick={() => {
-              if (!canEditModel) return;
-              setShowCountMenu(!showCountMenu);
-              setShowModelMenu(false);
-              setShowRatioMenu(false);
-            }}
-            className={`flex h-[34px] min-w-[82px] items-center justify-center gap-1 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
-            style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', fontWeight: 600, opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
-          >
-            {formatGenerationCount(modelParams.count)}
-            <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
-          </button>
-          {canEditModel && showCountMenu && (
-            <div className="absolute bottom-full left-0 mb-2 py-1 rounded-lg z-30" style={{ background: FLOATING_PANEL_BACKGROUND, border: FLOATING_PANEL_BORDER, boxShadow: '0 12px 28px rgba(0,0,0,0.4)', width: 82 }}>
-              {COUNT_OPTIONS.map((c) => (
-                <button
-                  key={c}
-                  disabled={!canEditModel}
-                  onClick={() => {
-                    if (!canEditModel) return;
-                    onModelParamsChange({ ...modelParams, count: c });
-                    setShowCountMenu(false);
-                  }}
-                  className={`w-full px-3 py-2 text-center text-[14px] transition-colors ${modelParams.count === c ? 'text-white bg-white/10' : 'text-white/75 hover:bg-white/5'}`}
-                >
-                  {formatGenerationCount(c)}
-                </button>
-              ))}
-            </div>
-          )}
+        {/* Credits + generate button */}
+        <div className="relative flex items-center gap-3">
           <div
-            className="flex h-[34px] min-w-[52px] items-center justify-center gap-1 rounded-lg px-2 text-[13px] font-medium"
+            className="flex h-[34px] min-w-[46px] items-center justify-center gap-1 text-[13px] font-medium"
             style={{
-              color: 'rgba(255,255,255,0.48)',
-              background: 'rgba(255,255,255,0.018)',
-              border: '1px solid rgba(255,255,255,0.035)',
+              color: 'rgba(255,255,255,0.52)',
             }}
             title={t('imageNode.creditCost', { count: GENERATION_CREDIT_COST })}
           >

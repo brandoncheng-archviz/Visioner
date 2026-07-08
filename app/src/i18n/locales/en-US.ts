@@ -159,7 +159,7 @@ const enUS = {
     actionDescPlaceholder: "Action description",
     add: "Add",
     resolution: "Resolution",
-    ratio: "Ratio",
+    ratio: "Aspect Ratio",
     generate: "Generate",
     generating: "Generating...",
     retry: "Retry",

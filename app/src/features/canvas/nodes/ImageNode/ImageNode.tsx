@@ -543,6 +543,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       .filter((value) => value.trim().length > 0)
       .join('\n\n');
     const { textPrompt, imageReferences, referenceImages, markReferences, promptBlocks, userPrompt, globalStyle, presets, controller: controllerSubmission } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview, controller);
+    const generationModelParams: ModelParams = { ...modelParams, count: '1张' };
 
     let task = createGenerationTask({
       sourceNodeId: id,
@@ -560,9 +561,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       })),
       markRefs: markReferences,
       modelParams: {
-        model: modelParams.model,
-        ratio: modelParams.ratio,
-        resolution: modelParams.resolution,
+        model: generationModelParams.model,
+        ratio: generationModelParams.ratio,
+        resolution: generationModelParams.resolution,
       },
     });
     setGenerationTask(task);
@@ -651,7 +652,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         userPrompt,
         inputRefs: task.inputRefs,
         markRefs: task.markRefs,
-        modelParams,
+        modelParams: generationModelParams,
         controller: controllerSubmission,
         style: globalStyle,
         presets: selectedPresets,
@@ -745,7 +746,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         presetIds: selectedPresets,
         styleId: selectedStyleId,
         controller: structuredClone(controller),
-        modelParams: { ...modelParams },
+        modelParams: { ...generationModelParams },
         seed: result.seed,
         width: result.width,
         height: result.height,
@@ -764,7 +765,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         styleId: selectedStyleId,
         lightPreview,
         controller: structuredClone(controller),
-        modelParams: { ...modelParams },
+        modelParams: { ...generationModelParams },
         createdAt: Date.now(),
       });
       setCurrentResultSet(newResultSet);
@@ -2221,6 +2222,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               isGenerating={isGenerating}
               generationTask={generationTask}
               textReferences={textReferences}
+              currentImageSize={imgSize ?? { width: getNodeWidth(data), height: getNodeHeight(data) }}
               onFocusTextReference={(nodeId) => {
                 const onFocusNode = data.onFocusNode as ((targetNodeId: string) => void) | undefined;
                 onFocusNode?.(nodeId);
