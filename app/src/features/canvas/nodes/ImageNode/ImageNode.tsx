@@ -47,6 +47,7 @@ import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
+import type { ImageNodeControllers } from './controllers';
 import { ImageCropOverlay, type NormalizedCropRect } from './ImageCropOverlay';
 import { createImageNodeViewModel } from './imageNodeViewModel';
 import { cropCoverImage } from '../../utils/cropImage';
@@ -113,6 +114,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [controller, setController] = useState<ImageControllerState>(() =>
     (data.controller as ImageControllerState | undefined) ?? DEFAULT_IMAGE_CONTROLLER_STATE,
   );
+  const controllers = data.controllers as ImageNodeControllers | undefined;
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
   const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
@@ -871,6 +873,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (imageNodeViewModel.isProcessing) return;
     setController(nextController);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, controller: nextController } } : n)));
+  };
+
+  const handleControllersChange = (nextControllers: ImageNodeControllers) => {
+    if (imageNodeViewModel.isProcessing) return;
+    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, controllers: nextControllers } } : n)));
   };
 
   const handleModelParamsChange = (params: ModelParams) => {
@@ -2204,6 +2211,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onLightPreviewChange={handleLightPreviewChange}
               controller={controller}
               onControllerChange={handleControllerChange}
+              controllers={controllers}
+              onControllersChange={handleControllersChange}
               modelParams={modelParams}
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}
@@ -2215,6 +2224,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canDeleteReference={imageNodeViewModel.canDeleteReference}
               canCreateMarks={canStartMarking}
               isMarkModeActive={activeImageMarkTargetNodeId === id}
+              isProcessing={imageNodeViewModel.isProcessing}
               isGenerating={isGenerating}
               generationTask={generationTask}
               textReferences={textReferences}

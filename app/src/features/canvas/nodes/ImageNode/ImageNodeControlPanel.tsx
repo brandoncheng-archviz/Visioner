@@ -44,6 +44,11 @@ import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '..
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
 import { ImageControllerPanel } from '../../components/ImageControllerPanel';
 import { hasActiveImageController, LIGHT_DIRECTION_OPTIONS, STYLE_OPTIONS, TIME_OPTIONS, TOGGLE_OPTIONS, WEATHER_OPTIONS } from '../../constants/imageController';
+import {
+  ImageControllersPopover,
+  ImageControllersTrigger,
+  type ImageNodeControllers,
+} from './controllers';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
@@ -199,6 +204,8 @@ export function ImageNodeControlPanel({
   onLightPreviewChange,
   controller,
   onControllerChange,
+  controllers,
+  onControllersChange,
   modelParams,
   onModelParamsChange,
   onGenerate,
@@ -210,6 +217,7 @@ export function ImageNodeControlPanel({
   canDeleteReference,
   canCreateMarks,
   isMarkModeActive,
+  isProcessing,
   isGenerating,
   generationTask,
   textReferences,
@@ -232,6 +240,8 @@ export function ImageNodeControlPanel({
   onLightPreviewChange: (data: LightPreviewData | null) => void;
   controller: ImageControllerState;
   onControllerChange: (controller: ImageControllerState) => void;
+  controllers?: ImageNodeControllers;
+  onControllersChange: (controllers: ImageNodeControllers) => void;
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void | Promise<void>;
@@ -243,6 +253,7 @@ export function ImageNodeControlPanel({
   canDeleteReference: boolean;
   canCreateMarks: boolean;
   isMarkModeActive: boolean;
+  isProcessing?: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   textReferences: TextReferenceInfo[];
@@ -270,6 +281,7 @@ export function ImageNodeControlPanel({
     }
   }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
   const [showController, setShowController] = useState(false);
+  const [showControllersPopover, setShowControllersPopover] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [customFrameWidth, setCustomFrameWidth] = useState('1');
@@ -295,6 +307,7 @@ export function ImageNodeControlPanel({
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const [atmosphereButtonElement, setAtmosphereButtonElement] = useState<HTMLButtonElement | null>(null);
+  const [controllersButtonElement, setControllersButtonElement] = useState<HTMLButtonElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const frameRatioButtonRef = useRef<HTMLButtonElement>(null);
@@ -310,6 +323,7 @@ export function ImageNodeControlPanel({
   const hasAtmosphereReference = sortedReferences.some(
     (reference) => getReferenceUsageSortRank(reference).group === 1,
   );
+  const isControllersDisabled = Boolean(isProcessing || isGenerating);
 
   const handleThumbnailClick = (ref: ReferenceInfo) => {
     if (!canEditPromptReferences) return;
@@ -780,6 +794,7 @@ export function ImageNodeControlPanel({
     setCustomFrameHeight(String(selectedFrameRatioDimensions.height));
     setShowRatioMenu(true);
     setShowModelMenu(false);
+    setShowControllersPopover(false);
   };
 
   const controllerSummaryLines = [
@@ -1060,6 +1075,7 @@ export function ImageNodeControlPanel({
                 if (isGenerating) return;
                 setShowController((open) => !open);
                 setShowLightPreview(false);
+                setShowControllersPopover(false);
               }}
               className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
                 isGenerating
@@ -1121,6 +1137,7 @@ export function ImageNodeControlPanel({
                 if (!canCreateMarks) return;
                 setShowLightPreview(false);
                 setShowController(false);
+                setShowControllersPopover(false);
                 onStartMarkMode();
               }}
               className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canCreateMarks ? (isMarkModeActive ? 'border-cyan-400/90 bg-cyan-400/[0.08] text-cyan-100/90 hover:border-cyan-300 hover:bg-cyan-400/[0.11]' : GENERATION_CONTROL_BUTTON_CLASS) : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
@@ -1486,6 +1503,7 @@ export function ImageNodeControlPanel({
                 if (!canEditModel) return;
                 setShowModelMenu((value) => !value);
                 setShowRatioMenu(false);
+                setShowControllersPopover(false);
               }}
               className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
               style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
@@ -1689,6 +1707,28 @@ export function ImageNodeControlPanel({
                 </div>
               </div>
             )}
+          </div>
+          {/* Controllers */}
+          <div className="relative">
+            <ImageControllersTrigger
+              ref={setControllersButtonElement}
+              controllers={controllers}
+              disabled={isControllersDisabled}
+              open={showControllersPopover}
+              onClick={() => {
+                setShowControllersPopover((value) => !value);
+                setShowModelMenu(false);
+                setShowRatioMenu(false);
+              }}
+            />
+            <ImageControllersPopover
+              open={showControllersPopover}
+              anchorElement={controllersButtonElement}
+              controllers={controllers}
+              disabled={isControllersDisabled}
+              onChange={onControllersChange}
+              onOpenChange={setShowControllersPopover}
+            />
           </div>
         </div>
         {/* Credits + generate button */}
