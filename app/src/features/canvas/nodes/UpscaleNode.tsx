@@ -419,7 +419,7 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
   ];
 
   return (
-    <div className="relative group/upscale" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
+    <div className="relative group/upscale" style={{ zIndex: selected ? 100 : 1, width: cardWidth }}>
       {/* Result toolbar — shown above title when success and node is selected */}
       {isResultMode && isOnlySelected && (
         <div
@@ -452,10 +452,10 @@ export function UpscaleNode({ data, selected, id }: NodeProps) {
               width: cardWidth,
               height: cardHeight,
               background: 'transparent',
+              border: `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR}`,
               borderRadius: CANVAS_NODE_CARD_RADIUS,
-              outline: selected ? `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid ${CANVAS_NODE_CARD_SELECTED_BORDER_COLOR}` : `${CANVAS_NODE_CARD_BORDER_WIDTH}px solid transparent`,
-              outlineOffset: 0,
               boxShadow: 'none',
+              boxSizing: 'border-box',
             }}
           >
             <img

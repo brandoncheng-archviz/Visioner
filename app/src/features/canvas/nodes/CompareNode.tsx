@@ -176,7 +176,6 @@ function CompareImageArea({
         width,
         height,
         boxSizing: 'border-box',
-        cursor: 'default',
         background: CANVAS_NODE_CARD_BACKGROUND,
       }}
     >
@@ -521,7 +520,7 @@ export function CompareNode({ id, data, selected }: NodeProps) {
   return (
     <div
       className="relative group/compare"
-      style={{ zIndex: selected ? 100 : 1, width: nodeWidth, cursor: 'default' }}
+      style={{ zIndex: selected ? 100 : 1, width: nodeWidth }}
       onContextMenu={preventNodeContextMenu}
     >
       {selected && (

@@ -157,11 +157,16 @@ export function ImageRoleTag({
   const availableBelow = anchorRect ? window.innerHeight - anchorRect.bottom - 20 : 0;
   const availableAbove = anchorRect ? anchorRect.top - 20 : 0;
   const openBelow = availableBelow >= Math.min(estimatedHeight, 280) || availableBelow >= availableAbove;
+  const menuMaxHeight = Math.max(140, openBelow ? availableBelow : availableAbove);
+  const menuHeight = Math.min(estimatedHeight, menuMaxHeight);
   const menuLeft = anchorRect
     ? Math.min(Math.max(12, anchorRect.left), window.innerWidth - menuWidth - 12)
     : 12;
-  const menuTop = anchorRect ? (openBelow ? anchorRect.bottom + 8 : anchorRect.top - 8) : 12;
-  const menuMaxHeight = Math.max(140, openBelow ? availableBelow : availableAbove);
+  const menuTop = anchorRect
+    ? openBelow
+      ? anchorRect.bottom + 8
+      : Math.max(12, anchorRect.top - 8 - menuHeight)
+    : 12;
 
   return (
     <>
@@ -236,8 +241,8 @@ export function ImageRoleTag({
           style={{
             left: menuLeft,
             top: menuTop,
-            transform: openBelow ? undefined : 'translateY(-100%)',
             width: menuWidth,
+            height: menuHeight,
             maxHeight: menuMaxHeight,
             background: FLOATING_PANEL_BACKGROUND,
             backdropFilter: 'blur(18px)',

@@ -17,6 +17,7 @@ type CreateImageNodeViewModelContext = {
   currentResultSet?: CurrentResultSet | null;
   generationTask?: GenerationTask | null;
   hasGenerationIntent?: boolean;
+  hasImageReferences?: boolean;
   isReferenceLocked?: boolean;
 };
 
@@ -81,6 +82,7 @@ export function createImageNodeViewModel(
     assetSource === 'history'
   );
   const hasImage = Boolean(displayImage);
+  const hasImageReferences = Boolean(context.hasImageReferences);
   const contentKind = getContentKind(data, hasImage, hasGeneratedResult);
   const status: ImageNodeVisualStatus = isProcessing ? 'processing' : hasImage || hasGeneratedResult ? 'ready' : 'empty';
   const viewKind = getViewKind(contentKind, isProcessing);
@@ -110,14 +112,14 @@ export function createImageNodeViewModel(
     isReferenceLocked,
     hasImage,
     hasGeneratedResult,
-    showUploadArea: isEmpty,
+    showUploadArea: isEmpty && !hasImageReferences,
     showImagePreview: hasImage,
     showControlPanel: showEditorSurface,
     showPromptEditor: showEditorSurface,
     showTopToolbar: (viewKind === 'resource' || viewKind === 'editor' || viewKind === 'processing') && hasImage,
     showGeneratedToolbar: viewKind === 'editor' && hasGeneratedResult,
     showReferenceUsageControl,
-    canUpload: viewKind === 'empty' && !isProcessing,
+    canUpload: viewKind === 'empty' && !hasImageReferences && !isProcessing,
     canEditPrompt: canEditEditorControls,
     canEditPromptReferences,
     canEditReferenceUsage,

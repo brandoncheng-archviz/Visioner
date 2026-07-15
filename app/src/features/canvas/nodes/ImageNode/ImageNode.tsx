@@ -423,11 +423,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     hasValidPromptContentInput(promptContent) ||
     (hasActiveImageController(controller) && (Boolean(displayImage) || references.length > 0))
   );
+  const hasImageReferences = references.length > 0;
   const imageNodeViewModel = createImageNodeViewModel(data, {
     displayImage,
     currentResultSet,
     generationTask,
     hasGenerationIntent,
+    hasImageReferences,
     isReferenceLocked: Boolean(data.isReferenceLocked),
   });
   const isGenerating = imageNodeViewModel.isProcessing;
@@ -1815,7 +1817,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     <div
       className={`relative group/image ${isCropMode ? 'nodrag nowheel' : ''}`}
       onContextMenuCapture={isCropMode ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}
-      style={{ zIndex: selected ? 100 : 1, width: displayCardWidth, cursor: 'default' }}
+      style={{ zIndex: selected ? 100 : 1, width: displayCardWidth }}
     >
       {canvasMarkSelectionPortal}
       {pointPickResultPortal}
@@ -2067,13 +2069,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               {renderImageMarkOverlays()}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-2 text-center">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/55">
-                <Image className="h-4 w-4" strokeWidth={1.7} />
-              </span>
-              <span className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                添加图片
-              </span>
+            <div className="flex h-full w-full items-center justify-center" aria-hidden="true">
+              <Image className="h-12 w-12 text-[rgba(172,176,188,0.42)]" strokeWidth={1.55} />
             </div>
           )}
         </div>
@@ -2217,7 +2214,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canEditModel={imageNodeViewModel.canEditModel}
               canDeleteReference={imageNodeViewModel.canDeleteReference}
               canCreateMarks={canStartMarking}
-              canEditMarks={imageNodeViewModel.canEditMarks}
               isMarkModeActive={activeImageMarkTargetNodeId === id}
               isGenerating={isGenerating}
               generationTask={generationTask}

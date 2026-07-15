@@ -15,6 +15,8 @@ import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
 import type { TextNodeModel, TextReferenceInfo } from '../types/basicNode.types';
 
+const NODE_CONTROL_PANEL_BACKGROUND = '#1e1e1e';
+
 export interface TextNodeImageReference {
   nodeId: string;
   title: string;
@@ -95,7 +97,7 @@ export function TextNodeInputPanel({
       style={{
         width: IMAGE_NODE_CONTROL_WIDTH,
         height: IMAGE_NODE_CONTROL_HEIGHT,
-        background: FLOATING_PANEL_BACKGROUND,
+        background: NODE_CONTROL_PANEL_BACKGROUND,
         border: FLOATING_PANEL_BORDER,
         boxShadow: '0 16px 34px rgba(0,0,0,0.48)',
       }}

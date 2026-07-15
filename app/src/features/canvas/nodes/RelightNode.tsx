@@ -551,7 +551,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   };
 
   return (
-    <div ref={relightRootRef} className="relative group/relight" style={{ zIndex: selected ? 100 : 1, width: cardWidth, cursor: 'default' }}>
+    <div ref={relightRootRef} className="relative group/relight" style={{ zIndex: selected ? 100 : 1, width: cardWidth }}>
       {resultImage && isResultMode && isOnlySelected && (
         <div
           className="absolute z-20 flex justify-center"

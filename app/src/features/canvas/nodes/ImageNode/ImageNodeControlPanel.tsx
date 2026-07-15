@@ -49,6 +49,7 @@ const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
 const GENERATION_CONTROL_BUTTON_DISABLED_CLASS =
   'border-[rgba(148,163,184,0.14)] bg-transparent text-[rgba(203,213,225,0.62)]';
+const NODE_CONTROL_PANEL_BACKGROUND = '#1e1e1e';
 const resizePromptReferenceTextarea = (element: HTMLTextAreaElement) => {
   const oneLineHeight = 24;
   const twoLineHeight = 44;
@@ -104,6 +105,17 @@ function isValidFrameRatio(width: number, height: number) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return false;
   const ratio = width / height;
   return ratio >= 1 / 8 && ratio <= 8;
+}
+
+function getBoundedImagePreviewSize(width: number | undefined, height: number | undefined, maxWidth: number, maxHeight: number) {
+  if (!width || !height || width <= 0 || height <= 0) {
+    return { width: maxWidth, height: maxHeight };
+  }
+  const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
 }
 
 function AspectFrameIcon({ ratio }: { ratio: number }) {
@@ -197,7 +209,6 @@ export function ImageNodeControlPanel({
   canEditModel,
   canDeleteReference,
   canCreateMarks,
-  canEditMarks,
   isMarkModeActive,
   isGenerating,
   generationTask,
@@ -231,7 +242,6 @@ export function ImageNodeControlPanel({
   canEditModel: boolean;
   canDeleteReference: boolean;
   canCreateMarks: boolean;
-  canEditMarks: boolean;
   isMarkModeActive: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
@@ -271,6 +281,8 @@ export function ImageNodeControlPanel({
   const [activeMarkCandidateBlockId, setActiveMarkCandidateBlockId] = useState<string | null>(null);
   const [markCandidateAnchorElement, setMarkCandidateAnchorElement] = useState<HTMLElement | null>(null);
   const [markCandidateAnchorRect, setMarkCandidateAnchorRect] = useState<DOMRect | null>(null);
+  const [referencePreview, setReferencePreview] = useState<{ reference: ReferenceInfo; rect: DOMRect } | null>(null);
+  const [textReferencePreview, setTextReferencePreview] = useState<{ reference: TextReferenceInfo; rect: DOMRect } | null>(null);
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0);
   const [highlightedPromptBlockId, setHighlightedPromptBlockId] = useState<string | null>(null);
   const [hoveredPromptBlockId, setHoveredPromptBlockId] = useState<string | null>(null);
@@ -314,6 +326,13 @@ export function ImageNodeControlPanel({
       onKeyDown={(event) => {
         if (event.key === 'Enter') handleThumbnailClick(ref);
       }}
+      onMouseEnter={(event) => {
+        if (!ref.imageUrl) return;
+        setReferencePreview({ reference: ref, rect: event.currentTarget.getBoundingClientRect() });
+      }}
+      onMouseLeave={() => {
+        setReferencePreview((current) => (current?.reference.nodeId === ref.nodeId ? null : current));
+      }}
       onPointerDown={(event) => event.stopPropagation()}
       className="nodrag nowheel group/ref relative flex-shrink-0 rounded-lg outline-none"
       style={{
@@ -354,6 +373,7 @@ export function ImageNodeControlPanel({
             event.preventDefault();
             event.stopPropagation();
             if (!canDeleteReference) return;
+            setReferencePreview(null);
             onRemoveReference(ref.nodeId);
           }}
           onDragStart={(event) => {
@@ -370,8 +390,119 @@ export function ImageNodeControlPanel({
     </div>
   );
 
+  const referencePreviewMaxImageWidth = 220;
+  const referencePreviewMaxImageHeight = 180;
+  const referencePreviewImageSize = referencePreview
+    ? getBoundedImagePreviewSize(
+        referencePreview.reference.width,
+        referencePreview.reference.height,
+        referencePreviewMaxImageWidth,
+        referencePreviewMaxImageHeight,
+      )
+    : { width: referencePreviewMaxImageWidth, height: 154 };
+  const referencePreviewWidth = referencePreviewImageSize.width + 12;
+  const referencePreviewHeight = referencePreviewImageSize.height + 34;
+  const referencePreviewGap = 8;
+  const referencePreviewMargin = 12;
+  const referencePreviewLeft = referencePreview
+    ? Math.min(
+        Math.max(referencePreviewMargin, referencePreview.rect.left),
+        window.innerWidth - referencePreviewWidth - referencePreviewMargin,
+      )
+    : 0;
+  const referencePreviewTop = referencePreview
+    ? referencePreview.rect.top >= referencePreviewHeight + referencePreviewGap + referencePreviewMargin
+      ? referencePreview.rect.top - referencePreviewHeight - referencePreviewGap
+      : Math.min(
+          referencePreview.rect.bottom + referencePreviewGap,
+          window.innerHeight - referencePreviewHeight - referencePreviewMargin,
+        )
+    : 0;
+  const referencePreviewPortal = referencePreview && referencePreview.reference.imageUrl
+    ? createPortal(
+        <div
+          className="pointer-events-none fixed z-[4300] overflow-hidden rounded-lg border border-white/10 bg-[#222224] p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.48)]"
+          style={{
+            left: referencePreviewLeft,
+            top: referencePreviewTop,
+            width: referencePreviewWidth,
+            border: `1px solid ${getImageRoleColor(referencePreview.reference.role, referencePreview.reference.localReferenceType)}66`,
+          }}
+        >
+          <div
+            className="flex items-center justify-center overflow-hidden rounded-md bg-black/20"
+            style={{
+              width: referencePreviewImageSize.width,
+              height: referencePreviewImageSize.height,
+            }}
+          >
+            <img
+              src={referencePreview.reference.imageUrl}
+              alt=""
+              draggable={false}
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <div
+            className="truncate px-1 pb-0.5 pt-1.5 text-center text-[12px] font-normal"
+            style={{ color: 'rgba(255,255,255,0.72)' }}
+          >
+            {getImageRoleLabel(
+              referencePreview.reference.role,
+              referencePreview.reference.customRoleLabel,
+              referencePreview.reference.localReferenceType,
+              referencePreview.reference.localReferenceLabel,
+            ) || t('imageNode.undefinedUsage')}
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  const textReferencePreviewWidth = 260;
+  const textReferencePreviewGap = 8;
+  const textReferencePreviewMargin = 12;
+  const textReferencePreviewCenterX = textReferencePreview
+    ? textReferencePreview.rect.left + (textReferencePreview.rect.width / 2)
+    : 0;
+  const textReferencePreviewLeft = textReferencePreview
+    ? Math.min(
+        Math.max(textReferencePreviewMargin + (textReferencePreviewWidth / 2), textReferencePreviewCenterX),
+        window.innerWidth - (textReferencePreviewWidth / 2) - textReferencePreviewMargin,
+      )
+    : 0;
+  const shouldPlaceTextReferencePreviewAbove = textReferencePreview
+    ? textReferencePreview.rect.top >= 128 + textReferencePreviewGap + textReferencePreviewMargin
+    : true;
+  const textReferencePreviewTop = textReferencePreview
+    ? shouldPlaceTextReferencePreviewAbove
+      ? textReferencePreview.rect.top - textReferencePreviewGap
+      : textReferencePreview.rect.bottom + textReferencePreviewGap
+    : 0;
+  const textReferencePreviewPortal = textReferencePreview
+    ? createPortal(
+        <div
+          className="pointer-events-none fixed z-[4300] rounded-xl p-3 text-left"
+          style={{
+            left: textReferencePreviewLeft,
+            top: textReferencePreviewTop,
+            width: textReferencePreviewWidth,
+            transform: shouldPlaceTextReferencePreviewAbove ? 'translate(-50%, -100%)' : 'translateX(-50%)',
+            background: 'rgba(8,8,10,0.98)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            boxShadow: '0 14px 34px rgba(0,0,0,0.58)',
+          }}
+        >
+          <div className="truncate text-[12px] font-medium text-white/78">{textReferencePreview.reference.title}</div>
+          <div className="mt-2 line-clamp-6 whitespace-pre-wrap break-words text-[12px] leading-5 text-white/58">
+            {textReferencePreview.reference.content.trim() || '当前文本节点暂无内容'}
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
   const renderTextReference = (reference: TextReferenceInfo, index: number) => {
-    const summary = reference.content.trim() || '当前文本节点暂无内容';
     return (
       <div
         key={reference.nodeId}
@@ -381,22 +512,20 @@ export function ImageNodeControlPanel({
         onKeyDown={(event) => {
           if (event.key === 'Enter') onFocusTextReference(reference.nodeId);
         }}
+        onMouseEnter={(event) => {
+          setTextReferencePreview({ reference, rect: event.currentTarget.getBoundingClientRect() });
+        }}
+        onMouseLeave={() => {
+          setTextReferencePreview((current) => (current?.reference.nodeId === reference.nodeId ? null : current));
+        }}
+        onFocus={(event) => {
+          setTextReferencePreview({ reference, rect: event.currentTarget.getBoundingClientRect() });
+        }}
+        onBlur={() => {
+          setTextReferencePreview((current) => (current?.reference.nodeId === reference.nodeId ? null : current));
+        }}
         className="nodrag nowheel group/text-ref relative h-[50px] w-[54px] flex-shrink-0 cursor-pointer rounded-lg text-left outline-none"
       >
-        <div
-          className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-[260px] max-w-[320px] -translate-x-1/2 rounded-xl p-3 text-left group-hover/text-ref:block group-focus-visible/text-ref:block"
-          style={{
-            background: 'rgba(8,8,10,0.98)',
-            border: '1px solid rgba(255,255,255,0.10)',
-            boxShadow: '0 14px 34px rgba(0,0,0,0.58)',
-          }}
-        >
-          <div className="truncate text-[12px] font-medium text-white/78">{reference.title}</div>
-          <div className="mt-2 line-clamp-6 whitespace-pre-wrap break-words text-[12px] leading-5 text-white/58">
-            {summary}
-          </div>
-        </div>
-
         <div
           className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg text-white/38 transition-colors group-hover/text-ref:bg-white/[0.07] group-hover/text-ref:text-white/52 group-focus-visible/text-ref:text-white/58"
           style={{
@@ -406,7 +535,7 @@ export function ImageNodeControlPanel({
         >
           <TextReferenceIcon />
           <span
-            className="absolute right-0 top-0 z-20 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[9px] font-medium text-white/72 group-hover/text-ref:hidden"
+            className="absolute right-0 top-0 z-20 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[9px] font-medium text-white/72 transition-opacity group-hover/text-ref:opacity-0"
             style={{ background: 'rgba(0,0,0,0.72)', border: '1px solid rgba(255,255,255,0.16)' }}
           >
             {index + 1}
@@ -421,9 +550,10 @@ export function ImageNodeControlPanel({
               event.preventDefault();
               event.stopPropagation();
               if (!canDeleteReference) return;
+              setTextReferencePreview(null);
               onRemoveReference(reference.nodeId);
             }}
-            className={`nodrag nowheel absolute right-0 top-0 z-30 h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition-colors hover:bg-black hover:text-white ${canDeleteReference ? 'hidden group-hover/text-ref:flex' : 'hidden'}`}
+            className={`nodrag nowheel absolute right-0 top-0 z-30 h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition hover:bg-black hover:text-white ${canDeleteReference ? 'flex opacity-0 pointer-events-none group-hover/text-ref:pointer-events-auto group-hover/text-ref:opacity-100' : 'hidden'}`}
             style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
             title="断开文本引用"
             aria-label="断开文本引用"
@@ -446,10 +576,11 @@ export function ImageNodeControlPanel({
   const imageMarkReferenceBlocks = promptContent.filter(
     (block): block is ImageMarkReferencePromptBlock => block.type === 'image_mark_reference',
   );
+  const canEditMarkReferenceBlocks = canEditPromptReferences;
   const activeMarkCandidateBlock = imageMarkReferenceBlocks.find((block) => block.id === activeMarkCandidateBlockId);
   useEffect(() => {
     if (!activeMarkCandidateBlockId) return;
-    if (!canEditMarks || !activeMarkCandidateBlock) return;
+    if (!canEditMarkReferenceBlocks || !activeMarkCandidateBlock) return;
 
     const closeMarkCandidateMenu = () => {
       setActiveMarkCandidateBlockId(null);
@@ -476,10 +607,10 @@ export function ImageNodeControlPanel({
       document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
       document.removeEventListener('keydown', handleEscape, true);
     };
-  }, [activeMarkCandidateBlock, activeMarkCandidateBlockId, canEditMarks]);
+  }, [activeMarkCandidateBlock, activeMarkCandidateBlockId, canEditMarkReferenceBlocks]);
 
   useEffect(() => {
-    if (!activeMarkCandidateBlock || !markCandidateAnchorElement || !canEditMarks) {
+    if (!activeMarkCandidateBlock || !markCandidateAnchorElement || !canEditMarkReferenceBlocks) {
       const frame = requestAnimationFrame(() => setMarkCandidateAnchorRect(null));
       return () => cancelAnimationFrame(frame);
     }
@@ -500,7 +631,7 @@ export function ImageNodeControlPanel({
     };
     updateAnchorRect();
     return () => cancelAnimationFrame(frame);
-  }, [activeMarkCandidateBlock, canEditMarks, markCandidateAnchorElement]);
+  }, [activeMarkCandidateBlock, canEditMarkReferenceBlocks, markCandidateAnchorElement]);
 
   const markCandidateMenuMargin = 12;
   const markCandidateMenuWidth = Math.min(180, Math.max(0, window.innerWidth - markCandidateMenuMargin * 2));
@@ -516,7 +647,7 @@ export function ImageNodeControlPanel({
     ? (markCandidateOpenBelow ? markCandidateAnchorRect.bottom + markCandidateMenuGap : markCandidateAnchorRect.top - markCandidateMenuGap)
     : markCandidateMenuMargin;
   const markCandidateMenuMaxHeight = Math.max(0, markCandidateOpenBelow ? markCandidateSpaceBelow : markCandidateSpaceAbove);
-  const markCandidateMenuPortal = activeMarkCandidateBlock && markCandidateAnchorRect && canEditMarks
+  const markCandidateMenuPortal = activeMarkCandidateBlock && markCandidateAnchorRect && canEditMarkReferenceBlocks
     ? createPortal(
         <div
           ref={markCandidateMenuRef}
@@ -802,14 +933,14 @@ export function ImageNodeControlPanel({
   };
 
   const startEditMarkReferenceBlock = (block: ImageMarkReferencePromptBlock) => {
-    if (!canEditMarks) return;
+    if (!canEditMarkReferenceBlocks) return;
     setEditingMarkReferenceBlockId(block.id);
     setEditingMarkPromptText(block.promptText);
     setEditingMarkPromptInitialText(block.promptText);
   };
 
   const saveMarkReferenceBlock = (blockId: string) => {
-    if (!canEditMarks) return;
+    if (!canEditMarkReferenceBlocks) return;
     const promptTextChanged = editingMarkPromptText !== editingMarkPromptInitialText;
     onPromptContentChange(promptContent.map((item) => item.type === 'image_mark_reference' && item.id === blockId
       ? { ...item, promptText: editingMarkPromptText, promptTextEdited: item.promptTextEdited === true || promptTextChanged }
@@ -902,7 +1033,7 @@ export function ImageNodeControlPanel({
       style={{
         width: IMAGE_NODE_CONTROL_WIDTH,
         minHeight: promptExpanded ? IMAGE_NODE_CONTROL_EXPANDED_HEIGHT : IMAGE_NODE_CONTROL_HEIGHT,
-        background: FLOATING_PANEL_BACKGROUND,
+        background: NODE_CONTROL_PANEL_BACKGROUND,
         border: FLOATING_PANEL_BORDER,
         borderRadius: 12,
         marginTop: 8,
@@ -914,6 +1045,8 @@ export function ImageNodeControlPanel({
       onWheelCapture={stopControlEvent}
     >
       {markCandidateMenuPortal}
+      {referencePreviewPortal}
+      {textReferencePreviewPortal}
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1054,7 +1187,7 @@ export function ImageNodeControlPanel({
                 const selectedCandidate = block.candidates.find((candidate) => candidate.id === block.selectedCandidateId)
                   ?? block.candidates[0];
                 const markUsageColor = getImageRoleColor(block.usageKey === 'undefined_usage' ? null : block.usageKey);
-                const isEditing = canEditMarks && editingMarkReferenceBlockId === block.id;
+                const isEditing = canEditMarkReferenceBlocks && editingMarkReferenceBlockId === block.id;
                 return (
                   <div
                     key={block.id}
@@ -1076,21 +1209,13 @@ export function ImageNodeControlPanel({
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full border border-white/15 bg-[#252526] text-teal-300/80">
                         <ScanSearch className="h-2 w-2" />
                       </span>
-                      {!isEditing && (
-                        <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[184px] overflow-hidden rounded-lg border border-white/10 bg-[#222224] p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.48)] group-hover/mark-thumb:block">
-                          <img src={block.thumbnailUrl} alt="" draggable={false} className="h-[116px] w-full rounded-md object-cover" />
-                          <div className="truncate px-1 pb-0.5 pt-1.5 text-[12px] font-medium" style={{ color: markUsageColor }}>
-                            {selectedCandidate?.label || block.markLabel}
-                          </div>
-                        </div>
-                      )}
                     </div>
                     <div className="flex min-w-0 max-w-[150px] flex-shrink items-center">
                         {block.candidates.length > 1 ? (
                           <button
                             data-mark-candidate-trigger={block.id}
                             type="button"
-                            disabled={!canEditMarks}
+                            disabled={!canEditMarkReferenceBlocks}
                             onPointerDown={(event) => event.stopPropagation()}
                             onClick={(event) => {
                               event.stopPropagation();
@@ -1150,7 +1275,7 @@ export function ImageNodeControlPanel({
                     ) : (
                       <span className="min-w-0 flex-1 truncate px-1.5 text-[15px] leading-5 text-white/65">{block.promptText}</span>
                     )}
-                    {canEditMarks && !isEditing ? (
+                    {canEditMarkReferenceBlocks && !isEditing ? (
                       <button
                         type="button"
                         className="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-black/25 text-white/70 opacity-0 transition-all hover:bg-red-500/20 hover:text-red-200 group-hover/mark-ref:opacity-100"
@@ -1216,12 +1341,6 @@ export function ImageNodeControlPanel({
                         <span className="flex h-6 w-6 items-center justify-center rounded" style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${usageColor}` }}>
                           <Image className="h-3.5 w-3.5" style={{ color: 'rgba(255,255,255,0.38)' }} />
                         </span>
-                      )}
-                      {!isEditing && previewImage && (
-                        <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 hidden w-[184px] overflow-hidden rounded-lg border border-white/10 bg-[#222224] p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.48)] group-hover/reference-thumb:block">
-                          <img src={previewImage} alt="" draggable={false} className="h-[116px] w-full rounded-md object-cover" />
-                          <div className="truncate px-1 pb-0.5 pt-1.5 text-[12px] font-medium" style={{ color: usageColor }}>{displayUsage}</div>
-                        </div>
                       )}
                     </div>
                     <span

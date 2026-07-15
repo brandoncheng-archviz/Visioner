@@ -412,14 +412,14 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                 startInlineEditing();
               }}
             >
-              <TextNodeGlyph className="mb-7 text-white/16" />
+              <TextNodeGlyph className="mb-7 text-[rgba(172,176,188,0.42)]" />
               <div className="text-[15px] leading-6 text-white/30">
                 双击编写内容，开始你的创作。
               </div>
             </div>
           ) : nodeState !== 'empty' || incomingSourceNodes.length > 0 ? (
             <div className="flex min-h-[300px] items-center justify-center">
-              <TextNodeGlyph className="text-white/16" />
+              <TextNodeGlyph className="text-[rgba(172,176,188,0.42)]" />
             </div>
           ) : (
             <div
@@ -430,8 +430,8 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                 triggerAction('draft');
               }}
             >
-              <TextNodeGlyph className="-mt-3 mb-7 text-white/14" />
-              <div className="mb-1 w-full px-2 text-[11px] text-white/22">尝试：</div>
+              <TextNodeGlyph className="-mt-3 mb-7 text-[rgba(172,176,188,0.42)]" />
+              <div className="mb-1 w-full px-2 text-[11px] text-white/14">尝试：</div>
               <div className="w-full space-y-0.5">
                 {EMPTY_ACTIONS.map(({ action, label, icon: Icon }) => (
                   <button
@@ -441,9 +441,9 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                       event.stopPropagation();
                       triggerAction(action);
                     }}
-                    className="nodrag flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/34 transition-colors hover:bg-white/[0.035] hover:text-white/46"
+                    className="nodrag group/empty-action flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/22 transition-colors hover:bg-white/[0.025] hover:text-white/34"
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-white/22" />
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-white/14 transition-colors group-hover/empty-action:text-white/24" />
                     <span>{label}</span>
                   </button>
                 ))}

@@ -159,7 +159,7 @@ export function SunSkyNode({ data, selected, id }: NodeProps) {
   }, [id, setNodes]);
 
   return (
-    <div className="relative group/sunsky" style={{ zIndex: selected ? 100 : 1, width: NODE_WIDTH, cursor: 'default' }}>
+    <div className="relative group/sunsky" style={{ zIndex: selected ? 100 : 1, width: NODE_WIDTH }}>
       {/* Title label */}
       <div
         className="absolute z-20"
