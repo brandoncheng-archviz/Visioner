@@ -14,6 +14,9 @@ import type { ImageControllerState } from '../types/imageController.types';
 
 type SelectKey = 'time' | 'lightDirection' | 'weather' | 'style';
 
+const ATMOSPHERE_INNER_SWITCH_TRACK = 'relative ml-2 h-4 w-7 shrink-0 rounded-full border transition-colors';
+const ATMOSPHERE_INNER_SWITCH_THUMB = 'absolute top-0.5 h-2.5 w-2.5 rounded-full transition-all';
+
 interface ImageControllerPanelProps {
   anchorElement: HTMLElement | null;
   controller: ImageControllerState;
@@ -252,7 +255,7 @@ export function ImageControllerPanel({
                     event.preventDefault();
                     toggleOption();
                   }}
-                  className={`flex h-8 items-center justify-between rounded-md border px-2.5 text-left text-[13px] font-medium transition ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${active ? 'border-[rgba(170,120,255,0.95)] bg-[rgba(150,100,255,0.16)] text-[rgba(235,235,240,0.88)] hover:bg-[rgba(150,100,255,0.19)]' : 'border-white/[0.10] bg-white/[0.025] text-[rgba(210,210,220,0.42)] hover:border-white/[0.16] hover:bg-white/[0.035] hover:text-[rgba(225,225,232,0.58)]'}`}
+                  className={`flex h-8 items-center justify-between rounded-md border border-white/[0.10] bg-white/[0.025] px-2.5 text-left text-[13px] font-medium transition ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-white/[0.16] hover:bg-white/[0.035]'} ${active ? 'text-[rgba(235,235,240,0.88)]' : 'text-[rgba(210,210,220,0.42)] hover:text-[rgba(225,225,232,0.58)]'}`}
                 >
                   <span>{option.label}</span>
                   <button
@@ -266,9 +269,9 @@ export function ImageControllerPanel({
                       event.stopPropagation();
                       toggleOption();
                     }}
-                    className={`relative ml-2 h-4 w-7 shrink-0 rounded-full border transition-colors ${active ? 'border-[rgba(170,120,255,0.95)] bg-[rgba(150,100,255,0.72)]' : 'border-white/[0.12] bg-white/[0.08]'}`}
+                    className={`${ATMOSPHERE_INNER_SWITCH_TRACK} ${active ? 'border-[#8b5cf6]/80 bg-[#8b5cf6] hover:brightness-110' : 'border-white/[0.18] bg-white/[0.10] hover:bg-white/[0.14]'}`}
                   >
-                    <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-full transition-all ${active ? 'left-[14px] bg-white/90' : 'left-0.5 bg-white/38'}`} />
+                    <span className={`${ATMOSPHERE_INNER_SWITCH_THUMB} ${active ? 'left-[14px] bg-white/90' : 'left-0.5 bg-white/58'}`} />
                   </button>
                 </div>
               );

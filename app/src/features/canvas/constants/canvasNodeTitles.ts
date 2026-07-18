@@ -9,4 +9,5 @@ export const NODE_BASE_TITLES: Record<string, string> = {
   compare: '图像对比',
   sunSky: '光影',
   relight: '光影调整',
+  quickRenderExterior: '快速渲染-室外',
 };

@@ -19,9 +19,19 @@ export interface StructureChannel {
   height?: number;
 }
 
+export interface PendingStructureChannelFile {
+  id: string;
+  imageUrl: string;
+  fileName: string;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+}
+
 export interface StructureControllerData {
   channels?: StructureChannel[];
   previewChannelId?: string;
+  pendingFiles?: PendingStructureChannelFile[];
   /** @deprecated retained for old placeholder node-data compatibility. */
   enabled?: boolean;
 }

@@ -1,5 +1,6 @@
 export type {
   ImageNodeControllers,
+  PendingStructureChannelFile,
   StructureChannel,
   StructureChannelType,
   StructureControllerData,

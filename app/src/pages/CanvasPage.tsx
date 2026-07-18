@@ -1653,7 +1653,7 @@ function FlowCanvas() {
 
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
-    if (!['text', 'image', 'video', 'relight', 'upscale', 'compare'].includes(type)) {
+    if (!['text', 'image', 'video', 'relight', 'upscale', 'compare', 'quickRenderExterior'].includes(type)) {
       setCreateMenu(null);
       setTempLine(null);
       return;
@@ -1691,7 +1691,7 @@ function FlowCanvas() {
     };
     const graphNodes = [...nodes, newNode];
     const targetNode = graphNodes.find((node) => node.id === newEdge.target);
-    if (targetNode && ['relight', 'upscale', 'compare'].includes(targetNode.type || '')) {
+    if (targetNode && ['relight', 'upscale', 'compare', 'quickRenderExterior'].includes(targetNode.type || '')) {
       const validation = validateImageProcessingEdge(graphNodes, edges, newEdge);
       if (!validation.valid) {
         showToast(validation.reason || t('canvas.cannotConnect'));

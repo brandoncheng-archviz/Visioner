@@ -11,6 +11,7 @@ import {
   Columns2,
   Headphones,
   X,
+  Building2,
 } from 'lucide-react';
 import { HistoryPanel } from './HistoryPanel';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +46,7 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
     text: TextNodeIcon as unknown as typeof Image,
     image: Image,
     relight: Sun,
+    quickRenderExterior: Building2,
     upscale: Sparkles,
     compare: Columns2,
   };

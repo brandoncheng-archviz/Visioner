@@ -1,4 +1,4 @@
-import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2 } from 'lucide-react';
+import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2, Building2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -126,6 +126,7 @@ const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
   text: TextNodeIcon as unknown as typeof Image,
   image: Image,
   relight: Sun,
+  quickRenderExterior: Building2,
   upscale: Sparkles,
   compare: Columns2,
 };
