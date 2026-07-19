@@ -1,3 +1,5 @@
+import type { ImageRole, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
+
 export type QuickRenderAtmosphereSource = 'unset' | 'followReference' | 'manual';
 
 export type QuickRenderAtmosphereOption = {
@@ -24,6 +26,13 @@ export type QuickRenderConnectedImage = {
   width: number;
   height: number;
   label?: string;
+  role?: ImageRole | null;
+  roleLabel?: string;
+  roleColor?: string;
+  customRoleLabel?: string;
+  localReferenceType?: LocalReferenceType;
+  localReferenceLabel?: string;
+  localReferencePoint?: LocalReferencePoint;
 };
 
 export type QuickRenderAtmosphereReference = {
@@ -64,6 +73,9 @@ export type QuickRenderExteriorNodeData = {
   label?: string;
   title?: string;
   connectedImages?: QuickRenderConnectedImage[];
+  onAddQuickRenderInputEdge?: (targetNodeId: string, sourceNodeId: string) => void;
+  onRemoveQuickRenderInputEdge?: (targetNodeId: string, sourceNodeId: string, sourceEdgeId?: string) => void;
+  onUploadQuickRenderInputImages?: (targetNodeId: string, files: FileList | null) => void;
   atmosphereEnabled?: boolean;
   atmosphere?: {
     time?: QuickRenderAtmosphereOption;
@@ -75,7 +87,9 @@ export type QuickRenderExteriorNodeData = {
     interiorLights?: boolean;
     motionBlur?: boolean;
   };
+  /** Deprecated: old quick render nodes may contain this field; current UI ignores it. */
   atmosphereReferenceEnabled?: boolean;
+  /** Deprecated: old quick render nodes may contain this field; current UI ignores it. */
   atmosphereReference?: QuickRenderAtmosphereReference | null;
   structureEnabled?: boolean;
   structure?: {

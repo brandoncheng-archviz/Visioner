@@ -28,6 +28,16 @@ import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_CROP_CANCEL_EVENT, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
+import {
+  formatPastedImageLabel,
+  getImageRejectMessage,
+  type ImageFileReject,
+} from '../features/canvas/utils/canvasFileUtils';
+import {
+  buildUploadedImageNode,
+  decodeImageFile,
+  filterImageImportFiles,
+} from '../features/canvas/utils/canvasImageImportUtils';
 import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
 import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
@@ -630,6 +640,59 @@ function FlowCanvas() {
     setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === targetNodeId)));
   }, []);
 
+  const addQuickRenderInputEdge = useCallback((targetNodeId: string, sourceNodeId: string) => {
+    const sourceNode = nodes.find((node) => node.id === sourceNodeId);
+    const targetNode = nodes.find((node) => node.id === targetNodeId);
+    if (!sourceNode || !targetNode || targetNode.type !== 'quickRenderExterior') return;
+    if (sourceNode.type === 'text' || sourceNode.type === 'compare' || sourceNode.type === 'upscale' || sourceNode.type === 'quickRenderExterior') return;
+    if (!resolveNodeImage(sourceNode.data)?.imageUrl) return;
+
+    const duplicateEdge = edges.find((edge) => {
+      if (edge.source !== sourceNodeId || edge.target !== targetNodeId) return false;
+      return edge.data?.kind === 'quickRenderInput' || edge.data?.kind === undefined;
+    });
+    if (duplicateEdge) {
+      showToast('该图像已添加');
+      return;
+    }
+
+    const newEdge: Edge = {
+      id: `quick-render-input-${sourceNodeId}-${targetNodeId}-${Date.now()}`,
+      source: sourceNodeId,
+      target: targetNodeId,
+      sourceHandle: 'right-source',
+      targetHandle: 'left-target',
+      data: { kind: 'quickRenderInput' },
+      style: { stroke: '#555', strokeWidth: 1 },
+    };
+    const validation = validateImageProcessingEdge(nodes, edges, newEdge);
+    if (!validation.valid) {
+      showToast(validation.reason || t('canvas.cannotConnect'));
+      return;
+    }
+
+    setEdges((currentEdges) => {
+      const stillDuplicate = currentEdges.some((edge) => {
+        if (edge.source !== sourceNodeId || edge.target !== targetNodeId) return false;
+        return edge.data?.kind === 'quickRenderInput' || edge.data?.kind === undefined;
+      });
+      return stillDuplicate ? currentEdges : [...currentEdges, newEdge];
+    });
+  }, [edges, nodes, setEdges, showToast, t, validateImageProcessingEdge]);
+
+  const removeQuickRenderInputEdge = useCallback((targetNodeId: string, sourceNodeId: string, sourceEdgeId?: string) => {
+    if (!sourceNodeId && !sourceEdgeId) return;
+    setEdges((currentEdges) => currentEdges.filter((edge) => {
+      if (edge.target !== targetNodeId) return true;
+      const edgeKind = edge.data?.kind;
+      const isQuickRenderInputEdge = edgeKind === 'quickRenderInput' || edgeKind === undefined;
+      if (!isQuickRenderInputEdge) return true;
+      const matchesEdgeId = Boolean(sourceEdgeId) && edge.id === sourceEdgeId;
+      const matchesSourceTarget = Boolean(sourceNodeId) && edge.source === sourceNodeId;
+      return !(matchesEdgeId || matchesSourceTarget);
+    }));
+  }, [setEdges]);
+
   const swapCompareInputs = useCallback((targetNodeId: string, leftSourceNodeId: string, rightSourceNodeId: string) => {
     setEdges((eds) => {
       const bySlot = getCompareEdgesBySlot(eds, targetNodeId);
@@ -1086,6 +1149,104 @@ function FlowCanvas() {
     lastPointerPositionRef,
   });
 
+  const uploadQuickRenderInputImages = useCallback((targetNodeId: string, files: FileList | null) => {
+    if (!files?.length) return;
+
+    const targetNode = nodes.find((node) => node.id === targetNodeId && node.type === 'quickRenderExterior');
+    if (!targetNode) return;
+
+    const { validFiles, rejectedFiles: initialRejectedFiles } = filterImageImportFiles(Array.from(files));
+    const rejectedFiles: ImageFileReject[] = [...initialRejectedFiles];
+    const preCheckMessage = getImageRejectMessage(rejectedFiles, validFiles.length);
+    if (validFiles.length === 0) {
+      if (preCheckMessage) showToast(preCheckMessage);
+      return;
+    }
+
+    const allLabels = getAllNodeLabels();
+    const assignedLabels: string[] = [];
+    const fileFinalLabels = validFiles.map((file) => {
+      const baseTitle = formatPastedImageLabel(file);
+      const label = getNextNodeTitle([...allLabels, ...assignedLabels], baseTitle);
+      assignedLabels.push(label);
+      return label;
+    });
+
+    Promise.all(
+      validFiles.map((file, index) => {
+        const objectUrl = URL.createObjectURL(file);
+        objectUrlsRef.current.add(objectUrl);
+        return decodeImageFile(file, objectUrl)
+          .then(({ naturalWidth, naturalHeight }) => ({
+            node: buildUploadedImageNode({
+              id: `image-${Date.now()}-${index}`,
+              label: fileFinalLabels[index],
+              objectUrl,
+              naturalWidth,
+              naturalHeight,
+              position: {
+                x: targetNode.position.x - IMAGE_NODE_PREVIEW_WIDTH - 100,
+                y: targetNode.position.y + index * 48,
+              },
+              selected: index === 0,
+            }),
+            index,
+          }))
+          .catch(() => {
+            URL.revokeObjectURL(objectUrl);
+            objectUrlsRef.current.delete(objectUrl);
+            rejectedFiles.push({ file, reason: 'decode-failed' });
+            console.warn(`[Canvas] Failed to decode image: ${file.name || 'unnamed'}`);
+            return null;
+          });
+      }),
+    ).then((results) => {
+      const createdNodes = results
+        .filter((result): result is { node: Node; index: number } => Boolean(result))
+        .map((result) => result.node);
+
+      if (createdNodes.length === 0) {
+        const finalMessage = getImageRejectMessage(rejectedFiles, createdNodes.length);
+        if (finalMessage) showToast(finalMessage);
+        return;
+      }
+
+      const graphNodes = [...nodes, ...createdNodes];
+      const createdEdges = createdNodes.flatMap((sourceNode) => {
+        const edge: Edge = {
+          id: `quick-render-input-${sourceNode.id}-${targetNodeId}-${Date.now()}`,
+          source: sourceNode.id,
+          target: targetNodeId,
+          sourceHandle: 'right-source',
+          targetHandle: 'left-target',
+          data: { kind: 'quickRenderInput' },
+          style: { stroke: '#555', strokeWidth: 1 },
+        };
+        const validation = validateImageProcessingEdge(graphNodes, edges, edge);
+        if (!validation.valid) return [];
+        return [edge];
+      });
+
+      setNodes((currentNodes) => [
+        ...currentNodes.map((node) => ({ ...node, selected: false })),
+        ...createdNodes,
+      ]);
+      setEdges((currentEdges) => [...currentEdges, ...createdEdges]);
+
+      setTimeout(() => {
+        fitView({
+          nodes: [...createdNodes.map((node) => ({ id: node.id })), { id: targetNodeId }],
+          duration: 300,
+          padding: 0.25,
+          maxZoom: Math.min(getViewport().zoom, 1),
+        });
+      }, 0);
+
+      const partialMessage = getImageRejectMessage(rejectedFiles, createdNodes.length);
+      if (partialMessage) showToast(partialMessage);
+    });
+  }, [edges, fitView, getAllNodeLabels, getViewport, nodes, objectUrlsRef, setEdges, setNodes, showToast, validateImageProcessingEdge]);
+
   const lockedPromptReferenceNodeIds = useMemo(() => {
     const lockedNodeIds = new Set<string>();
     nodes.forEach((node) => {
@@ -1142,6 +1303,9 @@ function FlowCanvas() {
         isReferenceLocked: n.type === 'image' ? lockedPromptReferenceNodeIds.has(n.id) : undefined,
         onStartLineDraw: startLineDraw,
         onRemoveReferenceEdge: removeReferenceEdge,
+        onAddQuickRenderInputEdge: n.type === 'quickRenderExterior' ? addQuickRenderInputEdge : undefined,
+        onRemoveQuickRenderInputEdge: n.type === 'quickRenderExterior' ? removeQuickRenderInputEdge : undefined,
+        onUploadQuickRenderInputImages: n.type === 'quickRenderExterior' ? uploadQuickRenderInputImages : undefined,
         onSwapCompareInputs: swapCompareInputs,
         onAssignReferenceEdgeRole: assignReferenceEdgeRole,
         onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' || n.type === 'relight' ? createUpscaleNode : undefined,
@@ -1168,7 +1332,7 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addQuickRenderInputEdge, removeQuickRenderInputEdge, uploadQuickRenderInputImages, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {

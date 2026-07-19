@@ -139,15 +139,19 @@ export function QuickRenderStructurePanel({ data, onChange }: QuickRenderStructu
       </div>
       {data.structureEnabled && (
         <div className="space-y-2 border-t border-white/[0.06] p-3">
-          {channels.length > 0 ? channels.map((channel) => (
-            <QuickRenderStructureChannelRow
-              key={channel.id}
-              channel={channel}
-              onToggle={() => updateStructure({ channels: channels.map((item) => item.id === channel.id ? { ...item, enabled: item.enabled === false } : item) })}
-              onWeightChange={(weight) => updateStructure({ channels: channels.map((item) => item.id === channel.id ? { ...item, weight } : item) })}
-              onRemove={() => updateStructure({ channels: channels.filter((item) => item.id !== channel.id) })}
-            />
-          )) : (
+          {channels.length > 0 ? (
+            <div className="quick-render-node-scrollbar max-h-[210px] space-y-2 overflow-y-auto pr-1">
+              {channels.map((channel) => (
+                <QuickRenderStructureChannelRow
+                  key={channel.id}
+                  channel={channel}
+                  onToggle={() => updateStructure({ channels: channels.map((item) => item.id === channel.id ? { ...item, enabled: item.enabled === false } : item) })}
+                  onWeightChange={(weight) => updateStructure({ channels: channels.map((item) => item.id === channel.id ? { ...item, weight } : item) })}
+                  onRemove={() => updateStructure({ channels: channels.filter((item) => item.id !== channel.id) })}
+                />
+              ))}
+            </div>
+          ) : (
             <div className="rounded-[10px] border border-dashed border-white/[0.08] px-3 py-3 text-[12px] text-white/36">导入结构通道后显示约束列表</div>
           )}
 

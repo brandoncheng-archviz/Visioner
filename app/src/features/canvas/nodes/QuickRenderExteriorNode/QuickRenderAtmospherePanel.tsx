@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -13,10 +14,18 @@ import type { QuickRenderAtmosphereOption, QuickRenderExteriorNodeData } from '.
 
 type QuickRenderAtmospherePanelProps = {
   data: QuickRenderExteriorNodeData;
+  hasAtmosphereReference: boolean;
   onChange: (patch: Partial<QuickRenderExteriorNodeData>) => void;
 };
 
 type SelectKey = 'time' | 'light' | 'weather' | 'style';
+type SelectMenuState = {
+  key: SelectKey;
+  left: number;
+  top: number;
+  width: number;
+  openBelow: boolean;
+};
 
 const SELECT_ROWS = [
   { key: 'time', label: '时间', options: TIME_OPTIONS },
@@ -28,6 +37,8 @@ const SELECT_ROWS = [
 const ATMOSPHERE_SWITCH_CLASS = "data-[state=checked]:bg-[#8b5cf6] data-[state=unchecked]:bg-white/[0.10] hover:data-[state=checked]:brightness-110 hover:data-[state=unchecked]:bg-white/[0.14]";
 const INNER_ATMOSPHERE_SWITCH_TRACK = 'relative ml-2 h-4 w-7 shrink-0 rounded-full border transition-colors';
 const INNER_ATMOSPHERE_SWITCH_THUMB = 'absolute top-0.5 h-2.5 w-2.5 rounded-full transition-all';
+const SELECT_MENU_ESTIMATED_HEIGHT = 260;
+const VIEWPORT_PADDING = 12;
 
 function getOptionLabel(value: string | undefined, options: ControllerOption<string>[]) {
   if (!value) return '未设置';
@@ -48,36 +59,35 @@ function SelectionRow({
   label,
   value,
   options,
-  expanded,
   hasAtmosphereReference,
   onToggle,
   onClear,
-  onChange,
+  buttonRef,
 }: {
   label: string;
   value: QuickRenderAtmosphereOption | undefined;
   options: ControllerOption<string>[];
-  expanded: boolean;
   hasAtmosphereReference: boolean;
   onToggle: () => void;
   onClear: () => void;
-  onChange: (value: string) => void;
+  buttonRef: (element: HTMLButtonElement | null) => void;
 }) {
   const hasManualValue = value?.source === 'manual';
   return (
-    <div className="border-b border-white/[0.055] last:border-b-0">
-      <div className="group/selection flex h-9 w-full items-center rounded-md transition hover:bg-white/[0.035]">
+    <div className="rounded-md border border-white/[0.08] bg-white/[0.02]">
+      <div className="group/selection flex h-8 w-full items-center rounded-md transition hover:bg-white/[0.035]">
         <button
+          ref={buttonRef}
           type="button"
           onClick={onToggle}
-          className="nodrag flex h-full min-w-0 flex-1 items-center justify-between px-1.5 text-left"
+          className="nodrag flex h-full min-w-0 flex-1 items-center justify-between gap-2 px-2 text-left"
         >
-          <span className="text-[13px] font-normal text-[rgba(210,210,220,0.42)]">{label}</span>
+          <span className="shrink-0 text-[13px] font-normal text-[rgba(210,210,220,0.42)]">{label}</span>
           <span className={hasManualValue
-            ? 'text-[13px] font-medium text-[rgba(235,235,240,0.86)]'
+            ? 'min-w-0 truncate text-[13px] font-medium text-[rgba(235,235,240,0.86)]'
             : hasAtmosphereReference
-              ? 'text-[13px] font-normal text-[rgba(220,220,228,0.58)]'
-              : 'text-[13px] font-normal text-[rgba(210,210,220,0.32)]'}
+              ? 'min-w-0 truncate text-[13px] font-normal text-[rgba(220,220,228,0.58)]'
+              : 'min-w-0 truncate text-[13px] font-normal text-[rgba(210,210,220,0.32)]'}
           >
             {getDisplayValue(value, options, hasAtmosphereReference)}
           </span>
@@ -97,36 +107,78 @@ function SelectionRow({
           </button>
         )}
         <button type="button" onClick={onToggle} className="nodrag mr-1 flex h-7 w-6 shrink-0 items-center justify-center" aria-label={`展开${label}`}>
-          <ChevronDown className={`h-3.5 w-3.5 text-[rgba(255,255,255,0.24)] transition-all group-hover/selection:text-white/42 ${expanded ? 'rotate-180' : ''}`} />
+          <ChevronDown className="h-3.5 w-3.5 text-[rgba(255,255,255,0.24)] transition-all group-hover/selection:text-white/42" />
         </button>
       </div>
-      {expanded && (
-        <div className="space-y-0.5 px-1.5 pb-2.5">
-          {options.map((option) => {
-            const selected = value?.source === 'manual' && value.value === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                title={option.description}
-                onClick={() => onChange(option.id)}
-                className={`nodrag flex h-7 w-full items-center justify-between rounded-md px-2 text-left text-[13px] font-medium transition ${selected ? 'bg-[#3b82f6]/[0.09] text-[rgba(235,235,240,0.88)]' : 'text-[rgba(225,225,232,0.72)] hover:bg-white/[0.04] hover:text-[rgba(235,235,240,0.88)]'}`}
-              >
-                <span>{option.label}</span>
-                {selected && <Check className="h-3.5 w-3.5 text-[#60a5fa]" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
 
-export function QuickRenderAtmospherePanel({ data, onChange }: QuickRenderAtmospherePanelProps) {
-  const [expandedGroup, setExpandedGroup] = useState<SelectKey | null>(null);
+export function QuickRenderAtmospherePanel({ data, hasAtmosphereReference, onChange }: QuickRenderAtmospherePanelProps) {
+  const [selectMenu, setSelectMenu] = useState<SelectMenuState | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const rowButtonRefs = useRef<Partial<Record<SelectKey, HTMLButtonElement>>>({});
   const atmosphere = data.atmosphere || {};
-  const hasAtmosphereReference = data.atmosphereReferenceEnabled === true && Boolean(data.atmosphereReference?.imageUrl);
+
+  const getMenuPosition = (element: HTMLElement): SelectMenuState => {
+    const rect = element.getBoundingClientRect();
+    const width = Math.max(190, rect.width);
+    const maxLeft = Math.max(VIEWPORT_PADDING, window.innerWidth - width - VIEWPORT_PADDING);
+    const left = Math.min(Math.max(rect.left, VIEWPORT_PADDING), maxLeft);
+    const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_PADDING;
+    const spaceAbove = rect.top - VIEWPORT_PADDING;
+    const openBelow = spaceBelow >= Math.min(SELECT_MENU_ESTIMATED_HEIGHT, 180) || spaceBelow >= spaceAbove;
+    const top = openBelow
+      ? rect.bottom + 6
+      : Math.max(VIEWPORT_PADDING, rect.top - SELECT_MENU_ESTIMATED_HEIGHT - 6);
+    return { key: 'time', left, top, width, openBelow };
+  };
+
+  const openSelectMenu = (key: SelectKey) => {
+    const element = rowButtonRefs.current[key];
+    if (!element) return;
+    const nextPosition = getMenuPosition(element);
+    setSelectMenu((current) => current?.key === key ? null : { ...nextPosition, key });
+  };
+
+  useEffect(() => {
+    if (!selectMenu) return;
+    const close = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      const activeButton = rowButtonRefs.current[selectMenu.key];
+      if (menuRef.current?.contains(target) || activeButton?.contains(target)) return;
+      setSelectMenu(null);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectMenu(null);
+    };
+    window.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [selectMenu]);
+
+  useEffect(() => {
+    if (!selectMenu) return;
+    const update = () => {
+      const element = rowButtonRefs.current[selectMenu.key];
+      if (!element) return;
+      setSelectMenu({ ...getMenuPosition(element), key: selectMenu.key });
+    };
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [selectMenu]);
+
   const setField = (key: SelectKey, value: string) => {
     onChange({
       atmosphere: {
@@ -134,7 +186,7 @@ export function QuickRenderAtmospherePanel({ data, onChange }: QuickRenderAtmosp
         [key]: { source: 'manual', value },
       },
     });
-    setExpandedGroup(null);
+    setSelectMenu(null);
   };
   const clearField = (key: SelectKey) => {
     onChange({
@@ -143,7 +195,7 @@ export function QuickRenderAtmospherePanel({ data, onChange }: QuickRenderAtmosp
         [key]: hasAtmosphereReference ? { source: 'followReference' } : { source: 'unset' },
       },
     });
-    setExpandedGroup(null);
+    setSelectMenu(null);
   };
   const setToggle = (key: 'addEntourage' | 'addPeople' | 'interiorLights' | 'motionBlur', value: boolean) => {
     onChange({ atmosphere: { ...atmosphere, [key]: value } });
@@ -154,9 +206,37 @@ export function QuickRenderAtmospherePanel({ data, onChange }: QuickRenderAtmosp
     { sourceId: 'indoorLighting', key: 'interiorLights' },
     { sourceId: 'motionBlur', key: 'motionBlur' },
   ] as const;
+  const activeSelectRow = selectMenu ? SELECT_ROWS.find((row) => row.key === selectMenu.key) : null;
+  const activeSelectValue = selectMenu ? atmosphere[selectMenu.key] : undefined;
 
   return (
     <section className="rounded-[12px] border border-white/[0.08] bg-white/[0.025]">
+      {selectMenu && activeSelectRow && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          className="nodrag nopan nowheel fixed z-[2000] overflow-hidden rounded-[10px] border border-white/[0.10] bg-[#222224] p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.52)]"
+          style={{ left: selectMenu.left, top: selectMenu.top, width: selectMenu.width }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onWheel={(event) => event.stopPropagation()}
+        >
+          {activeSelectRow.options.map((option) => {
+            const selected = activeSelectValue?.source === 'manual' && activeSelectValue.value === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                title={option.description}
+                onClick={() => setField(activeSelectRow.key, option.id)}
+                className={`flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-[13px] font-medium transition ${selected ? 'bg-[#3b82f6]/[0.09] text-[rgba(235,235,240,0.88)]' : 'text-[rgba(225,225,232,0.72)] hover:bg-white/[0.055] hover:text-[rgba(235,235,240,0.9)]'}`}
+              >
+                <span className="truncate">{option.label}</span>
+                {selected && <Check className="h-3.5 w-3.5 shrink-0 text-[#60a5fa]" />}
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
       <div className="flex items-center justify-between px-3 py-2.5">
         <span className="text-[13px] font-medium text-white/82">氛围控制</span>
         <Switch
@@ -188,19 +268,19 @@ export function QuickRenderAtmospherePanel({ data, onChange }: QuickRenderAtmosp
               );
             })}
           </div>
-
-          <div className="mt-3 border-t border-white/[0.055] pt-2">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-white/[0.055] pt-2">
             {SELECT_ROWS.map((row) => (
               <SelectionRow
                 key={row.key}
                 label={row.label}
                 value={atmosphere[row.key]}
                 options={row.options}
-                expanded={expandedGroup === row.key}
                 hasAtmosphereReference={hasAtmosphereReference}
-                onToggle={() => setExpandedGroup((current) => current === row.key ? null : row.key)}
+                onToggle={() => openSelectMenu(row.key)}
                 onClear={() => clearField(row.key)}
-                onChange={(value) => setField(row.key, value)}
+                buttonRef={(element) => {
+                  rowButtonRefs.current[row.key] = element ?? undefined;
+                }}
               />
             ))}
           </div>

@@ -54,8 +54,6 @@ export function createQuickRenderExteriorNodeData(label: string): QuickRenderExt
     title: label,
     connectedImages: [],
     atmosphereEnabled: false,
-    atmosphereReferenceEnabled: false,
-    atmosphereReference: null,
     atmosphere: {
       time: { source: 'unset' },
       weather: { source: 'unset' },

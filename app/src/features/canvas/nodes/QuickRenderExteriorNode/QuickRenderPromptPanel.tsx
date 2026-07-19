@@ -14,7 +14,7 @@ export function QuickRenderPromptPanel({ value, onChange }: QuickRenderPromptPan
           maxLength={1000}
           onChange={(event) => onChange(event.target.value)}
           placeholder="输入补充描述，支持指定材质、细节、氛围等..."
-          className="nodrag h-[88px] w-full resize-none bg-transparent text-[13px] leading-5 text-white/78 outline-none placeholder:text-white/28"
+          className="nodrag h-[64px] w-full resize-none bg-transparent text-[13px] leading-5 text-white/78 outline-none placeholder:text-white/28"
           onPointerDown={(event) => event.stopPropagation()}
         />
         <div className="text-right text-[11px] text-white/32">{safeValue.length} / 1000</div>

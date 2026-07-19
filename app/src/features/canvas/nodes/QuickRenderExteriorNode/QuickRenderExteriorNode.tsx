@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Handle, Position, useReactFlow, useStore, type Node, type NodeProps } from '@xyflow/react';
 import { Home, Plus, Sparkles } from 'lucide-react';
 import { CANVAS_NODE_CARD_BACKGROUND, CANVAS_NODE_CARD_BORDER_COLOR, CANVAS_NODE_CARD_BORDER_WIDTH, CANVAS_NODE_CARD_RADIUS, CANVAS_NODE_CARD_SELECTED_BORDER_COLOR } from '../../constants/canvasConstants';
+import { getReferenceUsageInfo } from '../../constants/imageUsages';
+import type { ImageRole, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
 import { QuickRenderAtmospherePanel } from './QuickRenderAtmospherePanel';
-import { QuickRenderAtmosphereReference } from './QuickRenderAtmosphereReference';
 import { QuickRenderConnectedImages } from './QuickRenderConnectedImages';
 import { QuickRenderFooter } from './QuickRenderFooter';
 import { QuickRenderPromptPanel } from './QuickRenderPromptPanel';
@@ -12,15 +14,18 @@ import { QuickRenderStructurePanel } from './QuickRenderStructurePanel';
 import type { QuickRenderConnectedImage, QuickRenderExteriorNodeData } from './quickRenderExterior.types';
 import {
   createQuickRenderExteriorNodeData,
-  createUploadedQuickRenderInputImage,
-  readImageFileAsDataUrl,
 } from './quickRenderExteriorUtils';
 
+const QUICK_RENDER_NODE_WIDTH = 450;
+const QUICK_RENDER_NODE_HEIGHT = 600;
+
 export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
-  const { setNodes, setEdges } = useReactFlow();
+  const { getNodes, setNodes } = useReactFlow();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
   const generateTimeoutRef = useRef<number | null>(null);
+  const [isCanvasSelecting, setIsCanvasSelecting] = useState(false);
+  const hoveredSelectableNodeRef = useRef<HTMLElement | null>(null);
   const canvasInputImages = useStore((state) => {
     return state.edges
       .filter((edge) => edge.target === id && edge.data?.kind !== 'atmosphereReference')
@@ -28,6 +33,18 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         const sourceNode = state.nodes.find((node) => node.id === edge.source);
         const resolved = resolveNodeImage(sourceNode?.data);
         if (!sourceNode || !resolved) return [];
+        const edgeRole = edge.data?.role as ImageRole | null | undefined;
+        const sourceRole = sourceNode.data?.role as ImageRole | null | undefined;
+        const role = edgeRole ?? sourceRole ?? null;
+        const customRoleLabel = (edge.data?.customRoleLabel as string | undefined)
+          ?? (sourceNode.data?.customRoleLabel as string | undefined);
+        const localReferenceType = (edge.data?.localReferenceType as LocalReferenceType | undefined)
+          ?? (sourceNode.data?.localReferenceType as LocalReferenceType | undefined);
+        const localReferenceLabel = (edge.data?.localReferenceLabel as string | undefined)
+          ?? (sourceNode.data?.localReferenceLabel as string | undefined);
+        const localReferencePoint = (edge.data?.localReferencePoint as LocalReferencePoint | undefined)
+          ?? (sourceNode.data?.localReferencePoint as LocalReferencePoint | undefined);
+        const usageInfo = getReferenceUsageInfo(role, customRoleLabel, localReferenceType, localReferenceLabel);
         return [{
           id: `canvas-${edge.id}`,
           sourceType: 'canvas' as const,
@@ -37,6 +54,13 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           width: resolved.width,
           height: resolved.height,
           label: typeof sourceNode.data?.label === 'string' ? sourceNode.data.label : undefined,
+          role,
+          roleLabel: usageInfo.label,
+          roleColor: usageInfo.color,
+          customRoleLabel,
+          localReferenceType: usageInfo.localReferenceType,
+          localReferenceLabel: usageInfo.localReferenceLabel,
+          localReferencePoint,
         }];
       });
   });
@@ -53,12 +77,35 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     () => [...canvasInputImages, ...uploadedInputImages],
     [canvasInputImages, uploadedInputImages],
   );
-  const inputImagesSignature = JSON.stringify(inputImages.map((image) => `${image.id}:${image.imageUrl}`));
-  const storedConnectedImagesSignature = JSON.stringify((nodeData.connectedImages || []).map((image) => `${image.id}:${image.imageUrl}`));
+  const hasAtmosphereReferenceInput = inputImages.some((image) => image.role === 'atmosphere_reference' || image.role === 'overall_reference' || image.roleLabel?.includes('氛围'));
 
   const updateData = useCallback((patch: Partial<QuickRenderExteriorNodeData>) => {
     setNodes((nodes) => nodes.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node));
   }, [id, setNodes]);
+
+  const clearCanvasSelectionHighlight = useCallback(() => {
+    if (!hoveredSelectableNodeRef.current) return;
+    hoveredSelectableNodeRef.current.classList.remove('quick-render-canvas-selectable-hover');
+    hoveredSelectableNodeRef.current = null;
+  }, []);
+
+  const getSelectableImageNode = useCallback((nodeId: string | null | undefined) => {
+    if (!nodeId || nodeId === id) return null;
+    const node = getNodes().find((item) => item.id === nodeId);
+    if (!node) return null;
+    if (node.type === 'text' || node.type === 'compare' || node.type === 'upscale' || node.type === 'quickRenderExterior') return null;
+    const resolved = resolveNodeImage(node.data);
+    if (!resolved?.imageUrl) return null;
+    return { node, resolved };
+  }, [getNodes, id]);
+
+  const addCanvasInputEdge = useCallback((sourceNode: Node) => {
+    nodeData.onAddQuickRenderInputEdge?.(id, sourceNode.id);
+  }, [id, nodeData]);
+
+  const startCanvasImageSelection = useCallback(() => {
+    setIsCanvasSelecting(true);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -67,32 +114,90 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
   }, []);
 
   useEffect(() => {
-    if (inputImagesSignature === storedConnectedImagesSignature) return;
-    updateData({ connectedImages: inputImages });
-  }, [inputImages, inputImagesSignature, storedConnectedImagesSignature, updateData]);
-
-  const removeConnectedImage = (image: QuickRenderConnectedImage) => {
-    if (image.sourceType === 'canvas') {
-      setEdges((edges) => edges.filter((edge) => edge.id !== image.sourceEdgeId));
+    if (!isCanvasSelecting) {
+      clearCanvasSelectionHighlight();
       return;
     }
+
+    const getNodeIdFromEvent = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return null;
+      return target.closest('.react-flow__node')?.getAttribute('data-id') ?? null;
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const nodeId = getNodeIdFromEvent(event);
+      const selectable = getSelectableImageNode(nodeId);
+      const nodeElement = selectable
+        ? document.querySelector(`.react-flow__node[data-id="${selectable.node.id}"]`) as HTMLElement | null
+        : null;
+      if (hoveredSelectableNodeRef.current === nodeElement) return;
+      clearCanvasSelectionHighlight();
+      if (!nodeElement) return;
+      nodeElement.classList.add('quick-render-canvas-selectable-hover');
+      hoveredSelectableNodeRef.current = nodeElement;
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const nodeId = getNodeIdFromEvent(event);
+      const selectable = getSelectableImageNode(nodeId);
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      if (selectable) {
+        addCanvasInputEdge(selectable.node);
+      }
+      setIsCanvasSelecting(false);
+      clearCanvasSelectionHighlight();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setIsCanvasSelecting(false);
+      clearCanvasSelectionHighlight();
+    };
+
+    document.body.style.cursor = 'crosshair';
+    window.addEventListener('pointermove', handlePointerMove, true);
+    window.addEventListener('pointerdown', handlePointerDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.body.style.cursor = '';
+      window.removeEventListener('pointermove', handlePointerMove, true);
+      window.removeEventListener('pointerdown', handlePointerDown, true);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      clearCanvasSelectionHighlight();
+    };
+  }, [addCanvasInputEdge, clearCanvasSelectionHighlight, getSelectableImageNode, isCanvasSelecting]);
+
+  const removeConnectedImage = (image: QuickRenderConnectedImage) => {
+    const removeCachedImage = (candidate: QuickRenderConnectedImage) => {
+      if (candidate.id === image.id) return false;
+      if (image.sourceEdgeId && candidate.sourceEdgeId === image.sourceEdgeId) return false;
+      if (
+        image.sourceType === 'canvas' &&
+        image.sourceNodeId &&
+        candidate.sourceType === 'canvas' &&
+        candidate.sourceNodeId === image.sourceNodeId
+      ) {
+        return false;
+      }
+      return true;
+    };
+
+    if (image.sourceType === 'canvas') {
+      nodeData.onRemoveQuickRenderInputEdge?.(id, image.sourceNodeId || '', image.sourceEdgeId);
+    }
+
     updateData({
-      connectedImages: (nodeData.connectedImages || []).filter((item) => item.id !== image.id),
+      connectedImages: (nodeData.connectedImages || []).filter(removeCachedImage),
     });
   };
 
-  const handleInputUpload = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const uploadedImages = await Promise.all(Array.from(files).map(async (file) => {
-      const imageUrl = await readImageFileAsDataUrl(file);
-      return createUploadedQuickRenderInputImage(imageUrl, file.name, file.type);
-    }));
-    updateData({
-      connectedImages: [
-        ...(nodeData.connectedImages || []),
-        ...uploadedImages,
-      ],
-    });
+  const handleInputUpload = (files: FileList | null) => {
+    nodeData.onUploadQuickRenderInputImages?.(id, files);
   };
 
   const handleGenerate = () => {
@@ -133,13 +238,29 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
   };
 
   return (
-    <div className="relative w-[520px]">
+    <div className="relative" style={{ width: QUICK_RENDER_NODE_WIDTH }}>
+      {isCanvasSelecting && typeof document !== 'undefined' && createPortal(
+        <>
+          <style>
+            {`
+              .react-flow__node.quick-render-canvas-selectable-hover .node-preview-card {
+                border-color: rgba(47, 107, 255, 0.95) !important;
+                box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.35), 0 16px 36px rgba(0, 0, 0, 0.38) !important;
+              }
+            `}
+          </style>
+          <div className="pointer-events-none fixed left-1/2 top-5 z-[2300] -translate-x-1/2 rounded-full border border-white/[0.10] bg-[#222224]/95 px-3 py-2 text-[12px] font-medium text-white/72 shadow-[0_12px_30px_rgba(0,0,0,0.42)]">
+            选择一张画布图片作为输入，Esc 取消
+          </div>
+        </>,
+        document.body,
+      )}
       <div
         className="absolute z-20 overflow-hidden nodrag"
         style={{
           top: -20 / zoom,
           left: 0,
-          width: 520 * zoom,
+          width: QUICK_RENDER_NODE_WIDTH * zoom,
           transform: `scale(${inverseScale})`,
           transformOrigin: 'top left',
         }}
@@ -154,7 +275,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         </div>
       </div>
 
-      <div className="relative w-[520px]">
+      <div className="relative" style={{ width: QUICK_RENDER_NODE_WIDTH }}>
         <div
           className="image-node-handle input-port"
           data-port-type="input"
@@ -214,8 +335,10 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         <Handle id="right-target" type="target" position={Position.Right} style={{ opacity: 0, width: handleSize, height: handleSize, right: 0, top: handleTop, pointerEvents: 'none' }} />
 
         <div
-          className="node-preview-card flex h-[600px] w-[520px] flex-col overflow-hidden"
+          className="node-preview-card flex flex-col overflow-hidden"
           style={{
+            width: QUICK_RENDER_NODE_WIDTH,
+            height: QUICK_RENDER_NODE_HEIGHT,
             background: CANVAS_NODE_CARD_BACKGROUND,
             borderRadius: CANVAS_NODE_CARD_RADIUS,
             borderWidth: CANVAS_NODE_CARD_BORDER_WIDTH,
@@ -231,9 +354,9 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
                 images={inputImages as QuickRenderConnectedImage[]}
                 onRemove={removeConnectedImage}
                 onUpload={handleInputUpload}
+                onSelectFromCanvas={startCanvasImageSelection}
               />
-              <QuickRenderAtmosphereReference data={nodeData} onChange={updateData} />
-              <QuickRenderAtmospherePanel data={nodeData} onChange={updateData} />
+              <QuickRenderAtmospherePanel data={nodeData} hasAtmosphereReference={hasAtmosphereReferenceInput} onChange={updateData} />
               <QuickRenderStructurePanel data={nodeData} onChange={updateData} />
               <QuickRenderPromptPanel value={nodeData.prompt || ''} onChange={(prompt) => updateData({ prompt })} />
               {visibleMockResultMessage && (
