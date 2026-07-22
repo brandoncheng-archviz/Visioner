@@ -11,10 +11,12 @@ export type QuickRenderStructureChannelType =
   | 'beauty'
   | 'albedo'
   | 'normal'
-  | 'depth'
   | 'ao'
+  | 'depth'
+  | 'maskId'
   | 'materialId'
-  | 'objectId';
+  | 'objectId'
+  | 'unknown';
 
 export type QuickRenderConnectedImage = {
   id: string;
@@ -47,12 +49,13 @@ export type QuickRenderStructureChannel = {
   id: string;
   type: QuickRenderStructureChannelType;
   name: string;
-  description: string;
   imageUrl: string;
-  enabled: boolean;
-  weight: number;
   fileName?: string;
   mimeType?: string;
+  sourceType?: 'upload' | 'canvas';
+  sourceNodeId?: string;
+  width?: number;
+  height?: number;
 };
 
 export type QuickRenderPendingStructureFile = {

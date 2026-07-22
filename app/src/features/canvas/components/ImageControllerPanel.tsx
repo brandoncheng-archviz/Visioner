@@ -271,7 +271,7 @@ export function ImageControllerPanel({
                     }}
                     className={`${ATMOSPHERE_INNER_SWITCH_TRACK} ${active ? 'border-[#8b5cf6]/80 bg-[#8b5cf6] hover:brightness-110' : 'border-white/[0.18] bg-white/[0.10] hover:bg-white/[0.14]'}`}
                   >
-                    <span className={`${ATMOSPHERE_INNER_SWITCH_THUMB} ${active ? 'left-[14px] bg-white/90' : 'left-0.5 bg-white/58'}`} />
+                    <span className={`${ATMOSPHERE_INNER_SWITCH_THUMB} bg-[#24252a] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] ${active ? 'left-[14px]' : 'left-0.5'}`} />
                   </button>
                 </div>
               );

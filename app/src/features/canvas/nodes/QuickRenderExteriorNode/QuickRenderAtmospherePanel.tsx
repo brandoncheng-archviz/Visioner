@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, X } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import {
   LIGHT_DIRECTION_OPTIONS,
   STYLE_OPTIONS,
@@ -34,7 +33,6 @@ const SELECT_ROWS = [
   { key: 'style', label: '风格', options: STYLE_OPTIONS },
 ] as const;
 
-const ATMOSPHERE_SWITCH_CLASS = "data-[state=checked]:bg-[#8b5cf6] data-[state=unchecked]:bg-white/[0.10] hover:data-[state=checked]:brightness-110 hover:data-[state=unchecked]:bg-white/[0.14]";
 const INNER_ATMOSPHERE_SWITCH_TRACK = 'relative ml-2 h-4 w-7 shrink-0 rounded-full border transition-colors';
 const INNER_ATMOSPHERE_SWITCH_THUMB = 'absolute top-0.5 h-2.5 w-2.5 rounded-full transition-all';
 const SELECT_MENU_ESTIMATED_HEIGHT = 260;
@@ -210,7 +208,7 @@ export function QuickRenderAtmospherePanel({ data, hasAtmosphereReference, onCha
   const activeSelectValue = selectMenu ? atmosphere[selectMenu.key] : undefined;
 
   return (
-    <section className="rounded-[12px] border border-white/[0.08] bg-white/[0.025]">
+    <section className="rounded-[12px] border border-white/[0.09] bg-white/[0.035]">
       {selectMenu && activeSelectRow && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
@@ -237,55 +235,48 @@ export function QuickRenderAtmospherePanel({ data, hasAtmosphereReference, onCha
         </div>,
         document.body,
       )}
-      <div className="flex items-center justify-between px-3 py-2.5">
+      <div className="px-3 pb-2 pt-2.5">
         <span className="text-[13px] font-medium text-white/82">氛围控制</span>
-        <Switch
-          checked={data.atmosphereEnabled === true}
-          onCheckedChange={(checked) => onChange({ atmosphereEnabled: checked })}
-          className={ATMOSPHERE_SWITCH_CLASS}
-        />
       </div>
-      {data.atmosphereEnabled && (
-        <div className="border-t border-white/[0.06] px-3 py-3">
-          <div className="grid grid-cols-2 gap-1.5">
-            {toggles.map(({ sourceId, key }) => {
-              const option = TOGGLE_OPTIONS.find((item) => item.id === sourceId);
-              const active = atmosphere[key] === true;
-              if (!option) return null;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  title={option.description}
-                  onClick={() => setToggle(key, !active)}
-                  className={`nodrag flex h-8 items-center justify-between rounded-md border border-white/[0.10] bg-white/[0.025] px-2.5 text-left text-[13px] font-medium transition hover:border-white/[0.16] hover:bg-white/[0.035] ${active ? 'text-[rgba(235,235,240,0.88)]' : 'text-[rgba(210,210,220,0.42)] hover:text-[rgba(225,225,232,0.58)]'}`}
-                >
-                  <span>{option.label}</span>
-                  <span className={`${INNER_ATMOSPHERE_SWITCH_TRACK} ${active ? 'border-[#8b5cf6]/80 bg-[#8b5cf6] hover:brightness-110' : 'border-white/[0.18] bg-white/[0.10] hover:bg-white/[0.14]'}`}>
-                    <span className={`${INNER_ATMOSPHERE_SWITCH_THUMB} ${active ? 'left-[14px] bg-white/90' : 'left-0.5 bg-white/58'}`} />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-white/[0.055] pt-2">
-            {SELECT_ROWS.map((row) => (
-              <SelectionRow
-                key={row.key}
-                label={row.label}
-                value={atmosphere[row.key]}
-                options={row.options}
-                hasAtmosphereReference={hasAtmosphereReference}
-                onToggle={() => openSelectMenu(row.key)}
-                onClear={() => clearField(row.key)}
-                buttonRef={(element) => {
-                  rowButtonRefs.current[row.key] = element ?? undefined;
-                }}
-              />
-            ))}
-          </div>
+      <div className="border-t border-white/[0.06] bg-black/[0.08] px-3 py-3">
+        <div className="grid grid-cols-2 gap-1.5">
+          {toggles.map(({ sourceId, key }) => {
+            const option = TOGGLE_OPTIONS.find((item) => item.id === sourceId);
+            const active = atmosphere[key] === true;
+            if (!option) return null;
+            return (
+              <button
+                key={key}
+                type="button"
+                title={option.description}
+                onClick={() => setToggle(key, !active)}
+                className={`nodrag flex h-8 items-center justify-between rounded-md border border-white/[0.10] bg-white/[0.025] px-2.5 text-left text-[13px] font-medium transition hover:border-white/[0.16] hover:bg-white/[0.035] ${active ? 'text-[rgba(235,235,240,0.88)]' : 'text-[rgba(210,210,220,0.42)] hover:text-[rgba(225,225,232,0.58)]'}`}
+              >
+                <span>{option.label}</span>
+                <span className={`${INNER_ATMOSPHERE_SWITCH_TRACK} ${active ? 'border-[#8b5cf6]/80 bg-[#8b5cf6] hover:brightness-110' : 'border-white/[0.18] bg-white/[0.10] hover:bg-white/[0.14]'}`}>
+                  <span className={`quick-render-inner-switch-thumb ${INNER_ATMOSPHERE_SWITCH_THUMB} ${active ? 'left-[14px]' : 'left-0.5'}`} />
+                </span>
+              </button>
+            );
+          })}
         </div>
-      )}
+        <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-white/[0.055] pt-2">
+          {SELECT_ROWS.map((row) => (
+            <SelectionRow
+              key={row.key}
+              label={row.label}
+              value={atmosphere[row.key]}
+              options={row.options}
+              hasAtmosphereReference={hasAtmosphereReference}
+              onToggle={() => openSelectMenu(row.key)}
+              onClear={() => clearField(row.key)}
+              buttonRef={(element) => {
+                rowButtonRefs.current[row.key] = element ?? undefined;
+              }}
+            />
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

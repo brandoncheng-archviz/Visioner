@@ -5,6 +5,7 @@ import type { QuickRenderConnectedImage } from './quickRenderExterior.types';
 
 const DEFAULT_USAGE_LABEL = '未设置用途';
 const DEFAULT_USAGE_COLOR = '#9CA3AF';
+const THUMBNAIL_SIZE = 54;
 
 type QuickRenderConnectedImagesProps = {
   images: QuickRenderConnectedImage[];
@@ -117,19 +118,20 @@ export function QuickRenderConnectedImages({
         document.body,
       )}
       <div className="flex items-center justify-between">
-        <div className="text-[13px] font-medium text-white/80">图像输入</div>
+        <div className="text-[13px] font-medium text-white/82">图像输入</div>
+        {images.length > 0 && <div className="text-[11px] text-white/42">{Math.min(images.length, 4)} / {Math.max(images.length, 4)}</div>}
       </div>
 
       {images.length > 0 ? (
-        <div className="flex items-start gap-2.5">
+        <div className="flex flex-wrap items-start gap-3">
           {visibleImages.map((image, index) => (
             <div
               key={image.id}
-              className="group/input-ref w-[64px]"
+              className="group/input-ref w-[60px]"
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
             >
-              <div className="relative h-[54px] w-[54px] overflow-hidden rounded-[8px] border border-white/[0.10] bg-white/[0.04]">
+              <div className="relative overflow-hidden rounded-[9px] border border-white/[0.10] bg-white/[0.04]" style={{ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}>
                 <img
                   src={image.imageUrl}
                   alt={image.label || image.fileName || `input-${index + 1}`}
@@ -169,7 +171,7 @@ export function QuickRenderConnectedImages({
                 </button>
               </div>
               <div
-                className="mt-1 flex max-w-[64px] items-center gap-1 rounded-full border bg-white/[0.035] px-1.5 py-0.5"
+                className="mt-1 flex max-w-[60px] items-center gap-1 px-0.5"
                 style={{
                   borderColor: `${image.roleColor || DEFAULT_USAGE_COLOR}40`,
                   color: image.roleColor || DEFAULT_USAGE_COLOR,
@@ -180,31 +182,32 @@ export function QuickRenderConnectedImages({
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: image.roleColor || DEFAULT_USAGE_COLOR }}
                 />
-                <span className="min-w-0 truncate text-[9px] font-medium">
+                <span className="min-w-0 truncate text-[10px] font-medium">
                   {image.roleLabel || DEFAULT_USAGE_LABEL}
                 </span>
               </div>
             </div>
           ))}
           {hiddenCount > 0 && (
-            <div className="flex h-[54px] w-[54px] items-center justify-center rounded-[8px] border border-white/[0.08] bg-white/[0.035] text-[13px] font-medium text-white/50">
-              +{hiddenCount}
+            <div className="flex flex-col items-center justify-center rounded-[9px] border border-white/[0.08] bg-white/[0.035] text-white/50" style={{ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}>
+              <span className="text-[13px] font-medium">+{hiddenCount}</span>
+              <span className="mt-1 text-[9px]">查看更多</span>
             </div>
           )}
         </div>
       ) : (
-        <div>
+        <div className="flex items-end gap-3">
           <button
             ref={addButtonRef}
             type="button"
-            className="nodrag nopan flex aspect-square w-[76px] flex-col items-center justify-center rounded-[10px] border border-dashed border-white/[0.12] bg-white/[0.025] text-white/58 transition hover:border-white/[0.20] hover:bg-white/[0.045] hover:text-white/78"
+            className="nodrag nopan flex flex-col items-center justify-center rounded-[9px] border border-dashed border-white/[0.16] bg-white/[0.025] text-white/58 transition hover:border-white/[0.26] hover:bg-white/[0.045] hover:text-white/82"
+            style={{ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
             onClick={openAddMenu}
             onPointerDown={(event) => event.stopPropagation()}
           >
             <Plus className="mb-1 h-4 w-4" />
-            <span className="text-[12px] font-medium">添加图像</span>
+            <span className="text-[10px] font-medium">添加图像</span>
           </button>
-          <div className="mt-1.5 text-[10px] text-white/34">从画布选择或上传资源图</div>
         </div>
       )}
 

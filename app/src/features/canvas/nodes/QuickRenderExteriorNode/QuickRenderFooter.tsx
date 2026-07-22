@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useStore } from '@xyflow/react';
 import { ArrowUp, Check, ChevronDown, Lock, Unlock, Zap } from 'lucide-react';
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../../constants/canvasConstants';
 import {
@@ -89,11 +90,19 @@ function AspectFrameIcon({ ratio }: { ratio: number }) {
   );
 }
 
-function getFloatingPosition(anchor: HTMLElement | null, width: number, height: number): FloatingPosition | null {
+function getFloatingPosition(
+  anchor: HTMLElement | null,
+  width: number,
+  height: number,
+  horizontalAlign: 'start' | 'center' = 'start',
+): FloatingPosition | null {
   if (!anchor) return null;
   const rect = anchor.getBoundingClientRect();
   const maxLeft = Math.max(VIEWPORT_PADDING, window.innerWidth - width - VIEWPORT_PADDING);
-  const left = Math.min(Math.max(rect.left, VIEWPORT_PADDING), maxLeft);
+  const preferredLeft = horizontalAlign === 'center'
+    ? rect.left + rect.width / 2 - width / 2
+    : rect.left;
+  const left = Math.min(Math.max(preferredLeft, VIEWPORT_PADDING), maxLeft);
   const topAbove = rect.top - height - FLOATING_PANEL_GAP;
   const topBelow = rect.bottom + FLOATING_PANEL_GAP;
   const top = topAbove >= VIEWPORT_PADDING
@@ -109,6 +118,7 @@ export function QuickRenderFooter({
   onChange,
   onGenerate,
 }: QuickRenderFooterProps) {
+  const flowTransform = useStore((state) => state.transform);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [customFrameWidth, setCustomFrameWidth] = useState('1');
@@ -174,7 +184,7 @@ export function QuickRenderFooter({
         setModelMenuPosition(getFloatingPosition(modelButtonRef.current, MODEL_MENU_WIDTH, MODEL_MENU_HEIGHT));
       }
       if (showRatioMenu) {
-        setFrameRatioPanelPosition(getFloatingPosition(frameRatioButtonRef.current, FRAME_RATIO_PANEL_WIDTH, FRAME_RATIO_PANEL_HEIGHT));
+        setFrameRatioPanelPosition(getFloatingPosition(frameRatioButtonRef.current, FRAME_RATIO_PANEL_WIDTH, FRAME_RATIO_PANEL_HEIGHT, 'center'));
       }
     };
 
@@ -185,12 +195,12 @@ export function QuickRenderFooter({
       window.removeEventListener('resize', updateFloatingPositions);
       window.removeEventListener('scroll', updateFloatingPositions, true);
     };
-  }, [showModelMenu, showRatioMenu]);
+  }, [flowTransform, showModelMenu, showRatioMenu]);
 
   const openRatioMenu = () => {
     setCustomFrameWidth(String(selectedFrameRatioDimensions.width));
     setCustomFrameHeight(String(selectedFrameRatioDimensions.height));
-    setFrameRatioPanelPosition(getFloatingPosition(frameRatioButtonRef.current, FRAME_RATIO_PANEL_WIDTH, FRAME_RATIO_PANEL_HEIGHT));
+    setFrameRatioPanelPosition(getFloatingPosition(frameRatioButtonRef.current, FRAME_RATIO_PANEL_WIDTH, FRAME_RATIO_PANEL_HEIGHT, 'center'));
     setShowRatioMenu(true);
     setShowModelMenu(false);
   };

@@ -6,7 +6,7 @@ type QuickRenderPromptPanelProps = {
 export function QuickRenderPromptPanel({ value, onChange }: QuickRenderPromptPanelProps) {
   const safeValue = value.slice(0, 1000);
   return (
-    <section className="space-y-2">
+    <section className="space-y-2 pb-4">
       <div className="text-[13px] font-medium text-white/80">提示词</div>
       <div className="rounded-[12px] border border-white/[0.08] bg-black/15 p-3">
         <textarea
