@@ -117,10 +117,7 @@ export function QuickRenderConnectedImages({
         </div>,
         document.body,
       )}
-      <div className="flex items-center justify-between">
-        <div className="text-[13px] font-medium text-white/82">图像输入</div>
-        {images.length > 0 && <div className="text-[11px] text-white/42">{Math.min(images.length, 4)} / {Math.max(images.length, 4)}</div>}
-      </div>
+      <div className="text-[13px] font-medium text-white/82">图像输入</div>
 
       {images.length > 0 ? (
         <div className="flex flex-wrap items-start gap-3">

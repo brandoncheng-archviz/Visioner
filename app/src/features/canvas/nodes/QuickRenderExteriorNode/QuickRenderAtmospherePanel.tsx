@@ -208,7 +208,7 @@ export function QuickRenderAtmospherePanel({ data, hasAtmosphereReference, onCha
   const activeSelectValue = selectMenu ? atmosphere[selectMenu.key] : undefined;
 
   return (
-    <section className="rounded-[12px] border border-white/[0.09] bg-white/[0.035]">
+    <section className="space-y-2 border-t border-white/[0.07] pt-3">
       {selectMenu && activeSelectRow && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
@@ -235,10 +235,8 @@ export function QuickRenderAtmospherePanel({ data, hasAtmosphereReference, onCha
         </div>,
         document.body,
       )}
-      <div className="px-3 pb-2 pt-2.5">
-        <span className="text-[13px] font-medium text-white/82">氛围控制</span>
-      </div>
-      <div className="border-t border-white/[0.06] bg-black/[0.08] px-3 py-3">
+      <div className="text-[13px] font-medium text-white/82">氛围控制</div>
+      <div className="space-y-1.5">
         <div className="grid grid-cols-2 gap-1.5">
           {toggles.map(({ sourceId, key }) => {
             const option = TOGGLE_OPTIONS.find((item) => item.id === sourceId);
@@ -260,7 +258,7 @@ export function QuickRenderAtmospherePanel({ data, hasAtmosphereReference, onCha
             );
           })}
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-white/[0.055] pt-2">
+        <div className="grid grid-cols-2 gap-1.5">
           {SELECT_ROWS.map((row) => (
             <SelectionRow
               key={row.key}

@@ -19,8 +19,8 @@ import {
   sortQuickRenderStructureChannels,
 } from './quickRenderExteriorUtils';
 
-const QUICK_RENDER_NODE_WIDTH = 520;
-const QUICK_RENDER_NODE_HEIGHT = 640;
+const QUICK_RENDER_NODE_WIDTH = 500;
+const QUICK_RENDER_NODE_MIN_HEIGHT = 700;
 type CanvasSelectionMode = 'input' | 'structure' | null;
 
 export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
@@ -387,18 +387,14 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           className="node-preview-card flex flex-col overflow-hidden"
           style={{
             width: QUICK_RENDER_NODE_WIDTH,
-            height: QUICK_RENDER_NODE_HEIGHT,
+            minHeight: QUICK_RENDER_NODE_MIN_HEIGHT,
             background: CANVAS_NODE_CARD_BACKGROUND,
             borderRadius: CANVAS_NODE_CARD_RADIUS,
             borderWidth: CANVAS_NODE_CARD_BORDER_WIDTH,
             borderColor: selected ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : CANVAS_NODE_CARD_BORDER_COLOR,
           }}
         >
-          <div
-            className="quick-render-node-scrollbar nowheel min-h-0 flex-1 overflow-y-auto"
-            onWheel={(event) => event.stopPropagation()}
-          >
-            <div className="space-y-3 p-4 pb-5">
+          <div className="flex-1 space-y-3 p-4 pb-5">
               <QuickRenderConnectedImages
                 images={inputImages as QuickRenderConnectedImage[]}
                 onRemove={removeConnectedImage}
@@ -414,7 +410,6 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
                   {visibleMockResultMessage}
                 </div>
               )}
-            </div>
           </div>
 
           <QuickRenderFooter
