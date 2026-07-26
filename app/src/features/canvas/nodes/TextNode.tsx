@@ -39,12 +39,12 @@ export type { TextNodeVisualState };
 
 const EMPTY_ACTIONS: Array<{
   action: TextNodeActionType;
-  label: string;
+  labelKey: string;
   icon: typeof PenLine;
 }> = [
-  { action: 'draft', label: '编写内容', icon: PenLine },
-  { action: 'image_to_text', label: '从图片提取描述', icon: FileText },
-  { action: 'text_to_image', label: '生成图片', icon: ImagePlus },
+  { action: 'draft', labelKey: 'textNode.empty.compose', icon: PenLine },
+  { action: 'image_to_text', labelKey: 'textNode.empty.extractFromImage', icon: FileText },
+  { action: 'text_to_image', labelKey: 'textNode.empty.generateImage', icon: ImagePlus },
 ];
 
 const TEXT_NODE_RESIZE_MIN_HEIGHT = 240;
@@ -76,7 +76,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
   const inverseScale = 1 / zoom;
   const nodeData = data as TextNodeData;
   const isComposeMode = isComposeTextNode(nodeData);
-  const title = nodeData.label || nodeData.title || '文本节点';
+  const title = nodeData.label || nodeData.title || t('textNode.title');
   const content = getTextContent(nodeData);
   const usesTextResourceLayout = isComposeMode || (nodeData.status === 'result' && content.length > 0);
   const [resizeDimensions, setResizeDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -270,7 +270,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
   };
 
   const toolbarActions = [
-    { icon: Maximize2, label: t('imageNode.fullscreen'), action: () => setShowFullscreen(true), disabled: isProcessing || !hasTextContent },
+    { icon: Maximize2, label: t('toolbar.fullscreen'), action: () => setShowFullscreen(true), disabled: isProcessing || !hasTextContent },
     { icon: Clipboard, label: t('common.copyText'), action: handleCopyText, disabled: isProcessing || !hasTextContent },
     { icon: Copy, label: t('common.createCopy'), action: handleDuplicateNode, disabled: isProcessing },
     { icon: Download, label: t('common.download'), action: handleDownloadText, disabled: isProcessing || !hasTextContent },
@@ -373,7 +373,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
               autoFocus
               value={inlineContent}
               disabled={isProcessing}
-              placeholder="输入文本内容..."
+              placeholder={t('textNode.compose.placeholder')}
               onChange={(event) => handleInlineContentChange(event.target.value)}
               onBlur={() => setIsInlineEditing(false)}
               onPointerDown={(event) => event.stopPropagation()}
@@ -387,7 +387,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                 maxHeight: usesTextResourceLayout ? '100%' : TEXT_NODE_MAX_HEIGHT,
                 boxSizing: 'border-box',
               }}
-              aria-label="编写文本内容"
+              aria-label={t('textNode.compose.title')}
             />
           ) : content ? (
             <div
@@ -414,7 +414,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
             >
               <TextNodeGlyph className="mb-7 text-[rgba(172,176,188,0.42)]" />
               <div className="text-[15px] leading-6 text-white/30">
-                双击编写内容，开始你的创作。
+                {t('textNode.compose.doubleClickHint')}
               </div>
             </div>
           ) : nodeState !== 'empty' || incomingSourceNodes.length > 0 ? (
@@ -431,9 +431,11 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
               }}
             >
               <TextNodeGlyph className="-mt-3 mb-7 text-[rgba(172,176,188,0.42)]" />
-              <div className="mb-1 w-full px-2 text-[11px] text-white/14">尝试：</div>
+              <div className="mb-1 w-full px-2 text-[11px] text-white/14">
+                {t('textNode.compose.suggestionsTitle')}
+              </div>
               <div className="w-full space-y-0.5">
-                {EMPTY_ACTIONS.map(({ action, label, icon: Icon }) => (
+                {EMPTY_ACTIONS.map(({ action, labelKey, icon: Icon }) => (
                   <button
                     key={action}
                     type="button"
@@ -444,7 +446,7 @@ export function TextNode({ data, selected, id, width, height }: NodeProps) {
                     className="nodrag group/empty-action flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/22 transition-colors hover:bg-white/[0.025] hover:text-white/34"
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0 text-white/14 transition-colors group-hover/empty-action:text-white/24" />
-                    <span>{label}</span>
+                    <span>{t(labelKey)}</span>
                   </button>
                 ))}
               </div>

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { QuickRenderConnectedImage } from './quickRenderExterior.types';
 
-const DEFAULT_USAGE_LABEL = '未设置用途';
 const DEFAULT_USAGE_COLOR = '#9CA3AF';
 const THUMBNAIL_SIZE = 54;
 
 type QuickRenderConnectedImagesProps = {
   images: QuickRenderConnectedImage[];
+  disabled?: boolean;
   onRemove: (image: QuickRenderConnectedImage) => void;
   onUpload: (files: FileList | null) => void;
   onSelectFromCanvas: () => void;
@@ -16,10 +17,12 @@ type QuickRenderConnectedImagesProps = {
 
 export function QuickRenderConnectedImages({
   images,
+  disabled = false,
   onRemove,
   onUpload,
   onSelectFromCanvas,
 }: QuickRenderConnectedImagesProps) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -37,6 +40,7 @@ export function QuickRenderConnectedImages({
 
   const removeThumbnail = (event: React.SyntheticEvent, image: QuickRenderConnectedImage) => {
     stopThumbnailEvent(event);
+    if (disabled) return;
     if (removedImageIdsRef.current.has(image.id)) return;
     removedImageIdsRef.current.add(image.id);
     onRemove(image);
@@ -47,6 +51,7 @@ export function QuickRenderConnectedImages({
 
   const openAddMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     stopThumbnailEvent(event);
+    if (disabled) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const width = 148;
     setMenuPosition({
@@ -79,8 +84,8 @@ export function QuickRenderConnectedImages({
   }, [menuPosition]);
 
   return (
-    <section className="space-y-2">
-      {menuPosition && typeof document !== 'undefined' && createPortal(
+    <section className={disabled ? 'pointer-events-none space-y-2 opacity-60' : 'space-y-2'} aria-disabled={disabled}>
+      {!disabled && menuPosition && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
           className="nodrag nopan nowheel fixed z-[2200] overflow-hidden rounded-[10px] border border-white/[0.10] bg-[#222224] p-1 shadow-[0_14px_34px_rgba(0,0,0,0.52)]"
@@ -101,7 +106,7 @@ export function QuickRenderConnectedImages({
               onSelectFromCanvas();
             }}
           >
-            从画布选择
+            {t('quickRenderExterior.imageInput.selectFromCanvas')}
           </button>
           <button
             type="button"
@@ -112,12 +117,12 @@ export function QuickRenderConnectedImages({
               fileInputRef.current?.click();
             }}
           >
-            上传资源图
+            {t('quickRenderExterior.imageInput.uploadResource')}
           </button>
         </div>,
         document.body,
       )}
-      <div className="text-[13px] font-medium text-white/82">图像输入</div>
+      <div className="text-[13px] font-medium text-white/82">{t('quickRenderExterior.sections.imageInput.title')}</div>
 
       {images.length > 0 ? (
         <div className="flex flex-wrap items-start gap-3">
@@ -161,8 +166,8 @@ export function QuickRenderConnectedImages({
                   }}
                   className="nodrag nopan nowheel absolute right-0 top-0 z-30 flex h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 opacity-0 transition hover:bg-black hover:text-white group-hover/input-ref:opacity-100"
                   style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-                  title="移除图像"
-                  aria-label="移除图像"
+                  title={t('quickRenderExterior.imageInput.removeImage')}
+                  aria-label={t('quickRenderExterior.imageInput.removeImage')}
                 >
                   <X className="h-2.5 w-2.5" />
                 </button>
@@ -173,14 +178,14 @@ export function QuickRenderConnectedImages({
                   borderColor: `${image.roleColor || DEFAULT_USAGE_COLOR}40`,
                   color: image.roleColor || DEFAULT_USAGE_COLOR,
                 }}
-                title={image.roleLabel || DEFAULT_USAGE_LABEL}
+                title={image.roleLabel || t('quickRenderExterior.imageInput.unassignedRole')}
               >
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: image.roleColor || DEFAULT_USAGE_COLOR }}
                 />
                 <span className="min-w-0 truncate text-[10px] font-medium">
-                  {image.roleLabel || DEFAULT_USAGE_LABEL}
+                  {image.roleLabel || t('quickRenderExterior.imageInput.unassignedRole')}
                 </span>
               </div>
             </div>
@@ -188,7 +193,7 @@ export function QuickRenderConnectedImages({
           {hiddenCount > 0 && (
             <div className="flex flex-col items-center justify-center rounded-[9px] border border-white/[0.08] bg-white/[0.035] text-white/50" style={{ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}>
               <span className="text-[13px] font-medium">+{hiddenCount}</span>
-              <span className="mt-1 text-[9px]">查看更多</span>
+              <span className="mt-1 text-[9px]">{t('quickRenderExterior.imageInput.viewMore')}</span>
             </div>
           )}
         </div>
@@ -203,7 +208,7 @@ export function QuickRenderConnectedImages({
             onPointerDown={(event) => event.stopPropagation()}
           >
             <Plus className="mb-1 h-4 w-4" />
-            <span className="text-[10px] font-medium">添加图像</span>
+            <span className="text-[10px] font-medium">{t('quickRenderExterior.imageInput.addImage')}</span>
           </button>
         </div>
       )}
@@ -214,6 +219,7 @@ export function QuickRenderConnectedImages({
         type="file"
         accept="image/png,image/jpeg,image/webp"
         multiple
+        disabled={disabled}
         onChange={(event) => {
           onUpload(event.target.files);
           event.currentTarget.value = '';

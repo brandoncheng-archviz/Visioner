@@ -2,10 +2,10 @@
 
 > A React-based single-page application for AI-driven video and image content creation. The project provides a homepage for discovering content and a visual node-based canvas editor for building multimedia workflows.
 
-**Important:** The current working directory (`/Users/brandon/Documents/work/Visioner/app`) is the project root. All source code, configuration, and build assets live here. There is no nested `app/` subdirectory inside this directory. The `src/` directory at the repository root (one level up) is effectively empty and is not part of this build.
+**Important:** The current working directory (`D:/CX/Cx_work/Aiwork/Visioner/app`) is the project root. All source code, configuration, and build assets live here. There is no nested `app/` subdirectory inside this directory.
 
 **Related Rule Files:**
-- `CANVAS_RULES.md` (at repo root) — Canvas editor architecture constraints and development rules (in Chinese). Must be read before modifying any canvas-related code.
+- `docs/image-node-rules.md` — ImageNode prompt assembly, reference usage, controller, and interaction rules (in Chinese). Must be read before modifying ImageNode behavior.
 
 ---
 
@@ -25,6 +25,7 @@
 | Forms | react-hook-form + zod | ^7.70.0 / ^4.3.5 |
 | Charts | recharts | ^2.15.4 |
 | i18n | i18next + react-i18next | ^26.2.0 / ^17.0.8 |
+| Testing | vitest | ^4.1.10 |
 
 Additional notable dependencies:
 
@@ -79,9 +80,10 @@ app/  (project root — current working directory)
 │   │   └── UpgradePanel.tsx
 │   ├── features/canvas/     # Canvas editor feature module (refactored from CanvasPage.tsx)
 │   │   ├── components/      # Canvas UI components (stage, sidebar, toolbars, menus, modals)
-│   │   ├── constants/       # Canvas constants, presets, image usage configs
+│   │   ├── connection/      # Connection drawing state machine and validation rules
+│   │   ├── constants/       # Canvas constants, presets, image usage configs, node titles
 │   │   ├── contexts/        # React contexts (HistoryContext)
-│   │   ├── hooks/           # Canvas-specific hooks (useToast)
+│   │   ├── hooks/           # Canvas-specific hooks (shortcuts, viewport, clipboard, undo/redo, etc.)
 │   │   ├── nodes/           # Node type components (ImageNode/, VideoNode, TextNode, etc.)
 │   │   ├── sunSky/          # SunSky lighting analysis subsystem (types, utils, UI components)
 │   │   ├── types/           # Canvas-specific TypeScript types
@@ -100,11 +102,11 @@ app/  (project root — current working directory)
 │   │   ├── nodeEditor/
 │   │   │   ├── dag.ts       # Cycle detection, topological sort, execution batches, input hashing
 │   │   │   └── types.ts     # Port types, EditorNode, EditorEdge, Camera, connection validation
-│   │   ├── nodeSystem.ts    # Node port config & DAG execution engine for React Flow canvas (~319 lines)
+│   │   ├── nodeSystem.ts    # Node port config & DAG execution engine for React Flow canvas
 │   │   └── utils.ts         # cn() utility for Tailwind class merging
 │   ├── pages/
 │   │   ├── Home.tsx         # Landing page composing Navbar + HeroCarousel + RecentProjects + TVShow
-│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator (~1,692 lines)
+│   │   ├── CanvasPage.tsx   # Visual node editor orchestrator
 │   │   └── add_thumbnails.py# Helper script to inject thumbnails into CanvasPage preset data
 │   ├── services/
 │   │   └── accountApi.ts    # Mock API for user profile, credits, billing, devices, plans
@@ -121,26 +123,32 @@ app/  (project root — current working directory)
 ├── eslint.config.js         # ESLint flat config: TS + react-hooks + react-refresh
 ├── postcss.config.js        # Tailwind + autoprefixer (ESM syntax)
 ├── info.md                  # Setup notes (Tailwind + shadcn component list)
-└── index.html               # App entry HTML (title: "Visioner")
+├── index.html               # App entry HTML (title: "Visioner")
+└── docs/
+    └── image-node-rules.md  # ImageNode rule contract (in Chinese)
 ```
 
 **Source file counts (verified):**
-- `src/components/ui/`: 53 shadcn/ui primitive components
-- `src/features/canvas/`: 82 files (components, nodes, sunSky, types, constants, utils, hooks, services, contexts)
-- `src/` total: 161 TypeScript / TSX source files; 164 total files under `src/` (excluding `.DS_Store`)
+- `src/components/ui/`: 53 shadcn/ui primitive components.
+- `src/features/canvas/`: 152 files (components, nodes, sunSky, types, constants, utils, hooks, services, contexts, connection).
+- `src/` total: 231 TypeScript / TSX source files.
+- Test files: 4 `.test.ts` files under `src/`.
 
 **Key file sizes (verified line counts):**
-- `CanvasPage.tsx`: ~1,692 lines (page entry + core state container)
-- `ImageNode.tsx`: ~1,867 lines
-- `ImageNodeControlPanel.tsx`: ~1,503 lines
-- `NodeEditorCanvas.tsx`: ~894 lines
-- `PresetPickerModal.tsx`: ~551 lines
-- `presets.ts`: ~979 lines
-- `CompareNode.tsx`: ~565 lines
-- `UpscaleNode.tsx`: ~642 lines
-- `RelightNode.tsx`: ~807 lines
-- `UpscaleParamPanel.tsx`: ~309 lines
-- `nodeSystem.ts`: ~319 lines
+- `CanvasPage.tsx`: ~2,150 lines (page entry + orchestration, now delegating to feature hooks and components).
+- `ImageNode.tsx`: ~2,261 lines.
+- `ImageNodeControlPanel.tsx`: ~1,809 lines.
+- `NodeEditorCanvas.tsx`: ~894 lines.
+- `PresetPickerModal.tsx`: ~542 lines.
+- `presets.ts`: ~979 lines.
+- `CompareNode.tsx`: ~705 lines.
+- `UpscaleNode.tsx`: ~652 lines.
+- `RelightNode.tsx`: ~824 lines.
+- `UpscaleParamPanel.tsx`: ~310 lines.
+- `nodeSystem.ts`: ~323 lines.
+- `ConnectionEngine.ts`: ~249 lines.
+- `QuickRenderExteriorNode.tsx`: ~498 lines.
+- `imageGenerationRequest.ts`: ~67 lines + tests.
 
 ---
 
@@ -163,6 +171,9 @@ npm run preview
 
 # Run ESLint
 npm run lint
+
+# Run tests with Vitest
+npm run test
 ```
 
 The `vite.config.ts` sets `base: './'` so the built app can be served from any subpath. The dev server runs on port 3000.
@@ -183,7 +194,7 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ## Code Style Guidelines
 
-- **Language**: UI labels and user-facing text are in Chinese. Code comments, variable names, and file names are in English.
+- **Language**: UI labels, user-facing text, and rule documents (`docs/image-node-rules.md`) are in Chinese. Code comments, variable names, and file names are in English.
 - **Imports**: Use the `@/` path alias for all internal imports (e.g., `@/components/ui/button`, `@/lib/utils`).
 - **Styling**: The project uses a custom dark theme. Tailwind utility classes are primary, but inline `style` props are used for dynamic values (especially in the canvas editor) and hardcoded palette colors.
 - **Theme colors** (hardcoded across the app):
@@ -213,63 +224,79 @@ The `vite.config.ts` sets `base: './'` so the built app can be served from any s
 
 ### React Flow Canvas Editor (`src/pages/CanvasPage.tsx` + `src/features/canvas/`)
 
-The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` (~1,692 lines) acts as the page entry and core state container, while UI and node logic live in `src/features/canvas/`.
+The canvas editor has been refactored from a monolithic file into a feature module. `CanvasPage.tsx` now acts as the page entry and orchestration layer, while stateful logic, UI, and node implementations live in `src/features/canvas/`.
 
-**`CanvasPage.tsx` / `FlowCanvas` responsibilities:**
-- Canvas page entry and React Flow provider wrapper
-- Core `nodes` / `edges` / `tempLine` state management
-- Line drawing logic (custom connection lines from output ports)
-- Copy / paste / duplicate / delete logic
-- Keyboard shortcuts (`Ctrl+C` / `Ctrl+V`, `Delete` / `Backspace`, `Ctrl+Z` / `Ctrl+Shift+Z`, `Ctrl+A`, `Esc`, arrows, `+`/`-`, `0`/`f`/`1`)
-- Drag-and-drop upload handling
-- Box-selection pre-highlight logic
-- Context menu state
-- Node registration and menu/drag/shortcut entry wiring
-- Undo/Redo history (max 50 states, JSON snapshot based)
+**`CanvasPage.tsx` responsibilities:**
+- Canvas page entry and React Flow provider wrapper.
+- High-level state bridging for `nodes`, `edges`, and `tempLine`.
+- Wiring of extracted feature hooks and UI components.
+- Node registration and menu/drag/shortcut entry wiring.
+- Project loading via `useParams().projectId`.
+
+**Extracted feature hooks (`src/features/canvas/hooks/`):**
+- `useCanvasKeyboardShortcuts` — keyboard shortcuts (copy, paste, undo, redo, select all, delete, zoom, fit view, etc.).
+- `useCanvasSelectionActions` — selection-based actions (delete, duplicate, box selection pre-highlight).
+- `useCanvasViewport` — pan, zoom, fit view, viewport resets.
+- `useCanvasDragDrop` — drag-and-drop upload handling.
+- `useCanvasUiPanels` — UI panel state (sidebar, help, minimap, grid, etc.).
+- `useTextNodeFloatingPanelPosition` — positioning for the floating TextNode input panel.
+- `useCanvasUndoRedo` — undo/redo history (max 50 states, JSON snapshot based).
+- `useCanvasImageImport` — image import decoding and filtering.
+- `useCanvasNodeClipboard` — copy/paste/duplicate of nodes.
+- `useFullscreenEscape` — fullscreen escape handling.
+- `useToast` — toast notification helpers.
 
 **Extracted UI components (`src/features/canvas/components/`):**
-- `CanvasStage.tsx` — React Flow container, Background, MiniMap, drop overlay, temp connection line, reject tooltip, upload toast
-- `CanvasSidebar.tsx` — Left sidebar pill, expanded panels (add, AI toolbox, assets, history, support)
-- `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu
-- `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel)
-- `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding
-- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `LightPreviewPanel.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`, `HistoryPanel.tsx`, `RelightAdvancedSettings.tsx`
+- `CanvasStage.tsx` — React Flow container, Background, MiniMap, drop overlay, temp connection line, reject tooltip, upload toast.
+- `CanvasSidebar.tsx` — Left sidebar pill, expanded panels (add, AI toolbox, assets, history, support).
+- `CanvasContextMenus.tsx` — Canvas right-click menu, node creation menu, node right-click menu.
+- `CanvasToolbar.tsx` — Bottom toolbar (MiniMap toggle, grid toggle, reset, zoom, help panel).
+- `GlobalDropForwarder.tsx` — Browser-level drag/drop event forwarding.
+- `CanvasFlowStyles.tsx` — Additional global/flow CSS-injected styles.
+- `CanvasToast.tsx` — Toast notification wrapper.
+- `CanvasImageMarkCaptureLayer.tsx` — Image mark capture overlay.
+- `TextNodeInputPanel.tsx` — Floating TextNode input panel.
+- `ImageControllerPanel.tsx` — Image node atmosphere/material/landscape/lighting/interior controller panel.
+- `CompareModeSwitcher.tsx`, `CompareFullscreenViewer.tsx` — Compare node UI helpers.
+- `RelightControlBody.tsx`, `RelightAdvancedSettings.tsx` — Relight node controls.
+- `TempConnectionLine.tsx`, `ImagePreviewModal.tsx`, `ImageRoleTag.tsx`, `ImageToolbar.tsx`, `LightPreviewPanel.tsx`, `NodeShell.tsx`, `ShortcutRow.tsx`, `StylePickerModal.tsx`, `UpscaleParamPanel.tsx`, `UpscaleResultToolbar.tsx`, `PresetPickerModal.tsx`, `CustomPresetFallbackCover.tsx`, `HistoryPanel.tsx`, `FullscreenCloseButton.tsx`.
+
+**Connection subsystem (`src/features/canvas/connection/`):**
+- `ConnectionEngine.ts` — Finite-state machine driving custom connection line drawing from output ports.
+- `connectionTypes.ts` — Types for connection decisions, validation results, reject codes, edge payloads.
+- `connectionRules.ts` — Validation rules (same handle side, same node, data type mismatch, cycle, duplicate, unique reference role conflict, relight/upscale/compare input limits, reference limits, text mode checks).
+- `buildConnectionValidationInput.ts` — Builds validation input from React Flow nodes/edges/state.
 
 **Node components (`src/features/canvas/nodes/`):**
-- `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, and styles
-  - `ImageNode.tsx`, `ImageNodeControlPanel.tsx`, `index.ts`
+- `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, styles, and image controllers.
+  - `ImageNode.tsx`, `ImageNodeControlPanel.tsx`, `ImageCropOverlay.tsx`, `index.ts`
+  - `controllers/` — `ImageControllersTrigger.tsx`, `ImageControllersPopover.tsx`, `CameraControlPlaceholder.tsx`, `StructureControlPlaceholder.tsx`, `imageControllers.types.ts`, `imageControllersUtils.ts`.
+- `QuickRenderExteriorNode/` — Quick exterior rendering node with connected images, render channels, atmosphere panel, prompt panel, and result graph generation.
+  - `QuickRenderExteriorNode.tsx`, `QuickRenderFooter.tsx`, `QuickRenderAtmospherePanel.tsx`, `QuickRenderConnectedImages.tsx`, `QuickRenderPromptPanel.tsx`, `QuickRenderRenderChannelsPanel.tsx`, `quickRenderExterior.types.ts`, `quickRenderExteriorUtils.ts`, `quickRenderRequest.ts`, `quickRenderGeneration.ts`, `quickRenderResultGraph.ts`, `mockQuickRender.ts`, plus `.test.ts` files.
 - `VideoNode.tsx`
 - `TextNode.tsx`
 - `AudioNode.tsx`
 - `ScriptNode.tsx`
 - `VideoMergeNode.tsx`
 - `UpscaleNode.tsx`
-- `RelightNode.tsx` — AI relighting node with advanced settings and preset support
-- `CompareNode.tsx` — Side-by-side image comparison with draggable slider
-- `SunSkyNode/` — SunSky lighting analysis node (preview, controls, derived info)
-  - `SunSkyNode.tsx`, `SunSkyNodeControls.tsx`, `SunSkyNodeInfo.tsx`, `SunSkyNodePreview.tsx`, `getSunSkyPreviewImage.ts`, `index.ts`, `resolveSunSkyDerived.ts`, `sunSkyNode.types.ts`, `sunSkyNode.utils.ts`
+- `RelightNode.tsx` — AI relighting node with advanced settings and preset support.
+- `CompareNode.tsx` — Side-by-side image comparison with draggable slider.
+- `SunSkyNode/` — SunSky lighting analysis node (preview, controls, derived info).
 
 **SunSky subsystem (`src/features/canvas/sunSky/`):**
 A dedicated feature module for solar and sky lighting analysis, consumed by `SunSkyNode`. It includes:
-- `components/` — `SunSkyPanel.tsx`, `SunSkyPreview.tsx`, `SunSkyControls.tsx`, `SunDomeController.tsx`, `SunSkyDerivedInfo.tsx`, `SunSkyPresetList.tsx`, `SunSkySnapshotStrip.tsx`
-- `utils/` — `resolveSunSkyState.ts`, `resolveSimpleSunSkyState.ts`, `sunSkyMath.ts`, `sunSkyPrompt.ts`
-- `data/` — `sunSkyPresets.ts`
-- `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`
+- `components/` — `SunSkyPanel.tsx`, `SunSkyPreview.tsx`, `SunSkyControls.tsx`, `SunDomeController.tsx`, `SunSkyDerivedInfo.tsx`, `SunSkyPresetList.tsx`, `SunSkySnapshotStrip.tsx`.
+- `utils/` — `resolveSunSkyState.ts`, `resolveSimpleSunSkyState.ts`, `sunSkyMath.ts`, `sunSkyPrompt.ts`.
+- `data/` — `sunSkyPresets.ts`.
+- `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`.
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`, `history.types.ts`, `relight.types.ts`
-- `constants/` — `canvasConstants.ts`, `imageUsages.ts`, `presets.ts`, `relightPresets.ts`
-- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `mockRelightTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`, `nodeNaming.ts`, `referenceLimits.ts`, `contentSafety.ts`, `relightSettings.ts`
-- `hooks/` — `useToast.ts`
-- `services/` — `identifyElement.ts`
-- `contexts/` — `HistoryContext.tsx`
-
-**Canvas architecture rules:**
-- Do **not** put new node UI, new panel UI, new toolbar UI, or new business logic back into `CanvasPage.tsx`.
-- New canvas features should be placed in the appropriate `src/features/canvas/` subfolder.
-- `CanvasPage.tsx` should only receive minimal wiring (node registration, menu entry, shortcut entry, state bridging).
-- Do not actively perform large-scale hook extractions (e.g., `useLineDrawing`, `useCanvasClipboard`) unless explicitly required.
-- Prefer small, low-risk changes that keep the current architecture stable.
+- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `imageController.types.ts`, `imageControllers.types.ts`, `basicNode.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`, `history.types.ts`, `relight.types.ts`, plus node-specific types under `QuickRenderExteriorNode/` and `SunSkyNode/`.
+- `constants/` — `canvasConstants.ts`, `canvasNodeTitles.ts`, `basicNodes.ts`, `imageUsages.ts`, `imageController.ts`, `imageModelOptions.ts`, `presets.ts`, `relightPresets.ts`, `textNode.ts`, `upscaleNodeDefaults.ts`.
+- `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `referenceLimits.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `mockRelightTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`, `nodeNaming.ts`, `nodeCopyData.ts`, `contentSafety.ts`, `relightSettings.ts`, `canvasGraphUtils.ts`, `canvasFileUtils.ts`, `canvasImageImportUtils.ts`, `canvasNodeFactories.ts`, `canvasEvents.ts`, `imageMarkCaptureRegistry.ts`, `cropImage.ts`, `compareSlots.ts`, `textNodeUtils.ts`, `shortcutLabels.ts`, `imageGenerationRequest.ts`, `canvasImageImportUtils.ts`.
+- `hooks/` — Listed above.
+- `services/` — `identifyElement.ts`.
+- `contexts/` — `HistoryContext.tsx`.
 
 **Features:**
 - Left sidebar tool panel (add nodes, AI toolbox, assets, history, tutorial, support).
@@ -281,20 +308,88 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - Custom connection line drawing from output ports with cycle detection, type validation, unique role usage conflict detection, and drop-to-create-node support.
 - Keyboard shortcuts: `Ctrl+C` / `Ctrl+V` for copy/paste, `Delete` / `Backspace` to remove selected nodes/edges, `Ctrl+Z` / `Ctrl+Shift+Z` for undo/redo, `Ctrl+A` to select all, `Esc` to deselect/close help, arrow keys to pan, `+`/`-` to zoom, `0`/`f`/`1` to fit view.
 - Zoom slider, grid snap toggle, fit view reset, and help panel in the bottom toolbar.
+- Image mark capture layer for creating local marks on images.
+- TextNode floating input panel for writing and editing text nodes.
+- Quick exterior render node with connected image slots, render channels (Albedo, Normal, AO, Depth), atmosphere controls, and automatic result graph creation.
 
 **ImageNode generation flow:**
 - `ImageNode` is the most complex node type, supporting AI image generation via a mock task system.
 - Generation state uses `GenerationTask` and `GenerationHistoryItem` types from `generation.types.ts`.
-- The `mockGenerationTask.ts` utility simulates generation with a 2–5 second delay, 10% failure rate, and `AbortSignal` support.
+- The `mockGenerationTask.ts` utility simulates generation with a delay, failure path, and `AbortSignal` support.
 - Image data fields: `inputImage` (original upload, never overwritten by generation), `currentImage` (latest display image), `image` (legacy compatibility), and `generatedImages` (history array).
-- Nodes support reference images with typed roles (`primary_building`, `atmosphere_reference`, `vegetation_reference`, `people_reference`, `sky_reference`, `custom_reference`, etc.).
+- Nodes support reference images with typed roles (`primary_building`, `atmosphere_reference`, `material_reference`, `landscape_reference`, `lighting_reference`, `interior_reference`, `custom_reference`, etc.).
+- Reference usage rules are documented in `docs/image-node-rules.md`.
+- `buildImageGenerationRequest` in `imageGenerationRequest.ts` builds the normalized API request object from node data, references, mark references, model parameters, controller state, style, and presets.
+
+**QuickRenderExteriorNode flow:**
+- Supports quick exterior rendering with a primary image input and optional render channels (Albedo, Normal, AO, Depth).
+- `buildQuickRenderRequest` normalizes connected images, render channels, atmosphere, and model parameters into a `QuickRenderRequest`.
+- `runQuickRenderGeneration` orchestrates `processing` → `success`/`failed` → `idle` and emits the result graph via `buildQuickRenderResultGraph`.
+- `mockQuickRender.ts` simulates the backend with configurable delay, outcome, and task identity.
+- Interaction locks during `processing` are derived from the view state via `getQuickRenderInteractionLocks`.
 
 **RelightNode flow:**
 - `RelightNode` supports AI relighting with advanced parameter controls and presets.
 - Uses `RelightTask` and related types from `relight.types.ts`.
 - The `mockRelightTask.ts` utility simulates relighting with a delay and `AbortSignal` support.
 - Settings are managed via `relightSettings.ts` and preset defaults live in `relightPresets.ts`.
-- UI includes `RelightAdvancedSettings.tsx` for fine-tuning light direction, intensity, and color temperature.
+- UI includes `RelightAdvancedSettings.tsx` and `RelightControlBody.tsx` for fine-tuning light direction, intensity, and color temperature.
+
+#### Canvas Development Rules
+
+**CanvasPage boundary**
+
+- `src/pages/CanvasPage.tsx` is the Canvas page orchestration layer. It may retain page-level core state, module composition, node registration, node creation entry points, and cross-module event bridges.
+- Do not place complete node UI, node-specific business logic, large static configuration, or implementations already extracted into feature modules in `CanvasPage.tsx`.
+- Logic under `hooks/`, `components/`, `connection/`, `nodes/`, `services/`, and other Canvas feature directories must not be moved back into `CanvasPage.tsx`.
+- Do not create abstractions merely to shorten a file. Add an abstraction only when its responsibility is clear and the migration risk is controlled.
+
+**Directory responsibilities**
+
+- `nodes/`: node UI and node-specific logic.
+- `components/`: shared Canvas UI.
+- `hooks/`: reusable state logic or state logic that needs isolation.
+- `connection/`: connection state machines, connection validation, and stable rejection/error codes.
+- `contexts/`: Context shared within the Canvas feature.
+- `services/`: Canvas-level services and wrappers around external capabilities.
+- `constants/`: static configuration, options, and presets.
+- `types/`: types shared across Canvas modules.
+- `utils/`: stateless pure functions.
+- Node-private types, constants, and utilities may be colocated with the node; do not promote them to global directories without a cross-module need.
+- Do not maintain authoritative node or component file inventories in these rules. Use the current directories and node registration implementation as the source of truth.
+
+**Change principles**
+
+- Prefer small, low-risk changes directly related to the current task.
+- Unless the task explicitly requires it, preserve existing UI, interactions, data structures, and behavior.
+- Do not perform unrelated directory moves, naming cleanup, or large-scale refactors.
+- When a change must cross module boundaries, explain why in the delivery summary.
+
+**Data and types**
+
+- TypeScript type files are the single source of truth for field definitions; do not duplicate complete field lists in this document.
+- Before changing ImageNode or generation-history data, read the current related types, normalization functions, and data-building logic.
+- The behavior of `inputImage`, `currentImage`, compatibility fields, generation history, and generation tasks is defined by the current implementation and specialized types.
+- Never infer data semantics only from old documentation or a field name.
+
+**i18n and errors**
+
+- New user-visible text must use the existing i18n mechanism, with matching keys added to both `zh-CN` and `en-US`.
+- Business data must use stable values; never use translated Chinese or English display text for business decisions.
+- Business logic should return stable error codes where practical, and the UI should translate them into visible messages.
+
+**Testing**
+
+- For request builders, normalization, data conversion, copied-state reset, and other pure functions, prefer unit tests in the repository's existing test framework.
+- Pure visual styling changes do not require new tests.
+- Use the repository's current test framework and commands; do not introduce a second testing system.
+
+**Canvas delivery summary**
+
+- State which files changed and each file's responsibility.
+- State whether `CanvasPage.tsx` or Canvas core state was affected.
+- State whether nodes, components, hooks, types, constants, services, or utilities were added.
+- List validation commands run and any unfinished work or manual checks still required.
 
 ### Custom 2D Canvas Node Editor (`src/components/NodeEditor/`)
 
@@ -319,10 +414,10 @@ Port types and colors:
 ### Internationalization (`src/i18n/`)
 
 The app uses `react-i18next` with two locale files:
-- `zh-CN.ts` — Default language (简体中文)
-- `en-US.ts` — Secondary locale
+- `zh-CN.ts` — Default language (简体中文).
+- `en-US.ts` — Secondary locale.
 
-Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`, `lightPreview`).
+Translation keys are organized by feature namespace (`common`, `canvas`, `imageNode`, `reference`, `preset`, `style`, `toolbar`, `modal`, `toast`, `error`, `sidebar`, `contextMenu`, `navbar`, `accountPanel`, `account`, `audioNode`, `scriptNode`, `videoMergeNode`, `canvasEdge`, `recentProjects`, `gallery`, `mark`, `upscale`, `home`, `upgradePanel`, `plan`, `faq`, `compare`, `lightPreview`, `controllers`).
 
 ### Data Layer (`src/data/siteData.ts`)
 
@@ -344,9 +439,18 @@ Mock API service for user account features (profile, credits, usage, billing, de
 
 ## Testing
 
-There are **no test files** in the project currently. No test runner (Jest, Vitest, Playwright, etc.) is installed.
+The project uses **Vitest** for unit and integration testing.
 
-If you add tests, the conventional location would be alongside source files (e.g., `*.test.tsx`) or in a top-level `tests/` directory inside the project root.
+- Test runner: `vitest` (^4.1.10).
+- Run command: `npm run test` (runs `vitest run`).
+- Existing test files:
+  - `src/features/canvas/utils/imageGenerationRequest.test.ts` (11 tests) — Covers `buildImageGenerationRequest` normalization of references, mark references, count parsing, controller/style/presets passthrough, and immutability.
+  - `src/features/canvas/utils/nodeCopyData.test.ts` (3 tests) — Covers `prepareCanvasNodeDataForCopy` resetting quick render task state when copying.
+  - `src/features/canvas/nodes/QuickRenderExteriorNode/quickRenderRequest.test.ts` (11 tests) — Covers request building, validation, view-state derivation, and `mockQuickRender` behavior including task race conditions.
+  - `src/features/canvas/nodes/QuickRenderExteriorNode/quickRenderGeneration.integration.test.ts` (2 tests) — Covers full `READY → PROCESSING → success → result graph → idle` flow and failed/retry flows.
+- Total: 27 tests across 4 test files (all passing as of the last run).
+
+If you add new tests, place them alongside the source files they cover (`*.test.ts` / `*.test.tsx`) or in a top-level `tests/` directory inside the project root.
 
 ---
 
@@ -356,6 +460,7 @@ If you add tests, the conventional location would be alongside source files (e.g
 - No API keys or secrets are present in the source code.
 - `zod` is available for runtime schema validation if backend APIs are introduced later.
 - All images are loaded from the local `public/images/` directory or external avatar URLs (`dicebear.com`).
+- Be careful not to expose backend credentials or real API keys in `src/services/accountApi.ts` or node mock utilities when wiring up production services.
 
 ---
 

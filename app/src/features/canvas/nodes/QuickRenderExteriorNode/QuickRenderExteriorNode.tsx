@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow, useStore, type Node, type NodeProps } from '@xyflow/react';
-import { Home, Plus, Sparkles } from 'lucide-react';
+import { AlertCircle, Home, Plus, RotateCcw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { CANVAS_NODE_CARD_BACKGROUND, CANVAS_NODE_CARD_BORDER_COLOR, CANVAS_NODE_CARD_BORDER_WIDTH, CANVAS_NODE_CARD_RADIUS, CANVAS_NODE_CARD_SELECTED_BORDER_COLOR } from '../../constants/canvasConstants';
 import { getReferenceUsageInfo } from '../../constants/imageUsages';
 import type { ImageRole, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
@@ -10,24 +11,39 @@ import { QuickRenderAtmospherePanel } from './QuickRenderAtmospherePanel';
 import { QuickRenderConnectedImages } from './QuickRenderConnectedImages';
 import { QuickRenderFooter } from './QuickRenderFooter';
 import { QuickRenderPromptPanel } from './QuickRenderPromptPanel';
-import { QuickRenderStructurePanel } from './QuickRenderStructurePanel';
-import type { QuickRenderConnectedImage, QuickRenderExteriorNodeData } from './quickRenderExterior.types';
+import { QuickRenderRenderChannelsPanel } from './QuickRenderRenderChannelsPanel';
+import type { QuickRenderConnectedImage, QuickRenderExteriorNodeData, QuickRenderRenderChannelType } from './quickRenderExterior.types';
+import { createQuickRenderTaskId, mockQuickRender } from './mockQuickRender';
+import { runQuickRenderGeneration } from './quickRenderGeneration';
 import {
-  createQuickRenderStructureChannel,
+  buildQuickRenderRequest,
+  createIdleQuickRenderTask,
+  deriveQuickRenderViewState,
+  getQuickRenderInteractionLocks,
+  shouldApplyQuickRenderTaskResult,
+  validateQuickRenderRequest,
+} from './quickRenderRequest';
+import {
+  createQuickRenderRenderChannel,
   createQuickRenderExteriorNodeData,
-  detectQuickRenderStructureChannelType,
-  sortQuickRenderStructureChannels,
+  sortQuickRenderRenderChannels,
 } from './quickRenderExteriorUtils';
 
-const QUICK_RENDER_NODE_WIDTH = 500;
-const QUICK_RENDER_NODE_MIN_HEIGHT = 700;
-type CanvasSelectionMode = 'input' | 'structure' | null;
+const QUICK_RENDER_NODE_WIDTH = 470;
+type CanvasSelectionMode =
+  | { kind: 'input' }
+  | { kind: 'renderChannel'; channelType: QuickRenderRenderChannelType }
+  | null;
 
 export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
+  const { t } = useTranslation();
   const { getNodes, setNodes } = useReactFlow();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
-  const generateTimeoutRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
+  const activeTaskIdRef = useRef<string | null>(null);
+  const generationLockRef = useRef(false);
+  const generationAbortRef = useRef<AbortController | null>(null);
   const [canvasSelectionMode, setCanvasSelectionMode] = useState<CanvasSelectionMode>(null);
   const hoveredSelectableNodeRef = useRef<HTMLElement | null>(null);
   const canvasInputImages = useStore((state) => {
@@ -69,8 +85,8 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
       });
   });
   const nodeData = useMemo(
-    () => ({ ...createQuickRenderExteriorNodeData(String(data.label || '快速渲染-室外')), ...(data as QuickRenderExteriorNodeData) }),
-    [data],
+    () => ({ ...createQuickRenderExteriorNodeData(String(data.label || t('quickRenderExterior.title'))), ...(data as QuickRenderExteriorNodeData) }),
+    [data, t],
   );
   const modelParams = nodeData.modelParams || { model: 'Nano Banana 2', aspectRatio: '1:1', resolution: '2K', count: 1 };
   const uploadedInputImages = useMemo(
@@ -81,7 +97,20 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     () => [...canvasInputImages, ...uploadedInputImages],
     [canvasInputImages, uploadedInputImages],
   );
-  const hasAtmosphereReferenceInput = inputImages.some((image) => image.role === 'atmosphere_reference' || image.role === 'overall_reference' || image.roleLabel?.includes('氛围'));
+  const quickRenderRequest = useMemo(
+    () => buildQuickRenderRequest(nodeData, inputImages),
+    [inputImages, nodeData],
+  );
+  const validation = useMemo(() => validateQuickRenderRequest(quickRenderRequest), [quickRenderRequest]);
+  const viewState = useMemo(
+    () => deriveQuickRenderViewState(nodeData, inputImages),
+    [inputImages, nodeData],
+  );
+  const interactionLocks = useMemo(() => getQuickRenderInteractionLocks(viewState), [viewState]);
+  const isProcessing = interactionLocks.generate;
+  const hasAtmosphereReferenceInput = inputImages.some(
+    (image) => image.role === 'atmosphere_reference' || image.role === 'overall_reference',
+  );
 
   const updateData = useCallback((patch: Partial<QuickRenderExteriorNodeData>) => {
     setNodes((nodes) => nodes.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node));
@@ -108,41 +137,54 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
   }, [id, nodeData]);
 
   const startCanvasImageSelection = useCallback(() => {
-    setCanvasSelectionMode('input');
-  }, []);
+    if (isProcessing) return;
+    setCanvasSelectionMode({ kind: 'input' });
+  }, [isProcessing]);
 
-  const addStructureChannelFromNode = useCallback((sourceNode: Node, resolved: { imageUrl: string; width?: number; height?: number }) => {
+  const addRenderChannelFromNode = useCallback((
+    sourceNode: Node,
+    resolved: { imageUrl: string; width?: number; height?: number },
+    channelType: QuickRenderRenderChannelType,
+  ) => {
+    if (isProcessing) return;
     const label = typeof sourceNode.data?.label === 'string' ? sourceNode.data.label : '';
     const fileName = (sourceNode.data?.fileName as string | undefined) || label || 'canvas-image';
-    const type = detectQuickRenderStructureChannelType(fileName) || 'unknown';
-    const nextChannel = createQuickRenderStructureChannel(
-      type,
+    const nextChannel = createQuickRenderRenderChannel(
+      channelType,
       resolved.imageUrl,
       fileName,
       undefined,
       'canvas',
-      sourceNode.id,
+      undefined,
       resolved.width,
       resolved.height,
     );
-    const structure = nodeData.structure || {};
+    const renderChannels = nodeData.renderChannels || nodeData.structure || {};
     updateData({
-      structureEnabled: true,
-      structure: {
-        ...structure,
-        channels: sortQuickRenderStructureChannels([...(structure.channels || []), nextChannel]),
+      renderChannelsEnabled: true,
+      renderChannels: {
+        ...renderChannels,
+        channels: sortQuickRenderRenderChannels([
+          ...(renderChannels.channels || []).filter((channel) => channel.type !== channelType),
+          nextChannel,
+        ]),
         pendingFiles: [],
       },
     });
-  }, [nodeData.structure, updateData]);
+  }, [isProcessing, nodeData.renderChannels, nodeData.structure, updateData]);
 
-  const startStructureChannelSelection = useCallback(() => {
-    setCanvasSelectionMode('structure');
-  }, []);
+  const startRenderChannelSelection = useCallback((channelType: QuickRenderRenderChannelType) => {
+    if (isProcessing) return;
+    setCanvasSelectionMode({ kind: 'renderChannel', channelType });
+  }, [isProcessing]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      if (generateTimeoutRef.current) window.clearTimeout(generateTimeoutRef.current);
+      mountedRef.current = false;
+      activeTaskIdRef.current = null;
+      generationLockRef.current = false;
+      generationAbortRef.current?.abort();
     };
   }, []);
 
@@ -178,10 +220,10 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
       event.stopPropagation();
       event.stopImmediatePropagation();
       if (selectable) {
-        if (canvasSelectionMode === 'input') {
+        if (canvasSelectionMode.kind === 'input') {
           addCanvasInputEdge(selectable.node);
         } else {
-          addStructureChannelFromNode(selectable.node, selectable.resolved);
+          addRenderChannelFromNode(selectable.node, selectable.resolved, canvasSelectionMode.channelType);
         }
       }
       setCanvasSelectionMode(null);
@@ -207,9 +249,10 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
       window.removeEventListener('keydown', handleKeyDown, true);
       clearCanvasSelectionHighlight();
     };
-  }, [addCanvasInputEdge, addStructureChannelFromNode, canvasSelectionMode, clearCanvasSelectionHighlight, getSelectableImageNode]);
+  }, [addCanvasInputEdge, addRenderChannelFromNode, canvasSelectionMode, clearCanvasSelectionHighlight, getSelectableImageNode]);
 
   const removeConnectedImage = (image: QuickRenderConnectedImage) => {
+    if (isProcessing) return;
     const removeCachedImage = (candidate: QuickRenderConnectedImage) => {
       if (candidate.id === image.id) return false;
       if (image.sourceEdgeId && candidate.sourceEdgeId === image.sourceEdgeId) return false;
@@ -234,31 +277,80 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
   };
 
   const handleInputUpload = (files: FileList | null) => {
+    if (isProcessing) return;
     nodeData.onUploadQuickRenderInputImages?.(id, files);
   };
 
-  const handleGenerate = () => {
-    if (nodeData.status === 'generating') return;
-    updateData({ status: 'generating', mockResultMessage: '正在模拟快速渲染...' });
-    generateTimeoutRef.current = window.setTimeout(() => {
-      updateData({ status: 'success', mockResultMessage: 'Mock 生成完成，后续将自动创建图片结果节点。' });
-    }, 1200);
-  };
+  const handleGenerate = useCallback(async () => {
+    if (generationLockRef.current || isProcessing || !validation.valid) return;
 
-  const isGenerating = nodeData.status === 'generating';
+    const request = buildQuickRenderRequest(nodeData, inputImages);
+    const latestValidation = validateQuickRenderRequest(request);
+    if (!latestValidation.valid) return;
+
+    generationLockRef.current = true;
+    setCanvasSelectionMode(null);
+    const taskId = createQuickRenderTaskId();
+    const outputNodeId = nodeData.onCreateQuickRenderOutput?.(id, taskId, request) ?? null;
+    if (!outputNodeId) {
+      generationLockRef.current = false;
+      return;
+    }
+    const abortController = new AbortController();
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = abortController;
+    activeTaskIdRef.current = taskId;
+    const outcome = await runQuickRenderGeneration({
+      request,
+      taskId,
+      signal: abortController.signal,
+      execute: (nextRequest) => mockQuickRender(nextRequest, { taskId, signal: abortController.signal }),
+      isTaskActive: (completedTaskId) => (
+        mountedRef.current
+        && shouldApplyQuickRenderTaskResult(activeTaskIdRef.current, completedTaskId)
+        && getNodes().some((node) => node.id === id)
+      ),
+      onTaskUpdate: (generationTask, lastResult) => {
+        updateData({ generationTask, ...(lastResult ? { lastResult } : {}) });
+        if (generationTask.status !== 'failed' || !generationTask.errorCode) return;
+        const errorMessage = generationTask.errorCode === 'CANCELLED'
+          ? t('quickRenderExterior.errors.cancelled')
+          : generationTask.errorCode === 'MISSING_INPUT'
+            ? t('quickRenderExterior.errors.missingInput')
+            : t('quickRenderExterior.errors.generationFailed');
+        nodeData.onQuickRenderOutputFailed?.(outputNodeId, taskId, errorMessage);
+      },
+      onResult: (nextRequest, result) => (
+        nodeData.onQuickRenderResult?.(id, outputNodeId, nextRequest, result) ?? false
+      ),
+    });
+    if (outcome !== 'ignored') {
+      activeTaskIdRef.current = null;
+      generationLockRef.current = false;
+    }
+  }, [getNodes, id, inputImages, isProcessing, nodeData, t, updateData, validation.valid]);
+
+  const generationTask = nodeData.generationTask || createIdleQuickRenderTask();
+  const validationMessage = validation.errors[0]?.code === 'INPUT_IMAGE_INVALID'
+    ? t('quickRenderExterior.errors.invalidInput')
+    : validation.errors[0]?.code === 'INPUT_IMAGE_REQUIRED'
+      ? t('quickRenderExterior.errors.inputRequired')
+      : undefined;
+  const generationErrorMessage = generationTask.errorCode === 'CANCELLED'
+    ? t('quickRenderExterior.errors.cancelled')
+    : generationTask.errorCode === 'MISSING_INPUT'
+      ? t('quickRenderExterior.errors.missingInput')
+      : t('quickRenderExterior.errors.generationFailed');
   const creditCost = 60;
   const handleTop = '50%';
   const handleSize = 28;
-  const visibleMockResultMessage = nodeData.mockResultMessage?.includes('从画布添加')
-    ? ''
-    : nodeData.mockResultMessage;
 
   const startHandleDraw = (
     event: React.PointerEvent<HTMLDivElement>,
     sourceHandleId: string,
     sourceHandleType: 'source' | 'target',
   ) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || isProcessing || sourceHandleType === 'source') return;
     event.stopPropagation();
     event.preventDefault();
     event.nativeEvent.stopImmediatePropagation();
@@ -299,7 +391,11 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
             `}
           </style>
           <div className="pointer-events-none fixed left-1/2 top-5 z-[2300] -translate-x-1/2 rounded-full border border-white/[0.10] bg-[#222224]/95 px-3 py-2 text-[12px] font-medium text-white/72 shadow-[0_12px_30px_rgba(0,0,0,0.42)]">
-            {canvasSelectionMode === 'input' ? '选择一张画布图片作为输入，Esc 取消' : '选择一张画布图片作为结构通道，Esc 取消'}
+            {canvasSelectionMode.kind === 'input'
+              ? t('quickRenderExterior.imageInput.selectionHint')
+              : t('quickRenderExterior.renderChannels.selectionHint', {
+                channel: t(`renderChannel.names.${canvasSelectionMode.channelType}`),
+              })}
           </div>
         </>,
         document.body,
@@ -318,7 +414,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           <div className="flex flex-1 items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
             <Home className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
             <span className="min-w-0 truncate" style={{ fontSize: 11 }}>
-              {nodeData.label || '快速渲染-室外'}
+              {nodeData.label || t('quickRenderExterior.title')}
             </span>
           </div>
         </div>
@@ -358,7 +454,6 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           data-data-type="image"
           data-handle-id="right-source"
           data-handle-type="source"
-          onPointerDown={(event) => startHandleDraw(event, 'right-source', 'source')}
           style={{
             position: 'absolute',
             right: 0,
@@ -387,7 +482,6 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           className="node-preview-card flex flex-col overflow-hidden"
           style={{
             width: QUICK_RENDER_NODE_WIDTH,
-            minHeight: QUICK_RENDER_NODE_MIN_HEIGHT,
             background: CANVAS_NODE_CARD_BACKGROUND,
             borderRadius: CANVAS_NODE_CARD_RADIUS,
             borderWidth: CANVAS_NODE_CARD_BORDER_WIDTH,
@@ -395,29 +489,37 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           }}
         >
           <div className="flex-1 space-y-3 p-4 pb-5">
-              <QuickRenderConnectedImages
-                images={inputImages as QuickRenderConnectedImage[]}
-                onRemove={removeConnectedImage}
-                onUpload={handleInputUpload}
-                onSelectFromCanvas={startCanvasImageSelection}
-              />
-              <QuickRenderStructurePanel data={nodeData} onChange={updateData} onSelectFromCanvas={startStructureChannelSelection} />
-              <QuickRenderAtmospherePanel data={nodeData} hasAtmosphereReference={hasAtmosphereReferenceInput} onChange={updateData} />
-              <QuickRenderPromptPanel value={nodeData.prompt || ''} onChange={(prompt) => updateData({ prompt })} />
-              {visibleMockResultMessage && (
-                <div className="flex items-center gap-2 rounded-[10px] border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-[12px] text-white/52">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {visibleMockResultMessage}
-                </div>
-              )}
+            <QuickRenderConnectedImages
+              images={inputImages as QuickRenderConnectedImage[]}
+              disabled={isProcessing}
+              onRemove={removeConnectedImage}
+              onUpload={handleInputUpload}
+              onSelectFromCanvas={startCanvasImageSelection}
+            />
+            <QuickRenderRenderChannelsPanel data={nodeData} disabled={isProcessing} onChange={updateData} onSelectFromCanvas={startRenderChannelSelection} />
+            <QuickRenderAtmospherePanel data={nodeData} disabled={isProcessing} hasAtmosphereReference={hasAtmosphereReferenceInput} onChange={updateData} />
+            <QuickRenderPromptPanel value={nodeData.prompt || ''} disabled={isProcessing} onChange={(prompt) => updateData({ prompt })} />
+            {generationTask.status === 'failed' && generationTask.errorCode && (
+              <div className="flex items-center gap-2 rounded-[10px] border border-red-400/15 bg-red-400/[0.06] px-3 py-2 text-[12px] text-red-200/80">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1">{generationErrorMessage}</span>
+                <button type="button" onClick={() => void handleGenerate()} className="nodrag flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-white/72 transition hover:bg-white/[0.06] hover:text-white">
+                  <RotateCcw className="h-3 w-3" />
+                  {t('common.actions.retry')}
+                </button>
+              </div>
+            )}
           </div>
 
           <QuickRenderFooter
             params={modelParams}
-            isGenerating={isGenerating}
+            isGenerating={isProcessing}
+            canGenerate={validation.valid}
+            disabled={isProcessing}
+            validationMessage={validationMessage}
             creditCost={creditCost}
             onChange={(params) => updateData({ modelParams: params })}
-            onGenerate={handleGenerate}
+            onGenerate={() => void handleGenerate()}
           />
         </div>
       </div>

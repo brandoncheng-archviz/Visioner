@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '@xyflow/react';
 import { ArrowUp, Check, ChevronDown, Lock, Unlock, Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../../constants/canvasConstants';
 import {
   IMAGE_MODEL_OPTIONS,
@@ -11,12 +12,12 @@ import {
 import type { QuickRenderExteriorModelParams } from './quickRenderExterior.types';
 
 const QUICK_RENDER_FRAME_RATIO_OPTIONS = [
-  { value: 'adaptive', label: '自适应' },
-  { value: '1:1', label: '1:1' },
-  { value: '4:3', label: '4:3' },
-  { value: '3:2', label: '3:2' },
-  { value: '16:9', label: '16:9' },
-  { value: '9:16', label: '9:16' },
+  { value: 'adaptive' },
+  { value: '1:1' },
+  { value: '4:3' },
+  { value: '3:2' },
+  { value: '16:9' },
+  { value: '9:16' },
 ] as const;
 
 const STANDARD_FRAME_RATIO_VALUES = new Set<string>(
@@ -28,6 +29,11 @@ const FRAME_RATIO_PANEL_WIDTH = 440;
 const FRAME_RATIO_PANEL_HEIGHT = 358;
 const FLOATING_PANEL_GAP = 8;
 const VIEWPORT_PADDING = 12;
+const MODEL_DESCRIPTION_KEYS: Record<string, string> = {
+  'Nano Banana 2': 'modelParams.model.nanoBanana2.description',
+  'Nano Banana Pro': 'modelParams.model.nanoBananaPro.description',
+  'GPT Image 2': 'modelParams.model.gptImage2.description',
+};
 
 type FloatingPosition = {
   left: number;
@@ -37,6 +43,9 @@ type FloatingPosition = {
 type QuickRenderFooterProps = {
   params: QuickRenderExteriorModelParams;
   isGenerating: boolean;
+  canGenerate: boolean;
+  disabled: boolean;
+  validationMessage?: string;
   creditCost: number;
   onChange: (params: QuickRenderExteriorModelParams) => void;
   onGenerate: () => void;
@@ -59,9 +68,9 @@ function isValidFrameRatio(width: number, height: number) {
   return ratio >= 1 / 8 && ratio <= 8;
 }
 
-function formatFrameRatioLabel(value: string | undefined) {
+function formatFrameRatioLabel(value: string | undefined, adaptiveLabel: string) {
   if (!value) return '1:1';
-  if (value === '自适应') return '自适应';
+  if (value === 'adaptive') return adaptiveLabel;
   const parsed = parseFrameRatio(value);
   if (!parsed) return value;
   const ratioValue = `${parsed.width}:${parsed.height}`;
@@ -114,10 +123,14 @@ function getFloatingPosition(
 export function QuickRenderFooter({
   params,
   isGenerating,
+  canGenerate,
+  disabled,
+  validationMessage,
   creditCost,
   onChange,
   onGenerate,
 }: QuickRenderFooterProps) {
+  const { t } = useTranslation();
   const flowTransform = useStore((state) => state.transform);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
@@ -133,8 +146,10 @@ export function QuickRenderFooter({
 
   const selectedModel = getImageModelOption(params.model);
   const adaptiveFrameRatio = '1:1';
-  const displayFrameRatio = params.aspectRatio === '自适应' ? adaptiveFrameRatio : params.aspectRatio;
-  const displayFrameRatioLabel = formatFrameRatioLabel(displayFrameRatio);
+  const displayFrameRatio = params.aspectRatio === 'adaptive' ? adaptiveFrameRatio : params.aspectRatio;
+  const displayFrameRatioLabel = params.aspectRatio === 'adaptive'
+    ? t('modelParams.aspectRatio.adaptive')
+    : formatFrameRatioLabel(displayFrameRatio, t('modelParams.aspectRatio.adaptive'));
   const selectedFrameRatioDimensions = parseFrameRatio(displayFrameRatio) ?? { width: 1, height: 1 };
   const currentResolution = selectedModel.resolutions.includes(params.resolution as ImageModelResolution)
     ? (params.resolution as ImageModelResolution)
@@ -286,7 +301,9 @@ export function QuickRenderFooter({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-medium text-white/85">{model.label}</span>
-              <span className="block truncate text-[12px] text-white/42">{model.description} · 默认 {model.defaultResolution}</span>
+              <span className="block truncate text-[12px] text-white/42">
+                {t(MODEL_DESCRIPTION_KEYS[model.id] || 'modelParams.model.nanoBanana2.description')} · {t('common.status.default')} {model.defaultResolution}
+              </span>
             </span>
             {params.model === model.id && <Check className="h-4 w-4 flex-shrink-0 text-white/70" />}
           </button>
@@ -315,10 +332,10 @@ export function QuickRenderFooter({
         onWheel={(event) => event.stopPropagation()}
       >
         <div>
-          <div className="mb-2 text-[13px] font-medium text-white/62">画幅比</div>
+          <div className="mb-2 text-[13px] font-medium text-white/62">{t('modelParams.aspectRatio.label')}</div>
           <div className="grid grid-cols-3 gap-2">
             {QUICK_RENDER_FRAME_RATIO_OPTIONS.map((ratioOption) => {
-              const optionValue = ratioOption.value === 'adaptive' ? '自适应' : ratioOption.value;
+              const optionValue = ratioOption.value;
               const isSelected = params.aspectRatio === optionValue;
               return (
                 <button
@@ -341,7 +358,7 @@ export function QuickRenderFooter({
                     border: isSelected ? '1px solid rgba(255,255,255,0.62)' : '1px solid rgba(255,255,255,0.075)',
                   }}
                 >
-                  {ratioOption.label}
+                  {ratioOption.value === 'adaptive' ? t('modelParams.aspectRatio.adaptive') : ratioOption.value}
                 </button>
               );
             })}
@@ -349,10 +366,10 @@ export function QuickRenderFooter({
         </div>
 
         <div className="mt-3 border-t border-white/[0.045] pt-3">
-          <div className="mb-2 text-[13px] font-medium text-white/62">自定义画幅比</div>
+          <div className="mb-2 text-[13px] font-medium text-white/62">{t('modelParams.aspectRatio.custom')}</div>
           <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto 1fr 40px' }}>
             <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
-              <span className="text-[12px] text-white/38">宽</span>
+              <span className="text-[12px] text-white/38">{t('modelParams.aspectRatio.width')}</span>
               <input
                 className="nodrag nopan nowheel min-w-0 flex-1 bg-transparent text-[14px] font-medium text-white/82 outline-none"
                 value={customFrameWidth}
@@ -368,7 +385,7 @@ export function QuickRenderFooter({
             </label>
             <span className="flex h-9 items-center justify-center text-[13px] text-white/32">×</span>
             <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
-              <span className="text-[12px] text-white/38">高</span>
+              <span className="text-[12px] text-white/38">{t('modelParams.aspectRatio.height')}</span>
               <input
                 className="nodrag nopan nowheel min-w-0 flex-1 bg-transparent text-[14px] font-medium text-white/82 outline-none"
                 value={customFrameHeight}
@@ -391,16 +408,16 @@ export function QuickRenderFooter({
                 background: isFrameRatioLocked ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
                 border: isFrameRatioLocked ? '1px solid rgba(255,255,255,0.58)' : '1px solid rgba(255,255,255,0.075)',
               }}
-              title={isFrameRatioLocked ? '锁定画幅比' : '自由输入画幅比'}
+              title={isFrameRatioLocked ? t('modelParams.aspectRatio.lock') : t('modelParams.aspectRatio.unlock')}
             >
               {isFrameRatioLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
             </button>
           </div>
-          <div className="mt-2 text-[12px] leading-snug text-white/30">画幅比只用于锁定构图比例，不代表最终输出像素。</div>
+          <div className="mt-2 text-[12px] leading-snug text-white/30">{t('modelParams.aspectRatio.hint')}</div>
         </div>
 
         <div className="mt-3 border-t border-white/[0.045] pt-3">
-          <div className="mb-2 text-[13px] font-medium text-white/62">分辨率</div>
+          <div className="mb-2 text-[13px] font-medium text-white/62">{t('modelParams.resolution.label')}</div>
           <div className="grid grid-cols-3 gap-2">
             {selectedModel.resolutions.map((resolution) => (
               <button
@@ -425,7 +442,7 @@ export function QuickRenderFooter({
     : null;
 
   return (
-    <footer className="flex h-[62px] shrink-0 items-center justify-between gap-2 border-t border-white/[0.07] px-3">
+    <footer className={disabled ? 'pointer-events-none flex h-[62px] shrink-0 items-center justify-between gap-2 border-t border-white/[0.07] px-3 opacity-60' : 'flex h-[62px] shrink-0 items-center justify-between gap-2 border-t border-white/[0.07] px-3'} aria-disabled={disabled}>
       {modelMenu}
       {frameRatioPanel}
       <div className="flex min-w-0 items-center gap-3">
@@ -478,7 +495,7 @@ export function QuickRenderFooter({
       <div className="relative flex shrink-0 items-center gap-2">
         <div
           className="flex h-[34px] min-w-[38px] items-center justify-center gap-1 text-[13px] font-medium text-white/52"
-          title={`消耗 ${creditCost} 积分`}
+          title={t('quickRenderExterior.footer.creditCost', { count: creditCost })}
         >
           <Zap className="h-3 w-3 fill-current text-[#b8a36d]" />
           <span>{creditCost}</span>
@@ -486,16 +503,16 @@ export function QuickRenderFooter({
         <button
           type="button"
           onClick={onGenerate}
-          disabled={isGenerating}
+          disabled={disabled || !canGenerate}
           className="nodrag flex items-center justify-center rounded-lg transition-colors"
           style={{
             width: 34,
             height: 34,
             background: isGenerating ? 'rgba(255,255,255,0.14)' : '#ffffff',
-            opacity: isGenerating ? 0.55 : 1,
-            cursor: isGenerating ? 'not-allowed' : 'pointer',
+            opacity: disabled || !canGenerate ? 0.55 : 1,
+            cursor: disabled || !canGenerate ? 'not-allowed' : 'pointer',
           }}
-          title={isGenerating ? '生成中' : '生成'}
+          title={isGenerating ? t('quickRenderExterior.processing.generating') : validationMessage || t('generation.actions.generate')}
         >
           {isGenerating ? (
             <div className="relative flex items-center justify-center">

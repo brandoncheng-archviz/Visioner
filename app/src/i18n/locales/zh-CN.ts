@@ -44,6 +44,28 @@ const zhCN = {
     lighting: "光影预览",
     expand: "扩展",
     fullscreen: "全屏",
+    actions: {
+      add: "添加",
+      remove: "移除",
+      delete: "删除",
+      clear: "清除",
+      cancel: "取消",
+      confirm: "确认",
+      apply: "应用",
+      save: "保存",
+      retry: "重试",
+      replace: "替换",
+      upload: "上传",
+      close: "关闭",
+      expand: "展开",
+    },
+    status: {
+      unset: "未设置",
+      processing: "处理中",
+      generating: "生成中",
+      failed: "失败",
+      default: "默认",
+    },
   },
 
   canvas: {
@@ -81,6 +103,131 @@ const zhCN = {
     createMenuQuickRenderExteriorNode: "快速渲染-室外",
     addSunSkyNode: "光影",
     createMenuSunSkyNode: "光影",
+    nodeTitles: {
+      image: "图片",
+      text: "文本节点",
+      compare: "图像对比",
+      upscale: "图像增强",
+      quickRenderExterior: "快速渲染·室外",
+      relight: "光影调整",
+      audio: "音频",
+      script: "脚本",
+    },
+  },
+
+  quickRenderExterior: {
+    title: "快速渲染·室外",
+    sections: {
+      imageInput: { title: "图像输入" },
+      renderChannels: { title: "渲染通道" },
+      atmosphere: { title: "氛围控制" },
+      prompt: { title: "提示词" },
+      parameters: { title: "生成设置" },
+    },
+    imageInput: {
+      addImage: "添加图像",
+      selectFromCanvas: "从画布选择",
+      uploadResource: "上传资源图",
+      removeImage: "移除图像",
+      unassignedRole: "未设置用途",
+      selectionHint: "选择一张画布图片作为输入，Esc 取消",
+      empty: "请添加至少一张图像输入",
+      viewMore: "查看更多",
+    },
+    renderChannels: {
+      selectFromCanvas: "从画布选择",
+      upload: "上传通道",
+      add: "添加 {{channel}} 通道",
+      replace: "替换 {{channel}} 通道",
+      remove: "移除 {{channel}} 通道",
+      selectionHint: "选择一张画布图片作为 {{channel}} 通道，Esc 取消",
+      unrecognized: "未识别",
+    },
+    prompt: { placeholder: "输入补充描述…" },
+    footer: { creditCost: "消耗 {{count}} 积分" },
+    processing: { generating: "正在快速渲染" },
+    errors: {
+      inputRequired: "请至少添加一张有效的图像输入",
+      invalidInput: "图像输入无效，请重新添加",
+      cancelled: "任务已取消",
+      generationFailed: "快速渲染失败，请稍后重试",
+      missingInput: "缺少有效的图像输入",
+    },
+  },
+
+  atmosphere: {
+    fields: { time: "时间", lighting: "光线", weather: "天气", style: "风格" },
+    time: {
+      sunrise: "日出",
+      earlyMorning: "清晨",
+      noon: "正午",
+      afternoon: "下午",
+      sunset: "傍晚",
+      night: "夜景",
+    },
+    lighting: {
+      front: "顺光",
+      back: "逆光",
+      left: "左侧光",
+      right: "右侧光",
+      softSky: "柔和天光",
+    },
+    weather: { sunny: "晴天", cloudy: "阴天", rainy: "雨天", snowy: "雪天", foggy: "雾天" },
+    style: {
+      photorealistic: "照片般真实",
+      nordic: "北欧氛围",
+      dramaticConcept: "概念戏剧",
+      luxuryRealEstate: "高端地产",
+      painterly: "绘画感",
+    },
+    toggles: {
+      addEntourage: { label: "增加配景" },
+      addPeople: { label: "增加人物" },
+      interiorLights: { label: "室内灯光" },
+      motionBlur: { label: "动态模糊" },
+    },
+    status: {
+      configured: "氛围已设置",
+      followReference: "跟随氛围参考",
+    },
+  },
+
+  renderChannel: {
+    names: {
+      beauty: "Beauty",
+      albedo: "Albedo",
+      normal: "Normal",
+      ao: "AO",
+      depth: "Depth",
+      mask: "Mask / ID",
+      materialId: "Material ID",
+      objectId: "Object ID",
+      unknown: "未识别",
+    },
+  },
+
+  generation: {
+    actions: { generate: "生成" },
+    status: { generating: "生成中" },
+  },
+
+  modelParams: {
+    model: {
+      nanoBanana2: { description: "快速、稳定" },
+      nanoBananaPro: { description: "更高质量" },
+      gptImage2: { description: "高质量图像生成" },
+    },
+    aspectRatio: {
+      label: "画幅比",
+      adaptive: "自适应",
+      custom: "自定义画幅比",
+      lock: "锁定画幅比",
+      unlock: "自由输入画幅比",
+      width: "宽",
+      height: "高",
+      hint: "画幅比只用于锁定构图比例，不代表最终输出像素。",
+    },
+    resolution: { label: "分辨率" },
   },
 
   compare: {
@@ -246,6 +393,20 @@ const zhCN = {
   },
 
   reference: {
+    roles: {
+      primaryBuilding: "主体建筑",
+      atmosphere: "氛围参考",
+      local: "局部参考",
+      unassigned: "未设置用途",
+    },
+    localTypes: {
+      vegetation: "植物",
+      people: "人物",
+      sky: "天空",
+      water: "海水",
+      city: "城市",
+      fog: "雾气",
+    },
     selectedCount: "已选择 {{count}} 张参考图",
     primaryBuilding: "主体建筑",
     atmosphereReference: "氛围参考",
@@ -569,6 +730,7 @@ const zhCN = {
   },
 
   toolbar: {
+    fullscreen: "全屏",
     minimap: "小地图",
     snapGrid: "网格吸附",
     resetView: "重置视图",
@@ -613,6 +775,50 @@ const zhCN = {
     spaceKey: "空格",
     drag: "拖拽",
     clickButton: "点击按钮",
+  },
+
+  textNode: {
+    title: "文本节点",
+    empty: {
+      compose: "编写内容",
+      extractFromImage: "从图片提取描述",
+      generateImage: "生成图片",
+    },
+    compose: {
+      title: "编写文本内容",
+      placeholder: "输入文本内容…",
+      doubleClickHint: "双击编写内容，开始你的创作。",
+      suggestionsTitle: "尝试：",
+    },
+    extract: {
+      prompt: "根据图片生成结构化中文提示词，提取以下内容：\n1. 主体描述\n2. 场景/环境\n3. 光影与时间段\n4. 镜头视角与构图\n5. 风格关键词\n6. 材质与细节特征\n7. 可选避免内容\n请使用清晰分段，便于后续一键用于生图。",
+      processing: "正在提取图片描述",
+    },
+    references: {
+      textEmpty: "当前文本节点暂无内容",
+      disconnectText: "断开文本引用",
+      disconnectImage: "断开图片引用",
+    },
+    processing: {
+      inProgress: "文本处理中",
+    },
+    validation: {
+      emptyContent: "请输入文本内容",
+      imageRequired: "请先连接一张有效图片",
+    },
+    errors: {
+      processingFailed: "文本处理失败，请重试",
+      extractFailed: "图片描述提取失败，请重试",
+    },
+    tooltips: {
+      submit: "发送（{{shortcut}}）",
+    },
+    models: {
+      geminiPro: "增强推理 · 高质量 · 10~20s",
+      geminiFlashLite: "轻量快速 · 低成本 · 5~10s",
+      geminiFlash: "快速高效 · 通用 · 10~20s",
+      deepSeekPro: "深度推理 · 高质量 · 10~20s",
+    },
   },
 
   modal: {

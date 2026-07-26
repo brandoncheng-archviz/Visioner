@@ -30,6 +30,10 @@ export interface ImageNodeData {
   currentResultSource?: 'history' | string;
   generatedImages?: GenerationHistoryItem[] | string[];
   generationTask?: GenerationTask | null;
+  sourceWorkflow?: {
+    type: 'quickRenderExterior';
+    sourceNodeId: string;
+  };
   isGenerating?: boolean;
   isProcessing?: boolean;
   isReferenceLocked?: boolean;

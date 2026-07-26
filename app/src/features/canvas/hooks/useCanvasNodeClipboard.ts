@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { Node } from '@xyflow/react';
+import { prepareCanvasNodeDataForCopy } from '../utils/nodeCopyData';
 
 type CanvasPosition = {
   x: number;
@@ -110,7 +111,7 @@ export function useCanvasNodeClipboard({
       );
       assignedLabels.push(nextLabel);
       const nextData = {
-        ...node.data,
+        ...prepareCanvasNodeDataForCopy(nodeType, node.data),
         label: nextLabel,
         title: typeof node.data.title === 'string' ? nextLabel : node.data.title,
       };

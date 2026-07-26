@@ -28,6 +28,7 @@ import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_CROP_CANCEL_EVENT, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
+import { prepareCanvasNodeDataForCopy } from '../features/canvas/utils/nodeCopyData';
 import {
   formatPastedImageLabel,
   getImageRejectMessage,
@@ -42,6 +43,12 @@ import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
 import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
 import type { GenerationHistoryItem, GenerationTask } from '../features/canvas/types/generation.types';
+import type { QuickRenderRequest, QuickRenderResult } from '../features/canvas/nodes/QuickRenderExteriorNode/quickRenderExterior.types';
+import {
+  buildQuickRenderCompletedOutput,
+  buildQuickRenderFailedOutput,
+  buildQuickRenderProcessingOutput,
+} from '../features/canvas/nodes/QuickRenderExteriorNode/quickRenderResultGraph';
 import type { RelightCreationOptions } from '../features/canvas/types/relight.types';
 import type {
   TextNodeActionType,
@@ -68,7 +75,7 @@ import {
 } from '../features/canvas/components/TextNodeInputPanel';
 import {
   DEFAULT_TEXT_NODE_MODEL,
-  TEXT_NODE_IMAGE_EXTRACTION_PROMPT,
+  TEXT_NODE_IMAGE_EXTRACTION_PROMPT_KEY,
   TEXT_NODE_WIDTH,
 } from '../features/canvas/constants/textNode';
 import {
@@ -1060,7 +1067,7 @@ function FlowCanvas() {
       }
     }
 
-    const editorInput = action === 'image_to_text' ? TEXT_NODE_IMAGE_EXTRACTION_PROMPT : '';
+    const editorInput = action === 'image_to_text' ? t(TEXT_NODE_IMAGE_EXTRACTION_PROMPT_KEY) : '';
     setNodes((currentNodes) => {
       const updatedNodes = currentNodes.map((node) => ({
         ...node,
@@ -1117,7 +1124,7 @@ function FlowCanvas() {
         editorInput,
       });
     }
-  }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setActivePanel, setEdges, setNodes]);
+  }, [edges, fitView, getAllNodeLabels, getViewport, nodes, setActivePanel, setEdges, setNodes, t]);
 
   const {
     copyNodes,
@@ -1247,6 +1254,106 @@ function FlowCanvas() {
     });
   }, [edges, fitView, getAllNodeLabels, getViewport, nodes, objectUrlsRef, setEdges, setNodes, showToast, validateImageProcessingEdge]);
 
+  const createQuickRenderOutput = useCallback((
+    sourceNodeId: string,
+    taskId: string,
+    request: QuickRenderRequest,
+  ) => {
+    const currentNodes = getNodes();
+    const sourceNode = currentNodes.find((node) => (
+      node.id === sourceNodeId && node.type === 'quickRenderExterior'
+    ));
+    if (!sourceNode) return null;
+
+    const label = getNextNodeTitle(
+      currentNodes.map((node) => String(node.data.label || '')),
+      NODE_BASE_TITLES.image,
+    );
+    const output = buildQuickRenderProcessingOutput({
+      sourceNode,
+      request,
+      taskId,
+      timestamp: Date.now(),
+      label,
+      existingNodes: currentNodes,
+    });
+
+    setNodes((nodesBeforeCreation) => {
+      if (!nodesBeforeCreation.some((node) => node.id === sourceNodeId)) return nodesBeforeCreation;
+      if (nodesBeforeCreation.some((node) => node.id === output.node.id)) return nodesBeforeCreation;
+      return [
+        ...nodesBeforeCreation.map((node) => ({ ...node, selected: false })),
+        output.node,
+      ];
+    });
+    setEdges((edgesBeforeCreation) => (
+      edgesBeforeCreation.some((edge) => edge.id === output.edge.id)
+        ? edgesBeforeCreation
+        : [...edgesBeforeCreation, output.edge]
+    ));
+
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id: output.node.id }],
+        duration: 300,
+        padding: 0.18,
+        maxZoom: Math.min(getViewport().zoom, 1),
+      });
+    }, 0);
+
+    return output.node.id;
+  }, [fitView, getNodes, getViewport, setEdges, setNodes]);
+
+  const writeQuickRenderResult = useCallback((
+    sourceNodeId: string,
+    outputNodeId: string,
+    request: QuickRenderRequest,
+    result: QuickRenderResult,
+  ) => {
+    const currentNodes = getNodes();
+    const sourceNode = currentNodes.find((node) => node.id === sourceNodeId && node.type === 'quickRenderExterior');
+    const outputNode = currentNodes.find((node) => node.id === outputNodeId && node.type === 'image');
+    if (!sourceNode || !outputNode || result.images.length === 0) return false;
+
+    const completedOutput = buildQuickRenderCompletedOutput({
+      outputNode,
+      sourceNodeId,
+      request,
+      result,
+      timestamp: Date.now(),
+      createImageNodeData: (image, batch) => ({
+        ...createGeneratedNodeDataFromHistoryImage(image, batch),
+        ...getRoleData(null),
+      }),
+    });
+    if (!completedOutput) return false;
+
+    setNodes((nodesBeforeWriteback) => {
+      if (!nodesBeforeWriteback.some((node) => node.id === sourceNodeId)) return nodesBeforeWriteback;
+      return nodesBeforeWriteback.map((node) => (
+        node.id === outputNodeId ? completedOutput : node
+      ));
+    });
+    return true;
+  }, [getNodes, setNodes]);
+
+  const failQuickRenderOutput = useCallback((
+    outputNodeId: string,
+    taskId: string,
+    errorMessage: string,
+  ) => {
+    const outputNode = getNodes().find((node) => node.id === outputNodeId && node.type === 'image');
+    if (!outputNode) return;
+    const failedOutput = buildQuickRenderFailedOutput({
+      outputNode,
+      taskId,
+      errorMessage,
+      timestamp: Date.now(),
+    });
+    setNodes((currentNodes) => currentNodes.map((node) => (
+      node.id === outputNodeId ? failedOutput : node
+    )));
+  }, [getNodes, setNodes]);
   const lockedPromptReferenceNodeIds = useMemo(() => {
     const lockedNodeIds = new Set<string>();
     nodes.forEach((node) => {
@@ -1273,7 +1380,7 @@ function FlowCanvas() {
       id: `${node.type}-${Date.now()}`,
       position: { x: node.position.x + 40, y: node.position.y + 40 },
       data: {
-        ...node.data,
+        ...prepareCanvasNodeDataForCopy(nodeType, node.data),
         label,
         title: typeof node.data.title === 'string' ? label : node.data.title,
       },
@@ -1306,6 +1413,9 @@ function FlowCanvas() {
         onAddQuickRenderInputEdge: n.type === 'quickRenderExterior' ? addQuickRenderInputEdge : undefined,
         onRemoveQuickRenderInputEdge: n.type === 'quickRenderExterior' ? removeQuickRenderInputEdge : undefined,
         onUploadQuickRenderInputImages: n.type === 'quickRenderExterior' ? uploadQuickRenderInputImages : undefined,
+        onCreateQuickRenderOutput: n.type === 'quickRenderExterior' ? createQuickRenderOutput : undefined,
+        onQuickRenderResult: n.type === 'quickRenderExterior' ? writeQuickRenderResult : undefined,
+        onQuickRenderOutputFailed: n.type === 'quickRenderExterior' ? failQuickRenderOutput : undefined,
         onSwapCompareInputs: swapCompareInputs,
         onAssignReferenceEdgeRole: assignReferenceEdgeRole,
         onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' || n.type === 'relight' ? createUpscaleNode : undefined,
@@ -1332,7 +1442,7 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addQuickRenderInputEdge, removeQuickRenderInputEdge, uploadQuickRenderInputImages, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addQuickRenderInputEdge, removeQuickRenderInputEdge, uploadQuickRenderInputImages, createQuickRenderOutput, writeQuickRenderResult, failQuickRenderOutput, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {
@@ -1574,12 +1684,12 @@ function FlowCanvas() {
         const sourceData = sourceNode.data as TextNodeData;
         return [{
           nodeId: sourceNode.id,
-          title: String(sourceData.label || sourceData.title || '文本节点'),
+          title: String(sourceData.label || sourceData.title || t('textNode.title')),
           content: getTextContent(sourceData),
           status: sourceData.status || 'empty',
         }];
       });
-  }, [edges, nodes, selectedTextNode]);
+  }, [edges, nodes, selectedTextNode, t]);
   const selectedTextNodeSubmitState = useMemo(() => {
     if (!selectedTextNode) return null;
     const inputSources = edges

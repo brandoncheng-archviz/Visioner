@@ -44,6 +44,28 @@ const enUS = {
     lighting: "Light Preview",
     expand: "Expand",
     fullscreen: "Fullscreen",
+    actions: {
+      add: "Add",
+      remove: "Remove",
+      delete: "Delete",
+      clear: "Clear",
+      cancel: "Cancel",
+      confirm: "Confirm",
+      apply: "Apply",
+      save: "Save",
+      retry: "Retry",
+      replace: "Replace",
+      upload: "Upload",
+      close: "Close",
+      expand: "Expand",
+    },
+    status: {
+      unset: "Not set",
+      processing: "Processing",
+      generating: "Generating",
+      failed: "Failed",
+      default: "Default",
+    },
   },
 
   canvas: {
@@ -81,6 +103,131 @@ const enUS = {
     createMenuQuickRenderExteriorNode: "Quick Render - Exterior",
     addSunSkyNode: "Light",
     createMenuSunSkyNode: "Light",
+    nodeTitles: {
+      image: "Image",
+      text: "Text",
+      compare: "Image Compare",
+      upscale: "Image Enhance",
+      quickRenderExterior: "Quick Render · Exterior",
+      relight: "Relight",
+      audio: "Audio",
+      script: "Script",
+    },
+  },
+
+  quickRenderExterior: {
+    title: "Quick Render · Exterior",
+    sections: {
+      imageInput: { title: "Image Input" },
+      renderChannels: { title: "Render Channels" },
+      atmosphere: { title: "Atmosphere" },
+      prompt: { title: "Prompt" },
+      parameters: { title: "Generation Settings" },
+    },
+    imageInput: {
+      addImage: "Add image",
+      selectFromCanvas: "Select from canvas",
+      uploadResource: "Upload image",
+      removeImage: "Remove image",
+      unassignedRole: "No role assigned",
+      selectionHint: "Select a canvas image as input. Press Esc to cancel",
+      empty: "Add at least one input image",
+      viewMore: "View more",
+    },
+    renderChannels: {
+      selectFromCanvas: "Select from canvas",
+      upload: "Upload channel",
+      add: "Add {{channel}} channel",
+      replace: "Replace {{channel}} channel",
+      remove: "Remove {{channel}} channel",
+      selectionHint: "Select a canvas image as the {{channel}} channel. Press Esc to cancel",
+      unrecognized: "Unrecognized",
+    },
+    prompt: { placeholder: "Add extra instructions…" },
+    footer: { creditCost: "Uses {{count}} credits" },
+    processing: { generating: "Rendering" },
+    errors: {
+      inputRequired: "Add at least one valid input image",
+      invalidInput: "The image input is invalid. Add it again",
+      cancelled: "Task cancelled",
+      generationFailed: "Quick render failed. Try again later",
+      missingInput: "No valid input image",
+    },
+  },
+
+  atmosphere: {
+    fields: { time: "Time", lighting: "Lighting", weather: "Weather", style: "Style" },
+    time: {
+      sunrise: "Sunrise",
+      earlyMorning: "Early Morning",
+      noon: "Noon",
+      afternoon: "Afternoon",
+      sunset: "Sunset",
+      night: "Night",
+    },
+    lighting: {
+      front: "Front Light",
+      back: "Backlight",
+      left: "Light from Left",
+      right: "Light from Right",
+      softSky: "Soft Skylight",
+    },
+    weather: { sunny: "Sunny", cloudy: "Cloudy", rainy: "Rainy", snowy: "Snowy", foggy: "Foggy" },
+    style: {
+      photorealistic: "Photorealistic",
+      nordic: "Nordic",
+      dramaticConcept: "Dramatic Concept",
+      luxuryRealEstate: "Luxury Real Estate",
+      painterly: "Painterly",
+    },
+    toggles: {
+      addEntourage: { label: "Add Entourage" },
+      addPeople: { label: "Add People" },
+      interiorLights: { label: "Interior Lights" },
+      motionBlur: { label: "Motion Blur" },
+    },
+    status: {
+      configured: "Atmosphere configured",
+      followReference: "Follow atmosphere reference",
+    },
+  },
+
+  renderChannel: {
+    names: {
+      beauty: "Beauty",
+      albedo: "Albedo",
+      normal: "Normal",
+      ao: "AO",
+      depth: "Depth",
+      mask: "Mask / ID",
+      materialId: "Material ID",
+      objectId: "Object ID",
+      unknown: "Unrecognized",
+    },
+  },
+
+  generation: {
+    actions: { generate: "Generate" },
+    status: { generating: "Generating" },
+  },
+
+  modelParams: {
+    model: {
+      nanoBanana2: { description: "Fast and reliable" },
+      nanoBananaPro: { description: "Higher quality" },
+      gptImage2: { description: "High-quality image generation" },
+    },
+    aspectRatio: {
+      label: "Aspect ratio",
+      adaptive: "Adaptive",
+      custom: "Custom aspect ratio",
+      lock: "Lock aspect ratio",
+      unlock: "Unlock aspect ratio",
+      width: "Width",
+      height: "Height",
+      hint: "Aspect ratio controls composition only and does not define final pixel dimensions.",
+    },
+    resolution: { label: "Resolution" },
   },
 
   compare: {
@@ -246,6 +393,20 @@ const enUS = {
   },
 
   reference: {
+    roles: {
+      primaryBuilding: "Primary Building",
+      atmosphere: "Atmosphere Reference",
+      local: "Local Reference",
+      unassigned: "No Role Assigned",
+    },
+    localTypes: {
+      vegetation: "Vegetation",
+      people: "People",
+      sky: "Sky",
+      water: "Water",
+      city: "City",
+      fog: "Fog",
+    },
     selectedCount: "Selected {{count}} reference images",
     primaryBuilding: "Primary Building",
     atmosphereReference: "Atmosphere Reference",
@@ -569,6 +730,7 @@ const enUS = {
   },
 
   toolbar: {
+    fullscreen: "Fullscreen",
     minimap: "Minimap",
     snapGrid: "Snap to Grid",
     resetView: "Reset View",
@@ -613,6 +775,50 @@ const enUS = {
     spaceKey: "Space",
     drag: "Drag",
     clickButton: "Click Button",
+  },
+
+  textNode: {
+    title: "Text",
+    empty: {
+      compose: "Write content",
+      extractFromImage: "Extract description from image",
+      generateImage: "Generate image",
+    },
+    compose: {
+      title: "Write text",
+      placeholder: "Enter text…",
+      doubleClickHint: "Double-click to start writing.",
+      suggestionsTitle: "Try:",
+    },
+    extract: {
+      prompt: "Create a structured prompt from the image, covering:\n1. Subject\n2. Scene and environment\n3. Lighting and time of day\n4. Camera angle and composition\n5. Style keywords\n6. Materials and details\n7. Optional exclusions\nUse clear sections so the result can be reused for image generation.",
+      processing: "Extracting image description",
+    },
+    references: {
+      textEmpty: "The current text node is empty",
+      disconnectText: "Disconnect text reference",
+      disconnectImage: "Disconnect image reference",
+    },
+    processing: {
+      inProgress: "Processing text",
+    },
+    validation: {
+      emptyContent: "Enter some text",
+      imageRequired: "Connect a valid image first",
+    },
+    errors: {
+      processingFailed: "Text processing failed. Try again",
+      extractFailed: "Failed to extract the image description. Try again",
+    },
+    tooltips: {
+      submit: "Send ({{shortcut}})",
+    },
+    models: {
+      geminiPro: "Advanced reasoning · High quality · 10–20s",
+      geminiFlashLite: "Lightweight · Low cost · 5–10s",
+      geminiFlash: "Fast · General purpose · 10–20s",
+      deepSeekPro: "Deep reasoning · High quality · 10–20s",
+    },
   },
 
   modal: {

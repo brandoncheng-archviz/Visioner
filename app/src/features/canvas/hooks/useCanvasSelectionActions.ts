@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { Dispatch, MouseEvent, SetStateAction } from 'react';
 import type { Edge, Node } from '@xyflow/react';
+import { prepareCanvasNodeDataForCopy } from '../utils/nodeCopyData';
 
 type SetNodes = Dispatch<SetStateAction<Node[]>>;
 type SetEdges = Dispatch<SetStateAction<Edge[]>>;
@@ -62,7 +63,7 @@ export function useCanvasSelectionActions({
       fallbackBaseTitle,
     );
     const nextData = {
-      ...node.data,
+      ...prepareCanvasNodeDataForCopy(nodeType, node.data),
       label,
       title: typeof node.data.title === 'string' ? label : node.data.title,
     };

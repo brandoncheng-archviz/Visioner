@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, ChevronDown, Image, X, Zap } from 'lucide-react';
+import { ArrowUp, Brain, ChevronDown, Image, X, Zap } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   FLOATING_PANEL_BACKGROUND,
   FLOATING_PANEL_BORDER,
@@ -9,7 +10,7 @@ import {
 import {
   DEFAULT_TEXT_NODE_MODEL,
   TEXT_NODE_MODELS,
-  TEXT_NODE_PLACEHOLDER,
+  TEXT_NODE_PLACEHOLDER_KEY,
 } from '../constants/textNode';
 import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 import { formatShortcut, getPlatformShortcutLabels } from '../utils/shortcutLabels';
@@ -67,6 +68,7 @@ export function TextNodeInputPanel({
   onRemoveTextReference,
   onRemoveImageReference,
 }: TextNodeInputPanelProps) {
+  const { t } = useTranslation();
   const shortcuts = getPlatformShortcutLabels();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [showModels, setShowModels] = useState(false);
@@ -105,7 +107,7 @@ export function TextNodeInputPanel({
       {(textReferences.length > 0 || imageReferences.length > 0) && (
         <div className="flex items-center gap-2 px-[14px] pb-2 pt-[14px]">
           {textReferences.map((reference, index) => {
-            const summary = reference.content.trim() || '当前文本节点暂无内容';
+            const summary = reference.content.trim() || t('textNode.references.textEmpty');
             return (
               <div
                 key={reference.nodeId}
@@ -158,8 +160,8 @@ export function TextNodeInputPanel({
                     }}
                     className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition-colors hover:bg-black hover:text-white group-hover/text-ref:flex"
                     style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-                    title="断开文本引用"
-                    aria-label="断开文本引用"
+                    title={t('textNode.references.disconnectText')}
+                    aria-label={t('textNode.references.disconnectText')}
                   >
                     <X className="h-2.5 w-2.5" />
                   </button>
@@ -248,8 +250,8 @@ export function TextNodeInputPanel({
                     background: 'rgba(0,0,0,0.78)',
                     border: '1px solid rgba(255,255,255,0.18)',
                   }}
-                  title="断开图片引用"
-                  aria-label="断开图片引用"
+                  title={t('textNode.references.disconnectImage')}
+                  aria-label={t('textNode.references.disconnectImage')}
                 >
                   <X className="h-2.5 w-2.5" />
                 </button>
@@ -276,7 +278,7 @@ export function TextNodeInputPanel({
               if (canSubmit) onSubmit();
             }
           }}
-          placeholder={TEXT_NODE_PLACEHOLDER}
+          placeholder={t(TEXT_NODE_PLACEHOLDER_KEY)}
           className="nowheel w-full resize-none bg-transparent outline-none placeholder:text-[rgba(255,255,255,0.38)]"
           style={{
             color: 'rgba(255,255,255,0.94)',
@@ -296,7 +298,7 @@ export function TextNodeInputPanel({
             className="flex items-center gap-1.5 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)' }}
           >
-            <span style={{ color: 'rgba(255,255,255,0.72)' }}>脳</span>
+            <Brain className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.72)' }} />
             <span className="truncate" style={{ maxWidth: 150 }}>
               {selectedModel.name}
             </span>
@@ -327,7 +329,7 @@ export function TextNodeInputPanel({
                   }`}
                 >
                   <div className="text-[15px] text-white/85">{item.name}</div>
-                  <div className="mt-0.5 text-[11px] text-white/40">{item.description}</div>
+                  <div className="mt-0.5 text-[11px] text-white/40">{t(item.descriptionKey)}</div>
                 </button>
               ))}
             </div>
@@ -368,7 +370,8 @@ export function TextNodeInputPanel({
               background: canSubmit ? '#ffffff' : 'rgba(255,255,255,0.14)',
               opacity: canSubmit ? 1 : 0.45,
             }}
-            title={`Send (${formatShortcut(shortcuts.submit)})`}
+            title={t('textNode.tooltips.submit', { shortcut: formatShortcut(shortcuts.submit) })}
+            aria-label={isProcessing ? t('textNode.processing.inProgress') : t('textNode.tooltips.submit', { shortcut: formatShortcut(shortcuts.submit) })}
           >
             {isProcessing ? (
               <div className="relative flex items-center justify-center">

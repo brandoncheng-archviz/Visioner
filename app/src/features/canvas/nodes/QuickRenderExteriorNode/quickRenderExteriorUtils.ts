@@ -1,12 +1,12 @@
 import type {
   QuickRenderAtmosphereOption,
   QuickRenderExteriorNodeData,
-  QuickRenderPendingStructureFile,
-  QuickRenderStructureChannel,
-  QuickRenderStructureChannelType,
+  QuickRenderPendingRenderChannelFile,
+  QuickRenderRenderChannel,
+  QuickRenderRenderChannelType,
 } from './quickRenderExterior.types';
 
-export const QUICK_RENDER_STRUCTURE_CHANNELS: Record<QuickRenderStructureChannelType, {
+export const QUICK_RENDER_CHANNELS: Record<QuickRenderRenderChannelType, {
   name: string;
 }> = {
   beauty: { name: 'Beauty' },
@@ -14,36 +14,36 @@ export const QUICK_RENDER_STRUCTURE_CHANNELS: Record<QuickRenderStructureChannel
   normal: { name: 'Normal' },
   ao: { name: 'AO' },
   depth: { name: 'Depth' },
-  maskId: { name: 'Mask / ID' },
+  mask: { name: 'Mask / ID' },
   materialId: { name: 'Material ID' },
   objectId: { name: 'Object ID' },
-  unknown: { name: '未识别' },
+  unknown: { name: 'Unrecognized' },
 };
 
-export const QUICK_RENDER_STRUCTURE_TYPES: QuickRenderStructureChannelType[] = [
+export const QUICK_RENDER_CHANNEL_TYPES: QuickRenderRenderChannelType[] = [
   'beauty',
   'albedo',
   'normal',
   'ao',
   'depth',
-  'maskId',
+  'mask',
   'unknown',
 ];
 
-export const QUICK_RENDER_STRUCTURE_SORT_ORDER: QuickRenderStructureChannelType[] = [
+export const QUICK_RENDER_CHANNEL_SORT_ORDER: QuickRenderRenderChannelType[] = [
   'beauty',
   'albedo',
   'normal',
   'ao',
   'depth',
-  'maskId',
+  'mask',
   'materialId',
   'objectId',
   'unknown',
 ];
 
-const DETECTION_RULES: Array<{ type: QuickRenderStructureChannelType; keywords: string[] }> = [
-  { type: 'maskId', keywords: ['materialid', 'material_id', 'matid', 'objectid', 'object_id', 'objid', 'maskid', 'mask', 'idmap', 'material', 'object'] },
+const DETECTION_RULES: Array<{ type: QuickRenderRenderChannelType; keywords: string[] }> = [
+  { type: 'mask', keywords: ['materialid', 'material_id', 'matid', 'objectid', 'object_id', 'objid', 'maskid', 'mask', 'idmap', 'material', 'object'] },
   { type: 'ao', keywords: ['ambientocclusion', 'ao'] },
   { type: 'albedo', keywords: ['sourcecolor', 'basecolor', 'albedo', 'diffuse'] },
   { type: 'beauty', keywords: ['beauty', 'render', 'final', 'rgb'] },
@@ -51,12 +51,12 @@ const DETECTION_RULES: Array<{ type: QuickRenderStructureChannelType; keywords: 
   { type: 'depth', keywords: ['zdepth', 'depth'] },
 ];
 
-export function normalizeQuickRenderStructureFileName(fileName: string): string {
+export function normalizeQuickRenderRenderChannelFileName(fileName: string): string {
   return fileName.toLowerCase().replace(/[\s_-]+/g, '');
 }
 
-export function detectQuickRenderStructureChannelType(fileName: string): QuickRenderStructureChannelType | null {
-  const normalized = normalizeQuickRenderStructureFileName(fileName);
+export function detectQuickRenderRenderChannelType(fileName: string): QuickRenderRenderChannelType | null {
+  const normalized = normalizeQuickRenderRenderChannelFileName(fileName);
   for (const rule of DETECTION_RULES) {
     if (rule.keywords.some((keyword) => normalized.includes(keyword))) {
       return rule.type;
@@ -81,11 +81,11 @@ export function createQuickRenderExteriorNodeData(label: string): QuickRenderExt
       interiorLights: false,
       motionBlur: false,
     },
-    structureEnabled: false,
-    structure: { channels: [], pendingFiles: [] },
+    renderChannelsEnabled: false,
+    renderChannels: { channels: [], pendingFiles: [] },
     prompt: '',
-    modelParams: { model: 'Nano Banana 2', aspectRatio: '1:1', resolution: '2K', count: 1 },
-    status: 'idle',
+    modelParams: { model: 'Nano Banana 2', aspectRatio: 'adaptive', resolution: '2K', count: 1 },
+    generationTask: { taskId: null, status: 'idle', errorCode: null, startedAt: null, completedAt: null },
   };
 }
 
@@ -115,8 +115,8 @@ export function createUploadedQuickRenderInputImage(
   };
 }
 
-export function createQuickRenderStructureChannel(
-  type: QuickRenderStructureChannelType,
+export function createQuickRenderRenderChannel(
+  type: QuickRenderRenderChannelType,
   imageUrl: string,
   fileName?: string,
   mimeType?: string,
@@ -124,10 +124,10 @@ export function createQuickRenderStructureChannel(
   sourceNodeId?: string,
   width?: number,
   height?: number,
-): QuickRenderStructureChannel {
-  const meta = QUICK_RENDER_STRUCTURE_CHANNELS[type];
+): QuickRenderRenderChannel {
+  const meta = QUICK_RENDER_CHANNELS[type];
   return {
-    id: `quick-structure-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `quick-render-channel-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     type,
     name: meta.name,
     imageUrl,
@@ -140,37 +140,37 @@ export function createQuickRenderStructureChannel(
   };
 }
 
-export function getQuickRenderStructureChannelName(type: QuickRenderStructureChannelType) {
-  return QUICK_RENDER_STRUCTURE_CHANNELS[type]?.name || QUICK_RENDER_STRUCTURE_CHANNELS.unknown.name;
+export function getQuickRenderRenderChannelName(type: QuickRenderRenderChannelType) {
+  return QUICK_RENDER_CHANNELS[type]?.name || QUICK_RENDER_CHANNELS.unknown.name;
 }
 
-export function normalizeQuickRenderStructureChannel(channel: QuickRenderStructureChannel): QuickRenderStructureChannel {
+export function normalizeQuickRenderRenderChannel(channel: QuickRenderRenderChannel): QuickRenderRenderChannel {
   return {
     ...channel,
     type: channel.type,
-    name: getQuickRenderStructureChannelName(channel.type),
+    name: getQuickRenderRenderChannelName(channel.type),
   };
 }
 
-export function sortQuickRenderStructureChannels(channels: QuickRenderStructureChannel[]) {
-  return [...channels].map(normalizeQuickRenderStructureChannel).sort((a, b) => {
-    const orderA = QUICK_RENDER_STRUCTURE_SORT_ORDER.indexOf(a.type);
-    const orderB = QUICK_RENDER_STRUCTURE_SORT_ORDER.indexOf(b.type);
+export function sortQuickRenderRenderChannels(channels: QuickRenderRenderChannel[]) {
+  return [...channels].map(normalizeQuickRenderRenderChannel).sort((a, b) => {
+    const orderA = QUICK_RENDER_CHANNEL_SORT_ORDER.indexOf(a.type);
+    const orderB = QUICK_RENDER_CHANNEL_SORT_ORDER.indexOf(b.type);
     return (orderA === -1 ? 999 : orderA) - (orderB === -1 ? 999 : orderB);
   });
 }
 
 export function mergeQuickRenderDetectedChannels(
-  currentChannels: QuickRenderStructureChannel[],
-  files: Array<{ type: QuickRenderStructureChannelType; imageUrl: string; fileName: string; mimeType?: string }>,
-): QuickRenderStructureChannel[] {
-  const lastByType = new Map<QuickRenderStructureChannelType, typeof files[number]>();
+  currentChannels: QuickRenderRenderChannel[],
+  files: Array<{ type: QuickRenderRenderChannelType; imageUrl: string; fileName: string; mimeType?: string }>,
+): QuickRenderRenderChannel[] {
+  const lastByType = new Map<QuickRenderRenderChannelType, typeof files[number]>();
   files.forEach((file) => lastByType.set(file.type, file));
   let nextChannels = currentChannels.map((channel) => {
     const replacement = lastByType.get(channel.type);
     if (!replacement) return channel;
     lastByType.delete(channel.type);
-    return normalizeQuickRenderStructureChannel({
+    return normalizeQuickRenderRenderChannel({
       ...channel,
       imageUrl: replacement.imageUrl,
       fileName: replacement.fileName,
@@ -181,17 +181,17 @@ export function mergeQuickRenderDetectedChannels(
   lastByType.forEach((file) => {
     nextChannels = [
       ...nextChannels,
-      createQuickRenderStructureChannel(file.type, file.imageUrl, file.fileName, file.mimeType),
+      createQuickRenderRenderChannel(file.type, file.imageUrl, file.fileName, file.mimeType),
     ];
   });
-  return sortQuickRenderStructureChannels(nextChannels);
+  return sortQuickRenderRenderChannels(nextChannels);
 }
 
-export function createPendingQuickRenderStructureFile(
+export function createPendingQuickRenderRenderChannelFile(
   imageUrl: string,
   fileName: string,
   mimeType?: string,
-): QuickRenderPendingStructureFile {
+): QuickRenderPendingRenderChannelFile {
   return {
     id: `quick-pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     imageUrl,
@@ -200,7 +200,7 @@ export function createPendingQuickRenderStructureFile(
   };
 }
 
-export function getQuickRenderStructureEnabled(channels: QuickRenderStructureChannel[] = []) {
+export function getQuickRenderRenderChannelsEnabled(channels: QuickRenderRenderChannel[] = []) {
   return channels.some((channel) => Boolean(channel.imageUrl));
 }
 
