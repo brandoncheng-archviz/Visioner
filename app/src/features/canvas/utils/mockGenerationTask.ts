@@ -3,6 +3,27 @@ import { checkGenerationRequestSafety, isContentSafetyAllowed } from './contentS
 
 let taskCounter = 0;
 
+export type MockGenerationErrorCode =
+  | 'cancelled'
+  | 'timeout'
+  | 'serviceUnavailable'
+  | 'invalidInput'
+  | 'safetyCheckFailed';
+
+class MockGenerationError extends Error {
+  readonly code: MockGenerationErrorCode;
+
+  constructor(code: MockGenerationErrorCode) {
+    super(code);
+    this.name = 'MockGenerationError';
+    this.code = code;
+  }
+}
+
+export function getMockGenerationErrorCode(error: unknown): MockGenerationErrorCode | null {
+  return error instanceof MockGenerationError ? error.code : null;
+}
+
 function createTaskId() {
   return `gen-${Date.now()}-${++taskCounter}`;
 }
@@ -57,7 +78,7 @@ export async function simulateGeneration(
     });
 
     if (!isContentSafetyAllowed(reviewResult)) {
-      throw new Error(reviewResult.message || '内容审核未通过');
+      throw new MockGenerationError('safetyCheckFailed');
     }
   } catch {
     // Development mock is fail-open: incomplete review plumbing must not block generation.
@@ -84,19 +105,19 @@ export async function simulateGeneration(
         clearInterval(intervalId);
 
         if (signal?.aborted) {
-          reject(new Error('任务已取消'));
+          reject(new MockGenerationError('cancelled'));
           return;
         }
 
         const shouldFail = Math.random() < failProbability;
         if (shouldFail) {
-          const errorMessages = [
-            '生成超时，请稍后重试',
-            '模型服务暂时不可用',
-            '输入参数异常，请检查引用图和提示词',
+          const errorCodes: MockGenerationErrorCode[] = [
+            'timeout',
+            'serviceUnavailable',
+            'invalidInput',
           ];
-          const message = errorMessages[Math.floor(Math.random() * errorMessages.length)];
-          reject(new Error(message));
+          const code = errorCodes[Math.floor(Math.random() * errorCodes.length)];
+          reject(new MockGenerationError(code));
         } else {
           resolve(createMockResult(input));
         }
@@ -108,7 +129,7 @@ export async function simulateGeneration(
         if (settled) return;
         settled = true;
         clearInterval(intervalId);
-        reject(new Error('任务已取消'));
+        reject(new MockGenerationError('cancelled'));
       };
       if (signal.aborted) {
         onAbort();

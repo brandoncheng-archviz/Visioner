@@ -1,8 +1,8 @@
 import type { ImageRole, ReferenceInfo, LocalReferenceType } from '../types/imageNode.types';
 import { normalizeLocalReferenceType } from '../constants/imageUsages';
 
-const UNDEFINED_USAGE_VALUES = new Set(['', 'unknown', 'unassigned', 'undefined', 'null', '未设置参考用途', '未定义用途']);
-const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
+const UNDEFINED_USAGE_VALUES = new Set(['', 'unknown', 'unassigned', 'undefined', 'null']);
+const LEGACY_CUSTOM_REFERENCE_LABEL = 'custom';
 
 function isDefinedUsageValue(value: unknown) {
   if (typeof value !== 'string') return value !== undefined && value !== null;
@@ -43,24 +43,23 @@ export function areReferenceListsEqual(a: ReferenceInfo[], b: ReferenceInfo[]) {
 
 export function getReferenceUsageSortRank(reference: Pick<ReferenceInfo, 'role' | 'roleLabel' | 'localReferenceType' | 'localReferenceLabel' | 'customRoleLabel'>) {
   const normalizedLocalReferenceType = normalizeLocalReferenceType(reference.localReferenceType);
-  const roleLabel = reference.roleLabel || '';
 
-  if (reference.role === 'primary_building' || roleLabel.includes('主体建筑')) {
+  if (reference.role === 'primary_building') {
     return { group: 0 };
   }
-  if (reference.role === 'atmosphere_reference' || reference.role === 'overall_reference' || roleLabel.includes('氛围')) {
+  if (reference.role === 'atmosphere_reference' || reference.role === 'overall_reference') {
     return { group: 1 };
   }
-  if (reference.role === 'material_reference' || roleLabel.includes('材质')) {
+  if (reference.role === 'material_reference') {
     return { group: 2 };
   }
-  if (reference.role === 'landscape_reference' || roleLabel.includes('景观')) {
+  if (reference.role === 'landscape_reference') {
     return { group: 3 };
   }
-  if (reference.role === 'lighting_reference' || roleLabel.includes('照明') || roleLabel.includes('灯光')) {
+  if (reference.role === 'lighting_reference') {
     return { group: 4 };
   }
-  if (reference.role === 'interior_reference' || roleLabel.includes('室内')) {
+  if (reference.role === 'interior_reference') {
     return { group: 5 };
   }
   if (

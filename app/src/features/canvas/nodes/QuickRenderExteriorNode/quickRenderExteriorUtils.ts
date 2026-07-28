@@ -144,6 +144,16 @@ export function getQuickRenderRenderChannelName(type: QuickRenderRenderChannelTy
   return QUICK_RENDER_CHANNELS[type]?.name || QUICK_RENDER_CHANNELS.unknown.name;
 }
 
+const SYSTEM_QUICK_RENDER_LABEL_PATTERN =
+  /^(?:快速渲染(?:\s*[-·]\s*室外)?|室外渲染|Quick Render(?:\s*[-·]\s*Exterior)?|Exterior Render)(\s+\d+)?$/i;
+
+export function getQuickRenderDisplayLabel(label: string | undefined, translatedTitle: string): string {
+  const normalizedLabel = label?.trim();
+  if (!normalizedLabel) return translatedTitle;
+  const match = normalizedLabel.match(SYSTEM_QUICK_RENDER_LABEL_PATTERN);
+  return match ? `${translatedTitle}${match[1] || ''}` : normalizedLabel;
+}
+
 export function normalizeQuickRenderRenderChannel(channel: QuickRenderRenderChannel): QuickRenderRenderChannel {
   return {
     ...channel,

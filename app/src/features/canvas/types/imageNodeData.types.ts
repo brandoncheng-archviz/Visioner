@@ -19,7 +19,7 @@ export interface ImageNodeData {
   currentImage?: string;
   currentResultId?: string | null;
   currentResultSet?: CurrentResultSet | null;
-  assetSource?: 'upload' | 'paste' | 'generated' | 'history' | string;
+  assetSource?: 'upload' | 'paste' | 'generated' | 'history' | 'quickRenderOutput' | string;
   isHistoryAsset?: boolean;
   isGeneratedResult?: boolean;
   generationStatus?: 'completed' | string;
@@ -30,10 +30,7 @@ export interface ImageNodeData {
   currentResultSource?: 'history' | string;
   generatedImages?: GenerationHistoryItem[] | string[];
   generationTask?: GenerationTask | null;
-  sourceWorkflow?: {
-    type: 'quickRenderExterior';
-    sourceNodeId: string;
-  };
+  sourceWorkflow?: QuickRenderWorkflowSource;
   isGenerating?: boolean;
   isProcessing?: boolean;
   isReferenceLocked?: boolean;
@@ -94,6 +91,31 @@ export interface ImageNodeData {
   onDuplicateNode?: (nodeId: string) => void;
   onDeleteNode?: (nodeId: string) => void;
   lightPreview?: LightPreviewData;
+}
+
+export interface QuickRenderWorkflowSnapshot {
+  sourceNodeTitle: string;
+  model: string;
+  aspectRatio: string;
+  resolution: string;
+  atmosphere: {
+    time: string | null;
+    weather: string | null;
+    lighting: string | null;
+    style: string | null;
+    addEntourage: boolean;
+    addPeople: boolean;
+    interiorLights: boolean;
+    motionBlur: boolean;
+  };
+  renderChannels: string[];
+  hasPrompt: boolean;
+}
+
+export interface QuickRenderWorkflowSource {
+  type: 'quickRenderExterior';
+  sourceNodeId: string;
+  snapshot?: QuickRenderWorkflowSnapshot;
 }
 
 function castRecord(data: unknown): Record<string, unknown> {

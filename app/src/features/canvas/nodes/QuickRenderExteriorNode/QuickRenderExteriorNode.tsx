@@ -26,6 +26,7 @@ import {
 import {
   createQuickRenderRenderChannel,
   createQuickRenderExteriorNodeData,
+  getQuickRenderDisplayLabel,
   sortQuickRenderRenderChannels,
 } from './quickRenderExteriorUtils';
 
@@ -88,6 +89,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     () => ({ ...createQuickRenderExteriorNodeData(String(data.label || t('quickRenderExterior.title'))), ...(data as QuickRenderExteriorNodeData) }),
     [data, t],
   );
+  const displayLabel = getQuickRenderDisplayLabel(nodeData.label, t('quickRenderExterior.title'));
   const modelParams = nodeData.modelParams || { model: 'Nano Banana 2', aspectRatio: '1:1', resolution: '2K', count: 1 };
   const uploadedInputImages = useMemo(
     () => (nodeData.connectedImages || []).filter((image) => image.sourceType === 'upload'),
@@ -414,7 +416,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           <div className="flex flex-1 items-center gap-1.5 overflow-hidden" style={{ minWidth: 0 }}>
             <Home className="flex-shrink-0 pointer-events-none" style={{ width: 13, height: 13 }} />
             <span className="min-w-0 truncate" style={{ fontSize: 11 }}>
-              {nodeData.label || t('quickRenderExterior.title')}
+              {displayLabel}
             </span>
           </div>
         </div>
@@ -489,6 +491,10 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           }}
         >
           <div className="flex-1 space-y-3 p-4 pb-5">
+            <div>
+              <div className="text-[15px] font-semibold text-white/90">{t('quickRenderExterior.title')}</div>
+              <div className="mt-0.5 text-[11px] text-white/42">{t('quickRenderExterior.subtitle')}</div>
+            </div>
             <QuickRenderConnectedImages
               images={inputImages as QuickRenderConnectedImage[]}
               disabled={isProcessing}

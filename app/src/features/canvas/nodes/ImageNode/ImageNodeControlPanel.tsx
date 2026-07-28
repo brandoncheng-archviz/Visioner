@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import {
   Image,
   X,
-  SlidersHorizontal,
   ChevronDown,
   ArrowUp,
   Maximize2,
@@ -23,7 +22,7 @@ import type {
 import type { ModelParams } from '../../types/canvas.types';
 import type { TextReferenceInfo } from '../../types/basicNode.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
-import type { ImageControllerState } from '../../types/imageController.types';
+import type { QuickRenderWorkflowSource } from '../../types/imageNodeData.types';
 import {
   FLOATING_PANEL_BACKGROUND,
   FLOATING_PANEL_BORDER,
@@ -42,13 +41,12 @@ import {
 } from '../../utils/referenceUtils';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
-import { ImageControllerPanel } from '../../components/ImageControllerPanel';
-import { hasActiveImageController, LIGHT_DIRECTION_OPTIONS, STYLE_OPTIONS, TIME_OPTIONS, TOGGLE_OPTIONS, WEATHER_OPTIONS } from '../../constants/imageController';
 import {
   ImageControllersPopover,
   ImageControllersTrigger,
   type ImageNodeControllers,
 } from './controllers';
+import { ImageNodeWorkflowSourceBadge } from './ImageNodeWorkflowSourceBadge';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
@@ -75,15 +73,19 @@ const resizePromptReferenceTextarea = (element: HTMLTextAreaElement) => {
   element.style.overflowY = contentHeight > element.clientHeight ? 'auto' : 'hidden';
 };
 const GENERATION_CREDIT_COST = 14;
-const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词、设置氛围或插入图片引用';
-const COMMON_FRAME_RATIO_OPTIONS = [
-  { value: 'adaptive', label: '自适应' },
+interface FrameRatioOption {
+  value: string;
+  label?: string;
+  labelKey?: string;
+}
+const COMMON_FRAME_RATIO_OPTIONS: FrameRatioOption[] = [
+  { value: 'adaptive', labelKey: 'modelParams.aspectRatio.adaptive' },
   { value: '1:1', label: '1:1' },
   { value: '4:3', label: '4:3' },
   { value: '3:2', label: '3:2' },
   { value: '16:9', label: '16:9' },
   { value: '9:16', label: '9:16' },
-] as const;
+];
 const STANDARD_FRAME_RATIO_VALUES = new Set<string>(COMMON_FRAME_RATIO_OPTIONS.map((option) => option.value).filter((value) => value !== 'adaptive'));
 
 function parseFrameRatio(value: string | undefined): { width: number; height: number } | null {
@@ -99,7 +101,7 @@ function parseFrameRatio(value: string | undefined): { width: number; height: nu
 
 function formatFrameRatioLabel(value: string | undefined) {
   if (!value) return '1:1';
-  if (value === '自适应') return '自适应';
+  if (value === 'adaptive') return '__ADAPTIVE__';
   const parsed = parseFrameRatio(value);
   if (!parsed) return value;
   if (STANDARD_FRAME_RATIO_VALUES.has(`${parsed.width}:${parsed.height}`)) return `${parsed.width}:${parsed.height}`;
@@ -202,10 +204,10 @@ export function ImageNodeControlPanel({
   onPromptContentChange,
   lightPreview,
   onLightPreviewChange,
-  controller,
-  onControllerChange,
   controllers,
   onControllersChange,
+  workflowSource,
+  onFocusWorkflowSource,
   modelParams,
   onModelParamsChange,
   onGenerate,
@@ -238,10 +240,10 @@ export function ImageNodeControlPanel({
   onPromptContentChange: (content: PromptContent[]) => void;
   lightPreview?: LightPreviewData | null;
   onLightPreviewChange: (data: LightPreviewData | null) => void;
-  controller: ImageControllerState;
-  onControllerChange: (controller: ImageControllerState) => void;
   controllers?: ImageNodeControllers;
   onControllersChange: (controllers: ImageNodeControllers) => void;
+  workflowSource?: QuickRenderWorkflowSource;
+  onFocusWorkflowSource?: (sourceNodeId: string) => void;
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
   onGenerate: () => void | Promise<void>;
@@ -269,6 +271,7 @@ export function ImageNodeControlPanel({
   showToast?: (msg: string) => void;
 }) {
   const { t } = useTranslation();
+  const translate = useCallback((key: string) => t(key), [t]);
   const [showLightPreview, setShowLightPreview] = useState(false);
 
   useEffect(() => {
@@ -280,7 +283,6 @@ export function ImageNodeControlPanel({
       return () => clearTimeout(timer);
     }
   }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
-  const [showController, setShowController] = useState(false);
   const [showControllersPopover, setShowControllersPopover] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
@@ -306,7 +308,6 @@ export function ImageNodeControlPanel({
   const [editingPromptInitialText, setEditingPromptInitialText] = useState('');
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
-  const [atmosphereButtonElement, setAtmosphereButtonElement] = useState<HTMLButtonElement | null>(null);
   const [controllersButtonElement, setControllersButtonElement] = useState<HTMLButtonElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -319,9 +320,6 @@ export function ImageNodeControlPanel({
   const sortedReferences = useMemo(
     () => sortReferencesByUsage(references),
     [references],
-  );
-  const hasAtmosphereReference = sortedReferences.some(
-    (reference) => getReferenceUsageSortRank(reference).group === 1,
   );
   const isControllersDisabled = Boolean(isProcessing || isGenerating);
 
@@ -396,7 +394,7 @@ export function ImageNodeControlPanel({
           }}
           className={`nodrag nowheel absolute right-0 top-0 z-30 items-center justify-center rounded-full bg-black/70 text-white transition-colors hover:bg-black ${canDeleteReference ? 'hidden group-hover/ref:flex' : 'hidden'}`}
           style={{ width: 18, height: 18, background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-          title={t('imageNode.removeReference')}
+          title={t('common.actions.remove')}
         >
           <X className="h-2.5 w-2.5" />
         </button>
@@ -466,6 +464,7 @@ export function ImageNodeControlPanel({
               referencePreview.reference.customRoleLabel,
               referencePreview.reference.localReferenceType,
               referencePreview.reference.localReferenceLabel,
+              translate,
             ) || t('imageNode.undefinedUsage')}
           </div>
         </div>,
@@ -509,7 +508,7 @@ export function ImageNodeControlPanel({
         >
           <div className="truncate text-[12px] font-medium text-white/78">{textReferencePreview.reference.title}</div>
           <div className="mt-2 line-clamp-6 whitespace-pre-wrap break-words text-[12px] leading-5 text-white/58">
-            {textReferencePreview.reference.content.trim() || '当前文本节点暂无内容'}
+            {textReferencePreview.reference.content.trim() || t('imageNode.reference.currentTextEmpty')}
           </div>
         </div>,
         document.body,
@@ -569,8 +568,8 @@ export function ImageNodeControlPanel({
             }}
             className={`nodrag nowheel absolute right-0 top-0 z-30 h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition hover:bg-black hover:text-white ${canDeleteReference ? 'flex opacity-0 pointer-events-none group-hover/text-ref:pointer-events-auto group-hover/text-ref:opacity-100' : 'hidden'}`}
             style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-            title="断开文本引用"
-            aria-label="断开文本引用"
+            title={t('imageNode.reference.disconnectText')}
+            aria-label={t('imageNode.reference.disconnectText')}
           >
             <X className="h-2.5 w-2.5" />
           </button>
@@ -704,7 +703,7 @@ export function ImageNodeControlPanel({
   const adaptiveFrameRatio = adaptiveFrameRatioSource && isValidFrameRatio(adaptiveFrameRatioSource.width, adaptiveFrameRatioSource.height)
     ? `${adaptiveFrameRatioSource.width}:${adaptiveFrameRatioSource.height}`
     : '1:1';
-  const displayFrameRatio = modelParams.ratio === '自适应' ? adaptiveFrameRatio : modelParams.ratio;
+  const displayFrameRatio = modelParams.ratio === 'adaptive' ? adaptiveFrameRatio : modelParams.ratio;
   const displayFrameRatioLabel = formatFrameRatioLabel(displayFrameRatio);
   const selectedFrameRatioDimensions = parseFrameRatio(displayFrameRatio) ?? parseFrameRatio(adaptiveFrameRatio) ?? { width: 1, height: 1 };
 
@@ -712,13 +711,13 @@ export function ImageNodeControlPanel({
     const width = Number(widthValue);
     const height = Number(heightValue);
     if (!isValidFrameRatio(width, height)) {
-      if (options?.showError) showToast?.('请输入 1:8 到 8:1 范围内的正整数画幅比');
+      if (options?.showError) showToast?.(t('imageNode.validation.invalidFrameRatio'));
       return false;
     }
     setFrameRatioMode('custom');
     onModelParamsChange({ ...modelParams, ratio: `${width}:${height}` });
     return true;
-  }, [modelParams, onModelParamsChange, showToast]);
+  }, [modelParams, onModelParamsChange, showToast, t]);
 
   const handleCustomFrameWidthChange = (value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -797,29 +796,13 @@ export function ImageNodeControlPanel({
     setShowControllersPopover(false);
   };
 
-  const controllerSummaryLines = [
-    ...TOGGLE_OPTIONS.filter((option) => controller.toggles[option.id]).map((option) => option.label),
-    ...([
-      ['time', '时间', TIME_OPTIONS],
-      ['lightDirection', t('imageNode.atmosphereLight'), LIGHT_DIRECTION_OPTIONS],
-      ['weather', '天气', WEATHER_OPTIONS],
-      ['style', '风格', STYLE_OPTIONS],
-    ] as const).flatMap(([key, label, options]) => {
-      const value = controller[key];
-      const option = value ? options.find((item) => item.id === value) : undefined;
-      if (!option) return [];
-      return [`${label}：${option.label}`];
-    }),
-  ];
-  const controllerSettingCount = controllerSummaryLines.length;
-  const hasAtmosphereSettings = hasActiveImageController(controller);
   const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
   const hasManyReferences = sortedReferences.length > RECOMMENDED_REFERENCE_IMAGES_PER_NODE;
 
 
   const handleGenerateClick = () => {
     if (!canGenerate) {
-      showToast?.(EMPTY_GENERATION_INTENT_MESSAGE);
+      showToast?.(t('imageNode.prompt.emptyGenerationHint'));
       return;
     }
 
@@ -1065,68 +1048,6 @@ export function ImageNodeControlPanel({
       {/* Top toolbar */}
       <div className="flex items-center justify-between" style={{ padding: '12px 14px 8px' }}>
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {/* Atmosphere */}
-          <div className="group/atmosphere relative">
-            <button
-              ref={setAtmosphereButtonElement}
-              type="button"
-              disabled={isGenerating}
-              onClick={() => {
-                if (isGenerating) return;
-                setShowController((open) => !open);
-                setShowLightPreview(false);
-                setShowControllersPopover(false);
-              }}
-              className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${
-                isGenerating
-                  ? GENERATION_CONTROL_BUTTON_DISABLED_CLASS
-                  : showController
-                    ? hasAtmosphereSettings
-                      ? 'border-[rgba(170,120,255,0.95)] bg-[rgba(150,100,255,0.16)] text-[rgba(255,255,255,0.92)] hover:border-[rgba(185,145,255,1)] hover:bg-[rgba(150,100,255,0.19)]'
-                      : 'border-[rgba(170,120,255,0.95)] bg-[rgba(150,100,255,0.05)] text-[rgba(255,255,255,0.78)] hover:border-[rgba(185,145,255,1)] hover:bg-[rgba(150,100,255,0.08)]'
-                    : hasAtmosphereSettings
-                      ? 'border-[rgba(148,163,184,0.28)] bg-[rgba(150,100,255,0.10)] text-[rgba(225,225,232,0.78)] hover:border-[rgba(148,163,184,0.48)] hover:bg-[rgba(150,100,255,0.13)]'
-                      : GENERATION_CONTROL_BUTTON_CLASS
-              }`}
-              style={{
-                width: 54,
-                height: 50,
-                padding: '4px',
-                opacity: isGenerating ? 0.45 : 1,
-                cursor: isGenerating ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span style={{ fontSize: 14 }}>氛围</span>
-            </button>
-            {!showController && (controllerSettingCount > 0 || hasAtmosphereReference) && (
-              <div className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 hidden w-[210px] rounded-lg border border-white/[0.09] bg-[#222224] px-2.5 py-2 text-left shadow-[0_12px_30px_rgba(0,0,0,0.46)] group-hover/atmosphere:block">
-                {controllerSettingCount > 0 ? (
-                  <>
-                    <div className="text-[12px] font-medium text-white/82">氛围已设置</div>
-                    <div className="mt-1 space-y-0.5 text-[11px] leading-4 text-white/42">
-                      {controllerSummaryLines.map((line) => <div key={line}>{line}</div>)}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-[12px] font-medium text-white/66">跟随氛围参考</div>
-                    <div className="mt-1 text-[11px] leading-4 text-white/42">时间、天气、光线将参考氛围图</div>
-                  </>
-                )}
-              </div>
-            )}
-            {showController && (
-              <ImageControllerPanel
-                anchorElement={atmosphereButtonElement}
-                controller={controller}
-                hasAtmosphereReference={hasAtmosphereReference}
-                disabled={isGenerating}
-                onChange={onControllerChange}
-                onClose={() => setShowController(false)}
-              />
-            )}
-          </div>
           {/* Element mark */}
           <div className="relative">
             <button
@@ -1136,7 +1057,6 @@ export function ImageNodeControlPanel({
               onClick={() => {
                 if (!canCreateMarks) return;
                 setShowLightPreview(false);
-                setShowController(false);
                 setShowControllersPopover(false);
                 onStartMarkMode();
               }}
@@ -1148,12 +1068,18 @@ export function ImageNodeControlPanel({
                 opacity: canCreateMarks ? 1 : 0.45,
                 cursor: canCreateMarks ? 'pointer' : 'not-allowed',
               }}
-              title={t('imageMark.button', { defaultValue: '标记' })}
+              title={t('imageMark.button')}
             >
               <ScanSearch className="h-4 w-4" />
-              <span style={{ fontSize: 14 }}>{t('imageMark.button', { defaultValue: '标记' })}</span>
+              <span style={{ fontSize: 14 }}>{t('imageMark.button')}</span>
             </button>
           </div>
+          {workflowSource?.type === 'quickRenderExterior' && (
+            <ImageNodeWorkflowSourceBadge
+              source={workflowSource}
+              onFocusSource={onFocusWorkflowSource}
+            />
+          )}
           {(textReferences.length > 0 || sortedReferences.length > 0) && (
             <div
               aria-hidden="true"
@@ -1172,7 +1098,7 @@ export function ImageNodeControlPanel({
           onClick={() => setPromptExpanded((value) => !value)}
           className="flex items-center justify-center rounded-md transition-colors hover:bg-white/5"
           style={{ width: 32, height: 32, color: promptExpanded ? '#ffffff' : 'rgba(255,255,255,0.45)' }}
-          title={promptExpanded ? t('imageNode.collapsePrompt') : t('imageNode.expandPrompt')}
+          title={promptExpanded ? t('common.actions.collapse') : t('common.actions.expand')}
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
@@ -1189,8 +1115,8 @@ export function ImageNodeControlPanel({
             }}
           >
             {hasTooManyReferences
-              ? '当前引用图数量超过上限，建议删除部分引用图。'
-              : '参考图较多，可能影响生成稳定性'}
+              ? t('imageNode.reference.referenceLimitWarning')
+              : t('imageNode.reference.tooManyReferences')}
           </div>
         </div>
       )}
@@ -1300,7 +1226,7 @@ export function ImageNodeControlPanel({
                           event.stopPropagation();
                           onPromptContentChange(promptContent.filter((item) => !('id' in item) || item.id !== block.id));
                         }}
-                        title={t('imageMark.removeChip', { defaultValue: '移除标记引用' })}
+                        title={t('imageMark.removeChip')}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -1439,7 +1365,7 @@ export function ImageNodeControlPanel({
             onChange={handlePromptChange}
             onKeyDown={handlePromptKeyDown}
             readOnly={!canEditPrompt}
-            placeholder={t('imageNode.promptPlaceholder')}
+            placeholder={t('imageNode.prompt.placeholder')}
             className="order-3 w-full bg-transparent resize-none outline-none placeholder:text-[rgba(255,255,255,0.38)] nowheel"
             style={{
               color: 'rgba(255,255,255,0.94)',
@@ -1483,7 +1409,15 @@ export function ImageNodeControlPanel({
                       <Image className="h-4 w-4" style={{ color: 'rgba(255,255,255,0.45)' }} />
                     </span>
                   )}
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{getImageRoleLabel(reference.role, reference.customRoleLabel, reference.localReferenceType, reference.localReferenceLabel) || t('imageNode.undefinedUsage')}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
+                    {getImageRoleLabel(
+                      reference.role,
+                      reference.customRoleLabel,
+                      reference.localReferenceType,
+                      reference.localReferenceLabel,
+                      translate,
+                    ) || t('imageNode.undefinedUsage')}
+                  </span>
                 </button>
               ))}
             </div>
@@ -1547,7 +1481,7 @@ export function ImageNodeControlPanel({
                     <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold text-white/90" style={{ background: m.iconBg }}>{m.iconText}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-medium text-white/85">{m.label}</span>
-                      <span className="block truncate text-[12px] text-white/42">{m.description} · 默认 {m.defaultResolution}</span>
+                      <span className="block truncate text-[12px] text-white/42">{t(m.descriptionKey)} · {t('common.status.default')} {m.defaultResolution}</span>
                     </span>
                     {modelParams.model === m.id && <Check className="h-4 w-4 flex-shrink-0 text-white/70" />}
                   </button>
@@ -1574,7 +1508,7 @@ export function ImageNodeControlPanel({
               <span style={{ color: 'rgba(255,255,255,0.58)' }}>
                 <AspectFrameIcon ratio={selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height} />
               </span>
-              <span>{displayFrameRatioLabel} · {modelParams.resolution}</span>
+              <span>{displayFrameRatioLabel === '__ADAPTIVE__' ? t('modelParams.aspectRatio.adaptive') : displayFrameRatioLabel} · {modelParams.resolution}</span>
               <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
             </button>
             {canEditModel && showRatioMenu && (
@@ -1594,7 +1528,7 @@ export function ImageNodeControlPanel({
                 onWheel={(event) => event.stopPropagation()}
               >
                 <div>
-                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>画幅比</div>
+                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('modelParams.aspectRatio.label')}</div>
                   <div className="grid grid-cols-3 gap-2">
                     {COMMON_FRAME_RATIO_OPTIONS.map((ar) => {
                       const optionValue = ar.value === 'adaptive' ? adaptiveFrameRatio : ar.value;
@@ -1617,7 +1551,7 @@ export function ImageNodeControlPanel({
                             border: isSelected ? '1px solid rgba(255,255,255,0.62)' : '1px solid rgba(255,255,255,0.075)',
                           }}
                         >
-                          {ar.label}
+                          {ar.labelKey ? t(ar.labelKey) : ar.label}
                         </button>
                       );
                     })}
@@ -1625,10 +1559,10 @@ export function ImageNodeControlPanel({
                 </div>
 
                 <div className="mt-3 border-t border-white/[0.045] pt-3">
-                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>自定义画幅比</div>
+                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('modelParams.aspectRatio.custom')}</div>
                   <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto 1fr 40px' }}>
                     <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
-                      <span className="text-[12px] text-white/38">宽</span>
+                      <span className="text-[12px] text-white/38">{t('modelParams.aspectRatio.width')}</span>
                       <input
                         className="nodrag nopan nowheel min-w-0 flex-1 bg-transparent text-[14px] font-medium text-white/82 outline-none"
                         value={customFrameWidth}
@@ -1647,7 +1581,7 @@ export function ImageNodeControlPanel({
                     </label>
                     <span className="flex h-9 items-center justify-center text-[13px] text-white/32">×</span>
                     <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
-                      <span className="text-[12px] text-white/38">高</span>
+                      <span className="text-[12px] text-white/38">{t('modelParams.aspectRatio.height')}</span>
                       <input
                         className="nodrag nopan nowheel min-w-0 flex-1 bg-transparent text-[14px] font-medium text-white/82 outline-none"
                         value={customFrameHeight}
@@ -1674,16 +1608,16 @@ export function ImageNodeControlPanel({
                         background: isFrameRatioLocked ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
                         border: isFrameRatioLocked ? '1px solid rgba(255,255,255,0.58)' : '1px solid rgba(255,255,255,0.075)',
                       }}
-                      title={isFrameRatioLocked ? '锁定画幅比' : '自由输入画幅比'}
+                      title={isFrameRatioLocked ? t('modelParams.aspectRatio.lock') : t('modelParams.aspectRatio.unlock')}
                     >
                       {isFrameRatioLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
                     </button>
                   </div>
-                  <div className="mt-2 text-[12px] leading-snug text-white/30">画幅比只用于锁定构图比例，不代表最终输出像素。</div>
+                  <div className="mt-2 text-[12px] leading-snug text-white/30">{t('modelParams.aspectRatio.hint')}</div>
                 </div>
 
                 <div className="mt-3 border-t border-white/[0.045] pt-3">
-                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('imageNode.resolution')}</div>
+                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('modelParams.resolution.label')}</div>
                   <div className="grid grid-cols-3 gap-2">
                     {selectedModel.resolutions.map((r) => (
                       <button
@@ -1760,9 +1694,9 @@ export function ImageNodeControlPanel({
               }}
               title={generationTask.errorMessage}
             >
-              <span className="truncate" style={{ maxWidth: 120 }}>{t('imageNode.generationFailed')}</span>
+              <span className="truncate" style={{ maxWidth: 120 }}>{t('imageNode.errors.generationFailed')}</span>
               <span className="text-white/60">·</span>
-              <span className="text-white/80 hover:text-white">{t('imageNode.retry')}</span>
+              <span className="text-white/80 hover:text-white">{t('common.actions.retry')}</span>
             </button>
           ) : (
             <button
@@ -1776,7 +1710,7 @@ export function ImageNodeControlPanel({
                 opacity: canGenerate ? 1 : 0.45,
                 cursor: canGenerate ? 'pointer' : 'not-allowed',
               }}
-              title={isGenerating ? t('imageNode.generating') : t('imageNode.generate')}
+              title={isGenerating ? t('generation.status.generating') : t('generation.actions.generate')}
             >
               {isGenerating ? (
                 <div className="relative flex items-center justify-center">

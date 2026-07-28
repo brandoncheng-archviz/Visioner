@@ -54,10 +54,13 @@ const enUS = {
       apply: "Apply",
       save: "Save",
       retry: "Retry",
+      download: "Download",
+      collapse: "Collapse",
       replace: "Replace",
       upload: "Upload",
       close: "Close",
       expand: "Expand",
+      reset: "Reset",
     },
     status: {
       unset: "Not set",
@@ -89,7 +92,7 @@ const enUS = {
       "video-merge": "Video Merge",
       sunSky: "Light Preview",
       relight: "Lighting Adjust",
-      quickRenderExterior: "Quick Render - Exterior",
+      quickRenderExterior: "Exterior Render",
     },
     createMenuContentGroup: "Basic Nodes",
     createMenuImageProcessingGroup: "Image Processing",
@@ -100,7 +103,7 @@ const enUS = {
     addCompareNode: "Image Compare",
     createMenuCompareNode: "Image Compare",
     createMenuRelightNode: "Lighting Adjust",
-    createMenuQuickRenderExteriorNode: "Quick Render - Exterior",
+    createMenuQuickRenderExteriorNode: "Exterior Render",
     addSunSkyNode: "Light",
     createMenuSunSkyNode: "Light",
     nodeTitles: {
@@ -108,7 +111,7 @@ const enUS = {
       text: "Text",
       compare: "Image Compare",
       upscale: "Image Enhance",
-      quickRenderExterior: "Quick Render · Exterior",
+      quickRenderExterior: "Exterior Render",
       relight: "Relight",
       audio: "Audio",
       script: "Script",
@@ -116,7 +119,9 @@ const enUS = {
   },
 
   quickRenderExterior: {
-    title: "Quick Render · Exterior",
+    title: "Exterior Render",
+    subtitle: "Generate high-quality exterior visuals",
+    outputTitlePrefix: "Exterior Render Output",
     sections: {
       imageInput: { title: "Image Input" },
       renderChannels: { title: "Render Channels" },
@@ -150,7 +155,7 @@ const enUS = {
       inputRequired: "Add at least one valid input image",
       invalidInput: "The image input is invalid. Add it again",
       cancelled: "Task cancelled",
-      generationFailed: "Quick render failed. Try again later",
+      generationFailed: "Exterior rendering failed. Try again later",
       missingInput: "No valid input image",
     },
   },
@@ -180,6 +185,7 @@ const enUS = {
       luxuryRealEstate: "Luxury Real Estate",
       painterly: "Painterly",
     },
+    title: "Atmosphere",
     toggles: {
       addEntourage: { label: "Add Entourage" },
       addPeople: { label: "Add People" },
@@ -189,6 +195,7 @@ const enUS = {
     status: {
       configured: "Atmosphere configured",
       followReference: "Follow atmosphere reference",
+      summaryItem: "{{field}}: {{value}}",
     },
   },
 
@@ -209,6 +216,10 @@ const enUS = {
   generation: {
     actions: { generate: "Generate" },
     status: { generating: "Generating" },
+    safety: {
+      checkFailedTitle: "Safety check failed",
+      checkFailedDescription: "The result did not pass the safety check. Revise the prompt and try again",
+    },
   },
 
   modelParams: {
@@ -226,6 +237,10 @@ const enUS = {
       width: "Width",
       height: "Height",
       hint: "Aspect ratio controls composition only and does not define final pixel dimensions.",
+    },
+    count: {
+      option_one: "{{count}} image",
+      option_other: "{{count}} images",
     },
     resolution: { label: "Resolution" },
   },
@@ -247,14 +262,20 @@ const enUS = {
   },
 
   imageNode: {
-    atmosphereLight: "Light",
-    followAtmosphereReference: "Follow Reference",
-    atmosphereLightOptions: {
-      front_light: "Front Light",
-      back_light: "Backlight",
-      left_side_light: "Left Light",
-      right_side_light: "Right Light",
-      diffused_light: "Soft Skylight",
+    title: "Image",
+    workflowSource: {
+      tooltip: "Exterior Render Source",
+      buttonLabel: "Exterior",
+      sourceNode: "Source node",
+      model: "Model",
+      output: "Ratio / resolution",
+      toggles: "Enabled options",
+      channels: "Render channels",
+      prompt: "Prompt",
+      noneEnabled: "None",
+      noChannels: "None",
+      promptEntered: "Entered",
+      promptEmpty: "Not entered",
     },
     controllers: {
       title: "Controllers",
@@ -322,6 +343,12 @@ const enUS = {
     referenceImage: "Reference Material",
     setImagePurpose: "Click to set image purpose",
     undefinedUsage: "Reference purpose not set",
+    reference: {
+      currentTextEmpty: "The current text node is empty",
+      disconnectText: "Disconnect text reference",
+      referenceLimitWarning: "The number of reference images exceeds the limit. Remove some references",
+      tooManyReferences: "Too many reference images may reduce generation stability",
+    },
     generateImage: "Generate Image",
     fullscreen: "Fullscreen",
     upscale: "Image Enhance",
@@ -354,6 +381,11 @@ const enUS = {
     expandPrompt: "Expand prompt box",
     collapsePrompt: "Collapse prompt box",
     promptPlaceholder: "Describe the image you want to generate, @ to reference materials",
+    prompt: {
+      title: "Prompt",
+      placeholder: "Describe the image you want to generate, @ to reference materials",
+      emptyGenerationHint: "Enter a prompt or add a reference image",
+    },
     selectImagePurpose: "Select image purpose",
     customPurposePlaceholder: "What does this image mainly reference? E.g.: paving / furniture / lighting / railing",
     customPurposeInputPlaceholder: "What should this image mainly reference?",
@@ -372,6 +404,31 @@ const enUS = {
     generate: "Generate",
     generating: "Generating...",
     retry: "Retry",
+    result: {
+      setAsMainImage: "Set as main image",
+      mainImage: "Main image",
+    },
+    processing: {
+      lockedHint: "Settings cannot be changed while generating",
+    },
+    validation: {
+      generationRequirements: "This content cannot be generated. Revise it and try again",
+      invalidFrameRatio: "Enter a positive integer aspect ratio between 1:8 and 8:1",
+    },
+    errors: {
+      invalidContent: "This content cannot be generated. Revise it and try again",
+      safetyCheckFailed: "The result did not pass the safety check. Revise the prompt and try again",
+      generationFailed: "Image generation failed. Try again",
+      cancelled: "Image generation was cancelled",
+      timeout: "Image generation timed out. Try again later",
+      serviceUnavailable: "The image generation service is temporarily unavailable",
+      invalidInput: "Invalid input. Check the reference images and prompt",
+    },
+    tooltips: {
+      setReferenceRole: "Set reference purpose",
+      adjustLighting: "Adjust lighting",
+      adjustCropRegion: "Adjust crop region",
+    },
     generationFailed: "Generation failed",
     originalImage: "Original",
     model: "Model",

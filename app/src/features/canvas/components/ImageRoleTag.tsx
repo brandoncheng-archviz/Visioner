@@ -38,6 +38,7 @@ export function ImageRoleTag({
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
+  const translate = useCallback((key: string) => t(key), [t]);
   const [internalOpen, setInternalOpen] = useState(false);
   const rawOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const open = disabled ? false : rawOpen;
@@ -47,9 +48,15 @@ export function ImageRoleTag({
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const displayLabel = getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel);
-  const selectedOption = getImageRoleOption(role, customRoleLabel);
-  const previewOption = getImageRoleOption(hoveredRole || role);
+  const displayLabel = getImageRoleLabel(
+    role,
+    customRoleLabel,
+    localReferenceType,
+    localReferenceLabel,
+    translate,
+  );
+  const selectedOption = getImageRoleOption(role, customRoleLabel, translate);
+  const previewOption = getImageRoleOption(hoveredRole || role, undefined, translate);
   const DisplayIcon = selectedOption?.Icon || Building2;
 
   const hasActiveRole = Boolean(role && role !== 'undefined_usage');
@@ -268,7 +275,9 @@ export function ImageRoleTag({
                   }}
                 >
                   <option.Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />
-                  <span className="flex-1 font-medium">{option.label}</span>
+                  <span className="flex-1 font-medium">
+                    {option.labelKey ? t(option.labelKey) : option.label}
+                  </span>
                   {active && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
                 </button>
               </div>
@@ -283,7 +292,7 @@ export function ImageRoleTag({
                 className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-white/5"
                 style={{ color: 'rgba(255,255,255,0.58)' }}
               >
-                <span className="flex-1">{t('reference.clearUsage', { defaultValue: '清除参考用途' })}</span>
+                <span className="flex-1">{t('reference.clearUsage')}</span>
               </button>
             </div>
           )}
@@ -308,7 +317,7 @@ export function ImageRoleTag({
                         color: 'rgba(225,245,255,0.76)',
                       }}
                     >
-                      <span style={{ color: previewOption.color }}>*</span> {t(`reference.constraints.${constraint}`, { defaultValue: constraint })}
+                      <span style={{ color: previewOption.color }}>*</span> {t(`reference.constraints.${constraint}`)}
                     </span>
                   ))}
                 </div>

@@ -195,7 +195,7 @@ export function ImageCropOverlay({
           <button
             key={handle}
             type="button"
-            aria-label={`crop-${handle}`}
+            aria-label={t('imageNode.tooltips.adjustCropRegion')}
             className="absolute z-20 h-3 w-3 rounded-[2px] border border-black/40 bg-white"
             onPointerDown={(event) => beginDrag(event, handle)}
             style={{
@@ -215,7 +215,7 @@ export function ImageCropOverlay({
         onPointerDown={(event) => event.stopPropagation()}
       >
         <button type="button" onClick={onCancel} className="flex h-8 min-w-[76px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs text-white/80 hover:bg-white/10">
-          <X className="h-3.5 w-3.5" />{t('common.cancel')}
+          <X className="h-3.5 w-3.5" />{t('common.actions.cancel')}
         </button>
         <div className="relative shrink-0 whitespace-nowrap">
           <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex h-8 min-w-[118px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs text-white/85 hover:bg-white/10">
@@ -232,7 +232,7 @@ export function ImageCropOverlay({
           )}
         </div>
         <button type="button" onClick={() => onConfirm(crop)} className="flex h-8 min-w-[76px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-white px-3 text-xs font-medium text-[#17171b] hover:bg-white/90">
-          <Check className="h-3.5 w-3.5" />{t('common.confirm')}
+          <Check className="h-3.5 w-3.5" />{t('common.actions.confirm')}
         </button>
       </div>
     </div>

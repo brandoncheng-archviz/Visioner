@@ -55,6 +55,20 @@ function createQuickRenderModelParams(request: QuickRenderRequest) {
   };
 }
 
+function createQuickRenderWorkflowSnapshot(sourceNode: Node, request: QuickRenderRequest) {
+  return {
+    sourceNodeTitle: String(sourceNode.data.label || sourceNode.data.title || ''),
+    model: request.modelParams.model,
+    aspectRatio: request.modelParams.aspectRatio,
+    resolution: request.modelParams.resolution,
+    atmosphere: { ...request.atmosphere },
+    renderChannels: Object.entries(request.renderChannels)
+      .filter(([, channel]) => Boolean(channel))
+      .map(([channelType]) => channelType),
+    hasPrompt: request.prompt.trim().length > 0,
+  };
+}
+
 function resolveQuickRenderOutputPosition(sourceNode: Node, existingNodes: Node[]) {
   const sourceWidth = sourceNode.measured?.width || sourceNode.width || QUICK_RENDER_OUTPUT_FALLBACK_WIDTH;
   const x = sourceNode.position.x + sourceWidth + QUICK_RENDER_OUTPUT_HORIZONTAL_GAP;
@@ -118,6 +132,7 @@ export function buildQuickRenderProcessingOutput({
       sourceWorkflow: {
         type: 'quickRenderExterior',
         sourceNodeId: sourceNode.id,
+        snapshot: createQuickRenderWorkflowSnapshot(sourceNode, request),
       },
     },
     selected: true,
@@ -183,6 +198,7 @@ export function buildQuickRenderCompletedOutput({
       label: outputNode.data.label,
       title: outputNode.data.title,
       sourceWorkflow: {
+        ...outputNode.data.sourceWorkflow as object,
         type: 'quickRenderExterior',
         sourceNodeId,
       },

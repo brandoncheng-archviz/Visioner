@@ -8,7 +8,7 @@ export type ImageModelOption = {
   provider: ImageModelProvider;
   iconText: string;
   iconBg: string;
-  description: string;
+  descriptionKey: string;
   resolutions: ImageModelResolution[];
   defaultResolution: ImageModelResolution;
   supportedCounts?: ImageModelCount[];
@@ -23,7 +23,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
     provider: 'google',
     iconText: 'NB',
     iconBg: 'linear-gradient(135deg, rgba(66,133,244,0.95), rgba(52,168,83,0.9))',
-    description: '快速、稳定',
+    descriptionKey: 'modelParams.model.nanoBanana2.description',
     resolutions: ['1K', '2K'],
     defaultResolution: '2K',
     supportedCounts: [1, 2, 4],
@@ -35,7 +35,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
     provider: 'google',
     iconText: 'NB',
     iconBg: 'linear-gradient(135deg, rgba(52,168,83,0.95), rgba(251,188,5,0.86))',
-    description: '更高质量',
+    descriptionKey: 'modelParams.model.nanoBananaPro.description',
     resolutions: ['1K', '2K', '4K'],
     defaultResolution: '2K',
     supportedCounts: [1, 2, 4],
@@ -47,7 +47,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
     provider: 'openai',
     iconText: 'AI',
     iconBg: 'linear-gradient(135deg, rgba(16,163,127,0.95), rgba(103,232,249,0.72))',
-    description: '高质量图像生成',
+    descriptionKey: 'modelParams.model.gptImage2.description',
     resolutions: ['1K', '2K', '4K'],
     defaultResolution: '2K',
     supportedCounts: [1],

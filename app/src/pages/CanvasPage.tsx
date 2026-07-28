@@ -1267,7 +1267,7 @@ function FlowCanvas() {
 
     const label = getNextNodeTitle(
       currentNodes.map((node) => String(node.data.label || '')),
-      NODE_BASE_TITLES.image,
+      t('quickRenderExterior.outputTitlePrefix'),
     );
     const output = buildQuickRenderProcessingOutput({
       sourceNode,
@@ -1302,7 +1302,7 @@ function FlowCanvas() {
     }, 0);
 
     return output.node.id;
-  }, [fitView, getNodes, getViewport, setEdges, setNodes]);
+  }, [fitView, getNodes, getViewport, setEdges, setNodes, t]);
 
   const writeQuickRenderResult = useCallback((
     sourceNodeId: string,
@@ -1945,7 +1945,9 @@ function FlowCanvas() {
     }
     const timestamp = Date.now();
     const newNodeId = `${type}-${timestamp}`;
-    const baseTitle = NODE_BASE_TITLES[type] || type;
+    const baseTitle = type === 'quickRenderExterior'
+      ? t('quickRenderExterior.title')
+      : NODE_BASE_TITLES[type] || type;
     const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
     const newNode = createBasicCanvasNode({
       id: newNodeId,

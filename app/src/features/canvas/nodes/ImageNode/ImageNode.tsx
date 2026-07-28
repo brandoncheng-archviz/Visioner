@@ -10,16 +10,21 @@ import type { LightPreviewData } from '../../types/lightPreview.types';
 import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
 import type { CurrentResultSet, ResultSetBatch, GeneratedImage } from '../../types/history.types';
 import type { TextReferenceInfo, TextNodeData } from '../../types/basicNode.types';
-import type { ImageControllerState } from '../../types/imageController.types';
 import {
   normalizeGeneratedImages,
   getCurrentImage,
   getNodeGenerationTask,
   getNodeWidth,
   getNodeHeight,
+  type QuickRenderWorkflowSource,
 } from '../../types/imageNodeData.types';
 import { useHistory } from '../../contexts/HistoryContext';
-import { createGenerationTask, simulateGeneration } from '../../utils/mockGenerationTask';
+import {
+  createGenerationTask,
+  getMockGenerationErrorCode,
+  simulateGeneration,
+  type MockGenerationErrorCode,
+} from '../../utils/mockGenerationTask';
 import { checkGenerationRequestSafety, checkGenerationResultSafety } from '../../utils/contentSafety';
 import {
   CANVAS_NODE_CARD_BACKGROUND,
@@ -51,9 +56,14 @@ import type { ImageNodeControllers } from './controllers';
 import { ImageCropOverlay, type NormalizedCropRect } from './ImageCropOverlay';
 import { createImageNodeViewModel } from './imageNodeViewModel';
 import { cropCoverImage } from '../../utils/cropImage';
-import { DEFAULT_IMAGE_CONTROLLER_STATE, hasActiveImageController } from '../../constants/imageController';
 
-const EMPTY_GENERATION_INTENT_MESSAGE = '请先输入提示词、设置氛围或插入图片引用';
+const MOCK_GENERATION_ERROR_KEYS: Record<MockGenerationErrorCode, string> = {
+  cancelled: 'imageNode.errors.cancelled',
+  timeout: 'imageNode.errors.timeout',
+  serviceUnavailable: 'imageNode.errors.serviceUnavailable',
+  invalidInput: 'imageNode.errors.invalidInput',
+  safetyCheckFailed: 'imageNode.errors.safetyCheckFailed',
+};
 
 function hasValidPromptContentInput(promptContent: PromptContent[]) {
   return promptContent.some((block) => {
@@ -64,7 +74,8 @@ function hasValidPromptContentInput(promptContent: PromptContent[]) {
 }
 
 export function ImageNode({ data, selected, id }: NodeProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const translate = useCallback((key: string) => t(key), [t]);
   const { show: showToast } = useToast();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
@@ -74,11 +85,17 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const role = rawRole;
   const customRoleLabel = data.customRoleLabel as string | undefined;
   const localReferenceType = normalizeLocalReferenceType((data.localReferenceType as LocalReferenceType | undefined)) ?? getLocalReferenceTypeFromRole(rawRole);
-  const localReferenceLabel = (data.localReferenceLabel as string | undefined) ?? getLocalReferenceLabel(rawRole, localReferenceType, data.localReferenceLabel as string | undefined, customRoleLabel);
+  const localReferenceLabel = (data.localReferenceLabel as string | undefined) ?? getLocalReferenceLabel(
+    rawRole,
+    localReferenceType,
+    data.localReferenceLabel as string | undefined,
+    customRoleLabel,
+    translate,
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const replaceFileRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [nodeName, setNodeName] = useState((data.label as string) || t('canvas.nodeLabels.image', { defaultValue: '图片' }));
+  const [nodeName, setNodeName] = useState((data.label as string) || t('imageNode.title'));
   const [localDisplayImage, setLocalDisplayImage] = useState(currentImage);
   const [editingName, setEditingName] = useState(false);
   const [imgSize, setImgSize] = useState<{ width: number; height: number } | null>(null);
@@ -111,10 +128,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [lightPreview, setLightPreview] = useState<LightPreviewData | null>((data.lightPreview as LightPreviewData | null | undefined) ?? null);
   const [selectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [selectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
-  const [controller, setController] = useState<ImageControllerState>(() =>
-    (data.controller as ImageControllerState | undefined) ?? DEFAULT_IMAGE_CONTROLLER_STATE,
-  );
   const controllers = data.controllers as ImageNodeControllers | undefined;
+  const workflowSource = data.sourceWorkflow as QuickRenderWorkflowSource | undefined;
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
   const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
@@ -197,11 +212,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [data.promptContent]);
 
   useEffect(() => {
-    const next = (data.controller as ImageControllerState | undefined) ?? DEFAULT_IMAGE_CONTROLLER_STATE;
-    setController((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
-  }, [data.controller]);
-
-  useEffect(() => {
     const next = (data.lightPreview as LightPreviewData | null | undefined) ?? null;
     setLightPreview((prev) => {
       if (prev === next) return prev;
@@ -224,7 +234,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [selectedResultImage]);
 
   useEffect(() => {
-    const nextName = (data.label as string | undefined) || t('canvas.nodeLabels.image', { defaultValue: '图片' });
+    const nextName = (data.label as string | undefined) || t('imageNode.title');
     if (!editingName) {
       setNodeName((prev) => (prev === nextName ? prev : nextName));
     }
@@ -328,6 +338,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         referenceCustomRoleLabel,
         edgeLocalRefType ?? sourceLocalRefType,
         edgeLocalRefLabel ?? sourceLocalRefLabel,
+        translate,
       );
       const imageUrl = getCurrentImage(sourceNode?.data);
       if (!imageUrl) return [];
@@ -346,7 +357,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       }];
     });
     return rawReferences.map((ref, idx) => ({ ...ref, index: idx + 1 }));
-  }, [allEdges, allNodes, id, i18n.language]);
+  }, [allEdges, allNodes, id, translate]);
   const textReferences: TextReferenceInfo[] = useMemo(() => {
     return allEdges
       .filter((edge) => edge.target === id)
@@ -357,12 +368,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         const content = getTextContent(sourceData);
         return [{
           nodeId: sourceNode.id,
-          title: sourceData.label || sourceData.title || '文本节点',
+          title: sourceData.label || sourceData.title || t('canvas.nodeLabels.text'),
           content,
           status: content ? 'result' : (sourceData.status || 'empty'),
         }];
       });
-  }, [allEdges, allNodes, id]);
+  }, [allEdges, allNodes, id, t]);
   const referencesSignature = JSON.stringify(
     references.map((reference) => ({
       nodeId: reference.nodeId,
@@ -413,7 +424,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         };
       }),
     );
-  }, [id, references, referencesSignature, savedReferencesSignature, setNodes]);
+  }, [id, references, referencesSignature, savedReferencesSignature, setNodes, t]);
 
   const selectedStyle = getStylePresetById(selectedStyleId);
   const textReferencePrompt = textReferences
@@ -422,8 +433,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     .join('\n\n');
   const hasGenerationIntent = (
     promptText.trim().length > 0 ||
-    hasValidPromptContentInput(promptContent) ||
-    (hasActiveImageController(controller) && (Boolean(displayImage) || references.length > 0))
+    hasValidPromptContentInput(promptContent)
   );
   const hasImageReferences = references.length > 0;
   const imageNodeViewModel = createImageNodeViewModel(data, {
@@ -523,17 +533,17 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         presetIds: firstHistoryItem?.presetIds || selectedPresets,
         styleId: firstHistoryItem?.styleId ?? selectedStyleId,
         lightPreview,
-        controller: firstHistoryItem?.controller ?? controller,
+        controller: firstHistoryItem?.controller,
         modelParams: firstHistoryItem?.modelParams || { ...modelParams },
         createdAt: firstHistoryItem?.createdAt || Date.now(),
       };
     },
-    [controller, generatedImages, id, lightPreview, modelParams, selectedPresets, selectedStyleId],
+    [generatedImages, id, lightPreview, modelParams, selectedPresets, selectedStyleId],
   );
 
   const runGeneration = useCallback(async () => {
     if (!hasGenerationIntent) {
-      showToast(EMPTY_GENERATION_INTENT_MESSAGE);
+      showToast(t('imageNode.prompt.emptyGenerationHint'));
       return;
     }
 
@@ -546,8 +556,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const promptWithTextReferences = [textReferencePrompt, promptText]
       .filter((value) => value.trim().length > 0)
       .join('\n\n');
-    const { textPrompt, imageReferences, referenceImages, markReferences, promptBlocks, userPrompt, globalStyle, presets, controller: controllerSubmission } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview, controller);
-    const generationModelParams: ModelParams = { ...modelParams, count: '1张' };
+    const { textPrompt, imageReferences, referenceImages, markReferences, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview);
+    const generationModelParams: ModelParams = { ...modelParams, count: '1' };
 
     let task = createGenerationTask({
       sourceNodeId: id,
@@ -597,11 +607,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       })),
     });
     if (!safetyResult.allowed) {
-      showToast(safetyResult.message ?? '当前内容不适合生成，请修改后再试。');
+      showToast(safetyResult.message ?? t('imageNode.errors.invalidContent'));
       const failedTask = {
         ...task,
         status: 'failed' as const,
-        errorMessage: safetyResult.message ?? '当前内容不适合生成，请修改后再试。',
+        errorMessage: safetyResult.message ?? t('imageNode.errors.invalidContent'),
         updatedAt: Date.now(),
       };
       setGenerationTask(failedTask);
@@ -657,7 +667,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         inputRefs: task.inputRefs,
         markRefs: task.markRefs,
         modelParams: generationModelParams,
-        controller: controllerSubmission,
         style: globalStyle,
         presets: selectedPresets,
       });
@@ -693,10 +702,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           imageUrl: results[0].imageUrl,
         });
         if (!resultSafety.allowed) {
-          showToast(resultSafety.message ?? '生成结果未通过安全检查，请调整提示词后重试。');
+          showToast(resultSafety.message ?? t('imageNode.errors.safetyCheckFailed'));
           setGenerationTask((prev) =>
             prev && prev.taskId === task.taskId
-              ? { ...prev, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() }
+              ? { ...prev, status: 'failed', errorMessage: resultSafety.message ?? t('generation.safety.checkFailedTitle'), updatedAt: Date.now() }
               : prev,
           );
           setNodes((nds) =>
@@ -706,7 +715,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                     ...n,
                   data: {
                     ...n.data,
-                    generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? '安全检查未通过', updatedAt: Date.now() },
+                    generationTask: { ...task, status: 'failed', errorMessage: resultSafety.message ?? t('generation.safety.checkFailedTitle'), updatedAt: Date.now() },
                     isGenerating: false,
                     isProcessing: false,
                   },
@@ -749,7 +758,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         markRefs: task.markRefs,
         presetIds: selectedPresets,
         styleId: selectedStyleId,
-        controller: structuredClone(controller),
         modelParams: { ...generationModelParams },
         seed: result.seed,
         width: result.width,
@@ -768,7 +776,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         presetIds: selectedPresets,
         styleId: selectedStyleId,
         lightPreview,
-        controller: structuredClone(controller),
         modelParams: { ...generationModelParams },
         createdAt: Date.now(),
       });
@@ -808,8 +815,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   userPrompt,
                   globalStyle,
                   presets,
-                  controllerSubmission,
-                  controller: structuredClone(controller),
                   promptContent,
                   generatedImages: nextGeneratedImages,
                   generationTask: { ...task, status: 'success', progress: 100, result: results[0], updatedAt: Date.now() },
@@ -823,7 +828,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '生成失败';
+      const errorCode = getMockGenerationErrorCode(err);
+      const errorMessage = errorCode
+        ? t(MOCK_GENERATION_ERROR_KEYS[errorCode])
+        : t('imageNode.errors.generationFailed');
       setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'failed', errorMessage, updatedAt: Date.now() } : prev));
       setNodes((nds) =>
         nds.map((n) =>
@@ -841,15 +849,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, controller, currentResultSet, addBatch, buildHistoryBatchFromCurrentResultSet]);
+  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, buildHistoryBatchFromCurrentResultSet, t]);
 
   const handleGenerate = useCallback(() => {
     if (!canGenerate) {
-      showToast(EMPTY_GENERATION_INTENT_MESSAGE);
+      showToast(t('imageNode.prompt.emptyGenerationHint'));
       return;
     }
     void runGeneration();
-  }, [canGenerate, runGeneration, showToast]);
+  }, [canGenerate, runGeneration, showToast, t]);
 
   const handlePromptChange = (value: string) => {
     if (!imageNodeViewModel.canEditPrompt) return;
@@ -867,12 +875,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     if (!imageNodeViewModel.canEditLighting) return;
     setLightPreview(data);
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, lightPreview: data } } : n)));
-  };
-
-  const handleControllerChange = (nextController: ImageControllerState) => {
-    if (imageNodeViewModel.isProcessing) return;
-    setController(nextController);
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, controller: nextController } } : n)));
   };
 
   const handleControllersChange = (nextControllers: ImageNodeControllers) => {
@@ -1011,7 +1013,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         }),
       );
       if (conflictingTarget) {
-        showToast(t('reference.downstreamConflict', { role: getImageRoleLabel(nextRole, nextCustomRoleLabel, nextLocalRefType, nextLocalRefLabel) }));
+        showToast(t('reference.downstreamConflict', {
+          role: getImageRoleLabel(
+            nextRole,
+            nextCustomRoleLabel,
+            nextLocalRefType,
+            nextLocalRefLabel,
+            translate,
+          ),
+        }));
         return;
       }
     }
@@ -1180,7 +1190,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         sourceNodeId: id,
         sourceImageUrl: displayImage,
         usageKey: role ?? 'undefined_usage',
-        usageLabel: getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel),
+        usageLabel: getImageRoleLabel(
+          role,
+          customRoleLabel,
+          localReferenceType,
+          localReferenceLabel,
+          translate,
+        ),
         markType: 'box',
         point: {
           normalizedX,
@@ -1225,7 +1241,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     } finally {
       if (requestId === markRequestIdRef.current) setPointPickLoading(false);
     }
-  }, [activeImageMarkSessionId, activeImageMarkTargetNodeId, customRoleLabel, data, displayImage, enterOwnMarkMode, id, imageMarks, imageNodeViewModel.canCreateMarks, isCanvasMarkSelectable, isPointPickMode, localReferenceLabel, localReferenceType, markTargetNodeId, resolveCoverGeometry, role, setNodes]);
+  }, [activeImageMarkSessionId, activeImageMarkTargetNodeId, customRoleLabel, data, displayImage, enterOwnMarkMode, id, imageMarks, imageNodeViewModel.canCreateMarks, isCanvasMarkSelectable, isPointPickMode, localReferenceLabel, localReferenceType, markTargetNodeId, resolveCoverGeometry, role, setNodes, translate]);
 
   useEffect(() => {
     const element = imgRef.current;
@@ -1342,7 +1358,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           onWheel={(event) => event.stopPropagation()}
         >
           <ScanSearch className="h-4 w-4 flex-shrink-0 text-teal-300/85" />
-          <span className="font-medium text-white/75">{t('imageMark.canvasModeHint', { defaultValue: '点击图片选择局部元素' })}</span>
+          <span className="font-medium text-white/75">{t('imageMark.canvasModeHint')}</span>
           <button
             type="button"
             className="shrink-0 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/55 transition-colors hover:bg-white/[0.10] hover:text-white/80"
@@ -1352,7 +1368,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onExitSelection?.();
             }}
           >
-            ESC · {t('imageMark.exit', { defaultValue: '退出' })}
+            ESC · {t('imageMark.exit')}
           </button>
         </div>,
         document.body,
@@ -1385,13 +1401,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           {pointPickLoading && (
             <div className="flex items-center gap-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
               <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-teal-400" />
-              {t('imageMark.identifying', { defaultValue: '正在识别元素...' })}
+              {t('imageMark.identifying')}
             </div>
           )}
 
           {pointPickError && (
             <div className="text-[11px] leading-4 text-white/65">
-              {t('imageMark.recognizeFailed', { defaultValue: '识别失败，请重新点击' })}
+              {t('imageMark.recognizeFailed')}
             </div>
           )}
 
@@ -1480,7 +1496,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               setActiveMarkMenuId((current) => current === mark.id ? null : mark.id);
             }}
           >
-            <span className="truncate" title={selectedCandidate?.label}>{selectedCandidate?.label || t('imageMark.unknown', { defaultValue: '未识别元素' })}</span>
+            <span className="truncate" title={selectedCandidate?.label}>{selectedCandidate?.label || t('imageMark.unknown')}</span>
             <ChevronDown className="h-3 w-3 flex-shrink-0" />
           </button>
         </div>
@@ -1560,7 +1576,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
             className="w-full rounded-md px-2 py-1.5 text-left text-[12px] text-red-300/75 hover:bg-red-500/10"
             onClick={() => deleteImageMark(activeImageMark.id)}
           >
-            {t('imageMark.deleteMark', { defaultValue: '删除标记' })}
+            {t('imageMark.deleteMark')}
           </button>
         </div>,
         document.body,
@@ -1603,7 +1619,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     return slots;
   }, [currentResultSet]);
   const showTitleMeta = zoom >= 0.35;
-  const roleOption = getImageRoleOption(role, customRoleLabel);
+  const roleOption = getImageRoleOption(role, customRoleLabel, translate);
   const RoleIconForTitle = roleOption?.Icon;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
   const isOnlySelected = selected && selectedNodeCount === 1;
@@ -1749,7 +1765,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const imageToolbarActions = useMemo(() => [
     {
       icon: Maximize2,
-      label: t('imageNode.fullscreen'),
+      label: t('toolbar.fullscreen'),
       action: handlePreview,
       disabled: !imageNodeViewModel.canUseToolbarActions,
     },
@@ -1761,7 +1777,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     },
     {
       icon: Download,
-      label: t('common.download'),
+      label: t('common.actions.download'),
       action: handleDownload,
       disabled: !imageNodeViewModel.canUseToolbarActions,
     },
@@ -1789,7 +1805,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     },
     {
       icon: Trash2,
-      label: t('common.delete'),
+      label: t('common.actions.delete'),
       action: handleDeleteNode,
       disabled: !imageNodeViewModel.canUseToolbarActions,
       danger: true,
@@ -1869,12 +1885,18 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   cursor: canEditRole ? 'pointer' : 'default',
                   opacity: canEditRole ? 1 : 0.5,
                 }}
-                title={t('imageNode.setImagePurpose')}
+                title={t('imageNode.tooltips.setReferenceRole')}
               >
                 {RoleIconForTitle && (
                   <RoleIconForTitle className="inline-block" style={{ width: 11, height: 11, marginRight: 3, verticalAlign: '-0.1em' }} />
                 )}
-                {getImageRoleLabel(role, customRoleLabel, localReferenceType, localReferenceLabel) || t('imageNode.undefinedUsage')}
+                {getImageRoleLabel(
+                  role,
+                  customRoleLabel,
+                  localReferenceType,
+                  localReferenceLabel,
+                  translate,
+                ) || t('imageNode.undefinedUsage')}
               </span>
             )}
             {editingName ? (
@@ -1977,10 +1999,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                             }}
                             className="flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors hover:bg-white/20"
                             style={{ background: 'rgba(22,12,9,0.62)', color: 'rgba(255,255,255,0.9)', border: '1px solid rgba(255,255,255,0.14)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-                            title="下载"
+                            title={t('common.actions.download')}
                           >
                             <Download className="h-3.5 w-3.5" />
-                            下载
+                            {t('common.actions.download')}
                           </button>
                           <button
                             type="button"
@@ -2000,10 +2022,10 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                               backdropFilter: 'blur(8px)',
                               WebkitBackdropFilter: 'blur(8px)',
                             }}
-                            title={isPrimary ? '收起' : '设为主图'}
+                            title={isPrimary ? t('common.actions.collapse') : t('imageNode.result.setAsMainImage')}
                           >
                             {isPrimary ? <Minimize2 className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
-                            {isPrimary ? '收起' : '设为主图'}
+                            {isPrimary ? t('common.actions.collapse') : t('imageNode.result.setAsMainImage')}
                           </button>
                         </div>
                       </div>
@@ -2057,7 +2079,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   }}
                 >
                   <Maximize2 className="h-4 w-4" />
-                  {currentResultSet.images.length}张
+                  {t('modelParams.count.option', { count: currentResultSet.images.length })}
                 </button>
               </div>
             )
@@ -2209,10 +2231,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onPromptContentChange={handlePromptContentChange}
               lightPreview={lightPreview}
               onLightPreviewChange={handleLightPreviewChange}
-              controller={controller}
-              onControllerChange={handleControllerChange}
               controllers={controllers}
               onControllersChange={handleControllersChange}
+              workflowSource={workflowSource}
+              onFocusWorkflowSource={(sourceNodeId) => {
+                const onFocusNode = data.onFocusNode as ((targetNodeId: string) => void) | undefined;
+                onFocusNode?.(sourceNodeId);
+              }}
               modelParams={modelParams}
               onModelParamsChange={handleModelParamsChange}
               onGenerate={handleGenerate}

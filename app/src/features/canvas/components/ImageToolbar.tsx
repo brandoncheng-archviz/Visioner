@@ -35,8 +35,8 @@ export function ImageToolbar({
   const [openMenuLabel, setOpenMenuLabel] = useState<string | null>(null);
 
   const tools: ToolbarAction[] = actions || [
-    { icon: Maximize2, label: t('imageNode.fullscreen'), action: onPreview, disabled: !hasImage },
-    { icon: Download, label: t('common.download'), action: onDownload, disabled: !hasImage },
+    { icon: Maximize2, label: t('toolbar.fullscreen'), action: onPreview, disabled: !hasImage },
+    { icon: Download, label: t('common.actions.download'), action: onDownload, disabled: !hasImage },
   ];
 
   const stopToolbarEvent = (event: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement>) => {

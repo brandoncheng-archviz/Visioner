@@ -99,7 +99,16 @@ describe('quick render generation entry', () => {
     expect(output.node.position).toEqual({ x: 690, y: 100 });
     expect(output.node.data).toEqual(expect.objectContaining({
       isProcessing: true,
-      sourceWorkflow: { type: 'quickRenderExterior', sourceNodeId: sourceNode.id },
+      sourceWorkflow: expect.objectContaining({
+        type: 'quickRenderExterior',
+        sourceNodeId: sourceNode.id,
+        snapshot: expect.objectContaining({
+          model: 'Nano Banana 2',
+          aspectRatio: '16:9',
+          resolution: '2K',
+          hasPrompt: false,
+        }),
+      }),
       generationTask: expect.objectContaining({ taskId, status: 'running' }),
     }));
     expect(output.edge.data).toEqual({

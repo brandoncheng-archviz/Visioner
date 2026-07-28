@@ -54,10 +54,13 @@ const zhCN = {
       apply: "应用",
       save: "保存",
       retry: "重试",
+      download: "下载",
+      collapse: "收起",
       replace: "替换",
       upload: "上传",
       close: "关闭",
       expand: "展开",
+      reset: "重置",
     },
     status: {
       unset: "未设置",
@@ -89,7 +92,7 @@ const zhCN = {
       "video-merge": "视频合成",
       sunSky: "光影预览",
       relight: "光影调整",
-      quickRenderExterior: "快速渲染-室外",
+      quickRenderExterior: "室外渲染",
     },
     createMenuContentGroup: "基础节点",
     createMenuImageProcessingGroup: "图像处理",
@@ -100,7 +103,7 @@ const zhCN = {
     addCompareNode: "图像对比",
     createMenuCompareNode: "图像对比",
     createMenuRelightNode: "光影调整",
-    createMenuQuickRenderExteriorNode: "快速渲染-室外",
+    createMenuQuickRenderExteriorNode: "室外渲染",
     addSunSkyNode: "光影",
     createMenuSunSkyNode: "光影",
     nodeTitles: {
@@ -108,7 +111,7 @@ const zhCN = {
       text: "文本节点",
       compare: "图像对比",
       upscale: "图像增强",
-      quickRenderExterior: "快速渲染·室外",
+      quickRenderExterior: "室外渲染",
       relight: "光影调整",
       audio: "音频",
       script: "脚本",
@@ -116,7 +119,9 @@ const zhCN = {
   },
 
   quickRenderExterior: {
-    title: "快速渲染·室外",
+    title: "室外渲染",
+    subtitle: "快速生成高质量室外效果图",
+    outputTitlePrefix: "室外渲染输出",
     sections: {
       imageInput: { title: "图像输入" },
       renderChannels: { title: "渲染通道" },
@@ -145,12 +150,12 @@ const zhCN = {
     },
     prompt: { placeholder: "输入补充描述…" },
     footer: { creditCost: "消耗 {{count}} 积分" },
-    processing: { generating: "正在快速渲染" },
+    processing: { generating: "正在生成室外效果图" },
     errors: {
       inputRequired: "请至少添加一张有效的图像输入",
       invalidInput: "图像输入无效，请重新添加",
       cancelled: "任务已取消",
-      generationFailed: "快速渲染失败，请稍后重试",
+      generationFailed: "室外渲染失败，请稍后重试",
       missingInput: "缺少有效的图像输入",
     },
   },
@@ -180,6 +185,7 @@ const zhCN = {
       luxuryRealEstate: "高端地产",
       painterly: "绘画感",
     },
+    title: "氛围",
     toggles: {
       addEntourage: { label: "增加配景" },
       addPeople: { label: "增加人物" },
@@ -189,6 +195,7 @@ const zhCN = {
     status: {
       configured: "氛围已设置",
       followReference: "跟随氛围参考",
+      summaryItem: "{{field}}：{{value}}",
     },
   },
 
@@ -209,6 +216,10 @@ const zhCN = {
   generation: {
     actions: { generate: "生成" },
     status: { generating: "生成中" },
+    safety: {
+      checkFailedTitle: "安全检查未通过",
+      checkFailedDescription: "生成结果未通过安全检查，请调整提示词后重试",
+    },
   },
 
   modelParams: {
@@ -226,6 +237,10 @@ const zhCN = {
       width: "宽",
       height: "高",
       hint: "画幅比只用于锁定构图比例，不代表最终输出像素。",
+    },
+    count: {
+      option_one: "{{count}}张",
+      option_other: "{{count}}张",
     },
     resolution: { label: "分辨率" },
   },
@@ -247,14 +262,20 @@ const zhCN = {
   },
 
   imageNode: {
-    atmosphereLight: "光线",
-    followAtmosphereReference: "跟随参考",
-    atmosphereLightOptions: {
-      front_light: "顺光",
-      back_light: "逆光",
-      left_side_light: "左侧光",
-      right_side_light: "右侧光",
-      diffused_light: "柔和天光",
+    title: "图片",
+    workflowSource: {
+      tooltip: "室外渲染来源",
+      buttonLabel: "室外",
+      sourceNode: "来源节点",
+      model: "模型",
+      output: "比例 / 分辨率",
+      toggles: "启用开关",
+      channels: "渲染通道",
+      prompt: "提示词",
+      noneEnabled: "未启用",
+      noChannels: "未启用",
+      promptEntered: "已输入",
+      promptEmpty: "未输入",
     },
     controllers: {
       title: "控制器",
@@ -321,6 +342,12 @@ const zhCN = {
     replaceImage: "替换图片",
     referenceImage: "引用素材",
     setImagePurpose: "点击设置图片用途",
+    reference: {
+      currentTextEmpty: "当前文本节点暂无内容",
+      disconnectText: "断开文本引用",
+      referenceLimitWarning: "当前参考图数量超过上限，建议删除部分参考图",
+      tooManyReferences: "参考图较多，可能影响生成稳定性",
+    },
     undefinedUsage: "未设置参考用途",
     generateImage: "生成图片",
     fullscreen: "全屏",
@@ -354,6 +381,11 @@ const zhCN = {
     expandPrompt: "展开提示词框",
     collapsePrompt: "收起提示词框",
     promptPlaceholder: "描述你想要生成的画面，@引用素材",
+    prompt: {
+      title: "提示词",
+      placeholder: "描述你想要生成的画面，@引用素材",
+      emptyGenerationHint: "请先输入提示词或插入参考图",
+    },
     selectImagePurpose: "选择图片用途",
     customPurposePlaceholder: "这张图主要参考什么？例如：铺装 / 家具 / 灯具 / 栏杆",
     customPurposeInputPlaceholder: "这张图主要参考什么？",
@@ -372,6 +404,31 @@ const zhCN = {
     generate: "生成",
     generating: "生成中...",
     retry: "重试",
+    result: {
+      setAsMainImage: "设为主图",
+      mainImage: "主图",
+    },
+    processing: {
+      lockedHint: "图片生成期间无法修改当前设置",
+    },
+    validation: {
+      generationRequirements: "当前内容不适合生成，请修改后再试",
+      invalidFrameRatio: "请输入 1:8 到 8:1 范围内的正整数画幅比",
+    },
+    errors: {
+      invalidContent: "当前内容不适合生成，请修改后再试",
+      safetyCheckFailed: "生成结果未通过安全检查，请调整提示词后重试",
+      generationFailed: "图片生成失败，请重试",
+      cancelled: "图片生成已取消",
+      timeout: "图片生成超时，请稍后重试",
+      serviceUnavailable: "图片生成服务暂时不可用",
+      invalidInput: "输入参数异常，请检查参考图和提示词",
+    },
+    tooltips: {
+      setReferenceRole: "设置参考用途",
+      adjustLighting: "调整光影",
+      adjustCropRegion: "调整裁剪区域",
+    },
     generationFailed: "生成失败",
     originalImage: "原图",
     model: "模型",

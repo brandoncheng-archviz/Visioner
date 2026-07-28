@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { RotateCcw } from 'lucide-react';
 import { createRelightLightPreview } from '../utils/relightSettings';
 import { DEFAULT_RELIGHT_SETTINGS, DEFAULT_RELIGHT_SUN } from '../constants/relightPresets';
@@ -27,6 +28,7 @@ export function LightPreviewPanel({
   onApply,
   onClose,
 }: LightPreviewPanelProps) {
+  const { t } = useTranslation();
   const [elevation, setElevation] = useState(initialSun?.elevation ?? DEFAULT_RELIGHT_SUN.elevation);
   const [azimuth, setAzimuth] = useState(initialSun?.azimuth ?? DEFAULT_RELIGHT_SUN.azimuth);
   const [settings, setSettings] = useState<RelightSettings>(initialSettings ?? DEFAULT_RELIGHT_SETTINGS);
@@ -151,7 +153,7 @@ export function LightPreviewPanel({
             className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-white/45 transition hover:bg-white/[0.04] hover:text-white/75"
           >
             <RotateCcw className="h-3 w-3" />
-            重置
+            {t('common.actions.reset')}
           </button>
           <div className="flex items-center gap-2">
             <button
@@ -160,7 +162,7 @@ export function LightPreviewPanel({
               className="h-8 rounded-lg px-3.5 text-[12px] font-medium text-white/65 transition hover:bg-white/[0.07]"
               style={{ background: 'rgba(255,255,255,0.04)' }}
             >
-              取消
+              {t('common.actions.cancel')}
             </button>
             <button
               type="button"
@@ -168,7 +170,7 @@ export function LightPreviewPanel({
               className="h-8 rounded-lg px-4 text-[12px] font-medium text-white transition hover:brightness-110"
               style={{ background: '#208cff' }}
             >
-              应用
+              {t('common.actions.apply')}
             </button>
           </div>
         </div>
