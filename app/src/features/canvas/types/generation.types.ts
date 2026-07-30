@@ -1,6 +1,7 @@
 import type { ModelParams } from './canvas.types';
 import type { ImageMarkBox, ImageMarkCandidate, ImageMarkPoint, LocalReferencePoint, LocalReferenceType } from './imageNode.types';
 import type { ImageControllerState } from './imageController.types';
+import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';
 
 export type GenerationStatus = 'pending' | 'running' | 'success' | 'failed';
 
@@ -35,6 +36,8 @@ export interface GenerationInput {
     model: string;
     ratio: string;
     resolution: string;
+    resolutionTier?: OutputResolutionTier;
+    requestedSize?: OutputSize;
   };
 }
 
@@ -63,6 +66,8 @@ export interface ImageGenerationRequest {
     model: string;
     aspectRatio: string;
     resolution: string;
+    resolutionTier: OutputResolutionTier;
+    requestedSize: OutputSize;
     count: ImageGenerationCount;
   };
   controller?: unknown;

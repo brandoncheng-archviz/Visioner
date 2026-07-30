@@ -46,7 +46,7 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
     text: TextNodeIcon as unknown as typeof Image,
     image: Image,
     relight: Sun,
-    quickRenderExterior: Building2,
+    exteriorRender: Building2,
     upscale: Sparkles,
     compare: Columns2,
   };

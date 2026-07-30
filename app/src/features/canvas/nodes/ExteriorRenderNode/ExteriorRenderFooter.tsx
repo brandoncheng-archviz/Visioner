@@ -9,24 +9,27 @@ import {
   getImageModelOption,
   type ImageModelResolution,
 } from '../../constants/imageModelOptions';
-import type { QuickRenderExteriorModelParams } from './quickRenderExterior.types';
+import { ModelAspectRatioOptions } from '../../components/ModelAspectRatioOptions';
+import { ModelParamsSummaryButton } from '../../components/ModelParamsSummaryButton';
+import {
+  calculateRequestedSize,
+  commitTargetSizeDraft,
+  doesSizeMatchAspectRatio,
+  getResolutionTier,
+  isFixedAspectRatioPreset,
+  isValidOutputSize,
+  parseAspectRatio,
+  updateTargetSizeDraft,
+  validateRequestedSize,
+  type AspectRatioPreset,
+  type OutputSize,
+} from '../../utils/modelParams';
+import type { ExteriorRenderModelParams } from './exteriorRender.types';
 
-const QUICK_RENDER_FRAME_RATIO_OPTIONS = [
-  { value: 'adaptive' },
-  { value: '1:1' },
-  { value: '4:3' },
-  { value: '3:2' },
-  { value: '16:9' },
-  { value: '9:16' },
-] as const;
-
-const STANDARD_FRAME_RATIO_VALUES = new Set<string>(
-  QUICK_RENDER_FRAME_RATIO_OPTIONS.map((option) => option.value).filter((value) => value !== 'adaptive'),
-);
 const MODEL_MENU_WIDTH = 248;
 const MODEL_MENU_HEIGHT = 192;
 const FRAME_RATIO_PANEL_WIDTH = 440;
-const FRAME_RATIO_PANEL_HEIGHT = 358;
+const FRAME_RATIO_PANEL_HEIGHT = 352;
 const FLOATING_PANEL_GAP = 8;
 const VIEWPORT_PADDING = 12;
 const MODEL_DESCRIPTION_KEYS: Record<string, string> = {
@@ -40,64 +43,17 @@ type FloatingPosition = {
   top: number;
 };
 
-type QuickRenderFooterProps = {
-  params: QuickRenderExteriorModelParams;
+type ExteriorRenderFooterProps = {
+  params: ExteriorRenderModelParams;
   isGenerating: boolean;
   canGenerate: boolean;
   disabled: boolean;
   validationMessage?: string;
   creditCost: number;
-  onChange: (params: QuickRenderExteriorModelParams) => void;
+  adaptiveSourceSize?: OutputSize | null;
+  onChange: (params: ExteriorRenderModelParams) => void;
   onGenerate: () => void;
 };
-
-function parseFrameRatio(value: string | undefined): { width: number; height: number } | null {
-  if (!value) return null;
-  const normalized = value.trim().replace('x', ':').replace('×', ':');
-  const match = normalized.match(/^(\d+):(\d+)$/);
-  if (!match) return null;
-  const width = Number.parseInt(match[1] ?? '', 10);
-  const height = Number.parseInt(match[2] ?? '', 10);
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
-  return { width, height };
-}
-
-function isValidFrameRatio(width: number, height: number) {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return false;
-  const ratio = width / height;
-  return ratio >= 1 / 8 && ratio <= 8;
-}
-
-function formatFrameRatioLabel(value: string | undefined, adaptiveLabel: string) {
-  if (!value) return '1:1';
-  if (value === 'adaptive') return adaptiveLabel;
-  const parsed = parseFrameRatio(value);
-  if (!parsed) return value;
-  const ratioValue = `${parsed.width}:${parsed.height}`;
-  if (STANDARD_FRAME_RATIO_VALUES.has(ratioValue)) return ratioValue;
-  return `${parsed.width}×${parsed.height}`;
-}
-
-function AspectFrameIcon({ ratio }: { ratio: number }) {
-  const isPortrait = ratio < 0.82;
-  const isSquare = ratio >= 0.82 && ratio <= 1.18;
-  const width = isSquare ? 13 : isPortrait ? 10 : 16;
-  const height = isSquare ? 13 : isPortrait ? 16 : 10;
-
-  return (
-    <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <rect
-        x={(20 - width) / 2}
-        y={(20 - height) / 2}
-        width={width}
-        height={height}
-        rx="1.8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
 
 function getFloatingPosition(
   anchor: HTMLElement | null,
@@ -120,16 +76,17 @@ function getFloatingPosition(
   return { left, top };
 }
 
-export function QuickRenderFooter({
+export function ExteriorRenderFooter({
   params,
   isGenerating,
   canGenerate,
   disabled,
   validationMessage,
   creditCost,
+  adaptiveSourceSize,
   onChange,
   onGenerate,
-}: QuickRenderFooterProps) {
+}: ExteriorRenderFooterProps) {
   const { t } = useTranslation();
   const flowTransform = useStore((state) => state.transform);
   const [showModelMenu, setShowModelMenu] = useState(false);
@@ -145,15 +102,23 @@ export function QuickRenderFooter({
   const frameRatioPanelRef = useRef<HTMLDivElement | null>(null);
 
   const selectedModel = getImageModelOption(params.model);
-  const adaptiveFrameRatio = '1:1';
+  const adaptiveFrameRatio = isValidOutputSize(adaptiveSourceSize)
+    ? `${adaptiveSourceSize.width}:${adaptiveSourceSize.height}`
+    : '1:1';
   const displayFrameRatio = params.aspectRatio === 'adaptive' ? adaptiveFrameRatio : params.aspectRatio;
-  const displayFrameRatioLabel = params.aspectRatio === 'adaptive'
-    ? t('modelParams.aspectRatio.adaptive')
-    : formatFrameRatioLabel(displayFrameRatio, t('modelParams.aspectRatio.adaptive'));
-  const selectedFrameRatioDimensions = parseFrameRatio(displayFrameRatio) ?? { width: 1, height: 1 };
+  const selectedFrameRatioDimensions = parseAspectRatio(displayFrameRatio) ?? { width: 1, height: 1 };
   const currentResolution = selectedModel.resolutions.includes(params.resolution as ImageModelResolution)
     ? (params.resolution as ImageModelResolution)
     : selectedModel.defaultResolution;
+  const resolutionTier = getResolutionTier(params.resolutionTier ?? currentResolution);
+  const requestedSize = validateRequestedSize(params.requestedSize, resolutionTier)
+    ? params.requestedSize
+    : calculateRequestedSize(params.aspectRatio, resolutionTier, adaptiveSourceSize);
+  const selectedAspectRatioOption: AspectRatioPreset | null = params.aspectRatio === 'adaptive'
+    ? 'adaptive'
+    : isFixedAspectRatioPreset(params.aspectRatio)
+      ? params.aspectRatio
+      : null;
 
   useEffect(() => {
     if (!showModelMenu && !showRatioMenu) return;
@@ -213,51 +178,65 @@ export function QuickRenderFooter({
   }, [flowTransform, showModelMenu, showRatioMenu]);
 
   const openRatioMenu = () => {
-    setCustomFrameWidth(String(selectedFrameRatioDimensions.width));
-    setCustomFrameHeight(String(selectedFrameRatioDimensions.height));
+    setCustomFrameWidth(String(requestedSize.width));
+    setCustomFrameHeight(String(requestedSize.height));
     setFrameRatioPanelPosition(getFloatingPosition(frameRatioButtonRef.current, FRAME_RATIO_PANEL_WIDTH, FRAME_RATIO_PANEL_HEIGHT, 'center'));
     setShowRatioMenu(true);
     setShowModelMenu(false);
   };
 
-  const commitCustomFrameRatio = (widthValue: string, heightValue: string) => {
-    const width = Number(widthValue);
-    const height = Number(heightValue);
-    if (!isValidFrameRatio(width, height)) return false;
-    onChange({ ...params, aspectRatio: `${width}:${height}`, resolution: currentResolution });
+  const commitTargetSize = (widthValue: string, heightValue: string) => {
+    const committedSize = commitTargetSizeDraft(
+      { width: widthValue, height: heightValue },
+      resolutionTier,
+      isFrameRatioLocked,
+    );
+    if (!committedSize) {
+      setCustomFrameWidth(String(requestedSize.width));
+      setCustomFrameHeight(String(requestedSize.height));
+      return false;
+    }
+    const nextRatio = doesSizeMatchAspectRatio(committedSize, displayFrameRatio)
+      ? params.aspectRatio
+      : `${committedSize.width}:${committedSize.height}`;
+    setCustomFrameWidth(String(committedSize.width));
+    setCustomFrameHeight(String(committedSize.height));
+    onChange({
+      ...params,
+      aspectRatio: nextRatio,
+      resolution: resolutionTier,
+      resolutionTier,
+      requestedSize: committedSize,
+    });
     return true;
   };
 
   const handleCustomFrameWidthChange = (value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    setCustomFrameWidth(value);
-    if (!value) return;
-
-    let nextHeight = customFrameHeight;
-    const width = Number(value);
-    const currentHeight = Number(customFrameHeight);
-    if (isFrameRatioLocked && width > 0 && currentHeight > 0) {
-      const ratio = selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height;
-      nextHeight = String(Math.max(1, Math.round(width / ratio)));
-      setCustomFrameHeight(nextHeight);
-    }
-    commitCustomFrameRatio(value, nextHeight);
+    const draft = updateTargetSizeDraft({
+      width: customFrameWidth,
+      height: customFrameHeight,
+      field: 'width',
+      value,
+      locked: isFrameRatioLocked,
+      lockedRatio: selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height,
+    });
+    if (!draft) return;
+    setCustomFrameWidth(draft.width);
+    setCustomFrameHeight(draft.height);
   };
 
   const handleCustomFrameHeightChange = (value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    setCustomFrameHeight(value);
-    if (!value) return;
-
-    let nextWidth = customFrameWidth;
-    const height = Number(value);
-    const currentWidth = Number(customFrameWidth);
-    if (isFrameRatioLocked && height > 0 && currentWidth > 0) {
-      const ratio = selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height;
-      nextWidth = String(Math.max(1, Math.round(height * ratio)));
-      setCustomFrameWidth(nextWidth);
-    }
-    commitCustomFrameRatio(nextWidth, value);
+    const draft = updateTargetSizeDraft({
+      width: customFrameWidth,
+      height: customFrameHeight,
+      field: 'height',
+      value,
+      locked: isFrameRatioLocked,
+      lockedRatio: selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height,
+    });
+    if (!draft) return;
+    setCustomFrameWidth(draft.width);
+    setCustomFrameHeight(draft.height);
   };
 
   const modelMenu = showModelMenu && modelMenuPosition && typeof document !== 'undefined'
@@ -317,7 +296,7 @@ export function QuickRenderFooter({
     ? createPortal(
       <div
         ref={frameRatioPanelRef}
-        className="nodrag nowheel fixed z-[1000] rounded-xl"
+        className="nodrag nowheel fixed z-[1000] flex flex-col rounded-xl"
         style={{
           left: frameRatioPanelPosition.left,
           top: frameRatioPanelPosition.top,
@@ -333,40 +312,27 @@ export function QuickRenderFooter({
       >
         <div>
           <div className="mb-2 text-[13px] font-medium text-white/62">{t('modelParams.aspectRatio.label')}</div>
-          <div className="grid grid-cols-3 gap-2">
-            {QUICK_RENDER_FRAME_RATIO_OPTIONS.map((ratioOption) => {
-              const optionValue = ratioOption.value;
-              const isSelected = params.aspectRatio === optionValue;
-              return (
-                <button
-                  key={ratioOption.value}
-                  type="button"
-                  onClick={() => {
-                    onChange({ ...params, aspectRatio: optionValue, resolution: currentResolution });
-                    if (ratioOption.value !== 'adaptive') {
-                      const parsed = parseFrameRatio(optionValue);
-                      if (parsed) {
-                        setCustomFrameWidth(String(parsed.width));
-                        setCustomFrameHeight(String(parsed.height));
-                      }
-                    }
-                  }}
-                  className="flex h-9 items-center justify-center rounded-md text-[14px] font-medium transition-colors hover:bg-white/[0.065]"
-                  style={{
-                    color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.58)',
-                    background: isSelected ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
-                    border: isSelected ? '1px solid rgba(255,255,255,0.62)' : '1px solid rgba(255,255,255,0.075)',
-                  }}
-                >
-                  {ratioOption.value === 'adaptive' ? t('modelParams.aspectRatio.adaptive') : ratioOption.value}
-                </button>
-              );
-            })}
-          </div>
+          <ModelAspectRatioOptions
+            selectedValue={selectedAspectRatioOption}
+            adaptiveLabel={t('modelParams.aspectRatio.adaptive')}
+            disabled={disabled}
+            onSelect={(value) => {
+              const nextRequestedSize = calculateRequestedSize(value, resolutionTier, adaptiveSourceSize);
+              setCustomFrameWidth(String(nextRequestedSize.width));
+              setCustomFrameHeight(String(nextRequestedSize.height));
+              onChange({
+                ...params,
+                aspectRatio: value,
+                resolution: resolutionTier,
+                resolutionTier,
+                requestedSize: nextRequestedSize,
+              });
+            }}
+          />
         </div>
 
-        <div className="mt-3 border-t border-white/[0.045] pt-3">
-          <div className="mb-2 text-[13px] font-medium text-white/62">{t('modelParams.aspectRatio.custom')}</div>
+        <div className="order-3 mt-3 border-t border-white/[0.045] pt-3">
+          <div className="mb-2 text-[13px] font-medium text-white/62">{t('modelParams.targetSize.label')}</div>
           <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto 1fr 40px' }}>
             <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
               <span className="text-[12px] text-white/38">{t('modelParams.aspectRatio.width')}</span>
@@ -375,6 +341,7 @@ export function QuickRenderFooter({
                 value={customFrameWidth}
                 inputMode="numeric"
                 onChange={(event) => handleCustomFrameWidthChange(event.target.value)}
+                onBlur={() => commitTargetSize(customFrameWidth, customFrameHeight)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault();
@@ -391,6 +358,7 @@ export function QuickRenderFooter({
                 value={customFrameHeight}
                 inputMode="numeric"
                 onChange={(event) => handleCustomFrameHeightChange(event.target.value)}
+                onBlur={() => commitTargetSize(customFrameWidth, customFrameHeight)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     event.preventDefault();
@@ -413,17 +381,26 @@ export function QuickRenderFooter({
               {isFrameRatioLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
             </button>
           </div>
-          <div className="mt-2 text-[12px] leading-snug text-white/30">{t('modelParams.aspectRatio.hint')}</div>
         </div>
 
-        <div className="mt-3 border-t border-white/[0.045] pt-3">
+        <div className="order-2 mt-3 border-t border-white/[0.045] pt-3">
           <div className="mb-2 text-[13px] font-medium text-white/62">{t('modelParams.resolution.label')}</div>
           <div className="grid grid-cols-3 gap-2">
             {selectedModel.resolutions.map((resolution) => (
               <button
                 key={resolution}
                 type="button"
-                onClick={() => onChange({ ...params, resolution })}
+                onClick={() => {
+                  const nextRequestedSize = calculateRequestedSize(params.aspectRatio, resolution, adaptiveSourceSize);
+                  setCustomFrameWidth(String(nextRequestedSize.width));
+                  setCustomFrameHeight(String(nextRequestedSize.height));
+                  onChange({
+                    ...params,
+                    resolution,
+                    resolutionTier: resolution,
+                    requestedSize: nextRequestedSize,
+                  });
+                }}
                 className="h-9 rounded-md text-[14px] font-medium transition-colors hover:bg-white/[0.065]"
                 style={{
                   color: currentResolution === resolution ? '#ffffff' : 'rgba(255,255,255,0.54)',
@@ -471,9 +448,11 @@ export function QuickRenderFooter({
         </div>
 
         <div className="relative">
-          <button
+          <ModelParamsSummaryButton
             ref={frameRatioButtonRef}
-            type="button"
+            aspectRatio={params.aspectRatio}
+            resolutionTier={resolutionTier}
+            disabled={disabled}
             onClick={() => {
               if (showRatioMenu) {
                 setShowRatioMenu(false);
@@ -481,21 +460,14 @@ export function QuickRenderFooter({
               }
               openRatioMenu();
             }}
-            className="nodrag flex items-center gap-1 text-[14px] text-white/90 transition-colors hover:text-white"
-          >
-            <span className="text-white/58">
-              <AspectFrameIcon ratio={selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height} />
-            </span>
-            <span>{displayFrameRatioLabel} · {currentResolution}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-white/55" />
-          </button>
+          />
         </div>
       </div>
 
       <div className="relative flex shrink-0 items-center gap-2">
         <div
           className="flex h-[34px] min-w-[38px] items-center justify-center gap-1 text-[13px] font-medium text-white/52"
-          title={t('quickRenderExterior.footer.creditCost', { count: creditCost })}
+          title={t('exteriorRender.footer.creditCost', { count: creditCost })}
         >
           <Zap className="h-3 w-3 fill-current text-[#b8a36d]" />
           <span>{creditCost}</span>
@@ -512,7 +484,7 @@ export function QuickRenderFooter({
             opacity: disabled || !canGenerate ? 0.55 : 1,
             cursor: disabled || !canGenerate ? 'not-allowed' : 'pointer',
           }}
-          title={isGenerating ? t('quickRenderExterior.processing.generating') : validationMessage || t('generation.actions.generate')}
+          title={isGenerating ? t('exteriorRender.processing.generating') : validationMessage || t('generation.actions.generate')}
         >
           {isGenerating ? (
             <div className="relative flex items-center justify-center">

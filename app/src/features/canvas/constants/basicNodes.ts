@@ -22,8 +22,8 @@ export const BASIC_NODE_DEFINITIONS = [
     group: 'imageProcessing',
   },
   {
-    type: 'quickRenderExterior',
-    labelKey: 'canvas.createMenuQuickRenderExteriorNode',
+    type: 'exteriorRender',
+    labelKey: 'canvas.createMenuExteriorRenderNode',
     color: '#38bdf8',
     group: 'imageProcessing',
   },

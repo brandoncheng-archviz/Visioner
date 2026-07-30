@@ -1,18 +1,18 @@
-export { QuickRenderExteriorNode } from './QuickRenderExteriorNode';
-export { createQuickRenderExteriorNodeData } from './quickRenderExteriorUtils';
-export type { QuickRenderExteriorNodeData } from './quickRenderExterior.types';
+export { ExteriorRenderNode } from './ExteriorRenderNode';
+export { createExteriorRenderNodeData } from './exteriorRenderUtils';
+export type { ExteriorRenderNodeData } from './exteriorRender.types';
 export {
-  buildQuickRenderRequest,
-  deriveQuickRenderViewState,
-  getQuickRenderInteractionLocks,
-  shouldApplyQuickRenderTaskResult,
-  validateQuickRenderRequest,
-} from './quickRenderRequest';
-export { mockQuickRender } from './mockQuickRender';
+  buildExteriorRenderRequest,
+  deriveExteriorRenderViewState,
+  getExteriorRenderInteractionLocks,
+  shouldApplyExteriorRenderTaskResult,
+  validateExteriorRenderRequest,
+} from './exteriorRenderRequest';
+export { mockExteriorRender } from './mockExteriorRender';
 export type {
-  QuickRenderGenerationTask,
-  QuickRenderRequest,
-  QuickRenderResult,
-  QuickRenderValidationResult,
-  QuickRenderViewState,
-} from './quickRenderExterior.types';
+  ExteriorRenderGenerationTask,
+  ExteriorRenderRequest,
+  ExteriorRenderResult,
+  ExteriorRenderValidationResult,
+  ExteriorRenderViewState,
+} from './exteriorRender.types';

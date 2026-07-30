@@ -45,6 +45,8 @@ describe('buildImageGenerationRequest', () => {
         model: 'Nano Banana 2',
         aspectRatio: '16:9',
         resolution: '2K',
+        resolutionTier: '2K',
+        requestedSize: { width: 2048, height: 1152 },
         count: 1,
       },
       controller: undefined,
@@ -161,6 +163,8 @@ describe('buildImageGenerationRequest', () => {
       model: 'Nano Banana 2',
       aspectRatio: '16:9',
       resolution: '2K',
+      resolutionTier: '2K',
+      requestedSize: { width: 2048, height: 1152 },
       count: expectedCount,
     });
   });

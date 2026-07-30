@@ -1,9 +1,9 @@
 import { Image } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { QuickRenderWorkflowSource } from '../../types/imageNodeData.types';
+import type { ExteriorRenderWorkflowSource } from '../../types/imageNodeData.types';
 
 type ImageNodeWorkflowSourceBadgeProps = {
-  source: QuickRenderWorkflowSource;
+  source: ExteriorRenderWorkflowSource;
   onFocusSource?: (sourceNodeId: string) => void;
 };
 
@@ -25,7 +25,7 @@ export function ImageNodeWorkflowSourceBadge({
   const enabledToggles = snapshot
     ? TOGGLE_KEYS.filter((key) => snapshot.atmosphere[key])
     : [];
-  const sourceTitle = snapshot?.sourceNodeTitle || t('quickRenderExterior.title');
+  const sourceTitle = snapshot?.sourceNodeTitle || t('exteriorRender.title');
 
   const translateAtmosphereValue = (
     category: 'time' | 'weather' | 'lighting' | 'style',
@@ -46,41 +46,43 @@ export function ImageNodeWorkflowSourceBadge({
       </button>
 
       <div
-        className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-[248px] rounded-lg border border-white/[0.10] p-3 text-left shadow-[0_14px_34px_rgba(0,0,0,0.58)] group-hover/workflow-source:block"
-        style={{ background: '#202024', opacity: 1, filter: 'none' }}
+        className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-[268px] rounded-lg border border-white/[0.08] bg-[#111214] p-3.5 text-left shadow-[0_12px_32px_rgba(0,0,0,0.45)] group-hover/workflow-source:block"
+        style={{ opacity: 1, filter: 'none', backdropFilter: 'none' }}
       >
-        <div className="text-[12px] font-semibold text-white/86">{t('imageNode.workflowSource.tooltip')}</div>
-        <div className="mt-2 grid grid-cols-[64px_minmax(0,1fr)] gap-x-2 gap-y-1 text-[11px] leading-4">
-          <span className="text-white/38">{t('imageNode.workflowSource.sourceNode')}</span>
-          <span className="truncate text-white/72">{sourceTitle}</span>
+        <div className="text-[14px] font-semibold leading-5 text-[rgba(255,255,255,0.92)]">
+          {t('imageNode.workflowSource.tooltip')}
+        </div>
+        <div className="mt-2.5 grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-[12px] leading-[18px]">
+          <span className="text-[rgba(255,255,255,0.58)]">{t('imageNode.workflowSource.sourceNode')}</span>
+          <span className="truncate font-medium text-[rgba(255,255,255,0.88)]">{sourceTitle}</span>
           {snapshot && (
             <>
-              <span className="text-white/38">{t('imageNode.workflowSource.model')}</span>
-              <span className="truncate text-white/72">{snapshot.model}</span>
-              <span className="text-white/38">{t('imageNode.workflowSource.output')}</span>
-              <span className="text-white/72">{snapshot.aspectRatio} · {snapshot.resolution}</span>
+              <span className="text-[rgba(255,255,255,0.58)]">{t('imageNode.workflowSource.model')}</span>
+              <span className="truncate font-medium text-[rgba(255,255,255,0.88)]">{snapshot.model}</span>
+              <span className="text-[rgba(255,255,255,0.58)]">{t('imageNode.workflowSource.output')}</span>
+              <span className="font-medium text-[rgba(255,255,255,0.88)]">{snapshot.aspectRatio} · {snapshot.resolution}</span>
               {ATMOSPHERE_KEYS.map(([field, category]) => (
                 <div key={field} className="contents">
-                  <span className="text-white/38">{t(`atmosphere.fields.${field}`)}</span>
-                  <span className="text-white/72">
+                  <span className="text-[rgba(255,255,255,0.58)]">{t(`atmosphere.fields.${field}`)}</span>
+                  <span className="font-medium text-[rgba(255,255,255,0.88)]">
                     {translateAtmosphereValue(category, snapshot.atmosphere[field])}
                   </span>
                 </div>
               ))}
-              <span className="text-white/38">{t('imageNode.workflowSource.toggles')}</span>
-              <span className="text-white/72">
+              <span className="text-[rgba(255,255,255,0.58)]">{t('imageNode.workflowSource.toggles')}</span>
+              <span className="font-medium text-[rgba(255,255,255,0.88)]">
                 {enabledToggles.length > 0
                   ? enabledToggles.map((key) => t(`atmosphere.toggles.${key}.label`)).join(' / ')
                   : t('imageNode.workflowSource.noneEnabled')}
               </span>
-              <span className="text-white/38">{t('imageNode.workflowSource.channels')}</span>
-              <span className="text-white/72">
+              <span className="text-[rgba(255,255,255,0.58)]">{t('imageNode.workflowSource.channels')}</span>
+              <span className="font-medium text-[rgba(255,255,255,0.88)]">
                 {snapshot.renderChannels.length > 0
                   ? snapshot.renderChannels.map((channel) => t(`renderChannel.names.${channel}`)).join(' / ')
                   : t('imageNode.workflowSource.noChannels')}
               </span>
-              <span className="text-white/38">{t('imageNode.workflowSource.prompt')}</span>
-              <span className="text-white/72">
+              <span className="text-[rgba(255,255,255,0.58)]">{t('imageNode.workflowSource.prompt')}</span>
+              <span className="font-medium text-[rgba(255,255,255,0.88)]">
                 {t(snapshot.hasPrompt
                   ? 'imageNode.workflowSource.promptEntered'
                   : 'imageNode.workflowSource.promptEmpty')}

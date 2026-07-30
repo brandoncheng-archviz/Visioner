@@ -1,37 +1,78 @@
 import { Armchair, Building2, LampCeiling, Layers, Mountain, SwatchBook } from 'lucide-react';
 import type { ImageRole, ImageRoleOption, LocalReferenceType } from '../types/imageNode.types';
 
-/* Reserved labels that cannot be used as custom local-reference names */
-export const SYSTEM_USAGE_LABELS = [
-  '主体建筑',
-  '氛围参考',
-  '材质参考',
-  '景观参考',
-  '照明参考',
-  '室内参考',
-  '局部参考',
-  '植物',
-  '人物',
-  '天空',
-  '海水',
-  '城市',
-  '雾气',
-  '铺装',
-  '未设置参考用途',
-  '未定义用途',
-  '手动输入其他元素',
-] as const;
+export type ReferenceRole = 'primaryBuilding' | 'atmosphere' | 'local' | 'unassigned';
+export type ReferenceLocalType = 'vegetation' | 'people' | 'sky' | 'water' | 'city' | 'fog';
+
+export const REFERENCE_ROLE_OPTIONS: ReadonlyArray<{
+  value: ReferenceRole;
+  labelKey: string;
+  descriptionKey: string;
+}> = [
+  { value: 'primaryBuilding', labelKey: 'reference.roles.primaryBuilding', descriptionKey: 'reference.descriptions.primaryBuilding' },
+  { value: 'atmosphere', labelKey: 'reference.roles.atmosphere', descriptionKey: 'reference.descriptions.atmosphere' },
+  { value: 'local', labelKey: 'reference.roles.local', descriptionKey: 'reference.descriptions.local' },
+  { value: 'unassigned', labelKey: 'reference.roles.unassigned', descriptionKey: 'reference.descriptions.unassigned' },
+];
+
+export const LOCAL_REFERENCE_TYPE_OPTIONS: ReadonlyArray<{
+  value: ReferenceLocalType;
+  storageValue: LocalReferenceType;
+  labelKey: string;
+}> = [
+  { value: 'vegetation', storageValue: 'vegetation', labelKey: 'reference.localTypes.vegetation' },
+  { value: 'people', storageValue: 'people', labelKey: 'reference.localTypes.people' },
+  { value: 'sky', storageValue: 'sky', labelKey: 'reference.localTypes.sky' },
+  { value: 'water', storageValue: 'seawater', labelKey: 'reference.localTypes.water' },
+  { value: 'city', storageValue: 'city', labelKey: 'reference.localTypes.city' },
+  { value: 'fog', storageValue: 'mist', labelKey: 'reference.localTypes.fog' },
+];
+
+const SYSTEM_USAGE_LABELS_BY_ID = {
+  roles: {
+    primaryBuilding: { zhCN: '主体建筑', enUS: 'Primary Building' },
+    atmosphere: { zhCN: '氛围参考', enUS: 'Atmosphere Reference' },
+    material: { zhCN: '材质参考', enUS: 'Material Reference' },
+    landscape: { zhCN: '景观参考', enUS: 'Landscape Reference' },
+    lighting: { zhCN: '照明参考', enUS: 'Lighting Reference' },
+    interior: { zhCN: '室内参考', enUS: 'Interior Reference' },
+    local: { zhCN: '局部参考', enUS: 'Local Reference' },
+    unassigned: { zhCN: '未设置参考用途', enUS: 'No Role Assigned' },
+    undefined: { zhCN: '未定义用途', enUS: 'Undefined Role' },
+  },
+  localTypes: {
+    vegetation: { zhCN: '植物', enUS: 'Vegetation' },
+    people: { zhCN: '人物', enUS: 'People' },
+    sky: { zhCN: '天空', enUS: 'Sky' },
+    water: { zhCN: '海水', enUS: 'Water' },
+    city: { zhCN: '城市', enUS: 'City' },
+    fog: { zhCN: '雾气', enUS: 'Fog' },
+    glass: { zhCN: '玻璃', enUS: 'Glass' },
+    paving: { zhCN: '铺装', enUS: 'Paving' },
+  },
+  actions: {
+    manualInput: { zhCN: '手动输入其他元素', enUS: 'Enter another element manually' },
+  },
+} as const;
+
+/* Reserved labels that cannot be used as custom local-reference names, in either locale. */
+export const SYSTEM_USAGE_LABELS = new Set(
+  Object.values(SYSTEM_USAGE_LABELS_BY_ID)
+    .flatMap((group) => Object.values(group))
+    .flatMap((labels) => [labels.zhCN, labels.enUS])
+    .map(normalizeUsageNameForCompare),
+);
 
 /* ─── Primary role options (shown in creation UI) ─── */
 export const imageRoleOptions: ImageRoleOption[] = [
   {
     value: 'primary_building',
     label: '主体建筑',
-    labelKey: 'reference.primaryBuilding',
+    labelKey: 'reference.roles.primaryBuilding',
     description: '主体建筑',
-    descriptionKey: 'reference.primaryBuilding',
+    descriptionKey: 'reference.roles.primaryBuilding',
     detail: '作为主体建筑参考，AI 将优先参考建筑体块、轮廓比例、立面关系、建筑特征，以及外立面的主要材质与纹理表达。',
-    detailKey: 'reference.primaryBuildingDetail',
+    detailKey: 'reference.descriptions.primaryBuilding',
     constraints: ['buildingMass', 'outlineRatio', 'facadeLanguage', 'windowRhythm', 'buildingFeature', 'mainMaterialTexture'],
     Icon: Building2,
     color: '#3B82F6',
@@ -39,11 +80,11 @@ export const imageRoleOptions: ImageRoleOption[] = [
   {
     value: 'atmosphere_reference',
     label: '氛围参考',
-    labelKey: 'reference.atmosphereReference',
+    labelKey: 'reference.roles.atmosphere',
     description: '氛围参考',
-    descriptionKey: 'reference.atmosphereReference',
+    descriptionKey: 'reference.roles.atmosphere',
     detail: '作为氛围参考，AI 将主要参考整体时间段、天气状态、色调、光影情绪、曝光关系、对比度和真实度，不复制具体建筑内容。',
-    detailKey: 'reference.atmosphereReferenceDetail',
+    detailKey: 'reference.descriptions.atmosphere',
     constraints: ['timeOfDay', 'weather', 'colorTone', 'lightShadowMood', 'exposure', 'contrast', 'realism', 'overallQuality'],
     Icon: Layers,
     color: '#8B5CF6',
@@ -51,11 +92,11 @@ export const imageRoleOptions: ImageRoleOption[] = [
   {
     value: 'material_reference',
     label: '材质参考',
-    labelKey: 'reference.materialReference',
+    labelKey: 'reference.roles.material',
     description: '材质参考',
-    descriptionKey: 'reference.materialReference',
+    descriptionKey: 'reference.roles.material',
     detail: '作为材质参考，AI 将主要参考材质类型、表面纹理、反射关系、粗糙度和细节质感，不复制整体建筑体块。',
-    detailKey: 'reference.materialReferenceDetail',
+    detailKey: 'reference.descriptions.material',
     constraints: ['materialTexture', 'surfaceFinish', 'reflection', 'detailQuality'],
     Icon: SwatchBook,
     color: '#94A3B8',
@@ -63,11 +104,11 @@ export const imageRoleOptions: ImageRoleOption[] = [
   {
     value: 'landscape_reference',
     label: '景观参考',
-    labelKey: 'reference.landscapeReference',
+    labelKey: 'reference.roles.landscape',
     description: '景观参考',
-    descriptionKey: 'reference.landscapeReference',
+    descriptionKey: 'reference.roles.landscape',
     detail: '作为景观参考，AI 将主要参考景观布局、植物配置、地形关系、铺装和室外空间氛围。',
-    detailKey: 'reference.landscapeReferenceDetail',
+    detailKey: 'reference.descriptions.landscape',
     constraints: ['landscapeLayout', 'planting', 'terrain', 'outdoorAtmosphere'],
     Icon: Mountain,
     color: '#22C55E',
@@ -75,11 +116,11 @@ export const imageRoleOptions: ImageRoleOption[] = [
   {
     value: 'lighting_reference',
     label: '照明参考',
-    labelKey: 'reference.lightingReference',
+    labelKey: 'reference.roles.lighting',
     description: '照明参考',
-    descriptionKey: 'reference.lightingReference',
+    descriptionKey: 'reference.roles.lighting',
     detail: '作为照明参考，AI 将主要参考灯具语言、光色、照明强度、明暗层次和光线分布。',
-    detailKey: 'reference.lightingReferenceDetail',
+    detailKey: 'reference.descriptions.lighting',
     constraints: ['fixtureLanguage', 'lightColor', 'lightIntensity', 'lightDistribution'],
     Icon: LampCeiling,
     color: '#F59E0B',
@@ -87,11 +128,11 @@ export const imageRoleOptions: ImageRoleOption[] = [
   {
     value: 'interior_reference',
     label: '室内参考',
-    labelKey: 'reference.interiorReference',
+    labelKey: 'reference.roles.interior',
     description: '室内参考',
-    descriptionKey: 'reference.interiorReference',
+    descriptionKey: 'reference.roles.interior',
     detail: '作为室内参考，AI 将主要参考室内空间布局、家具陈设、室内材质和整体氛围。',
-    detailKey: 'reference.interiorReferenceDetail',
+    detailKey: 'reference.descriptions.interior',
     constraints: ['interiorLayout', 'furniture', 'interiorMaterial', 'interiorMood'],
     Icon: Armchair,
     color: '#F97316',
@@ -111,42 +152,42 @@ export const localReferenceOptions: LocalReferenceOption[] = [
   {
     value: 'vegetation',
     label: '植物',
-    labelKey: 'reference.localReferenceVegetation',
+    labelKey: 'reference.localTypes.vegetation',
     promptText: '只参考该图中的植物类型、种植密度、景观层次和绿化氛围，不复制整体建筑体块与构图。',
     color: '#22C55E',
   },
   {
     value: 'people',
     label: '人物',
-    labelKey: 'reference.localReferencePeople',
+    labelKey: 'reference.localTypes.people',
     promptText: '只参考该图中的人物尺度、活动状态、人群密度和生活氛围，不复制整体建筑体块与构图。',
     color: '#F97316',
   },
   {
     value: 'sky',
     label: '天空',
-    labelKey: 'reference.localReferenceSky',
+    labelKey: 'reference.localTypes.sky',
     promptText: '只参考该图中的天空状态、云量、天气感和时间段氛围，不复制整体建筑体块与构图。',
     color: '#7DD3FC',
   },
   {
     value: 'seawater',
     label: '海水',
-    labelKey: 'reference.localReferenceWater',
+    labelKey: 'reference.localTypes.water',
     promptText: '只参考该图中的海水状态、反射关系、湿润感和滨海氛围，不复制整体建筑体块与构图。',
     color: '#06B6D4',
   },
   {
     value: 'city',
     label: '城市',
-    labelKey: 'reference.localReferenceRetail',
+    labelKey: 'reference.localTypes.city',
     promptText: '只参考该图中的城市界面、街道关系、建筑背景和都市氛围，不复制整体建筑体块与构图。',
     color: '#64748B',
   },
   {
     value: 'glass',
     label: '玻璃',
-    labelKey: 'reference.localReferenceGlass',
+    labelKey: 'reference.localTypes.glass',
     promptText: '参考该图中玻璃的通透度、反射、室内可见度、材质质感、光影关系和高级感，并自然融合到目标建筑画面中。',
     color: '#67E8F9',
   },
@@ -156,14 +197,14 @@ const legacyLocalReferenceOptions: LocalReferenceOption[] = [
   {
     value: 'mist',
     label: '雾气',
-    labelKey: 'reference.localReferenceMist',
+    labelKey: 'reference.localTypes.fog',
     promptText: '只参考该图中的雾气浓度、空气透视、远近虚实和朦胧氛围，不复制整体建筑体块与构图。',
     color: '#A78BFA',
   },
   {
     value: 'paving',
     label: '铺装',
-    labelKey: 'reference.localReferencePaving',
+    labelKey: 'reference.localTypes.paving',
     promptText: '只参考该图中的铺装材质、拼接方式、纹理尺度和地面细节，不复制整体建筑体块与构图。',
     color: '#D6A76C',
   },
@@ -291,7 +332,7 @@ export function validateCustomReferenceLabel(value: string, existingLabels: stri
   const label = normalizeCustomReferenceLabel(value);
   if (!label) return { ok: false as const, message: 'reference_custom_empty' as const };
   const normalized = normalizeUsageNameForCompare(label);
-  if (SYSTEM_USAGE_LABELS.some((reserved) => normalizeUsageNameForCompare(reserved) === normalized)) {
+  if (SYSTEM_USAGE_LABELS.has(normalized)) {
     return { ok: false as const, message: 'reference_custom_reserved' as const };
   }
   if (existingLabels.some((existing) => normalizeUsageNameForCompare(existing) === normalized)) {
@@ -336,10 +377,14 @@ export function getImageRoleLabel(
 ): string {
   const normalizedRole = getNormalizedRole(role) || role;
   if (!normalizedRole) {
-    return translate ? translate('imageNode.undefinedUsage') : '未设置参考用途';
+    return translate ? translate('reference.roles.unassigned') : '未设置参考用途';
   }
   const option = getImageRoleOption(normalizedRole, customLabel, translate);
-  const baseLabel = option?.label || (translate ? translate('imageNode.undefinedUsage') : '未设置参考用途');
+  const baseLabel = normalizedRole === 'local_reference'
+    ? translate
+      ? translate('reference.roles.local')
+      : '局部参考'
+    : option?.label || (translate ? translate('reference.roles.unassigned') : '未设置参考用途');
   if (normalizedRole === 'local_reference') {
     const subLabel = getLocalReferenceLabel(role, localRefType, localRefLabel, customLabel, translate);
     if (subLabel) return `${baseLabel} · ${subLabel}`;

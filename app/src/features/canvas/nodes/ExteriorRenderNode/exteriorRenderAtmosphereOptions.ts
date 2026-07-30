@@ -1,16 +1,16 @@
 import type {
-  QuickRenderAtmosphereLighting,
-  QuickRenderAtmosphereStyle,
-  QuickRenderAtmosphereTime,
-  QuickRenderAtmosphereWeather,
-} from './quickRenderExterior.types';
+  ExteriorRenderAtmosphereLighting,
+  ExteriorRenderAtmosphereStyle,
+  ExteriorRenderAtmosphereTime,
+  ExteriorRenderAtmosphereWeather,
+} from './exteriorRender.types';
 
-export type QuickRenderAtmosphereDisplayOption<T extends string> = {
+export type ExteriorRenderAtmosphereDisplayOption<T extends string> = {
   id: T;
   labelKey: string;
 };
 
-export const QUICK_RENDER_TIME_OPTIONS: QuickRenderAtmosphereDisplayOption<QuickRenderAtmosphereTime>[] = [
+export const EXTERIOR_RENDER_TIME_OPTIONS: ExteriorRenderAtmosphereDisplayOption<ExteriorRenderAtmosphereTime>[] = [
   { id: 'sunrise', labelKey: 'atmosphere.time.sunrise' },
   { id: 'earlyMorning', labelKey: 'atmosphere.time.earlyMorning' },
   { id: 'noon', labelKey: 'atmosphere.time.noon' },
@@ -19,7 +19,7 @@ export const QUICK_RENDER_TIME_OPTIONS: QuickRenderAtmosphereDisplayOption<Quick
   { id: 'night', labelKey: 'atmosphere.time.night' },
 ];
 
-export const QUICK_RENDER_LIGHTING_OPTIONS: QuickRenderAtmosphereDisplayOption<QuickRenderAtmosphereLighting>[] = [
+export const EXTERIOR_RENDER_LIGHTING_OPTIONS: ExteriorRenderAtmosphereDisplayOption<ExteriorRenderAtmosphereLighting>[] = [
   { id: 'front', labelKey: 'atmosphere.lighting.front' },
   { id: 'back', labelKey: 'atmosphere.lighting.back' },
   { id: 'left', labelKey: 'atmosphere.lighting.left' },
@@ -27,7 +27,7 @@ export const QUICK_RENDER_LIGHTING_OPTIONS: QuickRenderAtmosphereDisplayOption<Q
   { id: 'softSky', labelKey: 'atmosphere.lighting.softSky' },
 ];
 
-export const QUICK_RENDER_WEATHER_OPTIONS: QuickRenderAtmosphereDisplayOption<QuickRenderAtmosphereWeather>[] = [
+export const EXTERIOR_RENDER_WEATHER_OPTIONS: ExteriorRenderAtmosphereDisplayOption<ExteriorRenderAtmosphereWeather>[] = [
   { id: 'sunny', labelKey: 'atmosphere.weather.sunny' },
   { id: 'cloudy', labelKey: 'atmosphere.weather.cloudy' },
   { id: 'rainy', labelKey: 'atmosphere.weather.rainy' },
@@ -35,7 +35,7 @@ export const QUICK_RENDER_WEATHER_OPTIONS: QuickRenderAtmosphereDisplayOption<Qu
   { id: 'foggy', labelKey: 'atmosphere.weather.foggy' },
 ];
 
-export const QUICK_RENDER_STYLE_OPTIONS: QuickRenderAtmosphereDisplayOption<QuickRenderAtmosphereStyle>[] = [
+export const EXTERIOR_RENDER_STYLE_OPTIONS: ExteriorRenderAtmosphereDisplayOption<ExteriorRenderAtmosphereStyle>[] = [
   { id: 'photorealistic', labelKey: 'atmosphere.style.photorealistic' },
   { id: 'nordic', labelKey: 'atmosphere.style.nordic' },
   { id: 'dramaticConcept', labelKey: 'atmosphere.style.dramaticConcept' },
@@ -43,7 +43,7 @@ export const QUICK_RENDER_STYLE_OPTIONS: QuickRenderAtmosphereDisplayOption<Quic
   { id: 'painterly', labelKey: 'atmosphere.style.painterly' },
 ];
 
-export const QUICK_RENDER_TOGGLE_OPTIONS = [
+export const EXTERIOR_RENDER_TOGGLE_OPTIONS = [
   { key: 'addEntourage', labelKey: 'atmosphere.toggles.addEntourage.label' },
   { key: 'addPeople', labelKey: 'atmosphere.toggles.addPeople.label' },
   { key: 'interiorLights', labelKey: 'atmosphere.toggles.interiorLights.label' },

@@ -3,39 +3,39 @@ import { DEFAULT_MODEL_PARAMS } from '../../constants/canvasConstants';
 import type { GenerationTask } from '../../types/generation.types';
 import type { GeneratedImage, ResultSetBatch } from '../../types/history.types';
 import { getRoleData } from '../../utils/referenceUtils';
-import type { QuickRenderRequest, QuickRenderResult } from './quickRenderExterior.types';
+import type { ExteriorRenderRequest, ExteriorRenderResult } from './exteriorRender.types';
 
-const QUICK_RENDER_OUTPUT_HORIZONTAL_GAP = 120;
-const QUICK_RENDER_OUTPUT_FALLBACK_WIDTH = 470;
-const QUICK_RENDER_OUTPUT_VERTICAL_OFFSET = 96;
-const QUICK_RENDER_OUTPUT_COLLISION_TOLERANCE = 80;
+const EXTERIOR_RENDER_OUTPUT_HORIZONTAL_GAP = 120;
+const EXTERIOR_RENDER_OUTPUT_FALLBACK_WIDTH = 470;
+const EXTERIOR_RENDER_OUTPUT_VERTICAL_OFFSET = 96;
+const EXTERIOR_RENDER_OUTPUT_COLLISION_TOLERANCE = 80;
 
-type BuildQuickRenderProcessingOutputOptions = {
+type BuildExteriorRenderProcessingOutputOptions = {
   sourceNode: Node;
-  request: QuickRenderRequest;
+  request: ExteriorRenderRequest;
   taskId: string;
   timestamp: number;
   label: string;
   existingNodes: Node[];
 };
 
-type BuildQuickRenderCompletedOutputOptions = {
+type BuildExteriorRenderCompletedOutputOptions = {
   outputNode: Node;
   sourceNodeId: string;
-  request: QuickRenderRequest;
-  result: QuickRenderResult;
+  request: ExteriorRenderRequest;
+  result: ExteriorRenderResult;
   timestamp: number;
   createImageNodeData: (image: GeneratedImage, batch: ResultSetBatch) => Node['data'];
 };
 
-type BuildQuickRenderFailedOutputOptions = {
+type BuildExteriorRenderFailedOutputOptions = {
   outputNode: Node;
   taskId: string;
   errorMessage: string;
   timestamp: number;
 };
 
-function createQuickRenderInputRefs(request: QuickRenderRequest) {
+function createExteriorRenderInputRefs(request: ExteriorRenderRequest) {
   return request.inputImages.map((image) => ({
     imageId: image.id,
     imageUrl: image.imageUrl,
@@ -45,22 +45,25 @@ function createQuickRenderInputRefs(request: QuickRenderRequest) {
   }));
 }
 
-function createQuickRenderModelParams(request: QuickRenderRequest) {
+function createExteriorRenderModelParams(request: ExteriorRenderRequest) {
   return {
     ...DEFAULT_MODEL_PARAMS,
     model: request.modelParams.model,
     ratio: request.modelParams.aspectRatio,
     resolution: request.modelParams.resolution,
+    resolutionTier: request.modelParams.resolutionTier,
+    requestedSize: request.modelParams.requestedSize,
     count: String(request.modelParams.count),
   };
 }
 
-function createQuickRenderWorkflowSnapshot(sourceNode: Node, request: QuickRenderRequest) {
+function createExteriorRenderWorkflowSnapshot(sourceNode: Node, request: ExteriorRenderRequest) {
   return {
     sourceNodeTitle: String(sourceNode.data.label || sourceNode.data.title || ''),
     model: request.modelParams.model,
     aspectRatio: request.modelParams.aspectRatio,
     resolution: request.modelParams.resolution,
+    requestedSize: request.modelParams.requestedSize,
     atmosphere: { ...request.atmosphere },
     renderChannels: Object.entries(request.renderChannels)
       .filter(([, channel]) => Boolean(channel))
@@ -69,32 +72,32 @@ function createQuickRenderWorkflowSnapshot(sourceNode: Node, request: QuickRende
   };
 }
 
-function resolveQuickRenderOutputPosition(sourceNode: Node, existingNodes: Node[]) {
-  const sourceWidth = sourceNode.measured?.width || sourceNode.width || QUICK_RENDER_OUTPUT_FALLBACK_WIDTH;
-  const x = sourceNode.position.x + sourceWidth + QUICK_RENDER_OUTPUT_HORIZONTAL_GAP;
+function resolveExteriorRenderOutputPosition(sourceNode: Node, existingNodes: Node[]) {
+  const sourceWidth = sourceNode.measured?.width || sourceNode.width || EXTERIOR_RENDER_OUTPUT_FALLBACK_WIDTH;
+  const x = sourceNode.position.x + sourceWidth + EXTERIOR_RENDER_OUTPUT_HORIZONTAL_GAP;
   let y = sourceNode.position.y;
 
   while (existingNodes.some((node) => (
-    Math.abs(node.position.x - x) < QUICK_RENDER_OUTPUT_COLLISION_TOLERANCE
-    && Math.abs(node.position.y - y) < QUICK_RENDER_OUTPUT_COLLISION_TOLERANCE
+    Math.abs(node.position.x - x) < EXTERIOR_RENDER_OUTPUT_COLLISION_TOLERANCE
+    && Math.abs(node.position.y - y) < EXTERIOR_RENDER_OUTPUT_COLLISION_TOLERANCE
   ))) {
-    y += QUICK_RENDER_OUTPUT_VERTICAL_OFFSET;
+    y += EXTERIOR_RENDER_OUTPUT_VERTICAL_OFFSET;
   }
 
   return { x, y };
 }
 
-export function buildQuickRenderProcessingOutput({
+export function buildExteriorRenderProcessingOutput({
   sourceNode,
   request,
   taskId,
   timestamp,
   label,
   existingNodes,
-}: BuildQuickRenderProcessingOutputOptions): { node: Node; edge: Edge } {
-  const outputNodeId = `image-quick-render-${taskId}`;
-  const inputRefs = createQuickRenderInputRefs(request);
-  const modelParams = createQuickRenderModelParams(request);
+}: BuildExteriorRenderProcessingOutputOptions): { node: Node; edge: Edge } {
+  const outputNodeId = `image-exterior-render-${taskId}`;
+  const inputRefs = createExteriorRenderInputRefs(request);
+  const modelParams = createExteriorRenderModelParams(request);
   const generationTask: GenerationTask = {
     taskId,
     sourceNodeId: sourceNode.id,
@@ -110,7 +113,7 @@ export function buildQuickRenderProcessingOutput({
   const node: Node = {
     id: outputNodeId,
     type: 'image',
-    position: resolveQuickRenderOutputPosition(sourceNode, existingNodes),
+    position: resolveExteriorRenderOutputPosition(sourceNode, existingNodes),
     data: {
       label,
       title: label,
@@ -121,6 +124,8 @@ export function buildQuickRenderProcessingOutput({
       selectedPresets: [],
       selectedStyleId: null,
       modelParams,
+      resolutionTier: request.modelParams.resolutionTier,
+      requestedSize: request.modelParams.requestedSize,
       generatedImages: [],
       generationTask,
       currentResultSet: null,
@@ -130,22 +135,22 @@ export function buildQuickRenderProcessingOutput({
       referencesSignature: '[]',
       isProcessing: true,
       sourceWorkflow: {
-        type: 'quickRenderExterior',
+        type: 'exteriorRender',
         sourceNodeId: sourceNode.id,
-        snapshot: createQuickRenderWorkflowSnapshot(sourceNode, request),
+        snapshot: createExteriorRenderWorkflowSnapshot(sourceNode, request),
       },
     },
     selected: true,
   };
   const edge: Edge = {
-    id: `quick-render-output-${sourceNode.id}-${outputNodeId}`,
+    id: `exterior-render-output-${sourceNode.id}-${outputNodeId}`,
     source: sourceNode.id,
     target: outputNodeId,
     sourceHandle: 'right-source',
     targetHandle: 'left-target',
     data: {
-      kind: 'quickRenderOutput',
-      sourceNodeType: 'quickRenderExterior',
+      kind: 'exteriorRenderOutput',
+      sourceNodeType: 'exteriorRender',
     },
     style: { stroke: '#555', strokeWidth: 1 },
   };
@@ -153,14 +158,14 @@ export function buildQuickRenderProcessingOutput({
   return { node, edge };
 }
 
-export function buildQuickRenderCompletedOutput({
+export function buildExteriorRenderCompletedOutput({
   outputNode,
   sourceNodeId,
   request,
   result,
   timestamp,
   createImageNodeData,
-}: BuildQuickRenderCompletedOutputOptions): Node | null {
+}: BuildExteriorRenderCompletedOutputOptions): Node | null {
   const resultImage = result.images[0];
   if (!resultImage) return null;
 
@@ -183,10 +188,10 @@ export function buildQuickRenderCompletedOutput({
     })),
     prompt: request.prompt,
     userPrompt: request.prompt,
-    inputRefs: createQuickRenderInputRefs(request),
+    inputRefs: createExteriorRenderInputRefs(request),
     presetIds: [],
     styleId: null,
-    modelParams: createQuickRenderModelParams(request),
+    modelParams: createExteriorRenderModelParams(request),
     createdAt: timestamp,
   };
 
@@ -199,22 +204,28 @@ export function buildQuickRenderCompletedOutput({
       title: outputNode.data.title,
       sourceWorkflow: {
         ...outputNode.data.sourceWorkflow as object,
-        type: 'quickRenderExterior',
+        type: 'exteriorRender',
         sourceNodeId,
       },
       isProcessing: false,
       assetSource: 'generated',
-      currentResultSource: 'quickRender',
+      currentResultSource: 'exteriorRender',
+      resolutionTier: request.modelParams.resolutionTier,
+      requestedSize: request.modelParams.requestedSize,
+      actualSize: {
+        width: resultImage.width,
+        height: resultImage.height,
+      },
     },
   };
 }
 
-export function buildQuickRenderFailedOutput({
+export function buildExteriorRenderFailedOutput({
   outputNode,
   taskId,
   errorMessage,
   timestamp,
-}: BuildQuickRenderFailedOutputOptions): Node {
+}: BuildExteriorRenderFailedOutputOptions): Node {
   const currentTask = outputNode.data.generationTask as GenerationTask | null | undefined;
   const sourceWorkflow = outputNode.data.sourceWorkflow as { sourceNodeId?: string } | undefined;
   return {

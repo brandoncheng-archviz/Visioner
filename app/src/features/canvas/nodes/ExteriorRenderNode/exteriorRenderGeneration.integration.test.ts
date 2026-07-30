@@ -1,26 +1,26 @@
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
-import { mockQuickRender } from './mockQuickRender';
-import { runQuickRenderGeneration } from './quickRenderGeneration';
+import { mockExteriorRender } from './mockExteriorRender';
+import { runExteriorRenderGeneration } from './exteriorRenderGeneration';
 import {
-  buildQuickRenderCompletedOutput,
-  buildQuickRenderFailedOutput,
-  buildQuickRenderProcessingOutput,
-} from './quickRenderResultGraph';
+  buildExteriorRenderCompletedOutput,
+  buildExteriorRenderFailedOutput,
+  buildExteriorRenderProcessingOutput,
+} from './exteriorRenderResultGraph';
 import {
-  buildQuickRenderRequest,
-  deriveQuickRenderViewState,
-  getQuickRenderInteractionLocks,
-} from './quickRenderRequest';
+  buildExteriorRenderRequest,
+  deriveExteriorRenderViewState,
+  getExteriorRenderInteractionLocks,
+} from './exteriorRenderRequest';
 import type {
-  QuickRenderConnectedImage,
-  QuickRenderExteriorNodeData,
-  QuickRenderGenerationTask,
-  QuickRenderRequest,
-  QuickRenderResult,
-} from './quickRenderExterior.types';
+  ExteriorRenderConnectedImage,
+  ExteriorRenderNodeData,
+  ExteriorRenderGenerationTask,
+  ExteriorRenderRequest,
+  ExteriorRenderResult,
+} from './exteriorRender.types';
 
-const inputImage: QuickRenderConnectedImage = {
+const inputImage: ExteriorRenderConnectedImage = {
   id: 'input-1',
   sourceType: 'upload',
   imageUrl: '/assets/mock/generation-results/result-01.png',
@@ -30,7 +30,7 @@ const inputImage: QuickRenderConnectedImage = {
   roleLabel: '主体建筑',
 };
 
-function createReadyData(): QuickRenderExteriorNodeData {
+function createReadyData(): ExteriorRenderNodeData {
   return {
     connectedImages: [inputImage],
     renderChannels: { channels: [] },
@@ -43,11 +43,11 @@ function createReadyData(): QuickRenderExteriorNodeData {
 
 function createProcessingOutput(
   sourceNode: Node,
-  request: QuickRenderRequest,
+  request: ExteriorRenderRequest,
   taskId: string,
   nodes: Node[],
 ) {
-  return buildQuickRenderProcessingOutput({
+  return buildExteriorRenderProcessingOutput({
     sourceNode,
     request,
     taskId,
@@ -60,10 +60,10 @@ function createProcessingOutput(
 function completeOutput(
   outputNode: Node,
   sourceNodeId: string,
-  request: QuickRenderRequest,
-  result: QuickRenderResult,
+  request: ExteriorRenderRequest,
+  result: ExteriorRenderResult,
 ) {
-  return buildQuickRenderCompletedOutput({
+  return buildExteriorRenderCompletedOutput({
     outputNode,
     sourceNodeId,
     request,
@@ -78,20 +78,20 @@ function completeOutput(
   });
 }
 
-describe('quick render generation entry', () => {
+describe('exterior render generation entry', () => {
   it('creates a processing image and system edge before completing that same output node', async () => {
     let data = createReadyData();
     const sourceNode: Node = {
-      id: 'quick-render-1',
-      type: 'quickRenderExterior',
+      id: 'exterior-render-1',
+      type: 'exteriorRender',
       position: { x: 100, y: 100 },
-      data: { label: '快速渲染-室外 01' },
+      data: { label: '室外渲染 01' },
     };
     let nodes: Node[] = [sourceNode];
     let edges: Edge[] = [];
-    const statuses: QuickRenderGenerationTask['status'][] = [];
+    const statuses: ExteriorRenderGenerationTask['status'][] = [];
     const taskId = 'task-success';
-    const request = buildQuickRenderRequest(data);
+    const request = buildExteriorRenderRequest(data);
     const output = createProcessingOutput(sourceNode, request, taskId, nodes);
     nodes = [...nodes, output.node];
     edges = [...edges, output.edge];
@@ -99,8 +99,10 @@ describe('quick render generation entry', () => {
     expect(output.node.position).toEqual({ x: 690, y: 100 });
     expect(output.node.data).toEqual(expect.objectContaining({
       isProcessing: true,
+      resolutionTier: '2K',
+      requestedSize: { width: 2048, height: 1152 },
       sourceWorkflow: expect.objectContaining({
-        type: 'quickRenderExterior',
+        type: 'exteriorRender',
         sourceNodeId: sourceNode.id,
         snapshot: expect.objectContaining({
           model: 'Nano Banana 2',
@@ -112,21 +114,21 @@ describe('quick render generation entry', () => {
       generationTask: expect.objectContaining({ taskId, status: 'running' }),
     }));
     expect(output.edge.data).toEqual({
-      kind: 'quickRenderOutput',
-      sourceNodeType: 'quickRenderExterior',
+      kind: 'exteriorRenderOutput',
+      sourceNodeType: 'exteriorRender',
     });
 
-    const outcome = await runQuickRenderGeneration({
+    const outcome = await runExteriorRenderGeneration({
       request,
       taskId,
-      execute: (nextRequest) => mockQuickRender(nextRequest, { taskId, delayMs: 0 }),
+      execute: (nextRequest) => mockExteriorRender(nextRequest, { taskId, delayMs: 0 }),
       isTaskActive: (completedTaskId) => completedTaskId === taskId,
       onTaskUpdate: (generationTask, lastResult) => {
         statuses.push(generationTask.status);
         data = { ...data, generationTask, ...(lastResult ? { lastResult } : {}) };
         if (generationTask.status === 'processing') {
-          expect(deriveQuickRenderViewState(data)).toBe('PROCESSING');
-          expect(Object.values(getQuickRenderInteractionLocks('PROCESSING')).every(Boolean)).toBe(true);
+          expect(deriveExteriorRenderViewState(data)).toBe('PROCESSING');
+          expect(Object.values(getExteriorRenderInteractionLocks('PROCESSING')).every(Boolean)).toBe(true);
         }
       },
       onResult: (nextRequest, result) => {
@@ -144,45 +146,90 @@ describe('quick render generation entry', () => {
     expect(nodes[1]?.data).toEqual(expect.objectContaining({
       isProcessing: false,
       assetSource: 'generated',
-      currentResultSource: 'quickRender',
+      currentResultSource: 'exteriorRender',
       currentImage: inputImage.imageUrl,
     }));
     expect(edges).toEqual([expect.objectContaining({
       source: sourceNode.id,
       target: output.node.id,
       data: {
-        kind: 'quickRenderOutput',
-        sourceNodeType: 'quickRenderExterior',
+        kind: 'exteriorRenderOutput',
+        sourceNodeType: 'exteriorRender',
       },
     })]);
+  });
+
+  it('stores a 5000+ returned image as actualSize without replacing the 4K request size', () => {
+    const sourceNode: Node = {
+      id: 'exterior-render-4k',
+      type: 'exteriorRender',
+      position: { x: 0, y: 0 },
+      data: { label: '室外渲染 4K' },
+    };
+    const request = buildExteriorRenderRequest({
+      ...createReadyData(),
+      modelParams: {
+        model: 'Nano Banana 2',
+        aspectRatio: '16:9',
+        resolution: '4K',
+        count: 1,
+      },
+    });
+    const output = createProcessingOutput(sourceNode, request, 'task-4k', [sourceNode]);
+    const completed = completeOutput(output.node, sourceNode.id, request, {
+      taskId: 'task-4k',
+      status: 'success',
+      images: [{
+        id: 'result-4k',
+        imageUrl: '/original-5120.png',
+        width: 5120,
+        height: 2880,
+        seed: 42,
+      }],
+      metadata: {
+        model: 'Nano Banana 2',
+        aspectRatio: '16:9',
+        resolution: '4K',
+      },
+    });
+
+    expect(output.node.data).toEqual(expect.objectContaining({
+      requestedSize: { width: 3840, height: 2160 },
+      resolutionTier: '4K',
+    }));
+    expect(completed?.data).toEqual(expect.objectContaining({
+      requestedSize: { width: 3840, height: 2160 },
+      actualSize: { width: 5120, height: 2880 },
+      currentImage: '/original-5120.png',
+    }));
   });
 
   it('keeps failed output and creates a new offset output for a later retry', async () => {
     let data = createReadyData();
     const sourceNode: Node = {
-      id: 'quick-render-2',
-      type: 'quickRenderExterior',
+      id: 'exterior-render-2',
+      type: 'exteriorRender',
       position: { x: 0, y: 0 },
-      data: { label: '快速渲染-室外 02' },
+      data: { label: '室外渲染 02' },
     };
     let nodes: Node[] = [sourceNode];
     let edges: Edge[] = [];
     const failedTaskId = 'task-failed';
-    const failedRequest = buildQuickRenderRequest(data);
+    const failedRequest = buildExteriorRenderRequest(data);
     const failedOutput = createProcessingOutput(sourceNode, failedRequest, failedTaskId, nodes);
     nodes = [...nodes, failedOutput.node];
     edges = [...edges, failedOutput.edge];
 
-    const failedOutcome = await runQuickRenderGeneration({
+    const failedOutcome = await runExteriorRenderGeneration({
       request: failedRequest,
       taskId: failedTaskId,
-      execute: (request) => mockQuickRender(request, { taskId: failedTaskId, delayMs: 0, outcome: 'failed' }),
+      execute: (request) => mockExteriorRender(request, { taskId: failedTaskId, delayMs: 0, outcome: 'failed' }),
       isTaskActive: (taskId) => taskId === failedTaskId,
       onTaskUpdate: (generationTask) => {
         data = { ...data, generationTask };
         if (generationTask.status !== 'failed') return;
         nodes = nodes.map((node) => node.id === failedOutput.node.id
-          ? buildQuickRenderFailedOutput({
+          ? buildExteriorRenderFailedOutput({
             outputNode: node,
             taskId: failedTaskId,
             errorMessage: 'failed',
@@ -201,16 +248,16 @@ describe('quick render generation entry', () => {
 
     data = { ...data, prompt: 'retry with latest prompt' };
     const retryTaskId = 'task-retry';
-    const retryRequest = buildQuickRenderRequest(data);
+    const retryRequest = buildExteriorRenderRequest(data);
     const retryOutput = createProcessingOutput(sourceNode, retryRequest, retryTaskId, nodes);
     nodes = [...nodes, retryOutput.node];
     edges = [...edges, retryOutput.edge];
     expect(retryOutput.node.position).toEqual({ x: 590, y: 96 });
 
-    const retryOutcome = await runQuickRenderGeneration({
+    const retryOutcome = await runExteriorRenderGeneration({
       request: retryRequest,
       taskId: retryTaskId,
-      execute: (request) => mockQuickRender(request, { taskId: retryTaskId, delayMs: 0 }),
+      execute: (request) => mockExteriorRender(request, { taskId: retryTaskId, delayMs: 0 }),
       isTaskActive: (taskId) => taskId === retryTaskId,
       onTaskUpdate: (generationTask, lastResult) => {
         data = { ...data, generationTask, ...(lastResult ? { lastResult } : {}) };

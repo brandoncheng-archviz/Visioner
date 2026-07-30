@@ -22,7 +22,7 @@ import type {
 import type { ModelParams } from '../../types/canvas.types';
 import type { TextReferenceInfo } from '../../types/basicNode.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
-import type { QuickRenderWorkflowSource } from '../../types/imageNodeData.types';
+import type { ExteriorRenderWorkflowSource } from '../../types/imageNodeData.types';
 import {
   FLOATING_PANEL_BACKGROUND,
   FLOATING_PANEL_BORDER,
@@ -41,6 +41,20 @@ import {
 } from '../../utils/referenceUtils';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { LightPreviewPanel } from '../../components/LightPreviewPanel';
+import { ModelAspectRatioOptions } from '../../components/ModelAspectRatioOptions';
+import { ModelParamsSummaryButton } from '../../components/ModelParamsSummaryButton';
+import {
+  calculateRequestedSize,
+  commitTargetSizeDraft,
+  doesSizeMatchAspectRatio,
+  getResolutionTier,
+  isFixedAspectRatioPreset,
+  isValidCustomAspectRatio,
+  parseAspectRatio,
+  updateTargetSizeDraft,
+  validateRequestedSize,
+  type AspectRatioPreset,
+} from '../../utils/modelParams';
 import {
   ImageControllersPopover,
   ImageControllersTrigger,
@@ -73,47 +87,6 @@ const resizePromptReferenceTextarea = (element: HTMLTextAreaElement) => {
   element.style.overflowY = contentHeight > element.clientHeight ? 'auto' : 'hidden';
 };
 const GENERATION_CREDIT_COST = 14;
-interface FrameRatioOption {
-  value: string;
-  label?: string;
-  labelKey?: string;
-}
-const COMMON_FRAME_RATIO_OPTIONS: FrameRatioOption[] = [
-  { value: 'adaptive', labelKey: 'modelParams.aspectRatio.adaptive' },
-  { value: '1:1', label: '1:1' },
-  { value: '4:3', label: '4:3' },
-  { value: '3:2', label: '3:2' },
-  { value: '16:9', label: '16:9' },
-  { value: '9:16', label: '9:16' },
-];
-const STANDARD_FRAME_RATIO_VALUES = new Set<string>(COMMON_FRAME_RATIO_OPTIONS.map((option) => option.value).filter((value) => value !== 'adaptive'));
-
-function parseFrameRatio(value: string | undefined): { width: number; height: number } | null {
-  if (!value) return null;
-  const normalized = value.trim().replace('×', ':').replace('x', ':');
-  const match = normalized.match(/^(\d+):(\d+)$/);
-  if (!match) return null;
-  const width = Number.parseInt(match[1], 10);
-  const height = Number.parseInt(match[2], 10);
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
-  return { width, height };
-}
-
-function formatFrameRatioLabel(value: string | undefined) {
-  if (!value) return '1:1';
-  if (value === 'adaptive') return '__ADAPTIVE__';
-  const parsed = parseFrameRatio(value);
-  if (!parsed) return value;
-  if (STANDARD_FRAME_RATIO_VALUES.has(`${parsed.width}:${parsed.height}`)) return `${parsed.width}:${parsed.height}`;
-  return `${parsed.width}×${parsed.height}`;
-}
-
-function isValidFrameRatio(width: number, height: number) {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return false;
-  const ratio = width / height;
-  return ratio >= 1 / 8 && ratio <= 8;
-}
-
 function getBoundedImagePreviewSize(width: number | undefined, height: number | undefined, maxWidth: number, maxHeight: number) {
   if (!width || !height || width <= 0 || height <= 0) {
     return { width: maxWidth, height: maxHeight };
@@ -123,27 +96,6 @@ function getBoundedImagePreviewSize(width: number | undefined, height: number | 
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
   };
-}
-
-function AspectFrameIcon({ ratio }: { ratio: number }) {
-  const isPortrait = ratio < 0.82;
-  const isSquare = ratio >= 0.82 && ratio <= 1.18;
-  const width = isSquare ? 13 : isPortrait ? 10 : 16;
-  const height = isSquare ? 13 : isPortrait ? 16 : 10;
-
-  return (
-    <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <rect
-        x={(20 - width) / 2}
-        y={(20 - height) / 2}
-        width={width}
-        height={height}
-        rx="1.8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
 }
 
 function TextReferenceIcon() {
@@ -242,7 +194,7 @@ export function ImageNodeControlPanel({
   onLightPreviewChange: (data: LightPreviewData | null) => void;
   controllers?: ImageNodeControllers;
   onControllersChange: (controllers: ImageNodeControllers) => void;
-  workflowSource?: QuickRenderWorkflowSource;
+  workflowSource?: ExteriorRenderWorkflowSource;
   onFocusWorkflowSource?: (sourceNodeId: string) => void;
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
@@ -289,7 +241,13 @@ export function ImageNodeControlPanel({
   const [customFrameWidth, setCustomFrameWidth] = useState('1');
   const [customFrameHeight, setCustomFrameHeight] = useState('1');
   const [isFrameRatioLocked, setIsFrameRatioLocked] = useState(true);
-  const [frameRatioMode, setFrameRatioMode] = useState<'adaptive' | 'preset' | 'custom'>('preset');
+  const [frameRatioMode, setFrameRatioMode] = useState<'adaptive' | 'preset' | 'custom'>(() => (
+    modelParams.ratio === 'adaptive'
+      ? 'adaptive'
+      : isFixedAspectRatioPreset(modelParams.ratio)
+        ? 'preset'
+        : 'custom'
+  ));
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [showReferenceMenu, setShowReferenceMenu] = useState(false);
   const [activeMarkCandidateBlockId, setActiveMarkCandidateBlockId] = useState<string | null>(null);
@@ -465,7 +423,7 @@ export function ImageNodeControlPanel({
               referencePreview.reference.localReferenceType,
               referencePreview.reference.localReferenceLabel,
               translate,
-            ) || t('imageNode.undefinedUsage')}
+            ) || t('reference.roles.unassigned')}
           </div>
         </div>,
         document.body,
@@ -700,57 +658,80 @@ export function ImageNodeControlPanel({
     (currentImageSize?.width && currentImageSize?.height
       ? { width: currentImageSize.width, height: currentImageSize.height }
       : null);
-  const adaptiveFrameRatio = adaptiveFrameRatioSource && isValidFrameRatio(adaptiveFrameRatioSource.width, adaptiveFrameRatioSource.height)
+  const adaptiveFrameRatio = adaptiveFrameRatioSource && isValidCustomAspectRatio(adaptiveFrameRatioSource.width, adaptiveFrameRatioSource.height)
     ? `${adaptiveFrameRatioSource.width}:${adaptiveFrameRatioSource.height}`
     : '1:1';
   const displayFrameRatio = modelParams.ratio === 'adaptive' ? adaptiveFrameRatio : modelParams.ratio;
-  const displayFrameRatioLabel = formatFrameRatioLabel(displayFrameRatio);
-  const selectedFrameRatioDimensions = parseFrameRatio(displayFrameRatio) ?? parseFrameRatio(adaptiveFrameRatio) ?? { width: 1, height: 1 };
+  const selectedFrameRatioDimensions = parseAspectRatio(displayFrameRatio) ?? parseAspectRatio(adaptiveFrameRatio) ?? { width: 1, height: 1 };
+  const resolutionTier = getResolutionTier(modelParams.resolutionTier ?? modelParams.resolution);
+  const requestedSize = validateRequestedSize(modelParams.requestedSize, resolutionTier)
+    ? modelParams.requestedSize
+    : calculateRequestedSize(modelParams.ratio, resolutionTier, adaptiveFrameRatioSource);
+  const selectedAspectRatioOption: AspectRatioPreset | null = frameRatioMode === 'adaptive'
+    ? 'adaptive'
+    : frameRatioMode === 'preset' && isFixedAspectRatioPreset(modelParams.ratio)
+      ? modelParams.ratio
+      : null;
 
-  const commitCustomFrameRatio = useCallback((widthValue: string, heightValue: string, options?: { showError?: boolean }) => {
-    const width = Number(widthValue);
-    const height = Number(heightValue);
-    if (!isValidFrameRatio(width, height)) {
+  const commitTargetSize = useCallback((widthValue: string, heightValue: string, options?: { showError?: boolean }) => {
+    const committedSize = commitTargetSizeDraft(
+      { width: widthValue, height: heightValue },
+      resolutionTier,
+      isFrameRatioLocked,
+    );
+    if (!committedSize) {
       if (options?.showError) showToast?.(t('imageNode.validation.invalidFrameRatio'));
+      setCustomFrameWidth(String(requestedSize.width));
+      setCustomFrameHeight(String(requestedSize.height));
       return false;
     }
-    setFrameRatioMode('custom');
-    onModelParamsChange({ ...modelParams, ratio: `${width}:${height}` });
+    const matchesSelectedRatio = doesSizeMatchAspectRatio(committedSize, displayFrameRatio);
+    const nextRatio = matchesSelectedRatio ? modelParams.ratio : `${committedSize.width}:${committedSize.height}`;
+    setCustomFrameWidth(String(committedSize.width));
+    setCustomFrameHeight(String(committedSize.height));
+    setFrameRatioMode(
+      nextRatio === 'adaptive' ? 'adaptive' : isFixedAspectRatioPreset(nextRatio) ? 'preset' : 'custom',
+    );
+    onModelParamsChange({
+      ...modelParams,
+      ratio: nextRatio,
+      resolution: resolutionTier,
+      resolutionTier,
+      requestedSize: committedSize,
+    });
     return true;
-  }, [modelParams, onModelParamsChange, showToast, t]);
+  }, [displayFrameRatio, isFrameRatioLocked, modelParams, onModelParamsChange, requestedSize, resolutionTier, showToast, t]);
 
   const handleCustomFrameWidthChange = (value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    setCustomFrameWidth(value);
-    if (!value) return;
-    let nextHeight = customFrameHeight;
-    const width = Number(value);
-    const currentHeight = Number(customFrameHeight);
-    if (isFrameRatioLocked && width > 0 && currentHeight > 0) {
-      const ratio = selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height;
-      nextHeight = String(Math.max(1, Math.round(width / ratio)));
-      setCustomFrameHeight(nextHeight);
-    }
-    commitCustomFrameRatio(value, nextHeight);
+    const draft = updateTargetSizeDraft({
+      width: customFrameWidth,
+      height: customFrameHeight,
+      field: 'width',
+      value,
+      locked: isFrameRatioLocked,
+      lockedRatio: selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height,
+    });
+    if (!draft) return;
+    setCustomFrameWidth(draft.width);
+    setCustomFrameHeight(draft.height);
   };
 
   const handleCustomFrameHeightChange = (value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    setCustomFrameHeight(value);
-    if (!value) return;
-    let nextWidth = customFrameWidth;
-    const height = Number(value);
-    const currentWidth = Number(customFrameWidth);
-    if (isFrameRatioLocked && height > 0 && currentWidth > 0) {
-      const ratio = selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height;
-      nextWidth = String(Math.max(1, Math.round(height * ratio)));
-      setCustomFrameWidth(nextWidth);
-    }
-    commitCustomFrameRatio(nextWidth, value);
+    const draft = updateTargetSizeDraft({
+      width: customFrameWidth,
+      height: customFrameHeight,
+      field: 'height',
+      value,
+      locked: isFrameRatioLocked,
+      lockedRatio: selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height,
+    });
+    if (!draft) return;
+    setCustomFrameWidth(draft.width);
+    setCustomFrameHeight(draft.height);
   };
 
   const handleCustomFrameInputCommit = () => {
-    commitCustomFrameRatio(customFrameWidth, customFrameHeight, { showError: true });
+    commitTargetSize(customFrameWidth, customFrameHeight, { showError: true });
   };
 
   const closeGenerationParamMenus = useCallback(() => {
@@ -789,8 +770,8 @@ export function ImageNodeControlPanel({
   }, [closeGenerationParamMenus, showModelMenu, showRatioMenu]);
 
   const openRatioMenu = () => {
-    setCustomFrameWidth(String(selectedFrameRatioDimensions.width));
-    setCustomFrameHeight(String(selectedFrameRatioDimensions.height));
+    setCustomFrameWidth(String(requestedSize.width));
+    setCustomFrameHeight(String(requestedSize.height));
     setShowRatioMenu(true);
     setShowModelMenu(false);
     setShowControllersPopover(false);
@@ -1074,7 +1055,7 @@ export function ImageNodeControlPanel({
               <span style={{ fontSize: 14 }}>{t('imageMark.button')}</span>
             </button>
           </div>
-          {workflowSource?.type === 'quickRenderExterior' && (
+          {workflowSource?.type === 'exteriorRender' && (
             <ImageNodeWorkflowSourceBadge
               source={workflowSource}
               onFocusSource={onFocusWorkflowSource}
@@ -1115,8 +1096,8 @@ export function ImageNodeControlPanel({
             }}
           >
             {hasTooManyReferences
-              ? t('imageNode.reference.referenceLimitWarning')
-              : t('imageNode.reference.tooManyReferences')}
+              ? t('reference.validation.maxImages')
+              : t('reference.validation.recommendedImages')}
           </div>
         </div>
       )}
@@ -1348,7 +1329,7 @@ export function ImageNodeControlPanel({
                           removePromptReferenceBlock(block.id);
                         }}
                         className="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-black/25 text-white/70 opacity-0 transition-all hover:bg-red-500/20 hover:text-red-200 group-hover/prompt-ref:opacity-100"
-                        title={t('imageNode.removeReferencePrompt')}
+                        title={t('reference.actions.removeFromPrompt')}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -1416,7 +1397,7 @@ export function ImageNodeControlPanel({
                       reference.localReferenceType,
                       reference.localReferenceLabel,
                       translate,
-                    ) || t('imageNode.undefinedUsage')}
+                    ) || t('reference.roles.unassigned')}
                   </span>
                 </button>
               ))}
@@ -1491,9 +1472,11 @@ export function ImageNodeControlPanel({
           </div>
           {/* Ratio · Resolution */}
           <div className="relative">
-            <button
+            <ModelParamsSummaryButton
               ref={frameRatioButtonRef}
               disabled={!canEditModel}
+              aspectRatio={modelParams.ratio}
+              resolutionTier={resolutionTier}
               onClick={() => {
                 if (!canEditModel) return;
                 if (showRatioMenu) {
@@ -1502,19 +1485,11 @@ export function ImageNodeControlPanel({
                 }
                 openRatioMenu();
               }}
-              className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
-              style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
-            >
-              <span style={{ color: 'rgba(255,255,255,0.58)' }}>
-                <AspectFrameIcon ratio={selectedFrameRatioDimensions.width / selectedFrameRatioDimensions.height} />
-              </span>
-              <span>{displayFrameRatioLabel === '__ADAPTIVE__' ? t('modelParams.aspectRatio.adaptive') : displayFrameRatioLabel} · {modelParams.resolution}</span>
-              <ChevronDown className="w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.55)' }} />
-            </button>
+            />
             {canEditModel && showRatioMenu && (
               <div
                 ref={frameRatioPanelRef}
-                className="absolute bottom-full left-0 z-30 rounded-xl"
+                className="absolute bottom-full left-0 z-30 flex flex-col rounded-xl"
                 style={{
                   marginBottom: 8,
                   width: 440,
@@ -1529,37 +1504,29 @@ export function ImageNodeControlPanel({
               >
                 <div>
                   <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('modelParams.aspectRatio.label')}</div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {COMMON_FRAME_RATIO_OPTIONS.map((ar) => {
-                      const optionValue = ar.value === 'adaptive' ? adaptiveFrameRatio : ar.value;
-                      const isSelected = ar.value === 'adaptive'
-                        ? frameRatioMode === 'adaptive' && displayFrameRatio === adaptiveFrameRatio
-                        : frameRatioMode !== 'adaptive' && displayFrameRatio === ar.value;
-                      return (
-                        <button
-                          key={ar.value}
-                          disabled={!canEditModel}
-                          onClick={() => {
-                            if (!canEditModel) return;
-                            setFrameRatioMode(ar.value === 'adaptive' ? 'adaptive' : 'preset');
-                            onModelParamsChange({ ...modelParams, ratio: optionValue });
-                          }}
-                          className="flex h-9 items-center justify-center rounded-md text-[14px] font-medium transition-colors hover:bg-white/[0.065]"
-                          style={{
-                            color: isSelected ? '#ffffff' : 'rgba(255,255,255,0.58)',
-                            background: isSelected ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.03)',
-                            border: isSelected ? '1px solid rgba(255,255,255,0.62)' : '1px solid rgba(255,255,255,0.075)',
-                          }}
-                        >
-                          {ar.labelKey ? t(ar.labelKey) : ar.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <ModelAspectRatioOptions
+                    selectedValue={selectedAspectRatioOption}
+                    adaptiveLabel={t('modelParams.aspectRatio.adaptive')}
+                    disabled={!canEditModel}
+                    onSelect={(value) => {
+                      if (!canEditModel) return;
+                      setFrameRatioMode(value === 'adaptive' ? 'adaptive' : 'preset');
+                      const nextRequestedSize = calculateRequestedSize(value, resolutionTier, adaptiveFrameRatioSource);
+                      setCustomFrameWidth(String(nextRequestedSize.width));
+                      setCustomFrameHeight(String(nextRequestedSize.height));
+                      onModelParamsChange({
+                        ...modelParams,
+                        ratio: value,
+                        resolution: resolutionTier,
+                        resolutionTier,
+                        requestedSize: nextRequestedSize,
+                      });
+                    }}
+                  />
                 </div>
 
-                <div className="mt-3 border-t border-white/[0.045] pt-3">
-                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('modelParams.aspectRatio.custom')}</div>
+                <div className="order-3 mt-3 border-t border-white/[0.045] pt-3">
+                  <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('modelParams.targetSize.label')}</div>
                   <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr auto 1fr 40px' }}>
                     <label className="flex h-9 min-w-0 items-center gap-2 rounded-md border border-white/[0.075] bg-white/[0.03] px-2.5">
                       <span className="text-[12px] text-white/38">{t('modelParams.aspectRatio.width')}</span>
@@ -1613,10 +1580,9 @@ export function ImageNodeControlPanel({
                       {isFrameRatioLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
                     </button>
                   </div>
-                  <div className="mt-2 text-[12px] leading-snug text-white/30">{t('modelParams.aspectRatio.hint')}</div>
                 </div>
 
-                <div className="mt-3 border-t border-white/[0.045] pt-3">
+                <div className="order-2 mt-3 border-t border-white/[0.045] pt-3">
                   <div className="mb-2 text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{t('modelParams.resolution.label')}</div>
                   <div className="grid grid-cols-3 gap-2">
                     {selectedModel.resolutions.map((r) => (
@@ -1625,7 +1591,15 @@ export function ImageNodeControlPanel({
                         disabled={!canEditModel}
                         onClick={() => {
                           if (!canEditModel) return;
-                          onModelParamsChange({ ...modelParams, resolution: r });
+                          const nextRequestedSize = calculateRequestedSize(modelParams.ratio, r, adaptiveFrameRatioSource);
+                          setCustomFrameWidth(String(nextRequestedSize.width));
+                          setCustomFrameHeight(String(nextRequestedSize.height));
+                          onModelParamsChange({
+                            ...modelParams,
+                            resolution: r,
+                            resolutionTier: r,
+                            requestedSize: nextRequestedSize,
+                          });
                         }}
                         className="h-9 rounded-md text-[14px] font-medium transition-colors hover:bg-white/[0.065]"
                         style={{

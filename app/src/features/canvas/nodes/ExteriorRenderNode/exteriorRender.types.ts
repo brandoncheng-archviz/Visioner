@@ -1,23 +1,24 @@
 import type { ImageRole, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
+import type { OutputResolutionTier, OutputSize } from '../../utils/modelParams';
 
-export type QuickRenderAtmosphereSource = 'unset' | 'followReference' | 'manual';
+export type ExteriorRenderAtmosphereSource = 'unset' | 'followReference' | 'manual';
 
-export type QuickRenderAtmosphereTime = 'sunrise' | 'earlyMorning' | 'noon' | 'afternoon' | 'sunset' | 'night';
-export type QuickRenderAtmosphereLighting = 'front' | 'back' | 'left' | 'right' | 'softSky';
-export type QuickRenderAtmosphereWeather = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'foggy';
-export type QuickRenderAtmosphereStyle = 'photorealistic' | 'nordic' | 'dramaticConcept' | 'luxuryRealEstate' | 'painterly';
-export type QuickRenderAtmosphereValue =
-  | QuickRenderAtmosphereTime
-  | QuickRenderAtmosphereLighting
-  | QuickRenderAtmosphereWeather
-  | QuickRenderAtmosphereStyle;
+export type ExteriorRenderAtmosphereTime = 'sunrise' | 'earlyMorning' | 'noon' | 'afternoon' | 'sunset' | 'night';
+export type ExteriorRenderAtmosphereLighting = 'front' | 'back' | 'left' | 'right' | 'softSky';
+export type ExteriorRenderAtmosphereWeather = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'foggy';
+export type ExteriorRenderAtmosphereStyle = 'photorealistic' | 'nordic' | 'dramaticConcept' | 'luxuryRealEstate' | 'painterly';
+export type ExteriorRenderAtmosphereValue =
+  | ExteriorRenderAtmosphereTime
+  | ExteriorRenderAtmosphereLighting
+  | ExteriorRenderAtmosphereWeather
+  | ExteriorRenderAtmosphereStyle;
 
-export type QuickRenderAtmosphereOption<T extends QuickRenderAtmosphereValue = QuickRenderAtmosphereValue> = {
-  source: QuickRenderAtmosphereSource;
+export type ExteriorRenderAtmosphereOption<T extends ExteriorRenderAtmosphereValue = ExteriorRenderAtmosphereValue> = {
+  source: ExteriorRenderAtmosphereSource;
   value?: T;
 };
 
-export type QuickRenderRenderChannelType =
+export type ExteriorRenderRenderChannelType =
   | 'beauty'
   | 'albedo'
   | 'normal'
@@ -28,7 +29,7 @@ export type QuickRenderRenderChannelType =
   | 'objectId'
   | 'unknown';
 
-export type QuickRenderConnectedImage = {
+export type ExteriorRenderConnectedImage = {
   id: string;
   sourceType: 'canvas' | 'upload';
   imageUrl: string;
@@ -47,7 +48,7 @@ export type QuickRenderConnectedImage = {
   localReferencePoint?: LocalReferencePoint;
 };
 
-export type QuickRenderAtmosphereReference = {
+export type ExteriorRenderAtmosphereReference = {
   sourceType: 'upload' | 'canvas';
   imageUrl: string;
   sourceNodeId?: string;
@@ -55,9 +56,9 @@ export type QuickRenderAtmosphereReference = {
   mimeType?: string;
 };
 
-export type QuickRenderRenderChannel = {
+export type ExteriorRenderRenderChannel = {
   id: string;
-  type: QuickRenderRenderChannelType;
+  type: ExteriorRenderRenderChannelType;
   name: string;
   imageUrl: string;
   fileName?: string;
@@ -68,21 +69,23 @@ export type QuickRenderRenderChannel = {
   height?: number;
 };
 
-export type QuickRenderPendingRenderChannelFile = {
+export type ExteriorRenderPendingRenderChannelFile = {
   id: string;
   imageUrl: string;
   fileName: string;
   mimeType?: string;
 };
 
-export type QuickRenderExteriorModelParams = {
+export type ExteriorRenderModelParams = {
   model: string;
   aspectRatio: string;
   resolution: string;
+  resolutionTier?: OutputResolutionTier;
+  requestedSize?: OutputSize;
   count?: number;
 };
 
-export type QuickRenderRequestInputImage = {
+export type ExteriorRenderRequestInputImage = {
   id: string;
   imageUrl: string;
   usage: {
@@ -93,20 +96,20 @@ export type QuickRenderRequestInputImage = {
   height?: number;
 };
 
-export type QuickRenderRequestRenderChannel = {
+export type ExteriorRenderRequestRenderChannel = {
   imageUrl: string;
   fileName?: string;
   width?: number;
   height?: number;
 };
 
-export type QuickRenderRequest = {
-  inputImages: QuickRenderRequestInputImage[];
+export type ExteriorRenderRequest = {
+  inputImages: ExteriorRenderRequestInputImage[];
   renderChannels: {
-    albedo: QuickRenderRequestRenderChannel | null;
-    normal: QuickRenderRequestRenderChannel | null;
-    ao: QuickRenderRequestRenderChannel | null;
-    depth: QuickRenderRequestRenderChannel | null;
+    albedo: ExteriorRenderRequestRenderChannel | null;
+    normal: ExteriorRenderRequestRenderChannel | null;
+    ao: ExteriorRenderRequestRenderChannel | null;
+    depth: ExteriorRenderRequestRenderChannel | null;
   };
   atmosphere: {
     addEntourage: boolean;
@@ -123,33 +126,35 @@ export type QuickRenderRequest = {
     model: string;
     aspectRatio: string;
     resolution: string;
+    resolutionTier: OutputResolutionTier;
+    requestedSize: OutputSize;
     count: number;
   };
 };
 
-export type QuickRenderValidationError = {
+export type ExteriorRenderValidationError = {
   code: 'INPUT_IMAGE_REQUIRED' | 'INPUT_IMAGE_INVALID';
   field: 'inputImages';
 };
 
-export type QuickRenderValidationResult = {
+export type ExteriorRenderValidationResult = {
   valid: boolean;
-  errors: QuickRenderValidationError[];
+  errors: ExteriorRenderValidationError[];
 };
 
-export type QuickRenderViewState = 'EMPTY' | 'READY' | 'PROCESSING';
-export type QuickRenderGenerationTaskStatus = 'idle' | 'processing' | 'success' | 'failed';
-export type QuickRenderErrorCode = 'CANCELLED' | 'GENERATION_FAILED' | 'MISSING_INPUT';
+export type ExteriorRenderViewState = 'EMPTY' | 'READY' | 'PROCESSING';
+export type ExteriorRenderGenerationTaskStatus = 'idle' | 'processing' | 'success' | 'failed';
+export type ExteriorRenderErrorCode = 'CANCELLED' | 'GENERATION_FAILED' | 'MISSING_INPUT';
 
-export type QuickRenderGenerationTask = {
+export type ExteriorRenderGenerationTask = {
   taskId: string | null;
-  status: QuickRenderGenerationTaskStatus;
-  errorCode: QuickRenderErrorCode | null;
+  status: ExteriorRenderGenerationTaskStatus;
+  errorCode: ExteriorRenderErrorCode | null;
   startedAt: number | null;
   completedAt: number | null;
 };
 
-export type QuickRenderResultImage = {
+export type ExteriorRenderResultImage = {
   id: string;
   imageUrl: string;
   width: number;
@@ -157,66 +162,66 @@ export type QuickRenderResultImage = {
   seed: number;
 };
 
-export type QuickRenderResult = {
+export type ExteriorRenderResult = {
   taskId: string;
   status: 'success';
-  images: QuickRenderResultImage[];
+  images: ExteriorRenderResultImage[];
   metadata: {
     model: string;
     aspectRatio: string;
     resolution: string;
   };
 };
-export type QuickRenderExteriorNodeData = {
+export type ExteriorRenderNodeData = {
   label?: string;
   title?: string;
-  connectedImages?: QuickRenderConnectedImage[];
-  onAddQuickRenderInputEdge?: (targetNodeId: string, sourceNodeId: string) => void;
-  onRemoveQuickRenderInputEdge?: (targetNodeId: string, sourceNodeId: string, sourceEdgeId?: string) => void;
-  onUploadQuickRenderInputImages?: (targetNodeId: string, files: FileList | null) => void;
+  connectedImages?: ExteriorRenderConnectedImage[];
+  onAddExteriorRenderInputEdge?: (targetNodeId: string, sourceNodeId: string) => void;
+  onRemoveExteriorRenderInputEdge?: (targetNodeId: string, sourceNodeId: string, sourceEdgeId?: string) => void;
+  onUploadExteriorRenderInputImages?: (targetNodeId: string, files: FileList | null) => void;
   atmosphereEnabled?: boolean;
   atmosphere?: {
-    time?: QuickRenderAtmosphereOption<QuickRenderAtmosphereTime>;
-    weather?: QuickRenderAtmosphereOption<QuickRenderAtmosphereWeather>;
-    light?: QuickRenderAtmosphereOption<QuickRenderAtmosphereLighting>;
-    style?: QuickRenderAtmosphereOption<QuickRenderAtmosphereStyle>;
+    time?: ExteriorRenderAtmosphereOption<ExteriorRenderAtmosphereTime>;
+    weather?: ExteriorRenderAtmosphereOption<ExteriorRenderAtmosphereWeather>;
+    light?: ExteriorRenderAtmosphereOption<ExteriorRenderAtmosphereLighting>;
+    style?: ExteriorRenderAtmosphereOption<ExteriorRenderAtmosphereStyle>;
     addEntourage?: boolean;
     addPeople?: boolean;
     interiorLights?: boolean;
     motionBlur?: boolean;
   };
-  /** Deprecated: old quick render nodes may contain this field; current UI ignores it. */
+  /** Deprecated: old exterior render nodes may contain this field; current UI ignores it. */
   atmosphereReferenceEnabled?: boolean;
-  /** Deprecated: old quick render nodes may contain this field; current UI ignores it. */
-  atmosphereReference?: QuickRenderAtmosphereReference | null;
+  /** Deprecated: old exterior render nodes may contain this field; current UI ignores it. */
+  atmosphereReference?: ExteriorRenderAtmosphereReference | null;
   renderChannelsEnabled?: boolean;
   renderChannels?: {
-    channels?: QuickRenderRenderChannel[];
-    pendingFiles?: QuickRenderPendingRenderChannelFile[];
+    channels?: ExteriorRenderRenderChannel[];
+    pendingFiles?: ExteriorRenderPendingRenderChannelFile[];
   };
-  /** Deprecated: read-only compatibility for quick render nodes saved before renderChannels was introduced. */
+  /** Deprecated: read-only compatibility for exterior render nodes saved before renderChannels was introduced. */
   structureEnabled?: boolean;
-  /** Deprecated: read-only compatibility for quick render nodes saved before renderChannels was introduced. */
+  /** Deprecated: read-only compatibility for exterior render nodes saved before renderChannels was introduced. */
   structure?: {
-    channels?: QuickRenderRenderChannel[];
-    pendingFiles?: QuickRenderPendingRenderChannelFile[];
+    channels?: ExteriorRenderRenderChannel[];
+    pendingFiles?: ExteriorRenderPendingRenderChannelFile[];
   };
   prompt?: string;
-  modelParams?: QuickRenderExteriorModelParams;
-  generationTask?: QuickRenderGenerationTask;
-  lastResult?: QuickRenderResult;
-  onCreateQuickRenderOutput?: (
+  modelParams?: ExteriorRenderModelParams;
+  generationTask?: ExteriorRenderGenerationTask;
+  lastResult?: ExteriorRenderResult;
+  onCreateExteriorRenderOutput?: (
     sourceNodeId: string,
     taskId: string,
-    request: QuickRenderRequest,
+    request: ExteriorRenderRequest,
   ) => string | null;
-  onQuickRenderResult?: (
+  onExteriorRenderResult?: (
     sourceNodeId: string,
     outputNodeId: string,
-    request: QuickRenderRequest,
-    result: QuickRenderResult,
+    request: ExteriorRenderRequest,
+    result: ExteriorRenderResult,
   ) => boolean | Promise<boolean>;
-  onQuickRenderOutputFailed?: (
+  onExteriorRenderOutputFailed?: (
     outputNodeId: string,
     taskId: string,
     errorMessage: string,

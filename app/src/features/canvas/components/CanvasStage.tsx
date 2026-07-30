@@ -25,7 +25,7 @@ import { ImageNode } from '../nodes/ImageNode';
 import { CompareNode } from '../nodes/CompareNode';
 import { SunSkyNode } from '../nodes/SunSkyNode';
 import { RelightNode } from '../nodes/RelightNode';
-import { QuickRenderExteriorNode } from '../nodes/QuickRenderExteriorNode';
+import { ExteriorRenderNode } from '../nodes/ExteriorRenderNode';
 import { TempConnectionLine } from './TempConnectionLine';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from '../constants/canvasConstants';
 import type { TempConnectionState } from '../types/canvas.types';
@@ -41,7 +41,7 @@ const nodeTypes = {
   'video-merge': VideoMergeNode,
   sunSky: SunSkyNode,
   relight: RelightNode,
-  quickRenderExterior: QuickRenderExteriorNode,
+  exteriorRender: ExteriorRenderNode,
 };
 
 const edgeTypes = {

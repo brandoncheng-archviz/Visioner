@@ -6,6 +6,7 @@ import type { CurrentResultSet } from './history.types';
 import type { RelightCreationOptions } from './relight.types';
 import type { ImageControllerState } from './imageController.types';
 import type { ImageNodeControllers } from './imageControllers.types';
+import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';
 
 /**
  * Typed data shape for an ImageNode.
@@ -19,7 +20,7 @@ export interface ImageNodeData {
   currentImage?: string;
   currentResultId?: string | null;
   currentResultSet?: CurrentResultSet | null;
-  assetSource?: 'upload' | 'paste' | 'generated' | 'history' | 'quickRenderOutput' | string;
+  assetSource?: 'upload' | 'paste' | 'generated' | 'history' | 'exteriorRenderOutput' | string;
   isHistoryAsset?: boolean;
   isGeneratedResult?: boolean;
   generationStatus?: 'completed' | string;
@@ -30,7 +31,7 @@ export interface ImageNodeData {
   currentResultSource?: 'history' | string;
   generatedImages?: GenerationHistoryItem[] | string[];
   generationTask?: GenerationTask | null;
-  sourceWorkflow?: QuickRenderWorkflowSource;
+  sourceWorkflow?: ExteriorRenderWorkflowSource;
   isGenerating?: boolean;
   isProcessing?: boolean;
   isReferenceLocked?: boolean;
@@ -59,6 +60,9 @@ export interface ImageNodeData {
   activeImageMarkSourceNodeId?: string | null;
   activeImageMarkSessionId?: string | null;
   modelParams?: ModelParams;
+  resolutionTier?: OutputResolutionTier;
+  requestedSize?: OutputSize;
+  actualSize?: OutputSize;
   referencesSignature?: string;
   // Edge-related callbacks injected by CanvasPage
   onStartLineDraw?: (
@@ -93,11 +97,12 @@ export interface ImageNodeData {
   lightPreview?: LightPreviewData;
 }
 
-export interface QuickRenderWorkflowSnapshot {
+export interface ExteriorRenderWorkflowSnapshot {
   sourceNodeTitle: string;
   model: string;
   aspectRatio: string;
   resolution: string;
+  requestedSize?: OutputSize;
   atmosphere: {
     time: string | null;
     weather: string | null;
@@ -112,10 +117,10 @@ export interface QuickRenderWorkflowSnapshot {
   hasPrompt: boolean;
 }
 
-export interface QuickRenderWorkflowSource {
-  type: 'quickRenderExterior';
+export interface ExteriorRenderWorkflowSource {
+  type: 'exteriorRender';
   sourceNodeId: string;
-  snapshot?: QuickRenderWorkflowSnapshot;
+  snapshot?: ExteriorRenderWorkflowSnapshot;
 }
 
 function castRecord(data: unknown): Record<string, unknown> {

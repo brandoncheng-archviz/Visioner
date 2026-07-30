@@ -6,7 +6,7 @@ describe('createImageNodeViewModel', () => {
     const viewModel = createImageNodeViewModel({
       currentImage: '/assets/mock/generation-results/result-01.png',
       currentResultSet: {
-        batchId: 'quick-render-task-1',
+        batchId: 'exterior-render-task-1',
         images: [{
           resultId: 'result-1',
           imageUrl: '/assets/mock/generation-results/result-01.png',
@@ -21,8 +21,8 @@ describe('createImageNodeViewModel', () => {
       isGeneratedResult: true,
       generationStatus: 'completed',
       sourceWorkflow: {
-        type: 'quickRenderExterior',
-        sourceNodeId: 'quick-render-1',
+        type: 'exteriorRender',
+        sourceNodeId: 'exterior-render-1',
       },
     });
 
@@ -32,15 +32,15 @@ describe('createImageNodeViewModel', () => {
     expect(viewModel.canDownload).toBe(true);
   });
 
-  it('keeps outputs saved with the former quickRenderOutput asset source editable', () => {
+  it('keeps outputs saved with the former exteriorRenderOutput asset source editable', () => {
     const viewModel = createImageNodeViewModel({
       currentImage: '/assets/mock/generation-results/result-01.png',
       currentResultId: 'result-1',
-      assetSource: 'quickRenderOutput',
+      assetSource: 'exteriorRenderOutput',
       isGeneratedResult: true,
       sourceWorkflow: {
-        type: 'quickRenderExterior',
-        sourceNodeId: 'quick-render-1',
+        type: 'exteriorRender',
+        sourceNodeId: 'exterior-render-1',
       },
     });
 

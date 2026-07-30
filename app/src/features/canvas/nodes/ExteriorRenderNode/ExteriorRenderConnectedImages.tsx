@@ -2,26 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { QuickRenderConnectedImage } from './quickRenderExterior.types';
+import type { ExteriorRenderConnectedImage } from './exteriorRender.types';
 
 const DEFAULT_USAGE_COLOR = '#9CA3AF';
 const THUMBNAIL_SIZE = 54;
 
-type QuickRenderConnectedImagesProps = {
-  images: QuickRenderConnectedImage[];
+type ExteriorRenderConnectedImagesProps = {
+  images: ExteriorRenderConnectedImage[];
   disabled?: boolean;
-  onRemove: (image: QuickRenderConnectedImage) => void;
+  onRemove: (image: ExteriorRenderConnectedImage) => void;
   onUpload: (files: FileList | null) => void;
   onSelectFromCanvas: () => void;
 };
 
-export function QuickRenderConnectedImages({
+export function ExteriorRenderConnectedImages({
   images,
   disabled = false,
   onRemove,
   onUpload,
   onSelectFromCanvas,
-}: QuickRenderConnectedImagesProps) {
+}: ExteriorRenderConnectedImagesProps) {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -38,7 +38,7 @@ export function QuickRenderConnectedImages({
     event.nativeEvent.stopImmediatePropagation?.();
   };
 
-  const removeThumbnail = (event: React.SyntheticEvent, image: QuickRenderConnectedImage) => {
+  const removeThumbnail = (event: React.SyntheticEvent, image: ExteriorRenderConnectedImage) => {
     stopThumbnailEvent(event);
     if (disabled) return;
     if (removedImageIdsRef.current.has(image.id)) return;
@@ -106,7 +106,7 @@ export function QuickRenderConnectedImages({
               onSelectFromCanvas();
             }}
           >
-            {t('quickRenderExterior.imageInput.selectFromCanvas')}
+            {t('exteriorRender.imageInput.selectFromCanvas')}
           </button>
           <button
             type="button"
@@ -117,12 +117,12 @@ export function QuickRenderConnectedImages({
               fileInputRef.current?.click();
             }}
           >
-            {t('quickRenderExterior.imageInput.uploadResource')}
+            {t('exteriorRender.imageInput.uploadResource')}
           </button>
         </div>,
         document.body,
       )}
-      <div className="text-[13px] font-medium text-white/82">{t('quickRenderExterior.sections.imageInput.title')}</div>
+      <div className="text-[13px] font-medium text-white/82">{t('exteriorRender.sections.imageInput.title')}</div>
 
       {images.length > 0 ? (
         <div className="flex flex-wrap items-start gap-3">
@@ -166,8 +166,8 @@ export function QuickRenderConnectedImages({
                   }}
                   className="nodrag nopan nowheel absolute right-0 top-0 z-30 flex h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 opacity-0 transition hover:bg-black hover:text-white group-hover/input-ref:opacity-100"
                   style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-                  title={t('quickRenderExterior.imageInput.removeImage')}
-                  aria-label={t('quickRenderExterior.imageInput.removeImage')}
+                  title={t('exteriorRender.imageInput.removeImage')}
+                  aria-label={t('exteriorRender.imageInput.removeImage')}
                 >
                   <X className="h-2.5 w-2.5" />
                 </button>
@@ -178,14 +178,14 @@ export function QuickRenderConnectedImages({
                   borderColor: `${image.roleColor || DEFAULT_USAGE_COLOR}40`,
                   color: image.roleColor || DEFAULT_USAGE_COLOR,
                 }}
-                title={image.roleLabel || t('quickRenderExterior.imageInput.unassignedRole')}
+                title={image.roleLabel || t('exteriorRender.imageInput.unassignedRole')}
               >
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: image.roleColor || DEFAULT_USAGE_COLOR }}
                 />
                 <span className="min-w-0 truncate text-[10px] font-medium">
-                  {image.roleLabel || t('quickRenderExterior.imageInput.unassignedRole')}
+                  {image.roleLabel || t('exteriorRender.imageInput.unassignedRole')}
                 </span>
               </div>
             </div>
@@ -193,7 +193,7 @@ export function QuickRenderConnectedImages({
           {hiddenCount > 0 && (
             <div className="flex flex-col items-center justify-center rounded-[9px] border border-white/[0.08] bg-white/[0.035] text-white/50" style={{ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}>
               <span className="text-[13px] font-medium">+{hiddenCount}</span>
-              <span className="mt-1 text-[9px]">{t('quickRenderExterior.imageInput.viewMore')}</span>
+              <span className="mt-1 text-[9px]">{t('exteriorRender.imageInput.viewMore')}</span>
             </div>
           )}
         </div>
@@ -208,7 +208,7 @@ export function QuickRenderConnectedImages({
             onPointerDown={(event) => event.stopPropagation()}
           >
             <Plus className="mb-1 h-4 w-4" />
-            <span className="text-[10px] font-medium">{t('quickRenderExterior.imageInput.addImage')}</span>
+            <span className="text-[10px] font-medium">{t('exteriorRender.imageInput.addImage')}</span>
           </button>
         </div>
       )}

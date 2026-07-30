@@ -1,32 +1,37 @@
 import type {
-  QuickRenderAtmosphereOption,
-  QuickRenderConnectedImage,
-  QuickRenderExteriorNodeData,
-  QuickRenderGenerationTask,
-  QuickRenderRequest,
-  QuickRenderRequestRenderChannel,
-  QuickRenderRenderChannel,
-  QuickRenderValidationResult,
-  QuickRenderViewState,
-} from './quickRenderExterior.types';
+  ExteriorRenderAtmosphereOption,
+  ExteriorRenderConnectedImage,
+  ExteriorRenderNodeData,
+  ExteriorRenderGenerationTask,
+  ExteriorRenderRequest,
+  ExteriorRenderRequestRenderChannel,
+  ExteriorRenderRenderChannel,
+  ExteriorRenderValidationResult,
+  ExteriorRenderViewState,
+} from './exteriorRender.types';
+import {
+  calculateRequestedSize,
+  getResolutionTier,
+  validateRequestedSize,
+} from '../../utils/modelParams';
 
-function resolveReferenceRole(image: QuickRenderConnectedImage): 'primaryBuilding' | 'atmosphere' | 'local' | 'unassigned' {
+function resolveReferenceRole(image: ExteriorRenderConnectedImage): 'primaryBuilding' | 'atmosphere' | 'local' | 'unassigned' {
   if (image.role === 'primary_building') return 'primaryBuilding';
   if (image.role === 'atmosphere_reference' || image.role === 'overall_reference') return 'atmosphere';
   if (image.role) return 'local';
   return 'unassigned';
 }
 
-function resolveAtmosphereValue(option: QuickRenderAtmosphereOption | undefined): string | null {
+function resolveAtmosphereValue(option: ExteriorRenderAtmosphereOption | undefined): string | null {
   if (option?.source === 'manual' && option.value) return option.value;
   if (option?.source === 'followReference') return 'followReference';
   return null;
 }
 
 function buildRenderChannel(
-  channels: QuickRenderRenderChannel[],
+  channels: ExteriorRenderRenderChannel[],
   type: 'albedo' | 'normal' | 'ao' | 'depth',
-): QuickRenderRequestRenderChannel | null {
+): ExteriorRenderRequestRenderChannel | null {
   const channel = channels.find((item) => item.type === type && item.imageUrl.trim().length > 0);
   if (!channel) return null;
   return {
@@ -37,10 +42,10 @@ function buildRenderChannel(
   };
 }
 
-export function buildQuickRenderRequest(
-  data: QuickRenderExteriorNodeData,
-  inputImages: readonly QuickRenderConnectedImage[] = data.connectedImages || [],
-): QuickRenderRequest {
+export function buildExteriorRenderRequest(
+  data: ExteriorRenderNodeData,
+  inputImages: readonly ExteriorRenderConnectedImage[] = data.connectedImages || [],
+): ExteriorRenderRequest {
   const channels = data.renderChannels?.channels || data.structure?.channels || [];
   const atmosphere = data.atmosphere || {};
   const modelParams = data.modelParams || {
@@ -49,6 +54,20 @@ export function buildQuickRenderRequest(
     resolution: '2K',
     count: 1,
   };
+  const resolutionTier = getResolutionTier(modelParams.resolutionTier ?? modelParams.resolution);
+  const adaptiveSource = inputImages.find((image) => (
+    typeof image.width === 'number'
+    && image.width > 0
+    && typeof image.height === 'number'
+    && image.height > 0
+  ));
+  const requestedSize = validateRequestedSize(modelParams.requestedSize, resolutionTier)
+    ? modelParams.requestedSize
+    : calculateRequestedSize(
+      modelParams.aspectRatio,
+      resolutionTier,
+      adaptiveSource ? { width: adaptiveSource.width!, height: adaptiveSource.height! } : null,
+    );
 
   return {
     inputImages: inputImages.map((image) => ({
@@ -82,13 +101,15 @@ export function buildQuickRenderRequest(
       model: modelParams.model,
       aspectRatio: modelParams.aspectRatio,
       resolution: modelParams.resolution,
+      resolutionTier,
+      requestedSize,
       count: modelParams.count || 1,
     },
   };
 }
 
-export function validateQuickRenderRequest(request: QuickRenderRequest): QuickRenderValidationResult {
-  const errors: QuickRenderValidationResult['errors'] = [];
+export function validateExteriorRenderRequest(request: ExteriorRenderRequest): ExteriorRenderValidationResult {
+  const errors: ExteriorRenderValidationResult['errors'] = [];
   if (request.inputImages.length === 0) {
     errors.push({ code: 'INPUT_IMAGE_REQUIRED', field: 'inputImages' });
   } else if (!request.inputImages.some((image) => image.imageUrl.trim().length > 0)) {
@@ -97,15 +118,15 @@ export function validateQuickRenderRequest(request: QuickRenderRequest): QuickRe
   return { valid: errors.length === 0, errors };
 }
 
-export function deriveQuickRenderViewState(
-  data: QuickRenderExteriorNodeData,
-  inputImages: readonly QuickRenderConnectedImage[] = data.connectedImages || [],
-): QuickRenderViewState {
+export function deriveExteriorRenderViewState(
+  data: ExteriorRenderNodeData,
+  inputImages: readonly ExteriorRenderConnectedImage[] = data.connectedImages || [],
+): ExteriorRenderViewState {
   if (data.generationTask?.status === 'processing') return 'PROCESSING';
-  return validateQuickRenderRequest(buildQuickRenderRequest(data, inputImages)).valid ? 'READY' : 'EMPTY';
+  return validateExteriorRenderRequest(buildExteriorRenderRequest(data, inputImages)).valid ? 'READY' : 'EMPTY';
 }
 
-export function getQuickRenderInteractionLocks(viewState: QuickRenderViewState) {
+export function getExteriorRenderInteractionLocks(viewState: ExteriorRenderViewState) {
   const locked = viewState === 'PROCESSING';
   return {
     inputImages: locked,
@@ -117,10 +138,10 @@ export function getQuickRenderInteractionLocks(viewState: QuickRenderViewState) 
   } as const;
 }
 
-export function shouldApplyQuickRenderTaskResult(activeTaskId: string | null, completedTaskId: string): boolean {
+export function shouldApplyExteriorRenderTaskResult(activeTaskId: string | null, completedTaskId: string): boolean {
   return activeTaskId === completedTaskId;
 }
 
-export function createIdleQuickRenderTask(): QuickRenderGenerationTask {
+export function createIdleExteriorRenderTask(): ExteriorRenderGenerationTask {
   return { taskId: null, status: 'idle', errorCode: null, startedAt: null, completedAt: null };
 }

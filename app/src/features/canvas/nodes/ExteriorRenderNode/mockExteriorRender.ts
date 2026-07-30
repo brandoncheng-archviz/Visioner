@@ -1,6 +1,6 @@
-import type { QuickRenderErrorCode, QuickRenderRequest, QuickRenderResult } from './quickRenderExterior.types';
+import type { ExteriorRenderErrorCode, ExteriorRenderRequest, ExteriorRenderResult } from './exteriorRender.types';
 
-export type MockQuickRenderOptions = {
+export type MockExteriorRenderOptions = {
   outcome?: 'success' | 'failed';
   delayMs?: number;
   signal?: AbortSignal;
@@ -9,19 +9,19 @@ export type MockQuickRenderOptions = {
 
 let mockTaskCounter = 0;
 
-export class QuickRenderError extends Error {
-  readonly code: QuickRenderErrorCode;
+export class ExteriorRenderError extends Error {
+  readonly code: ExteriorRenderErrorCode;
 
-  constructor(code: QuickRenderErrorCode) {
+  constructor(code: ExteriorRenderErrorCode) {
     super(code);
-    this.name = 'QuickRenderError';
+    this.name = 'ExteriorRenderError';
     this.code = code;
   }
 }
 
-export function createQuickRenderTaskId() {
+export function createExteriorRenderTaskId() {
   mockTaskCounter += 1;
-  return `quick-render-${Date.now()}-${mockTaskCounter}`;
+  return `exterior-render-${Date.now()}-${mockTaskCounter}`;
 }
 
 function waitForMockDelay(delayMs: number, signal?: AbortSignal) {
@@ -36,7 +36,7 @@ function waitForMockDelay(delayMs: number, signal?: AbortSignal) {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
-      reject(new QuickRenderError('CANCELLED'));
+      reject(new ExteriorRenderError('CANCELLED'));
     };
     if (signal?.aborted) {
       abort();
@@ -46,18 +46,18 @@ function waitForMockDelay(delayMs: number, signal?: AbortSignal) {
   });
 }
 
-export async function mockQuickRender(
-  request: QuickRenderRequest,
-  options: MockQuickRenderOptions = {},
-): Promise<QuickRenderResult> {
-  const taskId = options.taskId || createQuickRenderTaskId();
+export async function mockExteriorRender(
+  request: ExteriorRenderRequest,
+  options: MockExteriorRenderOptions = {},
+): Promise<ExteriorRenderResult> {
+  const taskId = options.taskId || createExteriorRenderTaskId();
   const delayMs = options.delayMs ?? 1500 + Math.floor(Math.random() * 1001);
   const outcome = options.outcome ?? 'success';
   await waitForMockDelay(delayMs, options.signal);
 
-  if (outcome === 'failed') throw new QuickRenderError('GENERATION_FAILED');
+  if (outcome === 'failed') throw new ExteriorRenderError('GENERATION_FAILED');
   const primaryImage = request.inputImages.find((image) => image.imageUrl.trim().length > 0);
-  if (!primaryImage) throw new QuickRenderError('MISSING_INPUT');
+  if (!primaryImage) throw new ExteriorRenderError('MISSING_INPUT');
 
   return {
     taskId,

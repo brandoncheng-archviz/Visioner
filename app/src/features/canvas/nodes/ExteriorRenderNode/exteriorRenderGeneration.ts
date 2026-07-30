@@ -1,30 +1,30 @@
 import type {
-  QuickRenderErrorCode,
-  QuickRenderGenerationTask,
-  QuickRenderRequest,
-  QuickRenderResult,
-} from './quickRenderExterior.types';
-import { QuickRenderError } from './mockQuickRender';
-import { createIdleQuickRenderTask, validateQuickRenderRequest } from './quickRenderRequest';
+  ExteriorRenderErrorCode,
+  ExteriorRenderGenerationTask,
+  ExteriorRenderRequest,
+  ExteriorRenderResult,
+} from './exteriorRender.types';
+import { ExteriorRenderError } from './mockExteriorRender';
+import { createIdleExteriorRenderTask, validateExteriorRenderRequest } from './exteriorRenderRequest';
 
-type QuickRenderGenerationOptions = {
-  request: QuickRenderRequest;
+type ExteriorRenderGenerationOptions = {
+  request: ExteriorRenderRequest;
   taskId: string;
   signal?: AbortSignal;
-  execute: (request: QuickRenderRequest) => Promise<QuickRenderResult>;
+  execute: (request: ExteriorRenderRequest) => Promise<ExteriorRenderResult>;
   isTaskActive: (taskId: string) => boolean;
-  onTaskUpdate: (task: QuickRenderGenerationTask, result?: QuickRenderResult) => void;
-  onResult: (request: QuickRenderRequest, result: QuickRenderResult) => boolean | Promise<boolean>;
+  onTaskUpdate: (task: ExteriorRenderGenerationTask, result?: ExteriorRenderResult) => void;
+  onResult: (request: ExteriorRenderRequest, result: ExteriorRenderResult) => boolean | Promise<boolean>;
   now?: () => number;
 };
 
-export type QuickRenderGenerationOutcome = 'success' | 'failed' | 'invalid' | 'ignored';
+export type ExteriorRenderGenerationOutcome = 'success' | 'failed' | 'invalid' | 'ignored';
 
-function resolveQuickRenderErrorCode(error: unknown): QuickRenderErrorCode {
-  return error instanceof QuickRenderError ? error.code : 'GENERATION_FAILED';
+function resolveExteriorRenderErrorCode(error: unknown): ExteriorRenderErrorCode {
+  return error instanceof ExteriorRenderError ? error.code : 'GENERATION_FAILED';
 }
 
-export async function runQuickRenderGeneration({
+export async function runExteriorRenderGeneration({
   request,
   taskId,
   signal,
@@ -33,8 +33,8 @@ export async function runQuickRenderGeneration({
   onTaskUpdate,
   onResult,
   now = Date.now,
-}: QuickRenderGenerationOptions): Promise<QuickRenderGenerationOutcome> {
-  if (!validateQuickRenderRequest(request).valid) return 'invalid';
+}: ExteriorRenderGenerationOptions): Promise<ExteriorRenderGenerationOutcome> {
+  if (!validateExteriorRenderRequest(request).valid) return 'invalid';
 
   const startedAt = now();
   onTaskUpdate({ taskId, status: 'processing', errorCode: null, startedAt, completedAt: null });
@@ -52,17 +52,17 @@ export async function runQuickRenderGeneration({
     }, result);
 
     const didWriteResult = await onResult(request, result);
-    if (!didWriteResult) throw new QuickRenderError('GENERATION_FAILED');
+    if (!didWriteResult) throw new ExteriorRenderError('GENERATION_FAILED');
     if (signal?.aborted || !isTaskActive(result.taskId)) return 'ignored';
 
-    onTaskUpdate(createIdleQuickRenderTask(), result);
+    onTaskUpdate(createIdleExteriorRenderTask(), result);
     return 'success';
   } catch (error) {
     if (signal?.aborted || !isTaskActive(taskId)) return 'ignored';
     onTaskUpdate({
       taskId,
       status: 'failed',
-      errorCode: resolveQuickRenderErrorCode(error),
+      errorCode: resolveExteriorRenderErrorCode(error),
       startedAt,
       completedAt: now(),
     });

@@ -36,15 +36,15 @@ function validate(sourceNodeType: string, targetNodeType: string) {
   });
 }
 
-describe('quick render connection rules', () => {
-  it('rejects manually connecting quickRenderExterior to an image node', () => {
-    expect(validate('quickRenderExterior', 'image')).toEqual(expect.objectContaining({
+describe('exterior render connection rules', () => {
+  it('rejects manually connecting exteriorRender to an image node', () => {
+    expect(validate('exteriorRender', 'image')).toEqual(expect.objectContaining({
       valid: false,
-      code: 'quick_render_manual_output',
+      code: 'exterior_render_manual_output',
     }));
   });
 
-  it('keeps image to quickRenderExterior input connections valid', () => {
-    expect(validate('image', 'quickRenderExterior')).toEqual({ valid: true });
+  it('keeps image to exteriorRender input connections valid', () => {
+    expect(validate('image', 'exteriorRender')).toEqual({ valid: true });
   });
 });

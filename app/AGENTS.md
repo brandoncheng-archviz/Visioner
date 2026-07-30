@@ -147,7 +147,7 @@ app/  (project root — current working directory)
 - `UpscaleParamPanel.tsx`: ~310 lines.
 - `nodeSystem.ts`: ~323 lines.
 - `ConnectionEngine.ts`: ~249 lines.
-- `QuickRenderExteriorNode.tsx`: ~498 lines.
+- `ExteriorRenderNode.tsx`: ~498 lines.
 - `imageGenerationRequest.ts`: ~67 lines + tests.
 
 ---
@@ -271,8 +271,8 @@ The canvas editor has been refactored from a monolithic file into a feature modu
 - `ImageNode/` — Image node with control panel, prompt box, reference image area, generation history, presets, styles, and image controllers.
   - `ImageNode.tsx`, `ImageNodeControlPanel.tsx`, `ImageCropOverlay.tsx`, `index.ts`
   - `controllers/` — `ImageControllersTrigger.tsx`, `ImageControllersPopover.tsx`, `CameraControlPlaceholder.tsx`, `StructureControlPlaceholder.tsx`, `imageControllers.types.ts`, `imageControllersUtils.ts`.
-- `QuickRenderExteriorNode/` — Quick exterior rendering node with connected images, render channels, atmosphere panel, prompt panel, and result graph generation.
-  - `QuickRenderExteriorNode.tsx`, `QuickRenderFooter.tsx`, `QuickRenderAtmospherePanel.tsx`, `QuickRenderConnectedImages.tsx`, `QuickRenderPromptPanel.tsx`, `QuickRenderRenderChannelsPanel.tsx`, `quickRenderExterior.types.ts`, `quickRenderExteriorUtils.ts`, `quickRenderRequest.ts`, `quickRenderGeneration.ts`, `quickRenderResultGraph.ts`, `mockQuickRender.ts`, plus `.test.ts` files.
+- `ExteriorRenderNode/` — Exterior rendering node with connected images, render channels, atmosphere panel, prompt panel, and result graph generation.
+  - `ExteriorRenderNode.tsx`, `ExteriorRenderFooter.tsx`, `ExteriorRenderAtmospherePanel.tsx`, `ExteriorRenderConnectedImages.tsx`, `ExteriorRenderPromptPanel.tsx`, `ExteriorRenderRenderChannelsPanel.tsx`, `exteriorRender.types.ts`, `exteriorRenderUtils.ts`, `exteriorRenderRequest.ts`, `exteriorRenderGeneration.ts`, `exteriorRenderResultGraph.ts`, `mockExteriorRender.ts`, plus `.test.ts` files.
 - `VideoNode.tsx`
 - `TextNode.tsx`
 - `AudioNode.tsx`
@@ -291,7 +291,7 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - `types/` — `sunSky.types.ts`, `simpleSunSky.types.ts`.
 
 **Supporting modules:**
-- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `imageController.types.ts`, `imageControllers.types.ts`, `basicNode.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`, `history.types.ts`, `relight.types.ts`, plus node-specific types under `QuickRenderExteriorNode/` and `SunSkyNode/`.
+- `types/` — `canvas.types.ts`, `generation.types.ts`, `imageNode.types.ts`, `imageNodeData.types.ts`, `imageController.types.ts`, `imageControllers.types.ts`, `basicNode.types.ts`, `upscaleNode.types.ts`, `lightPreview.types.ts`, `history.types.ts`, `relight.types.ts`, plus node-specific types under `ExteriorRenderNode/` and `SunSkyNode/`.
 - `constants/` — `canvasConstants.ts`, `canvasNodeTitles.ts`, `basicNodes.ts`, `imageUsages.ts`, `imageController.ts`, `imageModelOptions.ts`, `presets.ts`, `relightPresets.ts`, `textNode.ts`, `upscaleNodeDefaults.ts`.
 - `utils/` — `promptUtils.ts`, `referenceUtils.ts`, `referenceLimits.ts`, `mockGenerationTask.ts`, `mockUpscaleTask.ts`, `mockRelightTask.ts`, `presetSelection.ts`, `userPresets.ts`, `imageNodeSizing.ts`, `resolveNodeImage.ts`, `nodeNaming.ts`, `nodeCopyData.ts`, `contentSafety.ts`, `relightSettings.ts`, `canvasGraphUtils.ts`, `canvasFileUtils.ts`, `canvasImageImportUtils.ts`, `canvasNodeFactories.ts`, `canvasEvents.ts`, `imageMarkCaptureRegistry.ts`, `cropImage.ts`, `compareSlots.ts`, `textNodeUtils.ts`, `shortcutLabels.ts`, `imageGenerationRequest.ts`, `canvasImageImportUtils.ts`.
 - `hooks/` — Listed above.
@@ -310,7 +310,7 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - Zoom slider, grid snap toggle, fit view reset, and help panel in the bottom toolbar.
 - Image mark capture layer for creating local marks on images.
 - TextNode floating input panel for writing and editing text nodes.
-- Quick exterior render node with connected image slots, render channels (Albedo, Normal, AO, Depth), atmosphere controls, and automatic result graph creation.
+- Exterior render node with connected image slots, render channels (Albedo, Normal, AO, Depth), atmosphere controls, and automatic result graph creation.
 
 **ImageNode generation flow:**
 - `ImageNode` is the most complex node type, supporting AI image generation via a mock task system.
@@ -321,12 +321,12 @@ A dedicated feature module for solar and sky lighting analysis, consumed by `Sun
 - Reference usage rules are documented in `docs/image-node-rules.md`.
 - `buildImageGenerationRequest` in `imageGenerationRequest.ts` builds the normalized API request object from node data, references, mark references, model parameters, controller state, style, and presets.
 
-**QuickRenderExteriorNode flow:**
-- Supports quick exterior rendering with a primary image input and optional render channels (Albedo, Normal, AO, Depth).
-- `buildQuickRenderRequest` normalizes connected images, render channels, atmosphere, and model parameters into a `QuickRenderRequest`.
-- `runQuickRenderGeneration` orchestrates `processing` → `success`/`failed` → `idle` and emits the result graph via `buildQuickRenderResultGraph`.
-- `mockQuickRender.ts` simulates the backend with configurable delay, outcome, and task identity.
-- Interaction locks during `processing` are derived from the view state via `getQuickRenderInteractionLocks`.
+**ExteriorRenderNode flow:**
+- Supports exterior rendering with a primary image input and optional render channels (Albedo, Normal, AO, Depth).
+- `buildExteriorRenderRequest` normalizes connected images, render channels, atmosphere, and model parameters into a `ExteriorRenderRequest`.
+- `runExteriorRenderGeneration` orchestrates `processing` → `success`/`failed` → `idle` and emits the result graph via `buildExteriorRenderResultGraph`.
+- `mockExteriorRender.ts` simulates the backend with configurable delay, outcome, and task identity.
+- Interaction locks during `processing` are derived from the view state via `getExteriorRenderInteractionLocks`.
 
 **RelightNode flow:**
 - `RelightNode` supports AI relighting with advanced parameter controls and presets.
@@ -445,9 +445,9 @@ The project uses **Vitest** for unit and integration testing.
 - Run command: `npm run test` (runs `vitest run`).
 - Existing test files:
   - `src/features/canvas/utils/imageGenerationRequest.test.ts` (11 tests) — Covers `buildImageGenerationRequest` normalization of references, mark references, count parsing, controller/style/presets passthrough, and immutability.
-  - `src/features/canvas/utils/nodeCopyData.test.ts` (3 tests) — Covers `prepareCanvasNodeDataForCopy` resetting quick render task state when copying.
-  - `src/features/canvas/nodes/QuickRenderExteriorNode/quickRenderRequest.test.ts` (11 tests) — Covers request building, validation, view-state derivation, and `mockQuickRender` behavior including task race conditions.
-  - `src/features/canvas/nodes/QuickRenderExteriorNode/quickRenderGeneration.integration.test.ts` (2 tests) — Covers full `READY → PROCESSING → success → result graph → idle` flow and failed/retry flows.
+  - `src/features/canvas/utils/nodeCopyData.test.ts` (3 tests) — Covers `prepareCanvasNodeDataForCopy` resetting exterior render task state when copying.
+  - `src/features/canvas/nodes/ExteriorRenderNode/exteriorRenderRequest.test.ts` (11 tests) — Covers request building, validation, view-state derivation, and `mockExteriorRender` behavior including task race conditions.
+  - `src/features/canvas/nodes/ExteriorRenderNode/exteriorRenderGeneration.integration.test.ts` (2 tests) — Covers full `READY → PROCESSING → success → result graph → idle` flow and failed/retry flows.
 - Total: 27 tests across 4 test files (all passing as of the last run).
 
 If you add new tests, place them alongside the source files they cover (`*.test.ts` / `*.test.tsx`) or in a top-level `tests/` directory inside the project root.

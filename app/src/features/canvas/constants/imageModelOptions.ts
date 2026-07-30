@@ -15,7 +15,7 @@ export type ImageModelOption = {
   costBase?: number;
 };
 
-// TODO: 待真实 API 接入后按实际模型能力调整。
+// TODO: Adjust these options to the actual model capabilities when the real API is connected.
 export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   {
     id: 'Nano Banana 2',
@@ -24,7 +24,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
     iconText: 'NB',
     iconBg: 'linear-gradient(135deg, rgba(66,133,244,0.95), rgba(52,168,83,0.9))',
     descriptionKey: 'modelParams.model.nanoBanana2.description',
-    resolutions: ['1K', '2K'],
+    resolutions: ['1K', '2K', '4K'],
     defaultResolution: '2K',
     supportedCounts: [1, 2, 4],
     costBase: 14,

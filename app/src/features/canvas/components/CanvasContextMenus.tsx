@@ -126,7 +126,7 @@ const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
   text: TextNodeIcon as unknown as typeof Image,
   image: Image,
   relight: Sun,
-  quickRenderExterior: Building2,
+  exteriorRender: Building2,
   upscale: Sparkles,
   compare: Columns2,
 };

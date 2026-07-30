@@ -3,31 +3,31 @@ import { createPortal } from 'react-dom';
 import { Plus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type {
-  QuickRenderExteriorNodeData,
-  QuickRenderRenderChannel,
-  QuickRenderRenderChannelType,
-} from './quickRenderExterior.types';
+  ExteriorRenderNodeData,
+  ExteriorRenderRenderChannel,
+  ExteriorRenderRenderChannelType,
+} from './exteriorRender.types';
 import {
-  createQuickRenderRenderChannel,
+  createExteriorRenderRenderChannel,
   readImageFileAsDataUrl,
-  sortQuickRenderRenderChannels,
-} from './quickRenderExteriorUtils';
+  sortExteriorRenderRenderChannels,
+} from './exteriorRenderUtils';
 
-type QuickRenderRenderChannelsPanelProps = {
-  data: QuickRenderExteriorNodeData;
+type ExteriorRenderRenderChannelsPanelProps = {
+  data: ExteriorRenderNodeData;
   disabled?: boolean;
-  onChange: (patch: Partial<QuickRenderExteriorNodeData>) => void;
-  onSelectFromCanvas: (channelType: QuickRenderRenderChannelType) => void;
+  onChange: (patch: Partial<ExteriorRenderNodeData>) => void;
+  onSelectFromCanvas: (channelType: ExteriorRenderRenderChannelType) => void;
 };
 
 type SlotMenu = {
-  channelType: QuickRenderRenderChannelType;
+  channelType: ExteriorRenderRenderChannelType;
   left: number;
   top: number;
   width: number;
 };
 
-const FIXED_RENDER_CHANNELS = ['albedo', 'normal', 'ao', 'depth'] as const satisfies readonly QuickRenderRenderChannelType[];
+const FIXED_RENDER_CHANNELS = ['albedo', 'normal', 'ao', 'depth'] as const satisfies readonly ExteriorRenderRenderChannelType[];
 const THUMBNAIL_SIZE = 54;
 const MENU_WIDTH = 150;
 
@@ -46,20 +46,20 @@ function getMenuPosition(element: HTMLElement) {
   };
 }
 
-export function QuickRenderRenderChannelsPanel({ data, disabled = false, onChange, onSelectFromCanvas }: QuickRenderRenderChannelsPanelProps) {
+export function ExteriorRenderRenderChannelsPanel({ data, disabled = false, onChange, onSelectFromCanvas }: ExteriorRenderRenderChannelsPanelProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const slotRefs = useRef<Partial<Record<QuickRenderRenderChannelType, HTMLButtonElement>>>({});
-  const uploadTypeRef = useRef<QuickRenderRenderChannelType>('albedo');
+  const slotRefs = useRef<Partial<Record<ExteriorRenderRenderChannelType, HTMLButtonElement>>>({});
+  const uploadTypeRef = useRef<ExteriorRenderRenderChannelType>('albedo');
   const [menu, setMenu] = useState<SlotMenu | null>(null);
   const renderChannels = data.renderChannels || data.structure || {};
   const channels = useMemo(
-    () => sortQuickRenderRenderChannels(renderChannels.channels || []),
+    () => sortExteriorRenderRenderChannels(renderChannels.channels || []),
     [renderChannels.channels],
   );
 
-  const updateSlot = (channelType: QuickRenderRenderChannelType, channel: QuickRenderRenderChannel | null) => {
+  const updateSlot = (channelType: ExteriorRenderRenderChannelType, channel: ExteriorRenderRenderChannel | null) => {
     if (disabled) return;
     const nextChannels = [
       ...channels.filter((item) => item.type !== channelType),
@@ -69,7 +69,7 @@ export function QuickRenderRenderChannelsPanel({ data, disabled = false, onChang
       renderChannelsEnabled: nextChannels.length > 0,
       renderChannels: {
         ...renderChannels,
-        channels: sortQuickRenderRenderChannels(nextChannels),
+        channels: sortExteriorRenderRenderChannels(nextChannels),
         pendingFiles: [],
       },
     });
@@ -81,7 +81,7 @@ export function QuickRenderRenderChannelsPanel({ data, disabled = false, onChang
     if (!file) return;
     const channelType = uploadTypeRef.current;
     const imageUrl = await readImageFileAsDataUrl(file);
-    updateSlot(channelType, createQuickRenderRenderChannel(
+    updateSlot(channelType, createExteriorRenderRenderChannel(
       channelType,
       imageUrl,
       file.name,
@@ -91,7 +91,7 @@ export function QuickRenderRenderChannelsPanel({ data, disabled = false, onChang
     if (inputRef.current) inputRef.current.value = '';
   };
 
-  const openSlotMenu = (event: React.MouseEvent<HTMLButtonElement>, channelType: QuickRenderRenderChannelType) => {
+  const openSlotMenu = (event: React.MouseEvent<HTMLButtonElement>, channelType: ExteriorRenderRenderChannelType) => {
     stopEvent(event);
     if (disabled) return;
     setMenu({ channelType, ...getMenuPosition(event.currentTarget) });
@@ -144,7 +144,7 @@ export function QuickRenderRenderChannelsPanel({ data, disabled = false, onChang
               onSelectFromCanvas(channelType);
             }}
           >
-            {t('quickRenderExterior.renderChannels.selectFromCanvas')}
+            {t('exteriorRender.renderChannels.selectFromCanvas')}
           </button>
           <button
             type="button"
@@ -156,19 +156,19 @@ export function QuickRenderRenderChannelsPanel({ data, disabled = false, onChang
               inputRef.current?.click();
             }}
           >
-            {t('quickRenderExterior.renderChannels.upload')}
+            {t('exteriorRender.renderChannels.upload')}
           </button>
         </div>,
         document.body,
       )}
 
-      <div className="text-[13px] font-medium text-white/82">{t('quickRenderExterior.sections.renderChannels.title')}</div>
+      <div className="text-[13px] font-medium text-white/82">{t('exteriorRender.sections.renderChannels.title')}</div>
 
       <div className="flex items-start gap-3">
         {FIXED_RENDER_CHANNELS.map((channelType) => {
           const channel = channels.find((item) => item.type === channelType);
           const channelName = t(`renderChannel.names.${channelType}`);
-          const slotActionKey = channel ? 'quickRenderExterior.renderChannels.replace' : 'quickRenderExterior.renderChannels.add';
+          const slotActionKey = channel ? 'exteriorRender.renderChannels.replace' : 'exteriorRender.renderChannels.add';
           const slotActionLabel = t(slotActionKey, { channel: channelName });
           return (
             <div key={channelType} className="group/channel relative w-[60px]">
@@ -199,8 +199,8 @@ export function QuickRenderRenderChannelsPanel({ data, disabled = false, onChang
                 <button
                   type="button"
                   className="nodrag nopan absolute right-[6px] top-0 z-20 flex h-[18px] w-[18px] items-center justify-center rounded-full border border-white/[0.18] bg-black/75 text-white/78 opacity-0 transition hover:bg-black hover:text-white group-hover/channel:opacity-100"
-                  aria-label={t('quickRenderExterior.renderChannels.remove', { channel: channelName })}
-                  title={t('quickRenderExterior.renderChannels.remove', { channel: channelName })}
+                  aria-label={t('exteriorRender.renderChannels.remove', { channel: channelName })}
+                  title={t('exteriorRender.renderChannels.remove', { channel: channelName })}
                   onPointerDown={stopEvent}
                   onClick={(event) => {
                     stopEvent(event);

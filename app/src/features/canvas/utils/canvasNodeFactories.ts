@@ -4,7 +4,7 @@ import { DEFAULT_MODEL_PARAMS } from '../constants/canvasConstants';
 import { UPSCALE_NODE_DEFAULTS } from '../constants/upscaleNodeDefaults';
 import { DEFAULT_TEXT_NODE_MODEL } from '../constants/textNode';
 import type { RelightCreationOptions } from '../types/relight.types';
-import { createQuickRenderExteriorNodeData } from '../nodes/QuickRenderExteriorNode';
+import { createExteriorRenderNodeData } from '../nodes/ExteriorRenderNode';
 import { getRoleData } from './referenceUtils';
 
 type CanvasPosition = {
@@ -82,8 +82,8 @@ export function createBasicCanvasNode({
             viewMode: 'edit',
           }
         : {}),
-      ...(type === 'quickRenderExterior'
-        ? createQuickRenderExteriorNodeData(label)
+      ...(type === 'exteriorRender'
+        ? createExteriorRenderNodeData(label)
         : {}),
       ...(type === 'compare'
         ? createCompareNodeData(label)

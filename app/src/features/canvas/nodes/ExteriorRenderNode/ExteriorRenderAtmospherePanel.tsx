@@ -3,24 +3,24 @@ import { createPortal } from 'react-dom';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
-  QUICK_RENDER_LIGHTING_OPTIONS,
-  QUICK_RENDER_STYLE_OPTIONS,
-  QUICK_RENDER_TIME_OPTIONS,
-  QUICK_RENDER_TOGGLE_OPTIONS,
-  QUICK_RENDER_WEATHER_OPTIONS,
-  type QuickRenderAtmosphereDisplayOption,
-} from './quickRenderAtmosphereOptions';
+  EXTERIOR_RENDER_LIGHTING_OPTIONS,
+  EXTERIOR_RENDER_STYLE_OPTIONS,
+  EXTERIOR_RENDER_TIME_OPTIONS,
+  EXTERIOR_RENDER_TOGGLE_OPTIONS,
+  EXTERIOR_RENDER_WEATHER_OPTIONS,
+  type ExteriorRenderAtmosphereDisplayOption,
+} from './exteriorRenderAtmosphereOptions';
 import type {
-  QuickRenderAtmosphereOption,
-  QuickRenderAtmosphereValue,
-  QuickRenderExteriorNodeData,
-} from './quickRenderExterior.types';
+  ExteriorRenderAtmosphereOption,
+  ExteriorRenderAtmosphereValue,
+  ExteriorRenderNodeData,
+} from './exteriorRender.types';
 
-type QuickRenderAtmospherePanelProps = {
-  data: QuickRenderExteriorNodeData;
+type ExteriorRenderAtmospherePanelProps = {
+  data: ExteriorRenderNodeData;
   disabled?: boolean;
   hasAtmosphereReference: boolean;
-  onChange: (patch: Partial<QuickRenderExteriorNodeData>) => void;
+  onChange: (patch: Partial<ExteriorRenderNodeData>) => void;
 };
 
 type SelectKey = 'time' | 'light' | 'weather' | 'style';
@@ -33,10 +33,10 @@ type SelectMenuState = {
 };
 
 const SELECT_ROWS = [
-  { key: 'time', labelKey: 'atmosphere.fields.time', options: QUICK_RENDER_TIME_OPTIONS },
-  { key: 'light', labelKey: 'atmosphere.fields.lighting', options: QUICK_RENDER_LIGHTING_OPTIONS },
-  { key: 'weather', labelKey: 'atmosphere.fields.weather', options: QUICK_RENDER_WEATHER_OPTIONS },
-  { key: 'style', labelKey: 'atmosphere.fields.style', options: QUICK_RENDER_STYLE_OPTIONS },
+  { key: 'time', labelKey: 'atmosphere.fields.time', options: EXTERIOR_RENDER_TIME_OPTIONS },
+  { key: 'light', labelKey: 'atmosphere.fields.lighting', options: EXTERIOR_RENDER_LIGHTING_OPTIONS },
+  { key: 'weather', labelKey: 'atmosphere.fields.weather', options: EXTERIOR_RENDER_WEATHER_OPTIONS },
+  { key: 'style', labelKey: 'atmosphere.fields.style', options: EXTERIOR_RENDER_STYLE_OPTIONS },
 ] as const;
 
 const INNER_ATMOSPHERE_SWITCH_TRACK = 'relative ml-2 h-4 w-7 shrink-0 rounded-full border transition-colors';
@@ -44,7 +44,7 @@ const INNER_ATMOSPHERE_SWITCH_THUMB = 'absolute top-0.5 h-2.5 w-2.5 rounded-full
 const SELECT_MENU_ESTIMATED_HEIGHT = 260;
 const VIEWPORT_PADDING = 12;
 
-type DisplayOption = QuickRenderAtmosphereDisplayOption<QuickRenderAtmosphereValue>;
+type DisplayOption = ExteriorRenderAtmosphereDisplayOption<ExteriorRenderAtmosphereValue>;
 
 function getOptionLabel(
   value: string | undefined,
@@ -58,7 +58,7 @@ function getOptionLabel(
 }
 
 function getDisplayValue(
-  option: QuickRenderAtmosphereOption | undefined,
+  option: ExteriorRenderAtmosphereOption | undefined,
   options: readonly DisplayOption[],
   hasAtmosphereReference: boolean,
   translate: (key: string) => string,
@@ -83,7 +83,7 @@ function SelectionRow({
   buttonRef,
 }: {
   label: string;
-  value: QuickRenderAtmosphereOption | undefined;
+  value: ExteriorRenderAtmosphereOption | undefined;
   options: readonly DisplayOption[];
   hasAtmosphereReference: boolean;
   translate: (key: string) => string;
@@ -135,7 +135,7 @@ function SelectionRow({
   );
 }
 
-export function QuickRenderAtmospherePanel({ data, disabled = false, hasAtmosphereReference, onChange }: QuickRenderAtmospherePanelProps) {
+export function ExteriorRenderAtmospherePanel({ data, disabled = false, hasAtmosphereReference, onChange }: ExteriorRenderAtmospherePanelProps) {
   const { t } = useTranslation();
   const [selectMenu, setSelectMenu] = useState<SelectMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -202,7 +202,7 @@ export function QuickRenderAtmospherePanel({ data, disabled = false, hasAtmosphe
     };
   }, [selectMenu]);
 
-  const setField = (key: SelectKey, value: QuickRenderAtmosphereValue) => {
+  const setField = (key: SelectKey, value: ExteriorRenderAtmosphereValue) => {
     if (disabled) return;
     onChange({
       atmosphere: {
@@ -256,10 +256,10 @@ export function QuickRenderAtmospherePanel({ data, disabled = false, hasAtmosphe
         </div>,
         document.body,
       )}
-      <div className="text-[13px] font-medium text-white/82">{t('quickRenderExterior.sections.atmosphere.title')}</div>
+      <div className="text-[13px] font-medium text-white/82">{t('exteriorRender.sections.atmosphere.title')}</div>
       <div className="space-y-1.5">
         <div className="grid grid-cols-2 gap-1.5">
-          {QUICK_RENDER_TOGGLE_OPTIONS.map(({ key, labelKey }) => {
+          {EXTERIOR_RENDER_TOGGLE_OPTIONS.map(({ key, labelKey }) => {
             const active = atmosphere[key] === true;
             return (
               <button
@@ -271,7 +271,7 @@ export function QuickRenderAtmospherePanel({ data, disabled = false, hasAtmosphe
               >
                 <span>{t(labelKey)}</span>
                 <span className={`${INNER_ATMOSPHERE_SWITCH_TRACK} ${active ? 'border-[#8b5cf6]/80 bg-[#8b5cf6] hover:brightness-110' : 'border-white/[0.18] bg-white/[0.10] hover:bg-white/[0.14]'}`}>
-                  <span className={`quick-render-inner-switch-thumb ${INNER_ATMOSPHERE_SWITCH_THUMB} ${active ? 'left-[14px]' : 'left-0.5'}`} />
+                  <span className={`exterior-render-inner-switch-thumb ${INNER_ATMOSPHERE_SWITCH_THUMB} ${active ? 'left-[14px]' : 'left-0.5'}`} />
                 </span>
               </button>
             );

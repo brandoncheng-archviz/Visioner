@@ -3,9 +3,9 @@ import { prepareCanvasNodeDataForCopy } from './nodeCopyData';
 
 describe('prepareCanvasNodeDataForCopy', () => {
   it.each(['processing', 'success', 'failed'] as const)(
-    'resets a copied quick render %s task to idle',
+    'resets a copied exterior render %s task to idle',
     (status) => {
-      const copied = prepareCanvasNodeDataForCopy('quickRenderExterior', {
+      const copied = prepareCanvasNodeDataForCopy('exteriorRender', {
         prompt: 'latest prompt',
         lastResult: { taskId: 'old-result' },
         generationTask: {

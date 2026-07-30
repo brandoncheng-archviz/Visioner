@@ -95,8 +95,8 @@ export function validateConnectionRules(input: ValidateConnectionRulesInput): Co
     return reject('invalid_text_mode', messages.cannotConnect);
   }
 
-  if (sourceNodeType === 'quickRenderExterior' && targetNodeType === 'image') {
-    return reject('quick_render_manual_output', messages.cannotConnect, {
+  if (sourceNodeType === 'exteriorRender' && targetNodeType === 'image') {
+    return reject('exterior_render_manual_output', messages.cannotConnect, {
       sourceNodeType,
       targetNodeType,
     });

@@ -4,6 +4,11 @@ import type {
   ImageGenerationCount,
   ImageGenerationRequest,
 } from '../types/generation.types';
+import {
+  calculateRequestedSize,
+  getResolutionTier,
+  validateRequestedSize,
+} from './modelParams';
 
 export interface BuildImageGenerationRequestInput {
   nodeId: string;
@@ -35,6 +40,11 @@ export function buildImageGenerationRequest({
   style,
   presets,
 }: BuildImageGenerationRequestInput): ImageGenerationRequest {
+  const resolutionTier = getResolutionTier(modelParams.resolutionTier ?? modelParams.resolution);
+  const requestedSize = validateRequestedSize(modelParams.requestedSize, resolutionTier)
+    ? modelParams.requestedSize
+    : calculateRequestedSize(modelParams.ratio, resolutionTier);
+
   return {
     nodeId,
     prompt,
@@ -58,6 +68,8 @@ export function buildImageGenerationRequest({
       model: modelParams.model,
       aspectRatio: modelParams.ratio,
       resolution: modelParams.resolution,
+      resolutionTier,
+      requestedSize,
       count: normalizeGenerationCount(modelParams.count),
     },
     controller,

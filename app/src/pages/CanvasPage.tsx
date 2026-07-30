@@ -43,12 +43,12 @@ import { HistoryProvider } from '../features/canvas/contexts/HistoryContext';
 import { HistoryPanel } from '../features/canvas/components/HistoryPanel';
 import type { GeneratedImage, ResultSetBatch } from '../features/canvas/types/history.types';
 import type { GenerationHistoryItem, GenerationTask } from '../features/canvas/types/generation.types';
-import type { QuickRenderRequest, QuickRenderResult } from '../features/canvas/nodes/QuickRenderExteriorNode/quickRenderExterior.types';
+import type { ExteriorRenderRequest, ExteriorRenderResult } from '../features/canvas/nodes/ExteriorRenderNode/exteriorRender.types';
 import {
-  buildQuickRenderCompletedOutput,
-  buildQuickRenderFailedOutput,
-  buildQuickRenderProcessingOutput,
-} from '../features/canvas/nodes/QuickRenderExteriorNode/quickRenderResultGraph';
+  buildExteriorRenderCompletedOutput,
+  buildExteriorRenderFailedOutput,
+  buildExteriorRenderProcessingOutput,
+} from '../features/canvas/nodes/ExteriorRenderNode/exteriorRenderResultGraph';
 import type { RelightCreationOptions } from '../features/canvas/types/relight.types';
 import type {
   TextNodeActionType,
@@ -291,7 +291,9 @@ function FlowCanvas() {
     relightMaxOneImage: t('error.relightMaxOneImage'),
     upscaleMaxOneImage: t('error.upscaleMaxOneImage'),
     compareMaxTwoImages: t('error.compareMaxTwoImages'),
-    usageConflict: (role) => t('reference.usageConflict', { role: getImageRoleLabel(role) }),
+    usageConflict: (role) => t('reference.validation.usageConflict', {
+      role: getImageRoleLabel(role, undefined, undefined, undefined, (key) => t(key)),
+    }),
   }), [t]);
 
   const validateImageProcessingEdge = useCallback((
@@ -647,16 +649,16 @@ function FlowCanvas() {
     setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === targetNodeId)));
   }, []);
 
-  const addQuickRenderInputEdge = useCallback((targetNodeId: string, sourceNodeId: string) => {
+  const addExteriorRenderInputEdge = useCallback((targetNodeId: string, sourceNodeId: string) => {
     const sourceNode = nodes.find((node) => node.id === sourceNodeId);
     const targetNode = nodes.find((node) => node.id === targetNodeId);
-    if (!sourceNode || !targetNode || targetNode.type !== 'quickRenderExterior') return;
-    if (sourceNode.type === 'text' || sourceNode.type === 'compare' || sourceNode.type === 'upscale' || sourceNode.type === 'quickRenderExterior') return;
+    if (!sourceNode || !targetNode || targetNode.type !== 'exteriorRender') return;
+    if (sourceNode.type === 'text' || sourceNode.type === 'compare' || sourceNode.type === 'upscale' || sourceNode.type === 'exteriorRender') return;
     if (!resolveNodeImage(sourceNode.data)?.imageUrl) return;
 
     const duplicateEdge = edges.find((edge) => {
       if (edge.source !== sourceNodeId || edge.target !== targetNodeId) return false;
-      return edge.data?.kind === 'quickRenderInput' || edge.data?.kind === undefined;
+      return edge.data?.kind === 'exteriorRenderInput' || edge.data?.kind === undefined;
     });
     if (duplicateEdge) {
       showToast('该图像已添加');
@@ -664,12 +666,12 @@ function FlowCanvas() {
     }
 
     const newEdge: Edge = {
-      id: `quick-render-input-${sourceNodeId}-${targetNodeId}-${Date.now()}`,
+      id: `exterior-render-input-${sourceNodeId}-${targetNodeId}-${Date.now()}`,
       source: sourceNodeId,
       target: targetNodeId,
       sourceHandle: 'right-source',
       targetHandle: 'left-target',
-      data: { kind: 'quickRenderInput' },
+      data: { kind: 'exteriorRenderInput' },
       style: { stroke: '#555', strokeWidth: 1 },
     };
     const validation = validateImageProcessingEdge(nodes, edges, newEdge);
@@ -681,19 +683,19 @@ function FlowCanvas() {
     setEdges((currentEdges) => {
       const stillDuplicate = currentEdges.some((edge) => {
         if (edge.source !== sourceNodeId || edge.target !== targetNodeId) return false;
-        return edge.data?.kind === 'quickRenderInput' || edge.data?.kind === undefined;
+        return edge.data?.kind === 'exteriorRenderInput' || edge.data?.kind === undefined;
       });
       return stillDuplicate ? currentEdges : [...currentEdges, newEdge];
     });
   }, [edges, nodes, setEdges, showToast, t, validateImageProcessingEdge]);
 
-  const removeQuickRenderInputEdge = useCallback((targetNodeId: string, sourceNodeId: string, sourceEdgeId?: string) => {
+  const removeExteriorRenderInputEdge = useCallback((targetNodeId: string, sourceNodeId: string, sourceEdgeId?: string) => {
     if (!sourceNodeId && !sourceEdgeId) return;
     setEdges((currentEdges) => currentEdges.filter((edge) => {
       if (edge.target !== targetNodeId) return true;
       const edgeKind = edge.data?.kind;
-      const isQuickRenderInputEdge = edgeKind === 'quickRenderInput' || edgeKind === undefined;
-      if (!isQuickRenderInputEdge) return true;
+      const isExteriorRenderInputEdge = edgeKind === 'exteriorRenderInput' || edgeKind === undefined;
+      if (!isExteriorRenderInputEdge) return true;
       const matchesEdgeId = Boolean(sourceEdgeId) && edge.id === sourceEdgeId;
       const matchesSourceTarget = Boolean(sourceNodeId) && edge.source === sourceNodeId;
       return !(matchesEdgeId || matchesSourceTarget);
@@ -1156,10 +1158,10 @@ function FlowCanvas() {
     lastPointerPositionRef,
   });
 
-  const uploadQuickRenderInputImages = useCallback((targetNodeId: string, files: FileList | null) => {
+  const uploadExteriorRenderInputImages = useCallback((targetNodeId: string, files: FileList | null) => {
     if (!files?.length) return;
 
-    const targetNode = nodes.find((node) => node.id === targetNodeId && node.type === 'quickRenderExterior');
+    const targetNode = nodes.find((node) => node.id === targetNodeId && node.type === 'exteriorRender');
     if (!targetNode) return;
 
     const { validFiles, rejectedFiles: initialRejectedFiles } = filterImageImportFiles(Array.from(files));
@@ -1221,12 +1223,12 @@ function FlowCanvas() {
       const graphNodes = [...nodes, ...createdNodes];
       const createdEdges = createdNodes.flatMap((sourceNode) => {
         const edge: Edge = {
-          id: `quick-render-input-${sourceNode.id}-${targetNodeId}-${Date.now()}`,
+          id: `exterior-render-input-${sourceNode.id}-${targetNodeId}-${Date.now()}`,
           source: sourceNode.id,
           target: targetNodeId,
           sourceHandle: 'right-source',
           targetHandle: 'left-target',
-          data: { kind: 'quickRenderInput' },
+          data: { kind: 'exteriorRenderInput' },
           style: { stroke: '#555', strokeWidth: 1 },
         };
         const validation = validateImageProcessingEdge(graphNodes, edges, edge);
@@ -1254,22 +1256,22 @@ function FlowCanvas() {
     });
   }, [edges, fitView, getAllNodeLabels, getViewport, nodes, objectUrlsRef, setEdges, setNodes, showToast, validateImageProcessingEdge]);
 
-  const createQuickRenderOutput = useCallback((
+  const createExteriorRenderOutput = useCallback((
     sourceNodeId: string,
     taskId: string,
-    request: QuickRenderRequest,
+    request: ExteriorRenderRequest,
   ) => {
     const currentNodes = getNodes();
     const sourceNode = currentNodes.find((node) => (
-      node.id === sourceNodeId && node.type === 'quickRenderExterior'
+      node.id === sourceNodeId && node.type === 'exteriorRender'
     ));
     if (!sourceNode) return null;
 
     const label = getNextNodeTitle(
       currentNodes.map((node) => String(node.data.label || '')),
-      t('quickRenderExterior.outputTitlePrefix'),
+      t('exteriorRender.outputTitlePrefix'),
     );
-    const output = buildQuickRenderProcessingOutput({
+    const output = buildExteriorRenderProcessingOutput({
       sourceNode,
       request,
       taskId,
@@ -1304,18 +1306,18 @@ function FlowCanvas() {
     return output.node.id;
   }, [fitView, getNodes, getViewport, setEdges, setNodes, t]);
 
-  const writeQuickRenderResult = useCallback((
+  const writeExteriorRenderResult = useCallback((
     sourceNodeId: string,
     outputNodeId: string,
-    request: QuickRenderRequest,
-    result: QuickRenderResult,
+    request: ExteriorRenderRequest,
+    result: ExteriorRenderResult,
   ) => {
     const currentNodes = getNodes();
-    const sourceNode = currentNodes.find((node) => node.id === sourceNodeId && node.type === 'quickRenderExterior');
+    const sourceNode = currentNodes.find((node) => node.id === sourceNodeId && node.type === 'exteriorRender');
     const outputNode = currentNodes.find((node) => node.id === outputNodeId && node.type === 'image');
     if (!sourceNode || !outputNode || result.images.length === 0) return false;
 
-    const completedOutput = buildQuickRenderCompletedOutput({
+    const completedOutput = buildExteriorRenderCompletedOutput({
       outputNode,
       sourceNodeId,
       request,
@@ -1337,14 +1339,14 @@ function FlowCanvas() {
     return true;
   }, [getNodes, setNodes]);
 
-  const failQuickRenderOutput = useCallback((
+  const failExteriorRenderOutput = useCallback((
     outputNodeId: string,
     taskId: string,
     errorMessage: string,
   ) => {
     const outputNode = getNodes().find((node) => node.id === outputNodeId && node.type === 'image');
     if (!outputNode) return;
-    const failedOutput = buildQuickRenderFailedOutput({
+    const failedOutput = buildExteriorRenderFailedOutput({
       outputNode,
       taskId,
       errorMessage,
@@ -1410,12 +1412,12 @@ function FlowCanvas() {
         isReferenceLocked: n.type === 'image' ? lockedPromptReferenceNodeIds.has(n.id) : undefined,
         onStartLineDraw: startLineDraw,
         onRemoveReferenceEdge: removeReferenceEdge,
-        onAddQuickRenderInputEdge: n.type === 'quickRenderExterior' ? addQuickRenderInputEdge : undefined,
-        onRemoveQuickRenderInputEdge: n.type === 'quickRenderExterior' ? removeQuickRenderInputEdge : undefined,
-        onUploadQuickRenderInputImages: n.type === 'quickRenderExterior' ? uploadQuickRenderInputImages : undefined,
-        onCreateQuickRenderOutput: n.type === 'quickRenderExterior' ? createQuickRenderOutput : undefined,
-        onQuickRenderResult: n.type === 'quickRenderExterior' ? writeQuickRenderResult : undefined,
-        onQuickRenderOutputFailed: n.type === 'quickRenderExterior' ? failQuickRenderOutput : undefined,
+        onAddExteriorRenderInputEdge: n.type === 'exteriorRender' ? addExteriorRenderInputEdge : undefined,
+        onRemoveExteriorRenderInputEdge: n.type === 'exteriorRender' ? removeExteriorRenderInputEdge : undefined,
+        onUploadExteriorRenderInputImages: n.type === 'exteriorRender' ? uploadExteriorRenderInputImages : undefined,
+        onCreateExteriorRenderOutput: n.type === 'exteriorRender' ? createExteriorRenderOutput : undefined,
+        onExteriorRenderResult: n.type === 'exteriorRender' ? writeExteriorRenderResult : undefined,
+        onExteriorRenderOutputFailed: n.type === 'exteriorRender' ? failExteriorRenderOutput : undefined,
         onSwapCompareInputs: swapCompareInputs,
         onAssignReferenceEdgeRole: assignReferenceEdgeRole,
         onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' || n.type === 'relight' ? createUpscaleNode : undefined,
@@ -1442,7 +1444,7 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addQuickRenderInputEdge, removeQuickRenderInputEdge, uploadQuickRenderInputImages, createQuickRenderOutput, writeQuickRenderResult, failQuickRenderOutput, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addExteriorRenderInputEdge, removeExteriorRenderInputEdge, uploadExteriorRenderInputImages, createExteriorRenderOutput, writeExteriorRenderResult, failExteriorRenderOutput, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {
@@ -1927,7 +1929,7 @@ function FlowCanvas() {
 
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
-    if (!['text', 'image', 'video', 'relight', 'upscale', 'compare', 'quickRenderExterior'].includes(type)) {
+    if (!['text', 'image', 'video', 'relight', 'upscale', 'compare', 'exteriorRender'].includes(type)) {
       setCreateMenu(null);
       setTempLine(null);
       return;
@@ -1945,8 +1947,8 @@ function FlowCanvas() {
     }
     const timestamp = Date.now();
     const newNodeId = `${type}-${timestamp}`;
-    const baseTitle = type === 'quickRenderExterior'
-      ? t('quickRenderExterior.title')
+    const baseTitle = type === 'exteriorRender'
+      ? t('exteriorRender.title')
       : NODE_BASE_TITLES[type] || type;
     const label = getNextNodeTitle(getAllNodeLabels(), baseTitle);
     const newNode = createBasicCanvasNode({
@@ -1967,7 +1969,7 @@ function FlowCanvas() {
     };
     const graphNodes = [...nodes, newNode];
     const targetNode = graphNodes.find((node) => node.id === newEdge.target);
-    if (targetNode && ['relight', 'upscale', 'compare', 'quickRenderExterior'].includes(targetNode.type || '')) {
+    if (targetNode && ['relight', 'upscale', 'compare', 'exteriorRender'].includes(targetNode.type || '')) {
       const validation = validateImageProcessingEdge(graphNodes, edges, newEdge);
       if (!validation.valid) {
         showToast(validation.reason || t('canvas.cannotConnect'));

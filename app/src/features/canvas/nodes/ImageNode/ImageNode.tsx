@@ -16,7 +16,7 @@ import {
   getNodeGenerationTask,
   getNodeWidth,
   getNodeHeight,
-  type QuickRenderWorkflowSource,
+  type ExteriorRenderWorkflowSource,
 } from '../../types/imageNodeData.types';
 import { useHistory } from '../../contexts/HistoryContext';
 import {
@@ -56,6 +56,13 @@ import type { ImageNodeControllers } from './controllers';
 import { ImageCropOverlay, type NormalizedCropRect } from './ImageCropOverlay';
 import { createImageNodeViewModel } from './imageNodeViewModel';
 import { cropCoverImage } from '../../utils/cropImage';
+import {
+  calculateRequestedSize,
+  getResolutionTier,
+  isValidOutputSize,
+  resolveOutputSize,
+  validateRequestedSize,
+} from '../../utils/modelParams';
 
 const MOCK_GENERATION_ERROR_KEYS: Record<MockGenerationErrorCode, string> = {
   cancelled: 'imageNode.errors.cancelled',
@@ -129,7 +136,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [selectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [selectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
   const controllers = data.controllers as ImageNodeControllers | undefined;
-  const workflowSource = data.sourceWorkflow as QuickRenderWorkflowSource | undefined;
+  const workflowSource = data.sourceWorkflow as ExteriorRenderWorkflowSource | undefined;
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
   const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
@@ -413,7 +420,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               imageId: reference.nodeId,
               imageUrl: reference.imageUrl,
               usageKey: reference.role ?? 'undefined_usage',
-              usageLabel: reference.roleLabel || t('imageNode.undefinedUsage'),
+              usageLabel: reference.roleLabel || t('reference.roles.unassigned'),
               customUsageName: reference.customRoleLabel,
               localReferenceType: reference.localReferenceType,
               localReferenceLabel: reference.localReferenceLabel,
@@ -557,7 +564,29 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       .filter((value) => value.trim().length > 0)
       .join('\n\n');
     const { textPrompt, imageReferences, referenceImages, markReferences, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview);
-    const generationModelParams: ModelParams = { ...modelParams, count: '1' };
+    const resolutionTier = getResolutionTier(modelParams.resolutionTier ?? modelParams.resolution);
+    const adaptiveSourceSize = references.find((reference) => (
+      typeof reference.width === 'number'
+      && reference.width > 0
+      && typeof reference.height === 'number'
+      && reference.height > 0
+    ));
+    const requestedSize = validateRequestedSize(modelParams.requestedSize, resolutionTier)
+      ? modelParams.requestedSize
+      : calculateRequestedSize(
+        modelParams.ratio,
+        resolutionTier,
+        adaptiveSourceSize?.width && adaptiveSourceSize.height
+          ? { width: adaptiveSourceSize.width, height: adaptiveSourceSize.height }
+          : imgSize,
+      );
+    const generationModelParams: ModelParams = {
+      ...modelParams,
+      count: '1',
+      resolution: resolutionTier,
+      resolutionTier,
+      requestedSize,
+    };
 
     let task = createGenerationTask({
       sourceNodeId: id,
@@ -574,11 +603,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         promptText: ref.promptText,
       })),
       markRefs: markReferences,
-      modelParams: {
-        model: generationModelParams.model,
-        ratio: generationModelParams.ratio,
-        resolution: generationModelParams.resolution,
-      },
+        modelParams: {
+          model: generationModelParams.model,
+          ratio: generationModelParams.ratio,
+          resolution: generationModelParams.resolution,
+          resolutionTier,
+          requestedSize,
+        },
     });
     setGenerationTask(task);
     setNodes((nds) =>
@@ -591,6 +622,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                 generationTask: task,
                 isGenerating: true,
                 isProcessing: true,
+                modelParams: generationModelParams,
+                resolutionTier,
+                requestedSize,
               },
             }
           : n,
@@ -684,6 +718,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               model: generationRequest.modelParams.model,
               ratio: generationRequest.modelParams.aspectRatio,
               resolution: generationRequest.modelParams.resolution,
+              resolutionTier: generationRequest.modelParams.resolutionTier,
+              requestedSize: generationRequest.modelParams.requestedSize,
             },
           },
           {
@@ -822,6 +858,11 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   isProcessing: false,
                   width: results[0]?.width,
                   height: results[0]?.height,
+                  resolutionTier,
+                  requestedSize,
+                  actualSize: results[0]
+                    ? { width: results[0].width, height: results[0].height }
+                    : undefined,
                 },
               }
             : n,
@@ -849,7 +890,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, buildHistoryBatchFromCurrentResultSet, t]);
+  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, buildHistoryBatchFromCurrentResultSet, t, imgSize]);
 
   const handleGenerate = useCallback(() => {
     if (!canGenerate) {
@@ -885,7 +926,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const handleModelParamsChange = (params: ModelParams) => {
     if (!imageNodeViewModel.canEditModel) return;
     setModelParams(params);
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, modelParams: params } } : n)));
+    setNodes((nds) => nds.map((n) => (n.id === id ? {
+      ...n,
+      data: {
+        ...n.data,
+        modelParams: params,
+        resolutionTier: params.resolutionTier,
+        requestedSize: params.requestedSize,
+      },
+    } : n)));
   };
 
   const handleRemoveReference = (sourceNodeId: string) => {
@@ -1013,7 +1062,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         }),
       );
       if (conflictingTarget) {
-        showToast(t('reference.downstreamConflict', {
+        showToast(t('reference.validation.downstreamConflict', {
           role: getImageRoleLabel(
             nextRole,
             nextCustomRoleLabel,
@@ -1619,6 +1668,13 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     return slots;
   }, [currentResultSet]);
   const showTitleMeta = zoom >= 0.35;
+  const storedRequestedSize = isValidOutputSize(data.requestedSize)
+    ? data.requestedSize
+    : modelParams.requestedSize;
+  const storedActualSize = isValidOutputSize(data.actualSize) ? data.actualSize : imgSize;
+  const displayedOutputSize = imageNodeViewModel.isProcessing
+    ? resolveOutputSize(null, storedRequestedSize)
+    : resolveOutputSize(storedActualSize, storedRequestedSize);
   const roleOption = getImageRoleOption(role, customRoleLabel, translate);
   const RoleIconForTitle = roleOption?.Icon;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
@@ -1896,7 +1952,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   localReferenceType,
                   localReferenceLabel,
                   translate,
-                ) || t('imageNode.undefinedUsage')}
+                ) || t('reference.roles.unassigned')}
               </span>
             )}
             {editingName ? (
@@ -1927,7 +1983,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </div>
           {imageNodeViewModel.hasImage && showTitleMeta && (
             <span className="flex-shrink-0 ml-2" style={{ fontSize: 11 }}>
-              {imgSize ? `${imgSize.width}×${imgSize.height}` : `${getNodeWidth(data) || 1024}×${getNodeHeight(data) || 1024}`}
+              {displayedOutputSize
+                ? `${displayedOutputSize.width}×${displayedOutputSize.height}`
+                : `${getNodeWidth(data) || 1024}×${getNodeHeight(data) || 1024}`}
             </span>
           )}
         </div>

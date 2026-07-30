@@ -9,7 +9,7 @@ export type ConnectionRejectCode =
   | 'relight_input_limit'
   | 'upscale_input_limit'
   | 'compare_input_limit'
-  | 'quick_render_manual_output'
+  | 'exterior_render_manual_output'
   | 'reference_limit'
   | 'unique_reference_role_conflict'
   | 'invalid_text_mode'

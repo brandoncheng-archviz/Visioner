@@ -7,37 +7,38 @@ import { CANVAS_NODE_CARD_BACKGROUND, CANVAS_NODE_CARD_BORDER_COLOR, CANVAS_NODE
 import { getReferenceUsageInfo } from '../../constants/imageUsages';
 import type { ImageRole, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
-import { QuickRenderAtmospherePanel } from './QuickRenderAtmospherePanel';
-import { QuickRenderConnectedImages } from './QuickRenderConnectedImages';
-import { QuickRenderFooter } from './QuickRenderFooter';
-import { QuickRenderPromptPanel } from './QuickRenderPromptPanel';
-import { QuickRenderRenderChannelsPanel } from './QuickRenderRenderChannelsPanel';
-import type { QuickRenderConnectedImage, QuickRenderExteriorNodeData, QuickRenderRenderChannelType } from './quickRenderExterior.types';
-import { createQuickRenderTaskId, mockQuickRender } from './mockQuickRender';
-import { runQuickRenderGeneration } from './quickRenderGeneration';
+import { ExteriorRenderAtmospherePanel } from './ExteriorRenderAtmospherePanel';
+import { ExteriorRenderConnectedImages } from './ExteriorRenderConnectedImages';
+import { ExteriorRenderFooter } from './ExteriorRenderFooter';
+import { ExteriorRenderPromptPanel } from './ExteriorRenderPromptPanel';
+import { ExteriorRenderRenderChannelsPanel } from './ExteriorRenderRenderChannelsPanel';
+import type { ExteriorRenderConnectedImage, ExteriorRenderNodeData, ExteriorRenderRenderChannelType } from './exteriorRender.types';
+import { createExteriorRenderTaskId, mockExteriorRender } from './mockExteriorRender';
+import { runExteriorRenderGeneration } from './exteriorRenderGeneration';
 import {
-  buildQuickRenderRequest,
-  createIdleQuickRenderTask,
-  deriveQuickRenderViewState,
-  getQuickRenderInteractionLocks,
-  shouldApplyQuickRenderTaskResult,
-  validateQuickRenderRequest,
-} from './quickRenderRequest';
+  buildExteriorRenderRequest,
+  createIdleExteriorRenderTask,
+  deriveExteriorRenderViewState,
+  getExteriorRenderInteractionLocks,
+  shouldApplyExteriorRenderTaskResult,
+  validateExteriorRenderRequest,
+} from './exteriorRenderRequest';
 import {
-  createQuickRenderRenderChannel,
-  createQuickRenderExteriorNodeData,
-  getQuickRenderDisplayLabel,
-  sortQuickRenderRenderChannels,
-} from './quickRenderExteriorUtils';
+  createExteriorRenderRenderChannel,
+  createExteriorRenderNodeData,
+  getExteriorRenderDisplayLabel,
+  sortExteriorRenderRenderChannels,
+} from './exteriorRenderUtils';
 
-const QUICK_RENDER_NODE_WIDTH = 470;
+const EXTERIOR_RENDER_NODE_WIDTH = 470;
 type CanvasSelectionMode =
   | { kind: 'input' }
-  | { kind: 'renderChannel'; channelType: QuickRenderRenderChannelType }
+  | { kind: 'renderChannel'; channelType: ExteriorRenderRenderChannelType }
   | null;
 
-export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
+export function ExteriorRenderNode({ data, selected, id }: NodeProps) {
   const { t } = useTranslation();
+  const translate = useCallback((key: string) => t(key), [t]);
   const { getNodes, setNodes } = useReactFlow();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
@@ -65,7 +66,13 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           ?? (sourceNode.data?.localReferenceLabel as string | undefined);
         const localReferencePoint = (edge.data?.localReferencePoint as LocalReferencePoint | undefined)
           ?? (sourceNode.data?.localReferencePoint as LocalReferencePoint | undefined);
-        const usageInfo = getReferenceUsageInfo(role, customRoleLabel, localReferenceType, localReferenceLabel);
+        const usageInfo = getReferenceUsageInfo(
+          role,
+          customRoleLabel,
+          localReferenceType,
+          localReferenceLabel,
+          translate,
+        );
         return [{
           id: `canvas-${edge.id}`,
           sourceType: 'canvas' as const,
@@ -86,10 +93,10 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
       });
   });
   const nodeData = useMemo(
-    () => ({ ...createQuickRenderExteriorNodeData(String(data.label || t('quickRenderExterior.title'))), ...(data as QuickRenderExteriorNodeData) }),
+    () => ({ ...createExteriorRenderNodeData(String(data.label || t('exteriorRender.title'))), ...(data as ExteriorRenderNodeData) }),
     [data, t],
   );
-  const displayLabel = getQuickRenderDisplayLabel(nodeData.label, t('quickRenderExterior.title'));
+  const displayLabel = getExteriorRenderDisplayLabel(nodeData.label, t('exteriorRender.title'));
   const modelParams = nodeData.modelParams || { model: 'Nano Banana 2', aspectRatio: '1:1', resolution: '2K', count: 1 };
   const uploadedInputImages = useMemo(
     () => (nodeData.connectedImages || []).filter((image) => image.sourceType === 'upload'),
@@ -99,28 +106,28 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     () => [...canvasInputImages, ...uploadedInputImages],
     [canvasInputImages, uploadedInputImages],
   );
-  const quickRenderRequest = useMemo(
-    () => buildQuickRenderRequest(nodeData, inputImages),
+  const exteriorRenderRequest = useMemo(
+    () => buildExteriorRenderRequest(nodeData, inputImages),
     [inputImages, nodeData],
   );
-  const validation = useMemo(() => validateQuickRenderRequest(quickRenderRequest), [quickRenderRequest]);
+  const validation = useMemo(() => validateExteriorRenderRequest(exteriorRenderRequest), [exteriorRenderRequest]);
   const viewState = useMemo(
-    () => deriveQuickRenderViewState(nodeData, inputImages),
+    () => deriveExteriorRenderViewState(nodeData, inputImages),
     [inputImages, nodeData],
   );
-  const interactionLocks = useMemo(() => getQuickRenderInteractionLocks(viewState), [viewState]);
+  const interactionLocks = useMemo(() => getExteriorRenderInteractionLocks(viewState), [viewState]);
   const isProcessing = interactionLocks.generate;
   const hasAtmosphereReferenceInput = inputImages.some(
     (image) => image.role === 'atmosphere_reference' || image.role === 'overall_reference',
   );
 
-  const updateData = useCallback((patch: Partial<QuickRenderExteriorNodeData>) => {
+  const updateData = useCallback((patch: Partial<ExteriorRenderNodeData>) => {
     setNodes((nodes) => nodes.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node));
   }, [id, setNodes]);
 
   const clearCanvasSelectionHighlight = useCallback(() => {
     if (!hoveredSelectableNodeRef.current) return;
-    hoveredSelectableNodeRef.current.classList.remove('quick-render-canvas-selectable-hover');
+    hoveredSelectableNodeRef.current.classList.remove('exterior-render-canvas-selectable-hover');
     hoveredSelectableNodeRef.current = null;
   }, []);
 
@@ -128,14 +135,14 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     if (!nodeId || nodeId === id) return null;
     const node = getNodes().find((item) => item.id === nodeId);
     if (!node) return null;
-    if (node.type === 'text' || node.type === 'compare' || node.type === 'upscale' || node.type === 'quickRenderExterior') return null;
+    if (node.type === 'text' || node.type === 'compare' || node.type === 'upscale' || node.type === 'exteriorRender') return null;
     const resolved = resolveNodeImage(node.data);
     if (!resolved?.imageUrl) return null;
     return { node, resolved };
   }, [getNodes, id]);
 
   const addCanvasInputEdge = useCallback((sourceNode: Node) => {
-    nodeData.onAddQuickRenderInputEdge?.(id, sourceNode.id);
+    nodeData.onAddExteriorRenderInputEdge?.(id, sourceNode.id);
   }, [id, nodeData]);
 
   const startCanvasImageSelection = useCallback(() => {
@@ -146,12 +153,12 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
   const addRenderChannelFromNode = useCallback((
     sourceNode: Node,
     resolved: { imageUrl: string; width?: number; height?: number },
-    channelType: QuickRenderRenderChannelType,
+    channelType: ExteriorRenderRenderChannelType,
   ) => {
     if (isProcessing) return;
     const label = typeof sourceNode.data?.label === 'string' ? sourceNode.data.label : '';
     const fileName = (sourceNode.data?.fileName as string | undefined) || label || 'canvas-image';
-    const nextChannel = createQuickRenderRenderChannel(
+    const nextChannel = createExteriorRenderRenderChannel(
       channelType,
       resolved.imageUrl,
       fileName,
@@ -166,7 +173,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
       renderChannelsEnabled: true,
       renderChannels: {
         ...renderChannels,
-        channels: sortQuickRenderRenderChannels([
+        channels: sortExteriorRenderRenderChannels([
           ...(renderChannels.channels || []).filter((channel) => channel.type !== channelType),
           nextChannel,
         ]),
@@ -175,7 +182,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     });
   }, [isProcessing, nodeData.renderChannels, nodeData.structure, updateData]);
 
-  const startRenderChannelSelection = useCallback((channelType: QuickRenderRenderChannelType) => {
+  const startRenderChannelSelection = useCallback((channelType: ExteriorRenderRenderChannelType) => {
     if (isProcessing) return;
     setCanvasSelectionMode({ kind: 'renderChannel', channelType });
   }, [isProcessing]);
@@ -211,7 +218,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
       if (hoveredSelectableNodeRef.current === nodeElement) return;
       clearCanvasSelectionHighlight();
       if (!nodeElement) return;
-      nodeElement.classList.add('quick-render-canvas-selectable-hover');
+      nodeElement.classList.add('exterior-render-canvas-selectable-hover');
       hoveredSelectableNodeRef.current = nodeElement;
     };
 
@@ -253,9 +260,9 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     };
   }, [addCanvasInputEdge, addRenderChannelFromNode, canvasSelectionMode, clearCanvasSelectionHighlight, getSelectableImageNode]);
 
-  const removeConnectedImage = (image: QuickRenderConnectedImage) => {
+  const removeConnectedImage = (image: ExteriorRenderConnectedImage) => {
     if (isProcessing) return;
-    const removeCachedImage = (candidate: QuickRenderConnectedImage) => {
+    const removeCachedImage = (candidate: ExteriorRenderConnectedImage) => {
       if (candidate.id === image.id) return false;
       if (image.sourceEdgeId && candidate.sourceEdgeId === image.sourceEdgeId) return false;
       if (
@@ -270,7 +277,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     };
 
     if (image.sourceType === 'canvas') {
-      nodeData.onRemoveQuickRenderInputEdge?.(id, image.sourceNodeId || '', image.sourceEdgeId);
+      nodeData.onRemoveExteriorRenderInputEdge?.(id, image.sourceNodeId || '', image.sourceEdgeId);
     }
 
     updateData({
@@ -280,20 +287,20 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
 
   const handleInputUpload = (files: FileList | null) => {
     if (isProcessing) return;
-    nodeData.onUploadQuickRenderInputImages?.(id, files);
+    nodeData.onUploadExteriorRenderInputImages?.(id, files);
   };
 
   const handleGenerate = useCallback(async () => {
     if (generationLockRef.current || isProcessing || !validation.valid) return;
 
-    const request = buildQuickRenderRequest(nodeData, inputImages);
-    const latestValidation = validateQuickRenderRequest(request);
+    const request = buildExteriorRenderRequest(nodeData, inputImages);
+    const latestValidation = validateExteriorRenderRequest(request);
     if (!latestValidation.valid) return;
 
     generationLockRef.current = true;
     setCanvasSelectionMode(null);
-    const taskId = createQuickRenderTaskId();
-    const outputNodeId = nodeData.onCreateQuickRenderOutput?.(id, taskId, request) ?? null;
+    const taskId = createExteriorRenderTaskId();
+    const outputNodeId = nodeData.onCreateExteriorRenderOutput?.(id, taskId, request) ?? null;
     if (!outputNodeId) {
       generationLockRef.current = false;
       return;
@@ -302,28 +309,28 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     generationAbortRef.current?.abort();
     generationAbortRef.current = abortController;
     activeTaskIdRef.current = taskId;
-    const outcome = await runQuickRenderGeneration({
+    const outcome = await runExteriorRenderGeneration({
       request,
       taskId,
       signal: abortController.signal,
-      execute: (nextRequest) => mockQuickRender(nextRequest, { taskId, signal: abortController.signal }),
+      execute: (nextRequest) => mockExteriorRender(nextRequest, { taskId, signal: abortController.signal }),
       isTaskActive: (completedTaskId) => (
         mountedRef.current
-        && shouldApplyQuickRenderTaskResult(activeTaskIdRef.current, completedTaskId)
+        && shouldApplyExteriorRenderTaskResult(activeTaskIdRef.current, completedTaskId)
         && getNodes().some((node) => node.id === id)
       ),
       onTaskUpdate: (generationTask, lastResult) => {
         updateData({ generationTask, ...(lastResult ? { lastResult } : {}) });
         if (generationTask.status !== 'failed' || !generationTask.errorCode) return;
         const errorMessage = generationTask.errorCode === 'CANCELLED'
-          ? t('quickRenderExterior.errors.cancelled')
+          ? t('exteriorRender.errors.cancelled')
           : generationTask.errorCode === 'MISSING_INPUT'
-            ? t('quickRenderExterior.errors.missingInput')
-            : t('quickRenderExterior.errors.generationFailed');
-        nodeData.onQuickRenderOutputFailed?.(outputNodeId, taskId, errorMessage);
+            ? t('exteriorRender.errors.missingInput')
+            : t('exteriorRender.errors.generationFailed');
+        nodeData.onExteriorRenderOutputFailed?.(outputNodeId, taskId, errorMessage);
       },
       onResult: (nextRequest, result) => (
-        nodeData.onQuickRenderResult?.(id, outputNodeId, nextRequest, result) ?? false
+        nodeData.onExteriorRenderResult?.(id, outputNodeId, nextRequest, result) ?? false
       ),
     });
     if (outcome !== 'ignored') {
@@ -332,17 +339,17 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
     }
   }, [getNodes, id, inputImages, isProcessing, nodeData, t, updateData, validation.valid]);
 
-  const generationTask = nodeData.generationTask || createIdleQuickRenderTask();
+  const generationTask = nodeData.generationTask || createIdleExteriorRenderTask();
   const validationMessage = validation.errors[0]?.code === 'INPUT_IMAGE_INVALID'
-    ? t('quickRenderExterior.errors.invalidInput')
+    ? t('exteriorRender.errors.invalidInput')
     : validation.errors[0]?.code === 'INPUT_IMAGE_REQUIRED'
-      ? t('quickRenderExterior.errors.inputRequired')
+      ? t('exteriorRender.errors.inputRequired')
       : undefined;
   const generationErrorMessage = generationTask.errorCode === 'CANCELLED'
-    ? t('quickRenderExterior.errors.cancelled')
+    ? t('exteriorRender.errors.cancelled')
     : generationTask.errorCode === 'MISSING_INPUT'
-      ? t('quickRenderExterior.errors.missingInput')
-      : t('quickRenderExterior.errors.generationFailed');
+      ? t('exteriorRender.errors.missingInput')
+      : t('exteriorRender.errors.generationFailed');
   const creditCost = 60;
   const handleTop = '50%';
   const handleSize = 28;
@@ -369,14 +376,14 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
   };
 
   return (
-    <div className="quick-render-exterior-node relative" style={{ width: QUICK_RENDER_NODE_WIDTH }}>
+    <div className="exterior-render-exterior-node relative" style={{ width: EXTERIOR_RENDER_NODE_WIDTH }}>
       <style>
         {`
-          .quick-render-exterior-node [data-slot="switch-thumb"] {
+          .exterior-render-exterior-node [data-slot="switch-thumb"] {
             background: #24252a !important;
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
           }
-          .quick-render-exterior-node .quick-render-inner-switch-thumb {
+          .exterior-render-exterior-node .exterior-render-inner-switch-thumb {
             background: #24252a !important;
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
           }
@@ -386,7 +393,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         <>
           <style>
             {`
-              .react-flow__node.quick-render-canvas-selectable-hover .node-preview-card {
+              .react-flow__node.exterior-render-canvas-selectable-hover .node-preview-card {
                 border-color: rgba(47, 107, 255, 0.95) !important;
                 box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.35), 0 16px 36px rgba(0, 0, 0, 0.38) !important;
               }
@@ -394,8 +401,8 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
           </style>
           <div className="pointer-events-none fixed left-1/2 top-5 z-[2300] -translate-x-1/2 rounded-full border border-white/[0.10] bg-[#222224]/95 px-3 py-2 text-[12px] font-medium text-white/72 shadow-[0_12px_30px_rgba(0,0,0,0.42)]">
             {canvasSelectionMode.kind === 'input'
-              ? t('quickRenderExterior.imageInput.selectionHint')
-              : t('quickRenderExterior.renderChannels.selectionHint', {
+              ? t('exteriorRender.imageInput.selectionHint')
+              : t('exteriorRender.renderChannels.selectionHint', {
                 channel: t(`renderChannel.names.${canvasSelectionMode.channelType}`),
               })}
           </div>
@@ -407,7 +414,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         style={{
           top: -20 / zoom,
           left: 0,
-          width: QUICK_RENDER_NODE_WIDTH * zoom,
+          width: EXTERIOR_RENDER_NODE_WIDTH * zoom,
           transform: `scale(${inverseScale})`,
           transformOrigin: 'top left',
         }}
@@ -422,7 +429,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         </div>
       </div>
 
-      <div className="relative" style={{ width: QUICK_RENDER_NODE_WIDTH }}>
+      <div className="relative" style={{ width: EXTERIOR_RENDER_NODE_WIDTH }}>
         <div
           className="image-node-handle input-port"
           data-port-type="input"
@@ -483,7 +490,7 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         <div
           className="node-preview-card flex flex-col overflow-hidden"
           style={{
-            width: QUICK_RENDER_NODE_WIDTH,
+            width: EXTERIOR_RENDER_NODE_WIDTH,
             background: CANVAS_NODE_CARD_BACKGROUND,
             borderRadius: CANVAS_NODE_CARD_RADIUS,
             borderWidth: CANVAS_NODE_CARD_BORDER_WIDTH,
@@ -492,19 +499,19 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
         >
           <div className="flex-1 space-y-3 p-4 pb-5">
             <div>
-              <div className="text-[15px] font-semibold text-white/90">{t('quickRenderExterior.title')}</div>
-              <div className="mt-0.5 text-[11px] text-white/42">{t('quickRenderExterior.subtitle')}</div>
+              <div className="text-[15px] font-semibold text-white/90">{t('exteriorRender.title')}</div>
+              <div className="mt-0.5 text-[11px] text-white/42">{t('exteriorRender.subtitle')}</div>
             </div>
-            <QuickRenderConnectedImages
-              images={inputImages as QuickRenderConnectedImage[]}
+            <ExteriorRenderConnectedImages
+              images={inputImages as ExteriorRenderConnectedImage[]}
               disabled={isProcessing}
               onRemove={removeConnectedImage}
               onUpload={handleInputUpload}
               onSelectFromCanvas={startCanvasImageSelection}
             />
-            <QuickRenderRenderChannelsPanel data={nodeData} disabled={isProcessing} onChange={updateData} onSelectFromCanvas={startRenderChannelSelection} />
-            <QuickRenderAtmospherePanel data={nodeData} disabled={isProcessing} hasAtmosphereReference={hasAtmosphereReferenceInput} onChange={updateData} />
-            <QuickRenderPromptPanel value={nodeData.prompt || ''} disabled={isProcessing} onChange={(prompt) => updateData({ prompt })} />
+            <ExteriorRenderRenderChannelsPanel data={nodeData} disabled={isProcessing} onChange={updateData} onSelectFromCanvas={startRenderChannelSelection} />
+            <ExteriorRenderAtmospherePanel data={nodeData} disabled={isProcessing} hasAtmosphereReference={hasAtmosphereReferenceInput} onChange={updateData} />
+            <ExteriorRenderPromptPanel value={nodeData.prompt || ''} disabled={isProcessing} onChange={(prompt) => updateData({ prompt })} />
             {generationTask.status === 'failed' && generationTask.errorCode && (
               <div className="flex items-center gap-2 rounded-[10px] border border-red-400/15 bg-red-400/[0.06] px-3 py-2 text-[12px] text-red-200/80">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -517,13 +524,24 @@ export function QuickRenderExteriorNode({ data, selected, id }: NodeProps) {
             )}
           </div>
 
-          <QuickRenderFooter
+          <ExteriorRenderFooter
             params={modelParams}
             isGenerating={isProcessing}
             canGenerate={validation.valid}
             disabled={isProcessing}
             validationMessage={validationMessage}
             creditCost={creditCost}
+            adaptiveSourceSize={(() => {
+              const source = inputImages.find((image) => (
+                typeof image.width === 'number'
+                && image.width > 0
+                && typeof image.height === 'number'
+                && image.height > 0
+              ));
+              return source?.width && source.height
+                ? { width: source.width, height: source.height }
+                : null;
+            })()}
             onChange={(params) => updateData({ modelParams: params })}
             onGenerate={() => void handleGenerate()}
           />

@@ -13,6 +13,8 @@ export interface ModelParams {
   model: string;
   ratio: string;
   resolution: string;
+  resolutionTier?: OutputResolutionTier;
+  requestedSize?: OutputSize;
   lens: string;
   count: string;
 }
@@ -51,3 +53,4 @@ export interface CreateConnectionMenuState {
   sourceHandleId: string;
   sourceHandleType: ConnectionHandleType;
 }
+import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';

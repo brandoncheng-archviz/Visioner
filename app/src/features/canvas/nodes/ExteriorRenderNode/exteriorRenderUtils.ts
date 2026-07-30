@@ -1,12 +1,12 @@
 import type {
-  QuickRenderAtmosphereOption,
-  QuickRenderExteriorNodeData,
-  QuickRenderPendingRenderChannelFile,
-  QuickRenderRenderChannel,
-  QuickRenderRenderChannelType,
-} from './quickRenderExterior.types';
+  ExteriorRenderAtmosphereOption,
+  ExteriorRenderNodeData,
+  ExteriorRenderPendingRenderChannelFile,
+  ExteriorRenderRenderChannel,
+  ExteriorRenderRenderChannelType,
+} from './exteriorRender.types';
 
-export const QUICK_RENDER_CHANNELS: Record<QuickRenderRenderChannelType, {
+export const EXTERIOR_RENDER_CHANNELS: Record<ExteriorRenderRenderChannelType, {
   name: string;
 }> = {
   beauty: { name: 'Beauty' },
@@ -20,7 +20,7 @@ export const QUICK_RENDER_CHANNELS: Record<QuickRenderRenderChannelType, {
   unknown: { name: 'Unrecognized' },
 };
 
-export const QUICK_RENDER_CHANNEL_TYPES: QuickRenderRenderChannelType[] = [
+export const EXTERIOR_RENDER_CHANNEL_TYPES: ExteriorRenderRenderChannelType[] = [
   'beauty',
   'albedo',
   'normal',
@@ -30,7 +30,7 @@ export const QUICK_RENDER_CHANNEL_TYPES: QuickRenderRenderChannelType[] = [
   'unknown',
 ];
 
-export const QUICK_RENDER_CHANNEL_SORT_ORDER: QuickRenderRenderChannelType[] = [
+export const EXTERIOR_RENDER_CHANNEL_SORT_ORDER: ExteriorRenderRenderChannelType[] = [
   'beauty',
   'albedo',
   'normal',
@@ -42,7 +42,7 @@ export const QUICK_RENDER_CHANNEL_SORT_ORDER: QuickRenderRenderChannelType[] = [
   'unknown',
 ];
 
-const DETECTION_RULES: Array<{ type: QuickRenderRenderChannelType; keywords: string[] }> = [
+const DETECTION_RULES: Array<{ type: ExteriorRenderRenderChannelType; keywords: string[] }> = [
   { type: 'mask', keywords: ['materialid', 'material_id', 'matid', 'objectid', 'object_id', 'objid', 'maskid', 'mask', 'idmap', 'material', 'object'] },
   { type: 'ao', keywords: ['ambientocclusion', 'ao'] },
   { type: 'albedo', keywords: ['sourcecolor', 'basecolor', 'albedo', 'diffuse'] },
@@ -51,12 +51,12 @@ const DETECTION_RULES: Array<{ type: QuickRenderRenderChannelType; keywords: str
   { type: 'depth', keywords: ['zdepth', 'depth'] },
 ];
 
-export function normalizeQuickRenderRenderChannelFileName(fileName: string): string {
+export function normalizeExteriorRenderRenderChannelFileName(fileName: string): string {
   return fileName.toLowerCase().replace(/[\s_-]+/g, '');
 }
 
-export function detectQuickRenderRenderChannelType(fileName: string): QuickRenderRenderChannelType | null {
-  const normalized = normalizeQuickRenderRenderChannelFileName(fileName);
+export function detectExteriorRenderRenderChannelType(fileName: string): ExteriorRenderRenderChannelType | null {
+  const normalized = normalizeExteriorRenderRenderChannelFileName(fileName);
   for (const rule of DETECTION_RULES) {
     if (rule.keywords.some((keyword) => normalized.includes(keyword))) {
       return rule.type;
@@ -65,7 +65,7 @@ export function detectQuickRenderRenderChannelType(fileName: string): QuickRende
   return null;
 }
 
-export function createQuickRenderExteriorNodeData(label: string): QuickRenderExteriorNodeData {
+export function createExteriorRenderNodeData(label: string): ExteriorRenderNodeData {
   return {
     label,
     title: label,
@@ -98,13 +98,13 @@ export function readImageFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-export function createUploadedQuickRenderInputImage(
+export function createUploadedExteriorRenderInputImage(
   imageUrl: string,
   fileName: string,
   mimeType?: string,
 ) {
   return {
-    id: `quick-input-upload-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `exterior-render-input-upload-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     sourceType: 'upload' as const,
     imageUrl,
     fileName,
@@ -115,8 +115,8 @@ export function createUploadedQuickRenderInputImage(
   };
 }
 
-export function createQuickRenderRenderChannel(
-  type: QuickRenderRenderChannelType,
+export function createExteriorRenderRenderChannel(
+  type: ExteriorRenderRenderChannelType,
   imageUrl: string,
   fileName?: string,
   mimeType?: string,
@@ -124,10 +124,10 @@ export function createQuickRenderRenderChannel(
   sourceNodeId?: string,
   width?: number,
   height?: number,
-): QuickRenderRenderChannel {
-  const meta = QUICK_RENDER_CHANNELS[type];
+): ExteriorRenderRenderChannel {
+  const meta = EXTERIOR_RENDER_CHANNELS[type];
   return {
-    id: `quick-render-channel-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `exterior-render-channel-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     type,
     name: meta.name,
     imageUrl,
@@ -140,47 +140,46 @@ export function createQuickRenderRenderChannel(
   };
 }
 
-export function getQuickRenderRenderChannelName(type: QuickRenderRenderChannelType) {
-  return QUICK_RENDER_CHANNELS[type]?.name || QUICK_RENDER_CHANNELS.unknown.name;
+export function getExteriorRenderRenderChannelName(type: ExteriorRenderRenderChannelType) {
+  return EXTERIOR_RENDER_CHANNELS[type]?.name || EXTERIOR_RENDER_CHANNELS.unknown.name;
 }
 
-const SYSTEM_QUICK_RENDER_LABEL_PATTERN =
-  /^(?:快速渲染(?:\s*[-·]\s*室外)?|室外渲染|Quick Render(?:\s*[-·]\s*Exterior)?|Exterior Render)(\s+\d+)?$/i;
+const SYSTEM_EXTERIOR_RENDER_LABEL_PATTERN = /^(?:室外渲染|Exterior Render)(\s+\d+)?$/i;
 
-export function getQuickRenderDisplayLabel(label: string | undefined, translatedTitle: string): string {
+export function getExteriorRenderDisplayLabel(label: string | undefined, translatedTitle: string): string {
   const normalizedLabel = label?.trim();
   if (!normalizedLabel) return translatedTitle;
-  const match = normalizedLabel.match(SYSTEM_QUICK_RENDER_LABEL_PATTERN);
+  const match = normalizedLabel.match(SYSTEM_EXTERIOR_RENDER_LABEL_PATTERN);
   return match ? `${translatedTitle}${match[1] || ''}` : normalizedLabel;
 }
 
-export function normalizeQuickRenderRenderChannel(channel: QuickRenderRenderChannel): QuickRenderRenderChannel {
+export function normalizeExteriorRenderRenderChannel(channel: ExteriorRenderRenderChannel): ExteriorRenderRenderChannel {
   return {
     ...channel,
     type: channel.type,
-    name: getQuickRenderRenderChannelName(channel.type),
+    name: getExteriorRenderRenderChannelName(channel.type),
   };
 }
 
-export function sortQuickRenderRenderChannels(channels: QuickRenderRenderChannel[]) {
-  return [...channels].map(normalizeQuickRenderRenderChannel).sort((a, b) => {
-    const orderA = QUICK_RENDER_CHANNEL_SORT_ORDER.indexOf(a.type);
-    const orderB = QUICK_RENDER_CHANNEL_SORT_ORDER.indexOf(b.type);
+export function sortExteriorRenderRenderChannels(channels: ExteriorRenderRenderChannel[]) {
+  return [...channels].map(normalizeExteriorRenderRenderChannel).sort((a, b) => {
+    const orderA = EXTERIOR_RENDER_CHANNEL_SORT_ORDER.indexOf(a.type);
+    const orderB = EXTERIOR_RENDER_CHANNEL_SORT_ORDER.indexOf(b.type);
     return (orderA === -1 ? 999 : orderA) - (orderB === -1 ? 999 : orderB);
   });
 }
 
-export function mergeQuickRenderDetectedChannels(
-  currentChannels: QuickRenderRenderChannel[],
-  files: Array<{ type: QuickRenderRenderChannelType; imageUrl: string; fileName: string; mimeType?: string }>,
-): QuickRenderRenderChannel[] {
-  const lastByType = new Map<QuickRenderRenderChannelType, typeof files[number]>();
+export function mergeExteriorRenderDetectedChannels(
+  currentChannels: ExteriorRenderRenderChannel[],
+  files: Array<{ type: ExteriorRenderRenderChannelType; imageUrl: string; fileName: string; mimeType?: string }>,
+): ExteriorRenderRenderChannel[] {
+  const lastByType = new Map<ExteriorRenderRenderChannelType, typeof files[number]>();
   files.forEach((file) => lastByType.set(file.type, file));
   let nextChannels = currentChannels.map((channel) => {
     const replacement = lastByType.get(channel.type);
     if (!replacement) return channel;
     lastByType.delete(channel.type);
-    return normalizeQuickRenderRenderChannel({
+    return normalizeExteriorRenderRenderChannel({
       ...channel,
       imageUrl: replacement.imageUrl,
       fileName: replacement.fileName,
@@ -191,33 +190,33 @@ export function mergeQuickRenderDetectedChannels(
   lastByType.forEach((file) => {
     nextChannels = [
       ...nextChannels,
-      createQuickRenderRenderChannel(file.type, file.imageUrl, file.fileName, file.mimeType),
+      createExteriorRenderRenderChannel(file.type, file.imageUrl, file.fileName, file.mimeType),
     ];
   });
-  return sortQuickRenderRenderChannels(nextChannels);
+  return sortExteriorRenderRenderChannels(nextChannels);
 }
 
-export function createPendingQuickRenderRenderChannelFile(
+export function createPendingExteriorRenderRenderChannelFile(
   imageUrl: string,
   fileName: string,
   mimeType?: string,
-): QuickRenderPendingRenderChannelFile {
+): ExteriorRenderPendingRenderChannelFile {
   return {
-    id: `quick-pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `exterior-render-pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     imageUrl,
     fileName,
     mimeType,
   };
 }
 
-export function getQuickRenderRenderChannelsEnabled(channels: QuickRenderRenderChannel[] = []) {
+export function getExteriorRenderRenderChannelsEnabled(channels: ExteriorRenderRenderChannel[] = []) {
   return channels.some((channel) => Boolean(channel.imageUrl));
 }
 
 export function resolveFollowReferenceOption(
-  current: QuickRenderAtmosphereOption | undefined,
+  current: ExteriorRenderAtmosphereOption | undefined,
   hasReference: boolean,
-): QuickRenderAtmosphereOption {
+): ExteriorRenderAtmosphereOption {
   if (current?.source === 'manual') return current;
   if (hasReference) return { source: 'followReference' };
   return { source: 'unset' };

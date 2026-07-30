@@ -227,7 +227,7 @@ export function ImageRoleTag({
             }}
           >
             <DisplayIcon className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.74)' }} />
-            <span>{displayLabel || t('imageNode.definePurpose')}</span>
+            <span>{displayLabel || t('reference.actions.setRole')}</span>
             <ChevronDown className="h-3 w-3" style={{ color: selectedOption ? selectedOption.color : 'rgba(255,255,255,0.68)' }} />
           </button>
         </div>
@@ -292,7 +292,7 @@ export function ImageRoleTag({
                 className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-white/5"
                 style={{ color: 'rgba(255,255,255,0.58)' }}
               >
-                <span className="flex-1">{t('reference.clearUsage')}</span>
+                <span className="flex-1">{t('reference.actions.clearRole')}</span>
               </button>
             </div>
           )}
@@ -304,7 +304,7 @@ export function ImageRoleTag({
                 color: 'rgba(255,255,255,0.54)',
               }}
             >
-              <div>{previewOption?.detail || t('reference.undefinedUsageDetail')}</div>
+              <div>{previewOption?.detail || t('reference.descriptions.unassigned')}</div>
               {previewOption && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {previewOption.constraints.map((constraint) => (
