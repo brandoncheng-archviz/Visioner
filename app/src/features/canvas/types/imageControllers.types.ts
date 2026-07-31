@@ -36,9 +36,21 @@ export interface StructureControllerData {
   enabled?: boolean;
 }
 
+export type CameraHeight = 'low' | 'eyeLevel' | 'slightlyHigh' | 'high' | 'birdsEye';
+export type CameraLens = 'ultraWide' | 'wide' | 'standard' | 'telephoto';
+export type CameraPerspective = 'onePoint' | 'twoPoint' | 'threePointUp' | 'threePointDown';
+export type CameraDepthOfField = 'allSharp' | 'subtle' | 'pronounced';
+
+export interface CameraControllerData {
+  enabled?: boolean;
+  height?: CameraHeight;
+  lens?: CameraLens;
+  perspective?: CameraPerspective;
+  depthOfField?: CameraDepthOfField;
+  preserveOriginalCameraFeatures?: boolean;
+}
+
 export interface ImageNodeControllers {
   structure?: StructureControllerData;
-  camera?: {
-    enabled?: boolean;
-  };
+  camera?: CameraControllerData;
 }

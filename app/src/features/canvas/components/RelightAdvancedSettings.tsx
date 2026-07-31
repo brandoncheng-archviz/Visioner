@@ -40,7 +40,7 @@ export function RelightAdvancedSettings({
   onPresetSelect: (preset: RelightPreset) => void;
 }) {
   return (
-    <div className="h-full border-l border-white/[0.07] px-5 py-5">
+    <div className="h-full overflow-y-auto border-l border-white/[0.07] px-4 py-4">
       <OptionGroup
         icon={<Cloud className="h-4 w-4" />}
         label="云量"
@@ -55,12 +55,12 @@ export function RelightAdvancedSettings({
         value={settings.fogLevel}
         onChange={(fogLevel) => onSettingsChange({ ...settings, fogLevel, lightingPresetId: undefined })}
       />
-      <div className="mt-6">
-        <div className="mb-3 flex items-center gap-2 text-[15px] font-medium text-white/72">
+      <div className="mt-4">
+        <div className="mb-2 flex items-center gap-2 text-[14px] font-medium text-white/72">
           <Sparkles className="h-4 w-4 text-white/52" />
           光影预设
         </div>
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-2">
           {RELIGHT_PRESETS.map((preset) => {
             const selected = settings.lightingPresetId === preset.id;
             const PresetIcon = PRESET_ICONS[preset.id as keyof typeof PRESET_ICONS] || Sun;
@@ -71,11 +71,11 @@ export function RelightAdvancedSettings({
                 onClick={() => onPresetSelect(preset)}
                 title={`${preset.name}：${preset.description}`}
                 aria-pressed={selected}
-                className="flex h-[76px] min-w-0 flex-col items-center justify-center gap-2 rounded-[9px] px-2 text-center transition duration-150 hover:brightness-125"
+                className="flex h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-[9px] px-2 text-center transition duration-150 hover:brightness-125"
                 style={{
-                  color: selected ? '#e5faff' : 'rgba(255,255,255,0.78)',
-                  background: selected ? 'rgba(0,212,255,0.075)' : 'rgba(255,255,255,0.025)',
-                  border: selected ? '1px solid rgba(0,212,255,0.26)' : '1px solid rgba(255,255,255,0.065)',
+                  color: selected ? '#ffffff' : 'rgba(255,255,255,0.78)',
+                  background: selected ? 'rgba(47,107,255,0.12)' : 'rgba(255,255,255,0.025)',
+                  border: selected ? '1px solid rgba(47,107,255,0.42)' : '1px solid rgba(255,255,255,0.065)',
                 }}
               >
                 <PresetIcon className="h-[18px] w-[18px] text-current opacity-65" strokeWidth={1.7} />
@@ -103,8 +103,8 @@ function OptionGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="mb-5">
-      <div className="mb-2.5 flex items-center gap-2 text-[15px] font-medium text-white/72">
+    <div className="mb-4">
+      <div className="mb-2 flex items-center gap-2 text-[14px] font-medium text-white/72">
         {icon}
         {label}
       </div>
@@ -116,11 +116,11 @@ function OptionGroup<T extends string>({
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
-              className="h-9 rounded-[9px] px-3.5 text-[14px] font-medium transition duration-150 hover:brightness-125"
+              className="h-8 rounded-[9px] px-3 text-[13px] font-medium transition duration-150 hover:brightness-125"
               style={{
                 color: selected ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.58)',
-                background: selected ? 'rgba(0,212,255,0.08)' : 'rgba(255,255,255,0.028)',
-                border: selected ? '1px solid rgba(0,212,255,0.25)' : '1px solid rgba(255,255,255,0.065)',
+                background: selected ? 'rgba(47,107,255,0.12)' : 'rgba(255,255,255,0.028)',
+                border: selected ? '1px solid rgba(47,107,255,0.42)' : '1px solid rgba(255,255,255,0.065)',
               }}
             >
               {option.label}

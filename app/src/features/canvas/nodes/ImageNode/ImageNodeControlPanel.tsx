@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
+  Camera,
   X,
   ChevronDown,
   ArrowUp,
@@ -56,6 +57,7 @@ import {
   type AspectRatioPreset,
 } from '../../utils/modelParams';
 import {
+  CameraControlPopover,
   ImageControllersPopover,
   ImageControllersTrigger,
   type ImageNodeControllers,
@@ -236,6 +238,7 @@ export function ImageNodeControlPanel({
     }
   }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
   const [showControllersPopover, setShowControllersPopover] = useState(false);
+  const [showCameraPopover, setShowCameraPopover] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [customFrameWidth, setCustomFrameWidth] = useState('1');
@@ -267,6 +270,7 @@ export function ImageNodeControlPanel({
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const [controllersButtonElement, setControllersButtonElement] = useState<HTMLButtonElement | null>(null);
+  const [cameraButtonElement, setCameraButtonElement] = useState<HTMLButtonElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const frameRatioButtonRef = useRef<HTMLButtonElement>(null);
@@ -775,6 +779,7 @@ export function ImageNodeControlPanel({
     setShowRatioMenu(true);
     setShowModelMenu(false);
     setShowControllersPopover(false);
+    setShowCameraPopover(false);
   };
 
   const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
@@ -1408,7 +1413,7 @@ export function ImageNodeControlPanel({
 
       {/* Bottom params bar */}
       <div className="flex items-center justify-between" style={{ padding: '4px 14px 14px' }}>
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3">
           {/* Model */}
           <div className="relative">
             <button
@@ -1419,6 +1424,7 @@ export function ImageNodeControlPanel({
                 setShowModelMenu((value) => !value);
                 setShowRatioMenu(false);
                 setShowControllersPopover(false);
+                setShowCameraPopover(false);
               }}
               className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
               style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
@@ -1625,6 +1631,7 @@ export function ImageNodeControlPanel({
               open={showControllersPopover}
               onClick={() => {
                 setShowControllersPopover((value) => !value);
+                setShowCameraPopover(false);
                 setShowModelMenu(false);
                 setShowRatioMenu(false);
               }}
@@ -1636,6 +1643,41 @@ export function ImageNodeControlPanel({
               disabled={isControllersDisabled}
               onChange={onControllersChange}
               onOpenChange={setShowControllersPopover}
+            />
+          </div>
+          {/* Camera */}
+          <div className="relative flex-shrink-0">
+            <button
+              ref={setCameraButtonElement}
+              type="button"
+              disabled={isControllersDisabled}
+              aria-pressed={showCameraPopover}
+              aria-label={t('imageNode.controllers.camera.title')}
+              onClick={() => {
+                if (isControllersDisabled) return;
+                setShowCameraPopover((value) => !value);
+                setShowControllersPopover(false);
+                setShowModelMenu(false);
+                setShowRatioMenu(false);
+              }}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                showCameraPopover
+                  ? 'border-white/[0.16] bg-white/[0.10] text-white/90'
+                  : controllers?.camera?.enabled === true
+                    ? 'border-white/[0.10] bg-white/[0.06] text-white/78 hover:border-white/[0.16] hover:bg-white/[0.09] hover:text-white/92'
+                    : 'border-white/[0.08] bg-white/[0.035] text-white/64 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white/88'
+              } disabled:cursor-not-allowed disabled:opacity-50`}
+              title={t('imageNode.controllers.camera.title')}
+            >
+              <Camera className="h-4 w-4" />
+            </button>
+            <CameraControlPopover
+              open={showCameraPopover}
+              anchorElement={cameraButtonElement}
+              controllers={controllers}
+              disabled={isControllersDisabled}
+              onChange={onControllersChange}
+              onOpenChange={setShowCameraPopover}
             />
           </div>
         </div>

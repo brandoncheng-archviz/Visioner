@@ -10,7 +10,6 @@ import type { LightPreviewData } from '../types/lightPreview.types';
 import { getPresetById } from '../constants/presets';
 import type { PresetItem } from '../types/imageNode.types';
 import { sortReferencesByUsage } from './referenceUtils';
-import i18n from '@/i18n';
 import type { ImageControllerState } from '../types/imageController.types';
 import {
   LIGHT_DIRECTION_OPTIONS,
@@ -19,8 +18,6 @@ import {
   TOGGLE_OPTIONS,
   WEATHER_OPTIONS,
 } from '../constants/imageController';
-
-const LEGACY_CUSTOM_REFERENCE_LABEL = ['自定义', '用途...'].join('');
 
 function normalizeSentence(text: string): string {
   const trimmed = text.trim();
@@ -133,26 +130,27 @@ export function stripReferencePromptMetadata(promptText: string) {
 export function getImageReferencePromptText(reference: ReferenceInfo) {
   const normalizedRole = getNormalizedRole(reference.role);
 
-  if (normalizedRole === 'primary_building' || reference.roleLabel.includes('主体建筑')) {
+  if (normalizedRole === 'primary_building') {
     return '默认保护主体建筑，保持建筑结构、体块比例、立面关系、相机角度和构图比例稳定；如果用户明确要求调整，则以用户显式意图为准。';
   }
-  if (normalizedRole === 'atmosphere_reference' || reference.role === 'overall_reference' || reference.roleLabel.includes('氛围')) {
+  if (normalizedRole === 'atmosphere_reference') {
     return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
   }
-  if (reference.role === 'material_reference' || reference.roleLabel.includes('材质')) {
+  if (normalizedRole === 'material_reference') {
     return '参考该图片中的材质类型、表面纹理、反射关系、粗糙度和细节质感。';
   }
-  if (reference.role === 'landscape_reference' || reference.roleLabel.includes('景观')) {
+  if (normalizedRole === 'landscape_reference') {
     return '参考该图片中的景观布局、植物配置、地形关系、铺装与室外空间氛围。';
   }
-  if (reference.role === 'lighting_reference' || reference.roleLabel.includes('照明') || reference.roleLabel.includes('灯光')) {
+  if (normalizedRole === 'lighting_reference') {
     return '参考该图片中的灯具语言、光色、照明强度、明暗层次和光线分布。';
   }
-  if (reference.role === 'interior_reference' || reference.roleLabel.includes('室内')) {
+  if (normalizedRole === 'interior_reference') {
     return '参考该图片中的室内空间布局、家具陈设、室内材质和整体氛围。';
   }
   if (normalizedRole === 'local_reference') {
-    const type = normalizeLocalReferenceType(reference.localReferenceType) || getLocalReferenceTypeFromRole(reference.role);
+    const type = normalizeLocalReferenceType(reference.localReferenceType)
+      ?? getLocalReferenceTypeFromRole(reference.role);
     const label = getLocalReferenceLabel(reference.role, reference.localReferenceType, reference.localReferenceLabel, reference.customRoleLabel);
     if (type === 'custom' && label) {
       return `只参考该图中的「${label}」相关视觉信息，不复制整体建筑体块与构图。`;
@@ -167,8 +165,8 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
     return '只重点参考该图中的指定局部元素，不复制整体建筑体块与构图。';
   }
   if (reference.role === 'custom_reference') {
-    const customUsage = reference.customRoleLabel?.trim() || reference.roleLabel.trim();
-    if (customUsage && customUsage !== LEGACY_CUSTOM_REFERENCE_LABEL && customUsage !== '未设置参考用途' && customUsage !== '未定义用途') {
+    const customUsage = reference.customRoleLabel?.trim();
+    if (customUsage) {
       return `只参考该图片中的${customUsage.replace(/参考/, '')}相关视觉信息，不复制整体建筑体块与构图。`;
     }
     return '只参考该图片中用户指定的局部参考视觉信息，不复制整体建筑体块与构图。';
@@ -185,7 +183,7 @@ export function createImageReferenceBlock(reference: ReferenceInfo): ImageRefere
     id: `image-ref-${reference.nodeId}`,
     imageId: reference.nodeId,
     sourceNodeId: reference.nodeId,
-    usage: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
+    usage: reference.roleLabel || reference.role || 'undefined_usage',
     thumbnailUrl: reference.imageUrl,
     promptText: stripReferencePromptMetadata(getImageReferencePromptText(reference)),
     promptTextEdited: false,
@@ -247,26 +245,16 @@ export function buildPromptSubmission(
 
   const referenceById = new Map(sortedNodeReferences.map((reference) => [reference.nodeId, reference]));
   const sortedReferenceIndex = new Map(sortedNodeReferences.map((reference, index) => [reference.nodeId, index]));
-  const blockRole = (block: ImageReferencePromptBlock) => referenceById.get(block.sourceNodeId)?.role ?? null;
-  const blockLocalReferenceType = (block: ImageReferencePromptBlock) =>
-    normalizeLocalReferenceType(referenceById.get(block.sourceNodeId)?.localReferenceType);
+  const blockReference = (block: ImageReferencePromptBlock) => referenceById.get(block.sourceNodeId);
+  const blockRole = (block: ImageReferencePromptBlock) => blockReference(block)?.role ?? null;
+  const normalizedBlockRole = (block: ImageReferencePromptBlock) => getNormalizedRole(blockRole(block));
+  const blockLocalReferenceType = (block: ImageReferencePromptBlock) => (
+    normalizeLocalReferenceType(blockReference(block)?.localReferenceType)
+    ?? getLocalReferenceTypeFromRole(blockRole(block))
+  );
   const isLocalReferenceBlock = (block: ImageReferencePromptBlock) =>
-    blockRole(block) === 'local_reference' ||
-    blockRole(block) === 'custom_reference' ||
-    blockRole(block) === 'vegetation_reference' ||
-    blockRole(block) === 'plant_reference' ||
-    blockRole(block) === 'people_reference' ||
-    blockRole(block) === 'sky_reference' ||
-    Boolean(blockLocalReferenceType(block)) ||
-    block.usage?.includes('植物') ||
-    block.usage?.includes('人物') ||
-    block.usage?.includes('天空') ||
-    block.usage?.includes('海水') ||
-    block.usage?.includes('城市') ||
-    block.usage?.includes('玻璃') ||
-    block.usage?.includes('雾气') ||
-    block.usage?.includes('铺装') ||
-    block.usage?.includes('局部');
+    normalizedBlockRole(block) === 'local_reference'
+    || Boolean(blockLocalReferenceType(block));
 
   const sortBlocksByReferenceOrder = (blocks: ImageReferencePromptBlock[]) =>
     [...blocks].sort((a, b) => {
@@ -278,14 +266,16 @@ export function buildPromptSubmission(
       return imageRefBlocks.indexOf(a) - imageRefBlocks.indexOf(b);
     });
 
-  const primaryBuilding = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'primary_building' || block.usage?.includes('主体建筑')));
-  const atmosphereRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'atmosphere_reference' || blockRole(block) === 'overall_reference' || block.usage?.includes('氛围')));
-  const materialRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'material_reference' || block.usage?.includes('材质')));
-  const landscapeRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'landscape_reference' || block.usage?.includes('景观')));
-  const lightingRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'lighting_reference' || block.usage?.includes('照明') || block.usage?.includes('灯光')));
-  const interiorRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'interior_reference' || block.usage?.includes('室内')));
+  const primaryBuilding = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => normalizedBlockRole(block) === 'primary_building'));
+  const atmosphereRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => normalizedBlockRole(block) === 'atmosphere_reference'));
+  const materialRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => normalizedBlockRole(block) === 'material_reference'));
+  const landscapeRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => normalizedBlockRole(block) === 'landscape_reference'));
+  const lightingRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => normalizedBlockRole(block) === 'lighting_reference'));
+  const interiorRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => normalizedBlockRole(block) === 'interior_reference'));
   const localRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter(isLocalReferenceBlock));
-  const undefinedRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => blockRole(block) === 'undefined_usage' || !block.usage || block.usage === '未设置参考用途' || block.usage === '未定义用途'));
+  const undefinedRefs = sortBlocksByReferenceOrder(imageRefBlocks.filter((block) => (
+    !normalizedBlockRole(block) && !blockLocalReferenceType(block)
+  )));
 
   const selectedPresetsList = selectedPresetIds
     .map(getPresetById)
@@ -347,7 +337,7 @@ export function buildPromptSubmission(
       imageId: reference.nodeId,
       imageUrl: reference.imageUrl,
       usageKey: reference.role ?? 'undefined_usage',
-      usageLabel: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
+      usageLabel: reference.roleLabel || reference.role || 'undefined_usage',
       customUsageName: reference.customRoleLabel,
       localReferenceType: reference.localReferenceType,
       localReferenceLabel: reference.localReferenceLabel,
@@ -386,7 +376,7 @@ export function buildPromptSubmission(
     imageReferences: sortedNodeReferences.map((reference) => ({
       imageId: reference.nodeId,
       sourceNodeId: reference.nodeId,
-      usage: reference.roleLabel || i18n.t('imageNode.undefinedUsage'),
+      usage: reference.roleLabel || reference.role || 'undefined_usage',
       localReferenceType: reference.localReferenceType,
       localReferenceLabel: reference.localReferenceLabel,
       localReferencePoint: reference.localReferencePoint,

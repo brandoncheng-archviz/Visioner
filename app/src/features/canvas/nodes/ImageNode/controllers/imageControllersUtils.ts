@@ -130,7 +130,6 @@ export function getStructurePreviewChannel(structure?: StructureControllerData):
 export function getEnabledControllerCount(controllers?: ImageNodeControllers): number {
   let count = 0;
   if (isStructureControllerEnabled(controllers?.structure)) count += 1;
-  if (controllers?.camera?.enabled === true) count += 1;
   return count;
 }
 

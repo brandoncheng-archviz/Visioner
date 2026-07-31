@@ -21,7 +21,7 @@ export function SunSkyNodeControls({
   const stacked = layout === 'stacked';
 
   return (
-    <div className={stacked ? '' : 'space-y-3'}>
+    <div className={stacked ? 'space-y-2' : 'space-y-3'}>
       <SunSlider
         icon={<Sun className="h-4 w-4" />}
         label="太阳高度"
@@ -35,7 +35,7 @@ export function SunSkyNodeControls({
         stacked={stacked}
         onChange={onElevationChange}
       />
-      <div className={stacked ? 'my-3 h-px bg-white/[0.045]' : 'h-px bg-white/[0.06]'} />
+      <div className={stacked ? 'my-2 h-px bg-white/[0.045]' : 'h-px bg-white/[0.06]'} />
       <SunSlider
         icon={<Compass className="h-4 w-4" />}
         label="太阳方位"
@@ -115,8 +115,8 @@ function SunSlider({
   );
 
   const title = (
-    <div className={`flex items-center ${stacked ? 'gap-2.5 text-[16px] font-medium' : 'gap-2 text-[15px] font-semibold'} text-white/78`}>
-      <span className={`${stacked ? 'h-8 w-8' : 'h-7 w-7'} flex shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 [&_svg]:h-4 [&_svg]:w-4`}>
+    <div className={`flex items-center ${stacked ? 'gap-2 text-[13px] font-medium' : 'gap-2 text-[15px] font-semibold'} text-white/78`}>
+      <span className={`${stacked ? 'h-6 w-6' : 'h-7 w-7'} flex shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/45 ${stacked ? '[&_svg]:h-3.5 [&_svg]:w-3.5' : '[&_svg]:h-4 [&_svg]:w-4'}`}>
         {icon}
       </span>
       <span className="truncate leading-none">{label}</span>
@@ -125,7 +125,7 @@ function SunSlider({
 
   const valueDisplay = (
     <span
-      className={`${stacked ? 'h-10 min-w-[72px] rounded-[10px] px-3 text-[19px]' : 'min-w-[62px] rounded-lg px-2 py-1.5 text-[15px]'} inline-flex items-center justify-center border font-medium transition-colors hover:bg-white/[0.06]`}
+      className={`${stacked ? 'h-7 min-w-[52px] rounded-lg px-2 text-[14px]' : 'min-w-[62px] rounded-lg px-2 py-1.5 text-[15px]'} inline-flex items-center justify-center border font-medium transition-colors hover:bg-white/[0.06]`}
       style={{
         color: 'rgba(255,255,255,0.92)',
         background: 'rgba(255,255,255,0.04)',
@@ -149,11 +149,11 @@ function SunSlider({
     >
       {stacked ? (
         <>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-3">
             {title}
             {valueDisplay}
           </div>
-          <div className="mt-3">
+          <div className="mt-2">
             {slider}
           </div>
         </>

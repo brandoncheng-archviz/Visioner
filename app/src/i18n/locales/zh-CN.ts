@@ -120,7 +120,6 @@ const zhCN = {
 
   exteriorRender: {
     title: "室外渲染",
-    subtitle: "生成高质量室外效果图",
     outputTitlePrefix: "室外渲染输出",
     sections: {
       imageInput: { title: "图像输入" },
@@ -337,6 +336,46 @@ const zhCN = {
         title: "相机控制",
         header: "相机控制",
         description: "用于控制视角高度、透视关系与景深表现。",
+        subtitle: "轻量约束 · 建筑可视化",
+        currentConfiguration: "当前配置",
+        cameraControl: "相机控件",
+        preserveOriginalCameraFeatures: "保持原相机特征",
+        height: {
+          title: "机位高度",
+          options: {
+            low: "低机位",
+            eyeLevel: "人视",
+            slightlyHigh: "略高",
+            high: "高机位",
+            birdsEye: "鸟瞰",
+          },
+        },
+        lens: {
+          title: "镜头范围",
+          options: {
+            ultraWide: "超广角",
+            wide: "广角",
+            standard: "标准",
+            telephoto: "长焦",
+          },
+        },
+        perspective: {
+          title: "透视方式",
+          options: {
+            onePoint: "一点透视",
+            twoPoint: "两点透视",
+            threePointUp: "三点透视（仰视）",
+            threePointDown: "三点透视（俯视）",
+          },
+        },
+        depthOfField: {
+          title: "景深",
+          options: {
+            allSharp: "全清晰",
+            subtle: "轻微景深",
+            pronounced: "明显景深",
+          },
+        },
       },
     },
     definePurpose: "设置参考用途",

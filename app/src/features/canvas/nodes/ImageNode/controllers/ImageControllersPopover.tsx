@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Camera, ChevronRight, Layers3, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Layers3, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../../../constants/canvasConstants';
 import type { ImageNodeControllers } from './imageControllers.types';
-import { CameraControlPlaceholder } from './CameraControlPlaceholder';
 import { StructureControlPlaceholder } from './StructureControlPlaceholder';
 import {
   getEnabledStructureChannelCount,
   isStructureControllerEnabled,
 } from './imageControllersUtils';
 
-type ControllerView = 'list' | 'structure' | 'camera';
+type ControllerView = 'list' | 'structure';
 
 interface ImageControllersPopoverProps {
   open: boolean;
@@ -24,8 +23,7 @@ interface ImageControllersPopoverProps {
 
 const POPOVER_WIDTH = 292;
 const STRUCTURE_POPOVER_WIDTH = 640;
-const POPOVER_LIST_HEIGHT = 158;
-const POPOVER_DETAIL_HEIGHT = 198;
+const POPOVER_LIST_HEIGHT = 108;
 const STRUCTURE_POPOVER_HEIGHT = 384;
 const POPOVER_MARGIN = 8;
 const POPOVER_ANCHOR_GAP = 4;
@@ -55,12 +53,11 @@ export function ImageControllersPopover({
       const rect = anchorElement.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const popoverWidth = view === 'structure' ? STRUCTURE_POPOVER_WIDTH : POPOVER_WIDTH;
+      const requestedPopoverWidth = view === 'structure' ? STRUCTURE_POPOVER_WIDTH : POPOVER_WIDTH;
+      const popoverWidth = Math.min(requestedPopoverWidth, viewportWidth - POPOVER_MARGIN * 2);
       const popoverHeight = view === 'structure'
         ? STRUCTURE_POPOVER_HEIGHT
-        : view === 'list'
-          ? POPOVER_LIST_HEIGHT
-          : POPOVER_DETAIL_HEIGHT;
+        : POPOVER_LIST_HEIGHT;
       const left = Math.min(
         Math.max(POPOVER_MARGIN, rect.left + rect.width / 2 - popoverWidth / 2),
         Math.max(POPOVER_MARGIN, viewportWidth - popoverWidth - POPOVER_MARGIN),
@@ -107,7 +104,6 @@ export function ImageControllersPopover({
 
   const headerTitle = useMemo(() => {
     if (view === 'structure') return t('imageNode.controllers.structure.header');
-    if (view === 'camera') return t('imageNode.controllers.camera.header');
     return t('imageNode.controllers.title');
   }, [t, view]);
 
@@ -137,27 +133,18 @@ export function ImageControllersPopover({
         {renderStatus(isStructureEnabled, structureStatus)}
         <ChevronRight className="h-4 w-4 flex-shrink-0 text-white/34" />
       </button>
-      <button
-        type="button"
-        onClick={() => setView('camera')}
-        className="mt-1 flex h-12 w-full items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-white/[0.06]"
-      >
-        <Camera className="h-4 w-4 flex-shrink-0 text-white/54" />
-        <span className="min-w-0 flex-1 text-[14px] font-medium text-white/82">{t('imageNode.controllers.camera.title')}</span>
-        {renderStatus(controllers?.camera?.enabled === true)}
-        <ChevronRight className="h-4 w-4 flex-shrink-0 text-white/34" />
-      </button>
     </div>
   );
 
   return createPortal(
     <div
       data-image-controllers-popover="true"
-      className="nodrag nopan nowheel fixed z-[120] overflow-hidden rounded-xl"
+      className="nodrag nopan nowheel fixed z-[120] overflow-y-auto rounded-xl"
       style={{
         left: position.left,
         top: position.top,
         width: view === 'structure' ? STRUCTURE_POPOVER_WIDTH : POPOVER_WIDTH,
+        maxHeight: `calc(100vh - ${POPOVER_MARGIN * 2}px)`,
         background: FLOATING_PANEL_BACKGROUND,
         border: FLOATING_PANEL_BORDER,
         boxShadow: '0 16px 38px rgba(0,0,0,0.44)',
@@ -192,9 +179,6 @@ export function ImageControllersPopover({
       {view === 'list' && renderList()}
       {view === 'structure' && (
         <StructureControlPlaceholder controllers={controllers} disabled={disabled} onChange={onChange} />
-      )}
-      {view === 'camera' && (
-        <CameraControlPlaceholder controllers={controllers} disabled={disabled} onChange={onChange} />
       )}
     </div>,
     document.body,

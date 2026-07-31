@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow, useStore, type Node, type NodeProps } from '@xyflow/react';
 import { AlertCircle, Home, Plus, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { CANVAS_NODE_CARD_BACKGROUND, CANVAS_NODE_CARD_BORDER_COLOR, CANVAS_NODE_CARD_BORDER_WIDTH, CANVAS_NODE_CARD_RADIUS, CANVAS_NODE_CARD_SELECTED_BORDER_COLOR } from '../../constants/canvasConstants';
+import { CANVAS_GENERATION_NODE_WIDTH, CANVAS_NODE_CARD_BACKGROUND, CANVAS_NODE_CARD_BORDER_COLOR, CANVAS_NODE_CARD_BORDER_WIDTH, CANVAS_NODE_CARD_RADIUS, CANVAS_NODE_CARD_SELECTED_BORDER_COLOR } from '../../constants/canvasConstants';
 import { getReferenceUsageInfo } from '../../constants/imageUsages';
 import type { ImageRole, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
@@ -30,7 +30,7 @@ import {
   sortExteriorRenderRenderChannels,
 } from './exteriorRenderUtils';
 
-const EXTERIOR_RENDER_NODE_WIDTH = 470;
+const EXTERIOR_RENDER_NODE_WIDTH = CANVAS_GENERATION_NODE_WIDTH;
 type CanvasSelectionMode =
   | { kind: 'input' }
   | { kind: 'renderChannel'; channelType: ExteriorRenderRenderChannelType }
@@ -498,10 +498,6 @@ export function ExteriorRenderNode({ data, selected, id }: NodeProps) {
           }}
         >
           <div className="flex-1 space-y-3 p-4 pb-5">
-            <div>
-              <div className="text-[15px] font-semibold text-white/90">{t('exteriorRender.title')}</div>
-              <div className="mt-0.5 text-[11px] text-white/42">{t('exteriorRender.subtitle')}</div>
-            </div>
             <ExteriorRenderConnectedImages
               images={inputImages as ExteriorRenderConnectedImage[]}
               disabled={isProcessing}

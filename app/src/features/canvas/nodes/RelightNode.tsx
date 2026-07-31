@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow, useStore, type NodeProps } from '@xyflow/react';
-import { Copy, Download, Loader2, Maximize2, Play, Plus, Square, Sun, Trash2, Zap } from 'lucide-react';
+import { Copy, Download, Loader2, Maximize2, Play, Plus, Square, Sun, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { LightPreviewData } from '../types/lightPreview.types';
 import type { RelightCreationOptions, RelightPreset, RelightSettings } from '../types/relight.types';
@@ -19,9 +19,8 @@ import {
   CANVAS_NODE_CARD_RADIUS,
   CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
   CANVAS_NODE_CONTROL_SCALE,
-  IMAGE_NODE_CONTROL_WIDTH,
+  CANVAS_GENERATION_NODE_WIDTH,
 } from '../constants/canvasConstants';
-import { resolveImageNodeSize } from '../utils/imageNodeSizing';
 import { getCurrentImage, getNodeHeight, getNodeWidth } from '../types/imageNodeData.types';
 import { useHistory } from '../contexts/HistoryContext';
 import { DEFAULT_RELIGHT_SETTINGS, DEFAULT_RELIGHT_SUN } from '../constants/relightPresets';
@@ -31,9 +30,11 @@ import {
   RELIGHT_ADVANCED_PANEL_WIDTH,
   RELIGHT_CONTROL_PANEL_EXPANDED_HEIGHT,
   RELIGHT_CONTROL_PANEL_HEIGHT,
+  RELIGHT_CONTROL_PANEL_WIDTH,
 } from '../components/RelightControlBody';
 import { ImageToolbar } from '../components/ImageToolbar';
 import { ImagePreviewModal } from '../components/ImagePreviewModal';
+import { GenerationSubmitControl } from '../components/GenerationSubmitControl';
 
 export type RelightStatus = 'empty' | 'previewing' | 'previewResult' | 'generating' | 'result' | 'error';
 
@@ -68,6 +69,10 @@ export interface RelightNodeData {
 }
 
 const RELIGHT_COST = 14;
+const RELIGHT_NODE_WIDTH = CANVAS_GENERATION_NODE_WIDTH;
+const RELIGHT_PREVIEW_MIN_HEIGHT = 260;
+const RELIGHT_PREVIEW_MAX_HEIGHT = 340;
+const RELIGHT_PREVIEW_EMPTY_HEIGHT = 300;
 
 export function RelightNode({ data, selected, id }: NodeProps) {
   const { t } = useTranslation();
@@ -129,15 +134,14 @@ export function RelightNode({ data, selected, id }: NodeProps) {
   const sizeSourceWidth = connectedInput?.width || nodeData.width || 1;
   const sizeSourceHeight = connectedInput?.height || nodeData.height || 1;
 
-  const previewSize = resolveImageNodeSize({
-    hasImage: Boolean(connectedInput || displayImage),
-    sourceWidth: sizeSourceWidth,
-    sourceHeight: sizeSourceHeight,
-  });
-
-  const cardWidth = previewSize.cardWidth;
-  const previewHeight = previewSize.cardHeight;
-  const controlPanelWidth = IMAGE_NODE_CONTROL_WIDTH + (showAdvancedSettings ? RELIGHT_ADVANCED_PANEL_WIDTH : 0);
+  const cardWidth = RELIGHT_NODE_WIDTH;
+  const previewHeight = connectedInput || displayImage
+    ? Math.min(
+        RELIGHT_PREVIEW_MAX_HEIGHT,
+        Math.max(RELIGHT_PREVIEW_MIN_HEIGHT, Math.round(RELIGHT_NODE_WIDTH * sizeSourceHeight / sizeSourceWidth)),
+      )
+    : RELIGHT_PREVIEW_EMPTY_HEIGHT;
+  const controlPanelWidth = RELIGHT_CONTROL_PANEL_WIDTH + (showAdvancedSettings ? RELIGHT_ADVANCED_PANEL_WIDTH : 0);
   const controlPanelHeight = showAdvancedSettings
     ? RELIGHT_CONTROL_PANEL_EXPANDED_HEIGHT
     : RELIGHT_CONTROL_PANEL_HEIGHT;
@@ -699,13 +703,15 @@ export function RelightNode({ data, selected, id }: NodeProps) {
             }}
           >
             <div
-              className="nodrag nopan nowheel overflow-hidden rounded-[18px] border transition-[width,min-height] duration-300 ease-out"
+              className="nodrag nopan nowheel flex flex-col overflow-hidden border transition-[width,height] duration-300 ease-out"
               style={{
                 width: controlPanelWidth,
-                minHeight: controlPanelHeight,
-                background: '#252526',
-                borderColor: 'rgba(255,255,255,0.08)',
-                boxShadow: '0 18px 48px rgba(0,0,0,0.42)',
+                height: controlPanelHeight,
+                background: CANVAS_NODE_CARD_BACKGROUND,
+                borderRadius: CANVAS_NODE_CARD_RADIUS,
+                borderWidth: CANVAS_NODE_CARD_BORDER_WIDTH,
+                borderColor: CANVAS_NODE_CARD_SELECTED_BORDER_COLOR,
+                boxShadow: '0 18px 48px rgba(0,0,0,0.38)',
               }}
               onWheel={stopNodeEvent}
               onPointerDown={stopNodeEvent}
@@ -730,7 +736,7 @@ export function RelightNode({ data, selected, id }: NodeProps) {
 
               {/* Footer actions span the complete control panel. */}
               <div
-                className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3"
+                className="flex h-[62px] shrink-0 items-center justify-between border-t border-white/[0.07] px-3"
                 onWheel={stopNodeEvent}
                 onPointerDown={stopNodeEvent}
                 onPointerMove={stopNodeEvent}
@@ -758,43 +764,14 @@ export function RelightNode({ data, selected, id }: NodeProps) {
                   )}
                   {isRealtimePreviewActive ? '停止预览' : '实时预览'}
                 </button>
-                <div
-                  className="flex h-12 items-center overflow-hidden rounded-[15px] border"
-                  style={{
-                    background: 'rgba(255,255,255,0.04)',
-                    borderColor: 'rgba(255,255,255,0.08)',
-                  }}
-                >
-                  <div
-                    className="flex h-full items-center gap-1.5 px-4 text-[13px] font-medium"
-                    style={{ color: 'rgba(255,255,255,0.58)' }}
-                    title={`消耗 ${RELIGHT_COST} 积分`}
-                  >
-                    <Zap className="h-3.5 w-3.5 fill-current text-[#b8a36d]" />
-                    <span>{RELIGHT_COST}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={!connectedInput || isGenerating}
-                    className="nodrag nowheel flex h-10 w-10 items-center justify-center rounded-[11px] transition duration-200 hover:brightness-105 hover:shadow-[0_4px_14px_rgba(255,255,255,0.12)] disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{
-                      marginRight: 3,
-                      color: 'rgba(0,0,0,0.86)',
-                      background: connectedInput && !isGenerating
-                        ? 'rgba(255,255,255,0.92)'
-                        : 'rgba(255,255,255,0.34)',
-                    }}
-                    title={isGenerating ? '光影调整生成中...' : `生成，消耗 ${RELIGHT_COST} 积分`}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
-                    {isGenerating ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <span className="text-[17px] font-semibold leading-none">↑</span>
-                    )}
-                  </button>
-                </div>
+                <GenerationSubmitControl
+                  creditCost={RELIGHT_COST}
+                  isGenerating={isGenerating}
+                  disabled={!connectedInput || isGenerating}
+                  creditTitle={`消耗 ${RELIGHT_COST} 积分`}
+                  buttonTitle={isGenerating ? '光影调整生成中...' : `生成，消耗 ${RELIGHT_COST} 积分`}
+                  onGenerate={handleGenerate}
+                />
               </div>
             </div>
           </div>

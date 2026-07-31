@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '@xyflow/react';
-import { ArrowUp, Check, ChevronDown, Lock, Unlock, Zap } from 'lucide-react';
+import { Check, ChevronDown, Lock, Unlock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FLOATING_PANEL_BACKGROUND, FLOATING_PANEL_BORDER } from '../../constants/canvasConstants';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../constants/imageModelOptions';
 import { ModelAspectRatioOptions } from '../../components/ModelAspectRatioOptions';
 import { ModelParamsSummaryButton } from '../../components/ModelParamsSummaryButton';
+import { GenerationSubmitControl } from '../../components/GenerationSubmitControl';
 import {
   calculateRequestedSize,
   commitTargetSizeDraft,
@@ -464,40 +465,14 @@ export function ExteriorRenderFooter({
         </div>
       </div>
 
-      <div className="relative flex shrink-0 items-center gap-2">
-        <div
-          className="flex h-[34px] min-w-[38px] items-center justify-center gap-1 text-[13px] font-medium text-white/52"
-          title={t('exteriorRender.footer.creditCost', { count: creditCost })}
-        >
-          <Zap className="h-3 w-3 fill-current text-[#b8a36d]" />
-          <span>{creditCost}</span>
-        </div>
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={disabled || !canGenerate}
-          className="nodrag flex items-center justify-center rounded-lg transition-colors"
-          style={{
-            width: 34,
-            height: 34,
-            background: isGenerating ? 'rgba(255,255,255,0.14)' : '#ffffff',
-            opacity: disabled || !canGenerate ? 0.55 : 1,
-            cursor: disabled || !canGenerate ? 'not-allowed' : 'pointer',
-          }}
-          title={isGenerating ? t('exteriorRender.processing.generating') : validationMessage || t('generation.actions.generate')}
-        >
-          {isGenerating ? (
-            <div className="relative flex items-center justify-center">
-              <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="rgba(0,0,0,0.15)" strokeWidth="2" />
-                <path d="M8 2A6 6 0 0 1 14 8" stroke="#000" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </div>
-          ) : (
-            <ArrowUp className="h-4 w-4 text-black" />
-          )}
-        </button>
-      </div>
+      <GenerationSubmitControl
+        creditCost={creditCost}
+        isGenerating={isGenerating}
+        disabled={disabled || !canGenerate}
+        creditTitle={t('exteriorRender.footer.creditCost', { count: creditCost })}
+        buttonTitle={isGenerating ? t('exteriorRender.processing.generating') : validationMessage || t('generation.actions.generate')}
+        onGenerate={onGenerate}
+      />
     </footer>
   );
 }

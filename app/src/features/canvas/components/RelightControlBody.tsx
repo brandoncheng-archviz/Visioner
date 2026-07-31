@@ -1,12 +1,13 @@
 import { ChevronRight } from 'lucide-react';
-import { IMAGE_NODE_CONTROL_WIDTH } from '../constants/canvasConstants';
+import { CANVAS_GENERATION_NODE_WIDTH } from '../constants/canvasConstants';
 import type { LightPreviewData } from '../types/lightPreview.types';
 import type { RelightPreset, RelightSettings } from '../types/relight.types';
 import { SunSkyNodeControls } from '../nodes/SunSkyNode/SunSkyNodeControls';
 import { RelightAdvancedSettings } from './RelightAdvancedSettings';
 
 export const RELIGHT_ADVANCED_PANEL_WIDTH = 340;
-export const RELIGHT_CONTROL_PANEL_HEIGHT = 360;
+export const RELIGHT_CONTROL_PANEL_WIDTH = CANVAS_GENERATION_NODE_WIDTH;
+export const RELIGHT_CONTROL_PANEL_HEIGHT = 350;
 export const RELIGHT_CONTROL_PANEL_EXPANDED_HEIGHT = 440;
 
 interface RelightControlBodyProps {
@@ -35,21 +36,21 @@ export function RelightControlBody({
   onPresetSelect,
 }: RelightControlBodyProps) {
   return (
-    <div className="flex">
-      <div className="flex-shrink-0" style={{ width: IMAGE_NODE_CONTROL_WIDTH }}>
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex-shrink-0" style={{ width: RELIGHT_CONTROL_PANEL_WIDTH }}>
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3">
           <div className="min-w-0">
-            <div className="truncate text-[16px] font-semibold text-white/90">
+            <div className="truncate text-[14px] font-semibold text-white/90">
               光影预览 / Light Preview
             </div>
-            <div className="mt-1.5 truncate text-[13px] text-white/42">
+            <div className="mt-1 truncate text-[12px] text-white/42">
               {lightPreview.derived.timeLabel} · {lightPreview.derived.directionLabel}
             </div>
           </div>
           <button
             type="button"
             onClick={onToggleAdvancedSettings}
-            className="ml-4 inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white/58 transition hover:bg-white/[0.05] hover:text-white/78"
+            className="ml-3 inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-medium text-white/58 transition hover:bg-white/[0.05] hover:text-white/78"
           >
             高级设置
             <ChevronRight
@@ -58,8 +59,8 @@ export function RelightControlBody({
           </button>
         </div>
 
-        <div className="grid gap-4 px-5 py-4" style={{ gridTemplateColumns: '205px minmax(0, 1fr)' }}>
-          <div className="relative flex h-[205px] items-center justify-center overflow-hidden rounded-xl bg-[#0f1219]">
+        <div className="grid gap-2.5 px-4 py-3" style={{ gridTemplateColumns: '150px minmax(0, 1fr)' }}>
+          <div className="relative flex h-[150px] items-center justify-center overflow-hidden rounded-xl bg-[#14141a]">
             <img
               src={lightPreview.derived.previewImagePath}
               alt="光影预览"
@@ -67,7 +68,7 @@ export function RelightControlBody({
               draggable={false}
             />
           </div>
-          <div className="min-w-0 space-y-3">
+          <div className="min-w-0 space-y-2">
             <SunSkyNodeControls
               elevation={elevation}
               azimuth={azimuth}

@@ -1,3 +1,4 @@
+export { CameraControlPopover } from './CameraControlPopover';
 export { ImageControllersPopover } from './ImageControllersPopover';
 export { ImageControllersTrigger } from './ImageControllersTrigger';
 export { getEnabledControllerCount } from './imageControllersUtils';

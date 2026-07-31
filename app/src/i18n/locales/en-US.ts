@@ -120,7 +120,6 @@ const enUS = {
 
   exteriorRender: {
     title: "Exterior Render",
-    subtitle: "Generate high-quality exterior visuals",
     outputTitlePrefix: "Exterior Render Output",
     sections: {
       imageInput: { title: "Image Input" },
@@ -337,6 +336,46 @@ const enUS = {
         title: "Camera Control",
         header: "Camera Control",
         description: "Control viewpoint height, perspective relationships, and depth of field.",
+        subtitle: "Lightweight constraints · Architectural visualization",
+        currentConfiguration: "Current configuration",
+        cameraControl: "Camera control",
+        preserveOriginalCameraFeatures: "Preserve original camera features",
+        height: {
+          title: "Camera height",
+          options: {
+            low: "Low",
+            eyeLevel: "Eye level",
+            slightlyHigh: "Slightly high",
+            high: "High",
+            birdsEye: "Bird's-eye",
+          },
+        },
+        lens: {
+          title: "Lens range",
+          options: {
+            ultraWide: "Ultra-wide",
+            wide: "Wide",
+            standard: "Standard",
+            telephoto: "Telephoto",
+          },
+        },
+        perspective: {
+          title: "Perspective",
+          options: {
+            onePoint: "One-point",
+            twoPoint: "Two-point",
+            threePointUp: "Three-point (upward)",
+            threePointDown: "Three-point (downward)",
+          },
+        },
+        depthOfField: {
+          title: "Depth of field",
+          options: {
+            allSharp: "All sharp",
+            subtle: "Subtle depth",
+            pronounced: "Pronounced depth",
+          },
+        },
       },
     },
     definePurpose: "Set Reference Purpose",
