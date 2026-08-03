@@ -16,6 +16,7 @@ import {
   getNodeGenerationTask,
   getNodeWidth,
   getNodeHeight,
+  type CameraControlData,
   type ExteriorRenderWorkflowSource,
 } from '../../types/imageNodeData.types';
 import { useHistory } from '../../contexts/HistoryContext';
@@ -927,6 +928,14 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         resolutionTier: params.resolutionTier,
         requestedSize: params.requestedSize,
       },
+    } : n)));
+  };
+
+  const handleCameraControlChange = (cameraControl: CameraControlData) => {
+    if (!imageNodeViewModel.canEditModel) return;
+    setNodes((nds) => nds.map((n) => (n.id === id ? {
+      ...n,
+      data: { ...n.data, cameraControl },
     } : n)));
   };
 
@@ -2289,6 +2298,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               }}
               modelParams={modelParams}
               onModelParamsChange={handleModelParamsChange}
+              cameraControl={data.cameraControl as CameraControlData | undefined}
+              onCameraControlChange={handleCameraControlChange}
               onGenerate={handleGenerate}
               canGenerate={canGenerate}
               canEditPrompt={imageNodeViewModel.canEditPrompt}

@@ -264,6 +264,26 @@ const enUS = {
 
   imageNode: {
     title: "Image",
+    camera: {
+      title: "Camera",
+      header: "Camera Control",
+      subtitle: "Lightweight constraints · Architectural visualization",
+      height: {
+        title: "Camera Height",
+        options: {
+          low: "Low",
+          eyeLevel: "Eye Level",
+          slightlyHigh: "Slightly High",
+          semiBirdsEye: "Semi-bird's-eye",
+          birdsEye: "Bird's-eye",
+        },
+      },
+      focalLength: { title: "Focal Length" },
+      aperture: { title: "Aperture" },
+      currentConfiguration: "Current setup",
+      twoPointPerspective: "Two-point perspective",
+      cameraControl: "Camera control",
+    },
     workflowSource: {
       tooltip: "Exterior Render Source",
       buttonLabel: "Exterior",

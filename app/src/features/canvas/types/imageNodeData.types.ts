@@ -7,6 +7,18 @@ import type { RelightCreationOptions } from './relight.types';
 import type { ImageControllerState } from './imageController.types';
 import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';
 
+export type CameraHeight = 'low' | 'eyeLevel' | 'slightlyHigh' | 'semiBirdsEye' | 'birdsEye';
+export type CameraFocalLength = 16 | 24 | 28 | 35 | 50 | 70 | 100;
+export type CameraAperture = 'f/1.8' | 'f/2.8' | 'f/4' | 'f/5.6' | 'f/8' | 'f/11' | 'f/16';
+
+export interface CameraControlData {
+  enabled: boolean;
+  height: CameraHeight;
+  focalLength: CameraFocalLength;
+  aperture: CameraAperture;
+  twoPointPerspective: boolean;
+}
+
 /**
  * Typed data shape for an ImageNode.
  * React Flow node.data is Record<string, unknown>; this interface
@@ -58,6 +70,7 @@ export interface ImageNodeData {
   activeImageMarkSourceNodeId?: string | null;
   activeImageMarkSessionId?: string | null;
   modelParams?: ModelParams;
+  cameraControl?: CameraControlData;
   resolutionTier?: OutputResolutionTier;
   requestedSize?: OutputSize;
   actualSize?: OutputSize;

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
+  Camera,
   X,
   ChevronDown,
   ArrowUp,
@@ -22,7 +23,7 @@ import type {
 import type { ModelParams } from '../../types/canvas.types';
 import type { TextReferenceInfo } from '../../types/basicNode.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
-import type { ExteriorRenderWorkflowSource } from '../../types/imageNodeData.types';
+import type { CameraControlData, ExteriorRenderWorkflowSource } from '../../types/imageNodeData.types';
 import {
   FLOATING_PANEL_BACKGROUND,
   FLOATING_PANEL_BORDER,
@@ -56,6 +57,8 @@ import {
   type AspectRatioPreset,
 } from '../../utils/modelParams';
 import { ImageNodeWorkflowSourceBadge } from './ImageNodeWorkflowSourceBadge';
+import { CameraControlPopover } from './CameraControlPopover';
+import { isCameraPopoverWheelEvent } from './cameraControlEvents';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
@@ -155,6 +158,8 @@ export function ImageNodeControlPanel({
   onFocusWorkflowSource,
   modelParams,
   onModelParamsChange,
+  cameraControl,
+  onCameraControlChange,
   onGenerate,
   canGenerate,
   canEditPrompt,
@@ -188,6 +193,8 @@ export function ImageNodeControlPanel({
   onFocusWorkflowSource?: (sourceNodeId: string) => void;
   modelParams: ModelParams;
   onModelParamsChange: (params: ModelParams) => void;
+  cameraControl?: CameraControlData;
+  onCameraControlChange: (value: CameraControlData) => void;
   onGenerate: () => void | Promise<void>;
   canGenerate: boolean;
   canEditPrompt: boolean;
@@ -226,6 +233,8 @@ export function ImageNodeControlPanel({
   }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
+  const [showCameraPopover, setShowCameraPopover] = useState(false);
+  const [cameraButtonElement, setCameraButtonElement] = useState<HTMLButtonElement | null>(null);
   const [customFrameWidth, setCustomFrameWidth] = useState('1');
   const [customFrameHeight, setCustomFrameHeight] = useState('1');
   const [isFrameRatioLocked, setIsFrameRatioLocked] = useState(true);
@@ -759,6 +768,7 @@ export function ImageNodeControlPanel({
     setCustomFrameHeight(String(requestedSize.height));
     setShowRatioMenu(true);
     setShowModelMenu(false);
+    setShowCameraPopover(false);
   };
 
   const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
@@ -986,6 +996,10 @@ export function ImageNodeControlPanel({
   };
 
   const stopControlEvent = (event: React.SyntheticEvent) => {
+    // Portals keep React's component-tree event propagation. Let wheel events
+    // from the camera popover reach its native capture listener before this
+    // control-panel ancestor isolates the rest of the node from the canvas.
+    if (isCameraPopoverWheelEvent(event)) return;
     event.stopPropagation();
   };
 
@@ -1401,6 +1415,7 @@ export function ImageNodeControlPanel({
                 if (!canEditModel) return;
                 setShowModelMenu((value) => !value);
                 setShowRatioMenu(false);
+                setShowCameraPopover(false);
               }}
               className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
               style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
@@ -1597,6 +1612,40 @@ export function ImageNodeControlPanel({
                 </div>
               </div>
             )}
+          </div>
+          {/* Camera is a bottom-level generation parameter, independent from controllers. */}
+          <div className="relative flex-shrink-0">
+            <button
+              ref={setCameraButtonElement}
+              type="button"
+              disabled={!canEditModel}
+              aria-pressed={showCameraPopover}
+              aria-label={t('imageNode.camera.title')}
+              onClick={() => {
+                if (!canEditModel) return;
+                setShowCameraPopover((value) => !value);
+                setShowModelMenu(false);
+                setShowRatioMenu(false);
+              }}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                cameraControl?.enabled
+                  ? 'border-[#2f6bff]/55 bg-[#2f6bff]/15 text-[#8eb0ff] hover:border-[#2f6bff]/75 hover:bg-[#2f6bff]/20'
+                  : showCameraPopover
+                    ? 'border-white/[0.16] bg-white/[0.09] text-white/86'
+                    : 'border-white/[0.08] bg-white/[0.03] text-white/52 hover:border-white/[0.14] hover:bg-white/[0.065] hover:text-white/82'
+              }`}
+              title={t('imageNode.camera.title')}
+            >
+              <Camera className="h-4 w-4" strokeWidth={1.6} />
+            </button>
+            <CameraControlPopover
+              open={showCameraPopover}
+              anchorElement={cameraButtonElement}
+              value={cameraControl}
+              disabled={!canEditModel}
+              onChange={onCameraControlChange}
+              onOpenChange={setShowCameraPopover}
+            />
           </div>
         </div>
         {/* Credits + generate button */}

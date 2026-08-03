@@ -264,6 +264,26 @@ const zhCN = {
 
   imageNode: {
     title: "图片",
+    camera: {
+      title: "相机",
+      header: "相机控制",
+      subtitle: "轻量约束 · 建筑可视化",
+      height: {
+        title: "机位",
+        options: {
+          low: "低机位",
+          eyeLevel: "人视",
+          slightlyHigh: "略高",
+          semiBirdsEye: "半鸟瞰",
+          birdsEye: "鸟瞰",
+        },
+      },
+      focalLength: { title: "焦距" },
+      aperture: { title: "光圈" },
+      currentConfiguration: "当前配置",
+      twoPointPerspective: "两点透视",
+      cameraControl: "相机控制",
+    },
     workflowSource: {
       tooltip: "室外渲染来源",
       buttonLabel: "室外",
