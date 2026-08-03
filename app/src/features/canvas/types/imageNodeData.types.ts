@@ -5,7 +5,6 @@ import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
 import type { RelightCreationOptions } from './relight.types';
 import type { ImageControllerState } from './imageController.types';
-import type { ImageNodeControllers } from './imageControllers.types';
 import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';
 
 /**
@@ -40,7 +39,6 @@ export interface ImageNodeData {
   selectedPresets?: string[];
   selectedStyleId?: string | null;
   controller?: ImageControllerState;
-  controllers?: ImageNodeControllers;
   role?: ImageRole;
   customRoleLabel?: string;
   localReferenceType?: import('./imageNode.types').LocalReferenceType;

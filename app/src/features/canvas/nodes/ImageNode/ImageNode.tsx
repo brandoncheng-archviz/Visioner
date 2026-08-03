@@ -52,7 +52,6 @@ import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
-import type { ImageNodeControllers } from './controllers';
 import { ImageCropOverlay, type NormalizedCropRect } from './ImageCropOverlay';
 import { createImageNodeViewModel } from './imageNodeViewModel';
 import { cropCoverImage } from '../../utils/cropImage';
@@ -135,7 +134,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [lightPreview, setLightPreview] = useState<LightPreviewData | null>((data.lightPreview as LightPreviewData | null | undefined) ?? null);
   const [selectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [selectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
-  const controllers = data.controllers as ImageNodeControllers | undefined;
   const workflowSource = data.sourceWorkflow as ExteriorRenderWorkflowSource | undefined;
   const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
   const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
@@ -918,11 +916,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, lightPreview: data } } : n)));
   };
 
-  const handleControllersChange = (nextControllers: ImageNodeControllers) => {
-    if (imageNodeViewModel.isProcessing) return;
-    setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, controllers: nextControllers } } : n)));
-  };
-
   const handleModelParamsChange = (params: ModelParams) => {
     if (!imageNodeViewModel.canEditModel) return;
     setModelParams(params);
@@ -1675,7 +1668,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const displayedOutputSize = imageNodeViewModel.isProcessing
     ? resolveOutputSize(null, storedRequestedSize)
     : resolveOutputSize(storedActualSize, storedRequestedSize);
-  const roleOption = getImageRoleOption(role, customRoleLabel, translate);
+  const roleOption = getImageRoleOption(role);
   const RoleIconForTitle = roleOption?.Icon;
   const selectedNodeCount = useStore((state) => state.nodes.filter((n) => n.selected).length);
   const isOnlySelected = selected && selectedNodeCount === 1;
@@ -2289,8 +2282,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onPromptContentChange={handlePromptContentChange}
               lightPreview={lightPreview}
               onLightPreviewChange={handleLightPreviewChange}
-              controllers={controllers}
-              onControllersChange={handleControllersChange}
               workflowSource={workflowSource}
               onFocusWorkflowSource={(sourceNodeId) => {
                 const onFocusNode = data.onFocusNode as ((targetNodeId: string) => void) | undefined;
@@ -2307,7 +2298,6 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canDeleteReference={imageNodeViewModel.canDeleteReference}
               canCreateMarks={canStartMarking}
               isMarkModeActive={activeImageMarkTargetNodeId === id}
-              isProcessing={imageNodeViewModel.isProcessing}
               isGenerating={isGenerating}
               generationTask={generationTask}
               textReferences={textReferences}

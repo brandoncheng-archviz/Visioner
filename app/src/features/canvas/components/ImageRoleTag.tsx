@@ -55,8 +55,8 @@ export function ImageRoleTag({
     localReferenceLabel,
     translate,
   );
-  const selectedOption = getImageRoleOption(role, customRoleLabel, translate);
-  const previewOption = getImageRoleOption(hoveredRole || role, undefined, translate);
+  const selectedOption = getImageRoleOption(role);
+  const previewOption = getImageRoleOption(hoveredRole || role);
   const DisplayIcon = selectedOption?.Icon || Building2;
 
   const hasActiveRole = Boolean(role && role !== 'undefined_usage');
@@ -276,7 +276,7 @@ export function ImageRoleTag({
                 >
                   <option.Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />
                   <span className="flex-1 font-medium">
-                    {option.labelKey ? t(option.labelKey) : option.label}
+                    {t(option.labelKey)}
                   </span>
                   {active && <Check className="h-3.5 w-3.5 flex-shrink-0" style={{ color: option.color }} />}
                 </button>
@@ -304,7 +304,7 @@ export function ImageRoleTag({
                 color: 'rgba(255,255,255,0.54)',
               }}
             >
-              <div>{previewOption?.detail || t('reference.descriptions.unassigned')}</div>
+              <div>{previewOption ? t(previewOption.detailKey) : t('reference.descriptions.unassigned')}</div>
               {previewOption && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {previewOption.constraints.map((constraint) => (

@@ -3,7 +3,11 @@ import enUS from '../../../i18n/locales/en-US';
 import zhCN from '../../../i18n/locales/zh-CN';
 import {
   getImageRoleLabel,
+  getImageRoleOption,
   getLocalReferenceLabel,
+  getReferenceUsageInfo,
+  imageRoleOptions,
+  localReferenceOptions,
   LOCAL_REFERENCE_TYPE_OPTIONS,
   REFERENCE_ROLE_OPTIONS,
   UNIQUE_USAGES,
@@ -31,6 +35,32 @@ describe('shared reference labels', () => {
     expect(getImageRoleLabel('atmosphere_reference', undefined, undefined, undefined, en)).toBe('Atmosphere Reference');
   });
 
+  it('stores only stable ids and translation keys for UI option copy', () => {
+    expect(imageRoleOptions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        value: 'primary_building',
+        labelKey: 'reference.roles.primaryBuilding',
+        descriptionKey: 'reference.roles.primaryBuilding',
+        detailKey: 'reference.descriptions.primaryBuilding',
+      }),
+    ]));
+    expect(localReferenceOptions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        value: 'vegetation',
+        labelKey: 'reference.localTypes.vegetation',
+      }),
+    ]));
+    for (const option of imageRoleOptions) {
+      expect(option).not.toHaveProperty('label');
+      expect(option).not.toHaveProperty('description');
+      expect(option).not.toHaveProperty('detail');
+    }
+    for (const option of localReferenceOptions) {
+      expect(option).not.toHaveProperty('label');
+    }
+    expect(getImageRoleOption('primary_building')).toBe(imageRoleOptions[0]);
+  });
+
   it('maps local reference values to runtime translation keys', () => {
     expect(LOCAL_REFERENCE_TYPE_OPTIONS).toEqual([
       { value: 'vegetation', storageValue: 'vegetation', labelKey: 'reference.localTypes.vegetation' },
@@ -56,6 +86,44 @@ describe('shared reference labels', () => {
       getImageRoleLabel('primary_building', undefined, undefined, undefined, en),
     );
     expect(UNIQUE_USAGES).toEqual(['primary_building', 'atmosphere_reference']);
+  });
+
+  it('switches reference display text without changing stored role or local type', () => {
+    const zhUsage = getReferenceUsageInfo(
+      'local_reference',
+      undefined,
+      'vegetation',
+      undefined,
+      zh,
+    );
+    const enUsage = getReferenceUsageInfo(
+      'local_reference',
+      undefined,
+      'vegetation',
+      undefined,
+      en,
+    );
+
+    expect(zhUsage).toEqual(expect.objectContaining({
+      normalizedRole: 'local_reference',
+      localReferenceType: 'vegetation',
+      label: '局部参考 · 植物',
+    }));
+    expect(enUsage).toEqual(expect.objectContaining({
+      normalizedRole: 'local_reference',
+      localReferenceType: 'vegetation',
+      label: 'Local Reference · Vegetation',
+    }));
+  });
+
+  it('preserves a custom usage label in both locales', () => {
+    const customLabel = 'Facade Detail';
+    expect(getImageRoleLabel('local_reference', customLabel, 'custom', customLabel, zh)).toBe(
+      `局部参考 · ${customLabel}`,
+    );
+    expect(getImageRoleLabel('local_reference', customLabel, 'custom', customLabel, en)).toBe(
+      `Local Reference · ${customLabel}`,
+    );
   });
 });
 

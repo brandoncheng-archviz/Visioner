@@ -229,12 +229,9 @@ export interface ReferenceInfo {
 
 export interface ImageRoleOption {
   value: ImageRole;
-  label: string;
-  labelKey?: string;
-  description: string;
-  descriptionKey?: string;
-  detail: string;
-  detailKey?: string;
+  labelKey: string;
+  descriptionKey: string;
+  detailKey: string;
   constraints: string[];
   Icon: typeof Building2;
   color: string;

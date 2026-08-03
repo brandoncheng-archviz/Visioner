@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
-  Camera,
   X,
   ChevronDown,
   ArrowUp,
@@ -56,12 +55,6 @@ import {
   validateRequestedSize,
   type AspectRatioPreset,
 } from '../../utils/modelParams';
-import {
-  CameraControlPopover,
-  ImageControllersPopover,
-  ImageControllersTrigger,
-  type ImageNodeControllers,
-} from './controllers';
 import { ImageNodeWorkflowSourceBadge } from './ImageNodeWorkflowSourceBadge';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
@@ -158,8 +151,6 @@ export function ImageNodeControlPanel({
   onPromptContentChange,
   lightPreview,
   onLightPreviewChange,
-  controllers,
-  onControllersChange,
   workflowSource,
   onFocusWorkflowSource,
   modelParams,
@@ -173,7 +164,6 @@ export function ImageNodeControlPanel({
   canDeleteReference,
   canCreateMarks,
   isMarkModeActive,
-  isProcessing,
   isGenerating,
   generationTask,
   textReferences,
@@ -194,8 +184,6 @@ export function ImageNodeControlPanel({
   onPromptContentChange: (content: PromptContent[]) => void;
   lightPreview?: LightPreviewData | null;
   onLightPreviewChange: (data: LightPreviewData | null) => void;
-  controllers?: ImageNodeControllers;
-  onControllersChange: (controllers: ImageNodeControllers) => void;
   workflowSource?: ExteriorRenderWorkflowSource;
   onFocusWorkflowSource?: (sourceNodeId: string) => void;
   modelParams: ModelParams;
@@ -209,7 +197,6 @@ export function ImageNodeControlPanel({
   canDeleteReference: boolean;
   canCreateMarks: boolean;
   isMarkModeActive: boolean;
-  isProcessing?: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   textReferences: TextReferenceInfo[];
@@ -237,8 +224,6 @@ export function ImageNodeControlPanel({
       return () => clearTimeout(timer);
     }
   }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
-  const [showControllersPopover, setShowControllersPopover] = useState(false);
-  const [showCameraPopover, setShowCameraPopover] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [customFrameWidth, setCustomFrameWidth] = useState('1');
@@ -269,8 +254,6 @@ export function ImageNodeControlPanel({
   const [editingPromptInitialText, setEditingPromptInitialText] = useState('');
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
-  const [controllersButtonElement, setControllersButtonElement] = useState<HTMLButtonElement | null>(null);
-  const [cameraButtonElement, setCameraButtonElement] = useState<HTMLButtonElement | null>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const frameRatioButtonRef = useRef<HTMLButtonElement>(null);
@@ -283,8 +266,6 @@ export function ImageNodeControlPanel({
     () => sortReferencesByUsage(references),
     [references],
   );
-  const isControllersDisabled = Boolean(isProcessing || isGenerating);
-
   const handleThumbnailClick = (ref: ReferenceInfo) => {
     if (!canEditPromptReferences) return;
     requestReferenceInsert(ref);
@@ -470,7 +451,7 @@ export function ImageNodeControlPanel({
         >
           <div className="truncate text-[12px] font-medium text-white/78">{textReferencePreview.reference.title}</div>
           <div className="mt-2 line-clamp-6 whitespace-pre-wrap break-words text-[12px] leading-5 text-white/58">
-            {textReferencePreview.reference.content.trim() || t('imageNode.reference.currentTextEmpty')}
+            {textReferencePreview.reference.content.trim() || t('reference.status.textEmpty')}
           </div>
         </div>,
         document.body,
@@ -530,8 +511,8 @@ export function ImageNodeControlPanel({
             }}
             className={`nodrag nowheel absolute right-0 top-0 z-30 h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition hover:bg-black hover:text-white ${canDeleteReference ? 'flex opacity-0 pointer-events-none group-hover/text-ref:pointer-events-auto group-hover/text-ref:opacity-100' : 'hidden'}`}
             style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-            title={t('imageNode.reference.disconnectText')}
-            aria-label={t('imageNode.reference.disconnectText')}
+            title={t('reference.actions.disconnectTextReference')}
+            aria-label={t('reference.actions.disconnectTextReference')}
           >
             <X className="h-2.5 w-2.5" />
           </button>
@@ -778,8 +759,6 @@ export function ImageNodeControlPanel({
     setCustomFrameHeight(String(requestedSize.height));
     setShowRatioMenu(true);
     setShowModelMenu(false);
-    setShowControllersPopover(false);
-    setShowCameraPopover(false);
   };
 
   const hasTooManyReferences = sortedReferences.length > MAX_REFERENCE_IMAGES_PER_NODE;
@@ -1043,7 +1022,6 @@ export function ImageNodeControlPanel({
               onClick={() => {
                 if (!canCreateMarks) return;
                 setShowLightPreview(false);
-                setShowControllersPopover(false);
                 onStartMarkMode();
               }}
               className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canCreateMarks ? (isMarkModeActive ? 'border-cyan-400/90 bg-cyan-400/[0.08] text-cyan-100/90 hover:border-cyan-300 hover:bg-cyan-400/[0.11]' : GENERATION_CONTROL_BUTTON_CLASS) : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
@@ -1423,8 +1401,6 @@ export function ImageNodeControlPanel({
                 if (!canEditModel) return;
                 setShowModelMenu((value) => !value);
                 setShowRatioMenu(false);
-                setShowControllersPopover(false);
-                setShowCameraPopover(false);
               }}
               className={`flex items-center gap-1.5 transition-colors ${canEditModel ? 'hover:text-white' : ''}`}
               style={{ fontSize: 15, color: 'rgba(255,255,255,0.9)', opacity: canEditModel ? 1 : 0.45, cursor: canEditModel ? 'pointer' : 'not-allowed' }}
@@ -1621,64 +1597,6 @@ export function ImageNodeControlPanel({
                 </div>
               </div>
             )}
-          </div>
-          {/* Controllers */}
-          <div className="relative">
-            <ImageControllersTrigger
-              ref={setControllersButtonElement}
-              controllers={controllers}
-              disabled={isControllersDisabled}
-              open={showControllersPopover}
-              onClick={() => {
-                setShowControllersPopover((value) => !value);
-                setShowCameraPopover(false);
-                setShowModelMenu(false);
-                setShowRatioMenu(false);
-              }}
-            />
-            <ImageControllersPopover
-              open={showControllersPopover}
-              anchorElement={controllersButtonElement}
-              controllers={controllers}
-              disabled={isControllersDisabled}
-              onChange={onControllersChange}
-              onOpenChange={setShowControllersPopover}
-            />
-          </div>
-          {/* Camera */}
-          <div className="relative flex-shrink-0">
-            <button
-              ref={setCameraButtonElement}
-              type="button"
-              disabled={isControllersDisabled}
-              aria-pressed={showCameraPopover}
-              aria-label={t('imageNode.controllers.camera.title')}
-              onClick={() => {
-                if (isControllersDisabled) return;
-                setShowCameraPopover((value) => !value);
-                setShowControllersPopover(false);
-                setShowModelMenu(false);
-                setShowRatioMenu(false);
-              }}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                showCameraPopover
-                  ? 'border-white/[0.16] bg-white/[0.10] text-white/90'
-                  : controllers?.camera?.enabled === true
-                    ? 'border-white/[0.10] bg-white/[0.06] text-white/78 hover:border-white/[0.16] hover:bg-white/[0.09] hover:text-white/92'
-                    : 'border-white/[0.08] bg-white/[0.035] text-white/64 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white/88'
-              } disabled:cursor-not-allowed disabled:opacity-50`}
-              title={t('imageNode.controllers.camera.title')}
-            >
-              <Camera className="h-4 w-4" />
-            </button>
-            <CameraControlPopover
-              open={showCameraPopover}
-              anchorElement={cameraButtonElement}
-              controllers={controllers}
-              disabled={isControllersDisabled}
-              onChange={onControllersChange}
-              onOpenChange={setShowCameraPopover}
-            />
           </div>
         </div>
         {/* Credits + generate button */}
