@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Image,
-  Camera,
   X,
   ChevronDown,
   ArrowUp,
@@ -58,6 +57,8 @@ import {
 } from '../../utils/modelParams';
 import { ImageNodeWorkflowSourceBadge } from './ImageNodeWorkflowSourceBadge';
 import { CameraControlPopover } from './CameraControlPopover';
+import { CameraPositionIcon } from './CameraPositionIcon';
+import { CameraControlPreview } from './CameraControlPreview';
 import { isCameraPopoverWheelEvent } from './cameraControlEvents';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
@@ -1614,7 +1615,8 @@ export function ImageNodeControlPanel({
             )}
           </div>
           {/* Camera is a bottom-level generation parameter, independent from controllers. */}
-          <div className="relative flex-shrink-0">
+          <div className="group/camera relative flex-shrink-0">
+            <CameraControlPreview value={cameraControl} />
             <button
               ref={setCameraButtonElement}
               type="button"
@@ -1634,9 +1636,8 @@ export function ImageNodeControlPanel({
                     ? 'border-white/[0.16] bg-white/[0.09] text-white/86'
                     : 'border-white/[0.08] bg-white/[0.03] text-white/52 hover:border-white/[0.14] hover:bg-white/[0.065] hover:text-white/82'
               }`}
-              title={t('imageNode.camera.title')}
             >
-              <Camera className="h-4 w-4" strokeWidth={1.6} />
+              <CameraPositionIcon className="h-[18px] w-[18px]" strokeWidth={1.6} />
             </button>
             <CameraControlPopover
               open={showCameraPopover}

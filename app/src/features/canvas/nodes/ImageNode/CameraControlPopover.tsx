@@ -50,6 +50,7 @@ export function CameraControlPopover({
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
+      if (target instanceof Element && target.closest('[data-image-camera-popover="true"]')) return;
       if (anchorElement?.contains(target) || panelRef.current?.contains(target)) return;
       onOpenChange(false);
     };

@@ -271,18 +271,102 @@ const enUS = {
       height: {
         title: "Camera Height",
         options: {
-          low: "Low",
+          low: "Near Ground",
           eyeLevel: "Eye Level",
-          slightlyHigh: "Slightly High",
-          semiBirdsEye: "Semi-bird's-eye",
+          slightlyHigh: "High",
+          semiBirdsEye: "Semi-aerial",
           birdsEye: "Bird's-eye",
+          aerial: "Aerial",
+        },
+        descriptions: {
+          low: "Ground-level view emphasizing foreground and building mass",
+          eyeLevel: "Natural eye-level view for everyday spatial presentation",
+          slightlyHigh: "Raised viewpoint balancing facades and site context",
+          semiBirdsEye: "Shows the overall layout and spatial hierarchy",
+          birdsEye: "Overlooks the site to emphasize planning and roof forms",
+          aerial: "Large-scale aerial view showing the city and surroundings",
+        },
+        guideLabel: "View camera height guide",
+        guideTitle: "Camera height guide",
+      },
+      focalLength: {
+        title: "Focal Length",
+        guideLabel: "View focal length preset guide",
+        guideTitle: "Focal length presets",
+        presets: {
+          "16": {
+            name: "Ultra-wide",
+            description: "Creates intense spatial tension with visible edge stretching.",
+            usage: "Best for tight interiors, bathrooms, corridors, and dramatic low-angle views.",
+          },
+          "24": {
+            name: "Architectural wide-angle",
+            description: "Balances spatial depth with complete scene coverage.",
+            usage: "Best for standard interior panoramas, large public spaces, and exterior views on compact sites.",
+          },
+          "35": {
+            name: "Golden focal length",
+            description: "Natural perspective with less edge distortion and a stable architectural photography feel.",
+            usage: "Best for standard eye-level exteriors, villas, primary civic-building views, and large interiors.",
+          },
+          "50": {
+            name: "Standard view",
+            description: "Restrained perspective with stronger subject focus.",
+            usage: "Best for architectural mid-shots, streetscape atmosphere, partial spaces, and furniture groupings.",
+          },
+          "85": {
+            name: "Medium telephoto",
+            description: "Compresses spatial relationships and reduces perspective distortion.",
+            usage: "Best for facades, component close-ups, distant subjects, and detail views.",
+          },
+          "100": {
+            name: "Telephoto",
+            description: "Strong spatial compression approaching an elevation or axonometric view.",
+            usage: "Best for distant landmarks, front elevations, architectural details, and compressed vistas.",
+          },
         },
       },
-      focalLength: { title: "Focal Length" },
-      aperture: { title: "Aperture" },
+      aperture: {
+        title: "Aperture",
+        guideLabel: "View aperture preset guide",
+        guideTitle: "Aperture presets",
+        semanticConstraint: "Aperture is only a semantic depth-of-field constraint and does not calculate physical exposure.",
+        presets: {
+          f2_8: {
+            name: "Close-up",
+            description: "Very shallow depth of field with pronounced background blur.",
+            usage: "Only suitable for close-ups of materials, decor, plants, handles, and building components.",
+          },
+          f4: {
+            name: "Shallow depth of field",
+            description: "Visible foreground and background blur makes the subject stand out.",
+            usage: "Best for partial spaces, close compositions, and atmospheric views with blurred foregrounds.",
+          },
+          f5_6: {
+            name: "Natural depth of field",
+            description: "Retains subtle depth while keeping the primary space clear.",
+            usage: "Best for eye-level interiors, close-to-medium spaces, and narrative architectural scenes.",
+          },
+          f8: {
+            name: "Panoramic clarity",
+            description: "Keeps the building and surroundings clear; the standard architectural photography default.",
+            usage: "Best for most architectural exteriors and interior panoramas.",
+          },
+          f16: {
+            name: "Deep depth of field",
+            description: "Keeps foreground, middle ground, and background highly clear for a restrained look.",
+            usage: "Best for bird's-eye views, aerials, city vistas, and very deep spaces.",
+          },
+        },
+      },
       currentConfiguration: "Current setup",
       twoPointPerspective: "Two-point perspective",
       cameraControl: "Camera control",
+      recommendedDefault: "Recommended · Default",
+      status: {
+        enabled: "Enabled",
+        disabled: "Disabled",
+      },
     },
     workflowSource: {
       tooltip: "Exterior Render Source",

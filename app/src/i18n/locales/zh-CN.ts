@@ -271,18 +271,102 @@ const zhCN = {
       height: {
         title: "机位",
         options: {
-          low: "低机位",
+          low: "近地",
           eyeLevel: "人视",
-          slightlyHigh: "略高",
-          semiBirdsEye: "半鸟瞰",
+          slightlyHigh: "高位",
+          semiBirdsEye: "半鸟",
           birdsEye: "鸟瞰",
+          aerial: "航拍",
+        },
+        descriptions: {
+          low: "贴近地面，强调前景与建筑体量",
+          eyeLevel: "自然人眼视角，适合日常空间表达",
+          slightlyHigh: "抬高视点，兼顾立面与场地关系",
+          semiBirdsEye: "展示总体布局与空间层次",
+          birdsEye: "俯视场地，突出规划与屋顶关系",
+          aerial: "大尺度航拍，呈现城市与环境关系",
+        },
+        guideLabel: "查看机位高度说明",
+        guideTitle: "机位高度对照",
+      },
+      focalLength: {
+        title: "焦距",
+        guideLabel: "查看焦距预设说明",
+        guideTitle: "焦距预设说明",
+        presets: {
+          "16": {
+            name: "超广角",
+            description: "极强空间张力，边缘拉伸明显。",
+            usage: "适合狭小室内、卫生间、走廊，以及具有冲击力的近地仰拍。",
+          },
+          "24": {
+            name: "建筑广角",
+            description: "兼顾空间感和画面完整度。",
+            usage: "适合常规室内全景、大型公共空间、紧凑场地建筑外景。",
+          },
+          "35": {
+            name: "黄金焦距",
+            description: "透视自然，边缘变形较少，建筑摄影感稳定。",
+            usage: "适合常规人视外景、别墅、公建主视角和大空间室内。",
+          },
+          "50": {
+            name: "标准视角",
+            description: "透视克制，主体更集中。",
+            usage: "适合建筑中景、街景氛围、局部空间和家具软装组合。",
+          },
+          "85": {
+            name: "中长焦",
+            description: "压缩空间关系，弱化透视畸变。",
+            usage: "适合建筑立面、构件特写、远景主体和细节画面。",
+          },
+          "100": {
+            name: "长焦",
+            description: "空间压缩明显，接近正立面或轴测式视觉。",
+            usage: "适合远距离地标、正立面、建筑细节和远景压缩。",
+          },
         },
       },
-      focalLength: { title: "焦距" },
-      aperture: { title: "光圈" },
+      aperture: {
+        title: "光圈",
+        guideLabel: "查看光圈预设说明",
+        guideTitle: "光圈预设说明",
+        semanticConstraint: "光圈仅作为景深语义约束，不参与真实曝光计算。",
+        presets: {
+          f2_8: {
+            name: "特写",
+            description: "极浅景深，背景虚化明显。",
+            usage: "仅适合材质、软装、植物、拉手和构件细节特写。",
+          },
+          f4: {
+            name: "浅景深",
+            description: "前后景有明显虚化，主体更突出。",
+            usage: "适合局部空间、近景构图和带虚化前景的氛围画面。",
+          },
+          f5_6: {
+            name: "自然景深",
+            description: "保留轻微景深，同时维持主要空间清晰。",
+            usage: "适合室内人视、近中景空间和带故事感的建筑画面。",
+          },
+          f8: {
+            name: "全景清晰",
+            description: "建筑主体与环境保持清晰，是常规建筑摄影默认选择。",
+            usage: "适合大多数建筑外景和室内全景。",
+          },
+          f16: {
+            name: "超大景深",
+            description: "前中后景保持高度清晰，视觉更克制。",
+            usage: "适合鸟瞰、航拍、城市远景和超长纵深空间。",
+          },
+        },
+      },
       currentConfiguration: "当前配置",
       twoPointPerspective: "两点透视",
       cameraControl: "相机控制",
+      recommendedDefault: "推荐 · 默认",
+      status: {
+        enabled: "已开启",
+        disabled: "已关闭",
+      },
     },
     workflowSource: {
       tooltip: "室外渲染来源",

@@ -23,6 +23,38 @@ afterEach(() => {
 });
 
 describe('CameraControlPanel wheel selectors', () => {
+  it('keeps two-point perspective off by default', () => {
+    render(<CameraControlPanel onChange={vi.fn()} onClose={vi.fn()} />);
+    const switches = document.querySelectorAll<HTMLElement>('[role="switch"]');
+
+    expect(switches).toHaveLength(2);
+    expect(switches[0]?.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it.each([
+    ['low', '近地', '0.5m'],
+    ['eyeLevel', '人视', '1.5m'],
+    ['slightlyHigh', '高位', '3.0m'],
+    ['semiBirdsEye', '半鸟', '8.0m'],
+    ['birdsEye', '鸟瞰', '30m'],
+    ['aerial', '航拍', '100m'],
+  ] as const)('shows the %s camera-height label and suggested fixed value', (height, label, fixedValue) => {
+    render(<CameraControlPanel value={{ ...ENABLED_CAMERA, height }} onChange={vi.fn()} onClose={vi.fn()} />);
+
+    expect(document.body.textContent).toContain(label);
+    expect(document.body.textContent).toContain(fixedValue);
+  });
+
+  it.each([16, 24, 35, 50, 85, 100] as const)('shows the %smm focal-length preset', (focalLength) => {
+    render(<CameraControlPanel value={{ ...ENABLED_CAMERA, focalLength }} onChange={vi.fn()} onClose={vi.fn()} />);
+    expect(document.body.textContent).toContain(`${focalLength}mm`);
+  });
+
+  it.each(['f/2.8', 'f/4', 'f/5.6', 'f/8', 'f/16'] as const)('shows the %s aperture preset', (aperture) => {
+    render(<CameraControlPanel value={{ ...ENABLED_CAMERA, aperture }} onChange={vi.fn()} onClose={vi.fn()} />);
+    expect(document.body.textContent).toContain(aperture);
+  });
+
   it('changes the camera height when WheelEvent reaches the height selector', () => {
     const onChange = vi.fn();
     const outerWheel = vi.fn();
@@ -81,7 +113,7 @@ describe('CameraControlPanel wheel selectors', () => {
 
     expect(onChange).toHaveBeenCalledTimes(2);
     expect(onChange).toHaveBeenNthCalledWith(1, { ...ENABLED_CAMERA, focalLength: 50 });
-    expect(onChange).toHaveBeenNthCalledWith(2, { ...ENABLED_CAMERA, focalLength: 70 });
+    expect(onChange).toHaveBeenNthCalledWith(2, { ...ENABLED_CAMERA, focalLength: 85 });
   });
 
   it('does not change aperture while camera control is disabled', () => {
@@ -96,6 +128,25 @@ describe('CameraControlPanel wheel selectors', () => {
     });
 
     expect(event.defaultPrevented).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['position', { ...ENABLED_CAMERA, height: 'low' }, -120],
+    ['position', { ...ENABLED_CAMERA, height: 'aerial' }, 120],
+    ['focalLength', { ...ENABLED_CAMERA, focalLength: 16 }, -120],
+    ['focalLength', { ...ENABLED_CAMERA, focalLength: 100 }, 120],
+    ['aperture', { ...ENABLED_CAMERA, aperture: 'f/2.8' }, -120],
+    ['aperture', { ...ENABLED_CAMERA, aperture: 'f/16' }, 120],
+  ] as const)('does not wrap the %s selector at either boundary', (column, camera, deltaY) => {
+    const onChange = vi.fn();
+    render(<CameraControlPanel value={camera} onChange={onChange} onClose={vi.fn()} />);
+    const selector = document.querySelector<HTMLElement>(`[data-camera-wheel-column="${column}"]`);
+
+    act(() => {
+      selector?.dispatchEvent(new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true }));
+    });
+
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -126,7 +177,7 @@ describe('CameraControlPanel wheel selectors', () => {
     });
 
     expect(ancestorCapture).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith({ ...ENABLED_CAMERA, aperture: 'f/11' });
+    expect(onChange).toHaveBeenCalledWith({ ...ENABLED_CAMERA, aperture: 'f/16' });
     anchor.remove();
   });
 });

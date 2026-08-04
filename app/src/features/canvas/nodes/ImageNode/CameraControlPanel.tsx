@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Aperture, Camera, ChevronDown, ChevronUp, MoveVertical, ScanLine, X } from 'lucide-react';
+import { Aperture, ChevronDown, ChevronUp, ScanLine, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Switch } from '@/components/ui/switch';
 import { CANVAS_NODE_CARD_SELECTED_BORDER_COLOR } from '../../constants/canvasConstants';
@@ -15,6 +15,15 @@ import {
   normalizeWheelDelta,
   type DiscreteWheelState,
 } from '../../utils/discreteWheel';
+import { CameraPositionIcon } from './CameraPositionIcon';
+import { CameraHeightGuide } from './CameraHeightGuide';
+import { CameraApertureGuide, CameraFocalLengthGuide } from './CameraOpticsGuide';
+import {
+  CAMERA_APERTURE_PRESETS,
+  CAMERA_FOCAL_LENGTH_PRESETS,
+  CAMERA_HEIGHT_PRESETS,
+  resolveCameraControl,
+} from './cameraControlDisplay';
 
 interface CameraOption<T extends string | number> {
   value: T;
@@ -47,32 +56,22 @@ const createWheelMotionByColumn = (): Record<CameraWheelColumn, CameraWheelMotio
   aperture: { direction: 1, sequence: 0 },
 });
 
-const DEFAULT_CAMERA_CONTROL: CameraControlData = {
-  enabled: false,
-  height: 'slightlyHigh',
-  focalLength: 35,
-  aperture: 'f/8',
-  twoPointPerspective: true,
-};
+const CAMERA_HEIGHT_OPTIONS: CameraOption<CameraHeight>[] = CAMERA_HEIGHT_PRESETS.map((preset) => ({
+  value: preset.value,
+  label: preset.labelKey,
+  helper: preset.fixedValue,
+}));
 
-const CAMERA_HEIGHT_OPTIONS: CameraOption<CameraHeight>[] = [
-  { value: 'low', label: 'imageNode.camera.height.options.low', helper: '0.2–1.3m' },
-  { value: 'eyeLevel', label: 'imageNode.camera.height.options.eyeLevel', helper: '1.4–1.8m' },
-  { value: 'slightlyHigh', label: 'imageNode.camera.height.options.slightlyHigh', helper: '1.9–4.0m' },
-  { value: 'semiBirdsEye', label: 'imageNode.camera.height.options.semiBirdsEye', helper: '4.1–15m' },
-  { value: 'birdsEye', label: 'imageNode.camera.height.options.birdsEye', helper: '15.1m+' },
-];
-
-const FOCAL_LENGTH_OPTIONS: CameraOption<CameraFocalLength>[] = [16, 24, 28, 35, 50, 70, 100].map((value) => ({
-  value: value as CameraFocalLength,
-  label: String(value),
+const FOCAL_LENGTH_OPTIONS: CameraOption<CameraFocalLength>[] = CAMERA_FOCAL_LENGTH_PRESETS.map((preset) => ({
+  value: preset.value,
+  label: String(preset.value),
   helper: 'mm',
 }));
 
-const APERTURE_OPTIONS: CameraOption<CameraAperture>[] = ['f/1.8', 'f/2.8', 'f/4', 'f/5.6', 'f/8', 'f/11', 'f/16'].map((value) => ({
-  value: value as CameraAperture,
-  label: value,
-  helper: value,
+const APERTURE_OPTIONS: CameraOption<CameraAperture>[] = CAMERA_APERTURE_PRESETS.map((preset) => ({
+  value: preset.value,
+  label: preset.value,
+  helper: preset.value,
 }));
 
 export function CameraControlPanel({
@@ -87,7 +86,7 @@ export function CameraControlPanel({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const camera = useMemo(() => ({ ...DEFAULT_CAMERA_CONTROL, ...value }), [value]);
+  const camera = useMemo(() => resolveCameraControl(value), [value]);
   const parameterDisabled = disabled || !camera.enabled;
   const panelRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef(camera);
@@ -154,6 +153,7 @@ export function CameraControlPanel({
       if (result.step === 0) return;
 
       const nextCamera = stepCameraValue(currentCamera, column, result.step);
+      if (nextCamera === currentCamera) return;
       cameraRef.current = nextCamera;
       onChangeRef.current(nextCamera);
       setWheelMotionByColumn((current) => ({
@@ -192,8 +192,9 @@ export function CameraControlPanel({
       <div className="grid min-h-0 grid-cols-3 gap-3 px-5 py-4 transition-all duration-200" style={{ opacity: camera.enabled ? 1 : 0.34 }}>
         <CameraWheelSelector
           column="position"
-          icon={<CameraHeightIcon />}
+          icon={<CameraPositionIcon className="h-11 w-11" />}
           title={t('imageNode.camera.height.title')}
+          titleAdornment={<CameraHeightGuide />}
           options={CAMERA_HEIGHT_OPTIONS}
           value={camera.height}
           wheelMotion={wheelMotionByColumn.position}
@@ -205,6 +206,7 @@ export function CameraControlPanel({
           column="focalLength"
           icon={<LensIcon />}
           title={t('imageNode.camera.focalLength.title')}
+          titleAdornment={<CameraFocalLengthGuide />}
           options={FOCAL_LENGTH_OPTIONS}
           value={camera.focalLength}
           wheelMotion={wheelMotionByColumn.focalLength}
@@ -215,6 +217,7 @@ export function CameraControlPanel({
           column="aperture"
           icon={<Aperture className="h-10 w-10" strokeWidth={1.15} />}
           title={t('imageNode.camera.aperture.title')}
+          titleAdornment={<CameraApertureGuide />}
           options={APERTURE_OPTIONS}
           value={camera.aperture}
           wheelMotion={wheelMotionByColumn.aperture}
@@ -254,6 +257,7 @@ function CameraWheelSelector<T extends string | number>({
   column,
   icon,
   title,
+  titleAdornment,
   options,
   value,
   wheelMotion: externalWheelMotion,
@@ -264,6 +268,7 @@ function CameraWheelSelector<T extends string | number>({
   column: CameraWheelColumn;
   icon: ReactNode;
   title: string;
+  titleAdornment?: ReactNode;
   options: CameraOption<T>[];
   value: T;
   wheelMotion: CameraWheelMotion;
@@ -275,13 +280,17 @@ function CameraWheelSelector<T extends string | number>({
   const [clickMotion, setClickMotion] = useState<CameraWheelMotion>({ direction: 1, sequence: 0 });
   const wheelMotion = externalWheelMotion.sequence > clickMotion.sequence ? externalWheelMotion : clickMotion;
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
-  const optionAt = useCallback((offset: number) => options[(selectedIndex + offset + options.length) % options.length], [options, selectedIndex]);
+  const optionAt = useCallback((offset: number) => options[selectedIndex + offset], [options, selectedIndex]);
+  const hasPrevious = selectedIndex > 0;
+  const hasNext = selectedIndex < options.length - 1;
   const selectOffset = useCallback((offset: -1 | 1) => {
     if (disabled) return;
+    const nextOption = optionAt(offset);
+    if (!nextOption) return;
     setClickMotion({ direction: offset, sequence: performance.now() });
-    onChange(optionAt(offset).value);
+    onChange(nextOption.value);
   }, [disabled, onChange, optionAt]);
-  const selected = optionAt(0);
+  const selected = options[selectedIndex];
   const labelFor = (option: CameraOption<T>) => translateLabels ? t(option.label) : option.label;
 
   return (
@@ -289,7 +298,14 @@ function CameraWheelSelector<T extends string | number>({
       data-camera-wheel-column={column}
       className="nodrag nopan nowheel flex min-w-0 flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-black/[0.08]"
     >
-      <div className="flex h-11 items-center justify-center px-3 text-[13px] font-medium tracking-[0.03em] text-white/68">{title}</div>
+      <div className="flex h-11 items-center justify-center px-3 text-[13px] font-medium tracking-[0.03em] text-white/68">
+        <span className="relative">
+          {title}
+          {titleAdornment && (
+            <span className="absolute left-full top-1/2 ml-1 -translate-y-1/2">{titleAdornment}</span>
+          )}
+        </span>
+      </div>
       <div className="flex h-[92px] items-center justify-center border-y border-white/[0.045] bg-white/[0.008]">
         <div className="flex h-[68px] w-[82px] items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.02] text-white/46">{icon}</div>
       </div>
@@ -304,20 +320,31 @@ function CameraWheelSelector<T extends string | number>({
           if (event.key === 'ArrowDown') { event.preventDefault(); selectOffset(1); }
         }}
       >
-        <button type="button" disabled={disabled} onClick={() => selectOffset(-1)} className="absolute inset-x-0 top-0 z-30 flex h-8 items-center justify-center text-white/28 transition-colors hover:text-white/65 disabled:cursor-default"><ChevronUp className="h-4 w-4" /></button>
-        <button type="button" disabled={disabled} onClick={() => selectOffset(1)} className="absolute inset-x-0 bottom-0 z-30 flex h-8 items-center justify-center text-white/28 transition-colors hover:text-white/65 disabled:cursor-default"><ChevronDown className="h-4 w-4" /></button>
+        <button type="button" disabled={disabled || !hasPrevious} onClick={() => selectOffset(-1)} className="absolute inset-x-0 top-0 z-30 flex h-8 items-center justify-center text-white/28 transition-colors hover:text-white/65 disabled:cursor-default disabled:text-white/10"><ChevronUp className="h-4 w-4" /></button>
+        <button type="button" disabled={disabled || !hasNext} onClick={() => selectOffset(1)} className="absolute inset-x-0 bottom-0 z-30 flex h-8 items-center justify-center text-white/28 transition-colors hover:text-white/65 disabled:cursor-default disabled:text-white/10"><ChevronDown className="h-4 w-4" /></button>
         <div className="pointer-events-none absolute inset-x-3 top-1/2 z-10 h-11 -translate-y-1/2 rounded-lg border border-white/[0.10] bg-white/[0.045]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-[#252526] via-[#252526]/80 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-[#252526] via-[#252526]/80 to-transparent" />
         {([-1, 0, 1] as const).map((offset) => {
           const option = optionAt(offset);
-          return (
+          if (!option) {
+            return (
+              <div
+                key={`boundary-${offset}`}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-3 z-[15] flex h-11 items-center justify-center text-[13px] text-white/10"
+                style={{ top: `calc(50% + ${offset * 49}px)`, transform: 'translateY(-50%)' }}
+              >
+                —
+              </div>
+            );
+          }
+          const optionButton = (
             <button
-              key={`${option.value}-${offset}-${wheelMotion.sequence}`}
               type="button"
               disabled={disabled}
               onClick={() => offset === 0 ? undefined : selectOffset(offset)}
-              className={`absolute inset-x-3 z-[15] flex h-11 items-center justify-center rounded-lg px-3 text-center transition-all duration-200 ease-out disabled:cursor-default ${
+              className={`flex h-11 w-full items-center justify-center rounded-lg px-3 text-center transition-all duration-200 ease-out disabled:cursor-default ${
                 wheelMotion.sequence > 0
                   ? wheelMotion.direction > 0
                     ? 'animate-in fade-in slide-in-from-bottom-2'
@@ -325,8 +352,6 @@ function CameraWheelSelector<T extends string | number>({
                   : ''
               }`}
               style={{
-                top: `calc(50% + ${offset * 49}px)`,
-                transform: 'translateY(-50%)',
                 color: offset === 0 ? 'rgba(255,255,255,0.94)' : 'rgba(255,255,255,0.40)',
                 opacity: offset === 0 ? 1 : 0.58,
                 fontSize: offset === 0 ? 15 : 13,
@@ -334,6 +359,15 @@ function CameraWheelSelector<T extends string | number>({
             >
               <span className="truncate font-medium tabular-nums">{labelFor(option)}</span>
             </button>
+          );
+          return (
+            <div
+              key={`${option.value}-${offset}-${wheelMotion.sequence}`}
+              className="absolute inset-x-3 z-[15] h-11"
+              style={{ top: `calc(50% + ${offset * 49}px)`, transform: 'translateY(-50%)' }}
+            >
+              {optionButton}
+            </div>
           );
         })}
       </div>
@@ -344,7 +378,7 @@ function CameraWheelSelector<T extends string | number>({
 
 function optionAtStep<T extends string | number>(options: CameraOption<T>[], value: T, step: -1 | 1) {
   const index = Math.max(0, options.findIndex((option) => option.value === value));
-  return options[(index + step + options.length) % options.length];
+  return options[index + step];
 }
 
 function stepCameraValue(
@@ -353,12 +387,15 @@ function stepCameraValue(
   step: -1 | 1,
 ): CameraControlData {
   if (column === 'position') {
-    return { ...camera, height: optionAtStep(CAMERA_HEIGHT_OPTIONS, camera.height, step).value };
+    const option = optionAtStep(CAMERA_HEIGHT_OPTIONS, camera.height, step);
+    return option ? { ...camera, height: option.value } : camera;
   }
   if (column === 'focalLength') {
-    return { ...camera, focalLength: optionAtStep(FOCAL_LENGTH_OPTIONS, camera.focalLength, step).value };
+    const option = optionAtStep(FOCAL_LENGTH_OPTIONS, camera.focalLength, step);
+    return option ? { ...camera, focalLength: option.value } : camera;
   }
-  return { ...camera, aperture: optionAtStep(APERTURE_OPTIONS, camera.aperture, step).value };
+  const option = optionAtStep(APERTURE_OPTIONS, camera.aperture, step);
+  return option ? { ...camera, aperture: option.value } : camera;
 }
 
 function CameraSwitch({ label, checked, disabled, onCheckedChange }: { label: string; checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void }) {
@@ -377,10 +414,6 @@ function CameraSwitch({ label, checked, disabled, onCheckedChange }: { label: st
 
 function SummaryChip({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
   return <span className={`rounded-md border px-2 py-1 text-[12px] ${muted ? 'border-white/[0.06] bg-transparent text-white/44' : 'border-white/[0.08] bg-white/[0.035] text-white/72'}`}>{children}</span>;
-}
-
-function CameraHeightIcon() {
-  return <div className="relative flex items-center gap-1"><Camera className="h-8 w-8" strokeWidth={1.35} /><MoveVertical className="h-5 w-5 opacity-60" strokeWidth={1.25} /></div>;
 }
 
 function LensIcon() {
