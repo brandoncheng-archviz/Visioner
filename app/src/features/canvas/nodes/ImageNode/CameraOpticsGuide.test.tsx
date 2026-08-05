@@ -8,9 +8,9 @@ import { CameraApertureGuide, CameraFocalLengthGuide } from './CameraOpticsGuide
 afterEach(cleanup);
 
 describe('CameraOpticsGuide', () => {
-  it('opens the complete focal-length guide with the default recommendation', async () => {
+  it('opens the complete focal-length guide on hover with the default recommendation', async () => {
     render(<CameraFocalLengthGuide />);
-    fireEvent.click(document.querySelector('button') as HTMLButtonElement);
+    fireEvent.pointerEnter(document.querySelector('[data-camera-guide-trigger="focalLength"]') as HTMLElement);
 
     await waitFor(() => {
       expect(document.body.textContent).toContain('焦距预设说明');
@@ -24,9 +24,9 @@ describe('CameraOpticsGuide', () => {
     });
   });
 
-  it('opens the complete aperture guide and explains its semantic-only behavior', async () => {
+  it('opens the complete aperture guide on hover and explains its semantic-only behavior', async () => {
     render(<CameraApertureGuide />);
-    fireEvent.click(document.querySelector('button') as HTMLButtonElement);
+    fireEvent.pointerEnter(document.querySelector('[data-camera-guide-trigger="aperture"]') as HTMLElement);
 
     await waitFor(() => {
       expect(document.body.textContent).toContain('光圈预设说明');

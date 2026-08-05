@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { CAMERA_HEIGHT_PRESETS } from './cameraControlDisplay';
 
 const SURFACE_CLASS = 'border-white/[0.08] bg-[#111214] shadow-[0_12px_32px_rgba(0,0,0,0.45)]';
@@ -20,18 +20,18 @@ export function CameraHeightGuide() {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
+    <Popover open={open}>
+      <PopoverAnchor asChild>
+        <span
+          data-camera-guide-trigger="height"
           aria-label={t('imageNode.camera.height.guideLabel')}
           className="nodrag nopan nowheel flex h-5 w-5 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/[0.05] hover:text-white/62"
           onPointerEnter={() => { cancelClose(); setOpen(true); }}
           onPointerLeave={scheduleClose}
         >
           <Info className="h-3.5 w-3.5" strokeWidth={1.6} />
-        </button>
-      </PopoverTrigger>
+        </span>
+      </PopoverAnchor>
       <PopoverContent
         data-image-camera-popover="true"
         side="top"

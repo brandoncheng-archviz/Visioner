@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Handle, Position, useReactFlow, useStore, type Node, type NodeProps } from '@xyflow/react';
-import { AlertCircle, Home, Plus, RotateCcw } from 'lucide-react';
+import { AlertCircle, Home, ImagePlus, Plus, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CANVAS_GENERATION_NODE_WIDTH, CANVAS_NODE_CARD_BACKGROUND, CANVAS_NODE_CARD_BORDER_COLOR, CANVAS_NODE_CARD_BORDER_WIDTH, CANVAS_NODE_CARD_RADIUS, CANVAS_NODE_CARD_SELECTED_BORDER_COLOR } from '../../constants/canvasConstants';
 import { getReferenceUsageInfo } from '../../constants/imageUsages';
@@ -12,6 +11,7 @@ import { ExteriorRenderConnectedImages } from './ExteriorRenderConnectedImages';
 import { ExteriorRenderFooter } from './ExteriorRenderFooter';
 import { ExteriorRenderPromptPanel } from './ExteriorRenderPromptPanel';
 import { ExteriorRenderRenderChannelsPanel } from './ExteriorRenderRenderChannelsPanel';
+import { CanvasSelectionModeBanner } from '../../components/CanvasSelectionModeBanner';
 import type { ExteriorRenderConnectedImage, ExteriorRenderNodeData, ExteriorRenderRenderChannelType } from './exteriorRender.types';
 import { createExteriorRenderTaskId, mockExteriorRender } from './mockExteriorRender';
 import { runExteriorRenderGeneration } from './exteriorRenderGeneration';
@@ -39,7 +39,7 @@ type CanvasSelectionMode =
 export function ExteriorRenderNode({ data, selected, id }: NodeProps) {
   const { t } = useTranslation();
   const translate = useCallback((key: string) => t(key), [t]);
-  const { getNodes, setNodes } = useReactFlow();
+  const { fitView, getNodes, getViewport, setNodes } = useReactFlow();
   const zoom = useStore((state) => state.transform[2]);
   const inverseScale = 1 / zoom;
   const mountedRef = useRef(true);
@@ -187,6 +187,18 @@ export function ExteriorRenderNode({ data, selected, id }: NodeProps) {
     setCanvasSelectionMode({ kind: 'renderChannel', channelType });
   }, [isProcessing]);
 
+  const returnToExteriorRenderNode = useCallback(() => {
+    setNodes((nodes) => nodes.map((node) => ({ ...node, selected: node.id === id })));
+    setTimeout(() => {
+      fitView({
+        nodes: [{ id }],
+        duration: 280,
+        padding: 0.35,
+        maxZoom: Math.min(getViewport().zoom, 1.15),
+      });
+    }, 0);
+  }, [fitView, getViewport, id, setNodes]);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -223,6 +235,7 @@ export function ExteriorRenderNode({ data, selected, id }: NodeProps) {
     };
 
     const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest('[data-canvas-selection-banner="true"]')) return;
       const nodeId = getNodeIdFromEvent(event);
       const selectable = getSelectableImageNode(nodeId);
       event.preventDefault();
@@ -389,7 +402,7 @@ export function ExteriorRenderNode({ data, selected, id }: NodeProps) {
           }
         `}
       </style>
-      {canvasSelectionMode && typeof document !== 'undefined' && createPortal(
+      {canvasSelectionMode && (
         <>
           <style>
             {`
@@ -399,15 +412,23 @@ export function ExteriorRenderNode({ data, selected, id }: NodeProps) {
               }
             `}
           </style>
-          <div className="pointer-events-none fixed left-1/2 top-5 z-[2300] -translate-x-1/2 rounded-full border border-white/[0.10] bg-[#222224]/95 px-3 py-2 text-[12px] font-medium text-white/72 shadow-[0_12px_30px_rgba(0,0,0,0.42)]">
-            {canvasSelectionMode.kind === 'input'
-              ? t('exteriorRender.imageInput.selectionHint')
-              : t('exteriorRender.renderChannels.selectionHint', {
+          <CanvasSelectionModeBanner
+            icon={ImagePlus}
+            title={canvasSelectionMode.kind === 'input'
+              ? t('exteriorRender.imageInput.selectionTitle')
+              : t('exteriorRender.renderChannels.selectionTitle', {
                 channel: t(`renderChannel.names.${canvasSelectionMode.channelType}`),
               })}
-          </div>
-        </>,
-        document.body,
+            description={canvasSelectionMode.kind === 'input'
+              ? t('exteriorRender.imageInput.selectionHint')
+              : t('exteriorRender.renderChannels.selectionHint')}
+            onBackToNode={returnToExteriorRenderNode}
+            onClose={() => {
+              setCanvasSelectionMode(null);
+              clearCanvasSelectionHighlight();
+            }}
+          />
+        </>
       )}
       <div
         className="absolute z-20 overflow-hidden nodrag"

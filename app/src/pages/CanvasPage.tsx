@@ -649,6 +649,31 @@ function FlowCanvas() {
     setEdges((eds) => eds.filter((edge) => !(edge.source === sourceNodeId && edge.target === targetNodeId)));
   }, []);
 
+  const addImageReferenceEdge = useCallback((targetNodeId: string, sourceNodeId: string) => {
+    const sourceNode = nodes.find((node) => node.id === sourceNodeId);
+    const targetNode = nodes.find((node) => node.id === targetNodeId);
+    if (!sourceNode || !targetNode || sourceNode.type !== 'image' || targetNode.type !== 'image') return;
+    if (!resolveNodeImage(sourceNode.data)?.imageUrl) return;
+
+    const newEdge: Edge = {
+      id: `image-reference-${sourceNodeId}-${targetNodeId}-${Date.now()}`,
+      source: sourceNodeId,
+      target: targetNodeId,
+      sourceHandle: 'right-source',
+      targetHandle: 'left-target',
+      style: { stroke: '#555', strokeWidth: 1 },
+    };
+    const validation = validateImageProcessingEdge(nodes, edges, newEdge);
+    if (!validation.valid) {
+      showToast(validation.reason || t('canvas.cannotConnect'));
+      return;
+    }
+
+    setEdges((currentEdges) => currentEdges.some((edge) => edge.source === sourceNodeId && edge.target === targetNodeId)
+      ? currentEdges
+      : [...currentEdges, newEdge]);
+  }, [edges, nodes, setEdges, showToast, t, validateImageProcessingEdge]);
+
   const addExteriorRenderInputEdge = useCallback((targetNodeId: string, sourceNodeId: string) => {
     const sourceNode = nodes.find((node) => node.id === sourceNodeId);
     const targetNode = nodes.find((node) => node.id === targetNodeId);
@@ -1412,6 +1437,7 @@ function FlowCanvas() {
         isReferenceLocked: n.type === 'image' ? lockedPromptReferenceNodeIds.has(n.id) : undefined,
         onStartLineDraw: startLineDraw,
         onRemoveReferenceEdge: removeReferenceEdge,
+        onAddImageReferenceEdge: n.type === 'image' ? addImageReferenceEdge : undefined,
         onAddExteriorRenderInputEdge: n.type === 'exteriorRender' ? addExteriorRenderInputEdge : undefined,
         onRemoveExteriorRenderInputEdge: n.type === 'exteriorRender' ? removeExteriorRenderInputEdge : undefined,
         onUploadExteriorRenderInputImages: n.type === 'exteriorRender' ? uploadExteriorRenderInputImages : undefined,
@@ -1444,7 +1470,7 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addExteriorRenderInputEdge, removeExteriorRenderInputEdge, uploadExteriorRenderInputImages, createExteriorRenderOutput, writeExteriorRenderResult, failExteriorRenderOutput, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addImageReferenceEdge, addExteriorRenderInputEdge, removeExteriorRenderInputEdge, uploadExteriorRenderInputImages, createExteriorRenderOutput, writeExteriorRenderResult, failExteriorRenderOutput, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {

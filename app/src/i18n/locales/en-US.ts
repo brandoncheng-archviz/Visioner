@@ -118,6 +118,11 @@ const enUS = {
     },
   },
 
+  canvasSelection: {
+    backToNode: "Back to Node",
+    close: "Exit canvas selection mode",
+  },
+
   exteriorRender: {
     title: "Exterior Render",
     outputTitlePrefix: "Exterior Render Output",
@@ -134,7 +139,8 @@ const enUS = {
       uploadResource: "Upload image",
       removeImage: "Remove image",
       unassignedRole: "No role assigned",
-      selectionHint: "Select a canvas image as input. Press Esc to cancel",
+      selectionTitle: "Select Reference from Canvas",
+      selectionHint: "Click an image node to use it as the image input",
       empty: "Add at least one input image",
       viewMore: "View more",
     },
@@ -144,7 +150,8 @@ const enUS = {
       add: "Add {{channel}} channel",
       replace: "Replace {{channel}} channel",
       remove: "Remove {{channel}} channel",
-      selectionHint: "Select a canvas image as the {{channel}} channel. Press Esc to cancel",
+      selectionTitle: "Select {{channel}} Channel",
+      selectionHint: "Click an image node to use it as the channel input",
       unrecognized: "Unrecognized",
     },
     prompt: { placeholder: "Add extra instructions…" },
@@ -367,6 +374,12 @@ const enUS = {
         enabled: "Enabled",
         disabled: "Disabled",
       },
+    },
+    referenceSelection: {
+      button: "Reference",
+      buttonTitle: "Add a reference from the canvas",
+      title: "Select Reference from Canvas",
+      hint: "Click an image node to add it as a reference",
     },
     workflowSource: {
       tooltip: "Exterior Render Source",

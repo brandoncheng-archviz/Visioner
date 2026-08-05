@@ -8,6 +8,7 @@ import {
   ArrowUp,
   Maximize2,
   ScanSearch,
+  ImagePlus,
   Zap,
   Check,
   Lock,
@@ -170,6 +171,8 @@ export function ImageNodeControlPanel({
   canDeleteReference,
   canCreateMarks,
   isMarkModeActive,
+  canSelectCanvasReference,
+  isCanvasReferenceSelectionModeActive,
   isGenerating,
   generationTask,
   textReferences,
@@ -179,6 +182,7 @@ export function ImageNodeControlPanel({
   onRemoveReference,
   onUseReference,
   onStartMarkMode,
+  onStartCanvasReferenceSelection,
   onUpdateMarkCandidate,
   showToast,
   autoOpenLightPanel,
@@ -205,6 +209,8 @@ export function ImageNodeControlPanel({
   canDeleteReference: boolean;
   canCreateMarks: boolean;
   isMarkModeActive: boolean;
+  canSelectCanvasReference: boolean;
+  isCanvasReferenceSelectionModeActive: boolean;
   isGenerating?: boolean;
   generationTask?: { status: string; progress: number; errorMessage: string | null } | null;
   textReferences: TextReferenceInfo[];
@@ -216,6 +222,7 @@ export function ImageNodeControlPanel({
   onRemoveReference: (nodeId: string) => void;
   onUseReference: (reference: ReferenceInfo) => void;
   onStartMarkMode: () => void;
+  onStartCanvasReferenceSelection: () => void;
   onUpdateMarkCandidate: (markId: string, candidateId: string) => void;
   showToast?: (msg: string) => void;
 }) {
@@ -1051,6 +1058,30 @@ export function ImageNodeControlPanel({
             >
               <ScanSearch className="h-4 w-4" />
               <span style={{ fontSize: 14 }}>{t('imageMark.button')}</span>
+            </button>
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              disabled={!canSelectCanvasReference}
+              aria-pressed={isCanvasReferenceSelectionModeActive}
+              onClick={() => {
+                if (!canSelectCanvasReference) return;
+                setShowLightPreview(false);
+                onStartCanvasReferenceSelection();
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors ${canSelectCanvasReference ? (isCanvasReferenceSelectionModeActive ? 'border-[#2f6bff]/80 bg-[#2f6bff]/15 text-[#b8caff] hover:border-[#2f6bff] hover:bg-[#2f6bff]/20' : GENERATION_CONTROL_BUTTON_CLASS) : GENERATION_CONTROL_BUTTON_DISABLED_CLASS}`}
+              style={{
+                width: 54,
+                height: 50,
+                padding: '4px',
+                opacity: canSelectCanvasReference ? 1 : 0.45,
+                cursor: canSelectCanvasReference ? 'pointer' : 'not-allowed',
+              }}
+              title={t('imageNode.referenceSelection.buttonTitle')}
+            >
+              <ImagePlus className="h-4 w-4" />
+              <span style={{ fontSize: 14 }}>{t('imageNode.referenceSelection.button')}</span>
             </button>
           </div>
           {workflowSource?.type === 'exteriorRender' && (

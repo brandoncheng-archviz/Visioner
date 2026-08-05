@@ -177,7 +177,6 @@ export function CameraControlPanel({
       <header className="flex items-start gap-4 border-b border-white/[0.06] px-5 py-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-[17px] font-semibold tracking-[-0.01em] text-white/92">{t('imageNode.camera.header')}</h2>
-          <p className="mt-1 text-[12px] tracking-[0.04em] text-white/40">{t('imageNode.camera.subtitle')}</p>
         </div>
         <button
           type="button"

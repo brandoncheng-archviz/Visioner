@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Copy, Crop, Download, Image, Maximize2, Minimize2, Plus, ScanSearch, Trash2, Upload } from 'lucide-react';
+import { Check, ChevronDown, Copy, Crop, Download, Image, ImagePlus, Maximize2, Minimize2, Plus, ScanSearch, Trash2, Upload } from 'lucide-react';
 import { Handle, Position, useStore, useReactFlow, type NodeProps } from '@xyflow/react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../hooks/useToast';
@@ -44,6 +44,7 @@ import { buildPromptSubmission, createImageMarkReferenceBlock } from '../../util
 import { buildImageGenerationRequest } from '../../utils/imageGenerationRequest';
 import { getRoleData } from '../../utils/referenceUtils';
 import { resolveNodeImage } from '../../utils/resolveNodeImage';
+import { isSelectableCanvasImageReferenceNode } from '../../utils/canvasReferenceSelection';
 import { resolveImageNodeSize } from '../../utils/imageNodeSizing';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
 import { getTextContent } from '../../utils/textNodeUtils';
@@ -52,9 +53,10 @@ import { registerImageMarkCaptureEntry } from '../../utils/imageMarkCaptureRegis
 import { ImageToolbar } from '../../components/ImageToolbar';
 import { ImagePreviewModal } from '../../components/ImagePreviewModal';
 import { ImageRoleTag } from '../../components/ImageRoleTag';
+import { CanvasSelectionModeBanner } from '../../components/CanvasSelectionModeBanner';
 import { ImageNodeControlPanel } from './ImageNodeControlPanel';
 import { ImageCropOverlay, type NormalizedCropRect } from './ImageCropOverlay';
-import { createImageNodeViewModel } from './imageNodeViewModel';
+import { canStartCanvasMarkSelection, createImageNodeViewModel } from './imageNodeViewModel';
 import { cropCoverImage } from '../../utils/cropImage';
 import {
   calculateRequestedSize,
@@ -114,6 +116,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const markRequestIdRef = useRef(0);
   const pendingMarkSourceActivationRef = useRef<string | null>(null);
+  const hoveredCanvasReferenceNodeRef = useRef<HTMLElement | null>(null);
   const markLabelButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const [activeMarkMenuId, setActiveMarkMenuId] = useState<string | null>(null);
   const [activeMarkButtonRect, setActiveMarkButtonRect] = useState<DOMRect | null>(null);
@@ -122,6 +125,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   /* ─── Point-pick mode for local reference ─── */
   const [isPointPickMode, setIsPointPickMode] = useState(false);
+  const [isCanvasReferenceSelectionMode, setIsCanvasReferenceSelectionMode] = useState(false);
   const [pendingLightPanelOpen, setPendingLightPanelOpen] = useState(false);
   const [pointPickLoading, setPointPickLoading] = useState(false);
   const [pointPickError, setPointPickError] = useState(false);
@@ -457,13 +461,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const activeImageMarkTargetNodeId = data.activeImageMarkTargetNodeId as string | null | undefined;
   const activeImageMarkSourceNodeId = data.activeImageMarkSourceNodeId as string | null | undefined;
   const activeImageMarkSessionId = data.activeImageMarkSessionId as string | null | undefined;
-  const canvasMarkableNodes = useMemo(() => allNodes.filter((node) => {
-    if (node.type !== 'image' || !getCurrentImage(node.data)) return false;
-    const sourceTask = node.data.generationTask as GenerationTask | null | undefined;
-    if (sourceTask?.status === 'running' || node.data.isGenerating || node.data.isProcessing) return false;
-    return true;
-  }), [allNodes]);
-  const canStartMarking = !imageNodeViewModel.isProcessing && canvasMarkableNodes.length > 0;
+  const canStartMarking = canStartCanvasMarkSelection(imageNodeViewModel.isProcessing);
   const isCanvasMarkSelectionMode = Boolean(activeImageMarkTargetNodeId);
   const isCanvasMarkSelectable = isCanvasMarkSelectionMode
     && Boolean(displayImage)
@@ -1152,6 +1150,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   }, [displayImage, exitPointPickMode, id, imageMarks, setNodes]);
 
   const startMarkMode = useCallback(() => {
+    setIsCanvasReferenceSelectionMode(false);
     if (activeImageMarkTargetNodeId === id) {
       exitPointPickMode();
       const onExitSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
@@ -1162,6 +1161,87 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const onStartSelection = data.onStartCanvasImageMarkSelection as ((targetNodeId: string) => void) | undefined;
     onStartSelection?.(id);
   }, [activeImageMarkTargetNodeId, canStartMarking, data.onExitCanvasImageMarkSelection, data.onStartCanvasImageMarkSelection, exitPointPickMode, id]);
+
+  const clearCanvasReferenceSelectionHighlight = useCallback(() => {
+    if (!hoveredCanvasReferenceNodeRef.current) return;
+    hoveredCanvasReferenceNodeRef.current.classList.remove('image-reference-canvas-selectable-hover');
+    hoveredCanvasReferenceNodeRef.current = null;
+  }, []);
+
+  const closeCanvasReferenceSelection = useCallback(() => {
+    setIsCanvasReferenceSelectionMode(false);
+    clearCanvasReferenceSelectionHighlight();
+  }, [clearCanvasReferenceSelectionHighlight]);
+
+  const startCanvasReferenceSelection = useCallback(() => {
+    if (!imageNodeViewModel.canEditPromptReferences) return;
+    exitPointPickMode();
+    const onExitMarkSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
+    onExitMarkSelection?.();
+    setIsCanvasReferenceSelectionMode(true);
+  }, [data.onExitCanvasImageMarkSelection, exitPointPickMode, imageNodeViewModel.canEditPromptReferences]);
+
+  useEffect(() => {
+    if (!isCanvasReferenceSelectionMode) {
+      clearCanvasReferenceSelectionHighlight();
+      return;
+    }
+
+    const getNodeIdFromEvent = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return null;
+      return target.closest('.react-flow__node')?.getAttribute('data-id') ?? null;
+    };
+    const getSelectableNode = (nodeId: string | null) => {
+      const node = allNodes.find((candidate) => candidate.id === nodeId);
+      return isSelectableCanvasImageReferenceNode(node, id) ? node : null;
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      const selectableNode = getSelectableNode(getNodeIdFromEvent(event));
+      const nodeElement = selectableNode
+        ? document.querySelector(`.react-flow__node[data-id="${selectableNode.id}"]`) as HTMLElement | null
+        : null;
+      if (hoveredCanvasReferenceNodeRef.current === nodeElement) return;
+      clearCanvasReferenceSelectionHighlight();
+      if (!nodeElement) return;
+      nodeElement.classList.add('image-reference-canvas-selectable-hover');
+      hoveredCanvasReferenceNodeRef.current = nodeElement;
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest('[data-canvas-selection-banner="true"]')) return;
+      const selectableNode = getSelectableNode(getNodeIdFromEvent(event));
+      if (!selectableNode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      const onAddReference = data.onAddImageReferenceEdge as ((targetNodeId: string, sourceNodeId: string) => void) | undefined;
+      onAddReference?.(id, selectableNode.id);
+      closeCanvasReferenceSelection();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeCanvasReferenceSelection();
+    };
+
+    document.body.style.cursor = 'crosshair';
+    window.addEventListener('pointermove', handlePointerMove, true);
+    window.addEventListener('pointerdown', handlePointerDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.body.style.cursor = '';
+      window.removeEventListener('pointermove', handlePointerMove, true);
+      window.removeEventListener('pointerdown', handlePointerDown, true);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      clearCanvasReferenceSelectionHighlight();
+    };
+  }, [allNodes, clearCanvasReferenceSelectionHighlight, closeCanvasReferenceSelection, data.onAddImageReferenceEdge, id, isCanvasReferenceSelectionMode]);
+
+  useEffect(() => {
+    if (!isCanvasReferenceSelectionMode || !imageNodeViewModel.isProcessing) return;
+    closeCanvasReferenceSelection();
+  }, [closeCanvasReferenceSelection, imageNodeViewModel.isProcessing, isCanvasReferenceSelectionMode]);
 
   const resolveCoverGeometry = useCallback(() => {
     const img = imgRef.current;
@@ -1394,35 +1474,44 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       })()
     : null;
   const canvasMarkSelectionPortal = activeImageMarkTargetNodeId === id
-    ? createPortal(
-        <div
-          className="fixed left-1/2 top-[54px] z-[4100] flex w-auto -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] shadow-[0_10px_26px_rgba(0,0,0,0.3)]"
-          style={{
-            background: 'rgba(37,37,38,0.9)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.86)',
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
+    ? (
+        <CanvasSelectionModeBanner
+          icon={ScanSearch}
+          title={t('imageMark.modeTitle')}
+          description={t('imageMark.modeHint')}
+          onBackToNode={() => {
+            const onFocusNode = data.onFocusNode as ((nodeId: string) => void) | undefined;
+            onFocusNode?.(id);
           }}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-          onWheel={(event) => event.stopPropagation()}
-        >
-          <ScanSearch className="h-4 w-4 flex-shrink-0 text-teal-300/85" />
-          <span className="font-medium text-white/75">{t('imageMark.canvasModeHint')}</span>
-          <button
-            type="button"
-            className="shrink-0 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/55 transition-colors hover:bg-white/[0.10] hover:text-white/80"
-            onClick={(event) => {
-              event.stopPropagation();
-              const onExitSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
-              onExitSelection?.();
+          onClose={() => {
+            const onExitSelection = data.onExitCanvasImageMarkSelection as (() => void) | undefined;
+            onExitSelection?.();
+          }}
+        />
+      )
+    : null;
+  const canvasReferenceSelectionPortal = isCanvasReferenceSelectionMode
+    ? (
+        <>
+          <style>
+            {`
+              .react-flow__node.image-reference-canvas-selectable-hover .node-preview-card {
+                border-color: rgba(47, 107, 255, 0.95) !important;
+                box-shadow: 0 0 0 2px rgba(47, 107, 255, 0.35), 0 16px 36px rgba(0, 0, 0, 0.38) !important;
+              }
+            `}
+          </style>
+          <CanvasSelectionModeBanner
+            icon={ImagePlus}
+            title={t('imageNode.referenceSelection.title')}
+            description={t('imageNode.referenceSelection.hint')}
+            onBackToNode={() => {
+              const onFocusNode = data.onFocusNode as ((nodeId: string) => void) | undefined;
+              onFocusNode?.(id);
             }}
-          >
-            ESC · {t('imageMark.exit')}
-          </button>
-        </div>,
-        document.body,
+            onClose={closeCanvasReferenceSelection}
+          />
+        </>
       )
     : null;
   const pointPickResultPortal = isPointPickMode && pointPickFeedbackPosition && (pointPickLoading || pointPickError)
@@ -1874,6 +1963,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     {
       icon: Upload,
       label: t('common.uploadFromDevice'),
+      controlHover: true,
       action: () => fileRef.current?.click(),
       disabled: !imageNodeViewModel.canUpload,
     },
@@ -1901,6 +1991,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
       style={{ zIndex: selected ? 100 : 1, width: displayCardWidth }}
     >
       {canvasMarkSelectionPortal}
+      {canvasReferenceSelectionPortal}
       {pointPickResultPortal}
       {activeMarkCandidatePortal}
       {/* Toolbar — empty nodes expose upload only; image nodes keep their existing actions. */}
@@ -2309,6 +2400,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               canDeleteReference={imageNodeViewModel.canDeleteReference}
               canCreateMarks={canStartMarking}
               isMarkModeActive={activeImageMarkTargetNodeId === id}
+              canSelectCanvasReference={imageNodeViewModel.canEditPromptReferences}
+              isCanvasReferenceSelectionModeActive={isCanvasReferenceSelectionMode}
               isGenerating={isGenerating}
               generationTask={generationTask}
               textReferences={textReferences}
@@ -2321,6 +2414,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
               onRemoveReference={handleRemoveReference}
               onUseReference={handleUseReference}
               onStartMarkMode={startMarkMode}
+              onStartCanvasReferenceSelection={startCanvasReferenceSelection}
               onUpdateMarkCandidate={updateMarkCandidate}
               showToast={showToast}
               autoOpenLightPanel={pendingLightPanelOpen}

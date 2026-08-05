@@ -14,6 +14,7 @@ export interface ToolbarAction {
   icon: ComponentType<{ className?: string }>;
   label: string;
   tooltipLabel?: string;
+  controlHover?: boolean;
   action?: () => void;
   disabled?: boolean;
   danger?: boolean;
@@ -38,6 +39,7 @@ export function ImageToolbar({
     { icon: Maximize2, label: t('toolbar.fullscreen'), action: onPreview, disabled: !hasImage },
     { icon: Download, label: t('common.actions.download'), action: onDownload, disabled: !hasImage },
   ];
+  const usesControlHover = tools.length === 1 && tools[0]?.controlHover === true;
 
   const stopToolbarEvent = (event: MouseEvent<HTMLButtonElement> | PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -58,12 +60,16 @@ export function ImageToolbar({
   return (
     <TooltipProvider delayDuration={120}>
       <div
-        className="flex items-center gap-1 rounded-2xl px-2 py-1.5 nodrag nowheel"
+        className={`group/upload-control flex items-center gap-1 rounded-2xl px-2 py-1.5 nodrag nowheel ${
+          usesControlHover
+            ? 'border border-[rgba(148,163,184,0.28)] bg-[#252526] transition-colors hover:border-[rgba(148,163,184,0.55)] hover:bg-[#303238]'
+            : ''
+        }`}
         style={{
-          background: '#252526',
+          background: usesControlHover ? undefined : '#252526',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: usesControlHover ? undefined : '1px solid rgba(255,255,255,0.08)',
           boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
         }}
       >
@@ -76,16 +82,29 @@ export function ImageToolbar({
                   onPointerDown={stopToolbarEvent}
                   onClick={(event) => handleAction(event, tool)}
                   disabled={tool.disabled}
-                  className="flex items-center justify-center rounded-full transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30"
+                  className={`flex items-center justify-center rounded-full transition-[color,background-color,box-shadow] duration-150 disabled:cursor-not-allowed disabled:opacity-30 ${
+                    tool.controlHover
+                      ? 'text-[rgba(203,213,225,0.68)] group-hover/upload-control:text-[#CBD5E1]'
+                      : 'enabled:hover:text-white'
+                  } ${
+                    tool.controlHover
+                      ? ''
+                      : 'enabled:hover:bg-white/20 enabled:hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                  } ${
+                    tool.controlHover
+                      ? ''
+                      : tool.danger
+                        ? 'text-white/[0.74]'
+                        : 'text-white/[0.85]'
+                  }`}
                   style={{
                     width: 32,
                     height: 32,
-                    color: tool.danger ? 'rgba(255,255,255,0.74)' : 'rgba(255,255,255,0.85)',
                   }}
                   aria-label={tool.label}
                   title={tool.label}
                 >
-                  <tool.icon className="w-4 h-4" />
+                  <tool.icon className="h-4 w-4 transition-colors duration-150" />
                 </button>
                 {openMenuLabel === tool.label && tool.menuItems?.length && (
                   <div

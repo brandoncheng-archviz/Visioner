@@ -84,6 +84,7 @@ export interface ImageNodeData {
     sourceHandleType?: ConnectionHandleType,
   ) => void;
   onRemoveReferenceEdge?: (targetNodeId: string, sourceNodeId: string) => void;
+  onAddImageReferenceEdge?: (targetNodeId: string, sourceNodeId: string) => void;
   onAssignReferenceEdgeRole?: (
     targetNodeId: string,
     sourceNodeId: string,

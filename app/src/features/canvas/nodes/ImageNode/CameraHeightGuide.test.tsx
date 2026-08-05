@@ -8,9 +8,9 @@ import { CameraHeightGuide } from './CameraHeightGuide';
 afterEach(cleanup);
 
 describe('CameraHeightGuide', () => {
-  it('opens the complete six-level guide on click', async () => {
+  it('opens the complete six-level guide on hover', async () => {
     render(<CameraHeightGuide />);
-    fireEvent.click(document.querySelector('button') as HTMLButtonElement);
+    fireEvent.pointerEnter(document.querySelector('[data-camera-guide-trigger="height"]') as HTMLElement);
 
     await waitFor(() => {
       expect(document.body.textContent).toContain('机位高度对照');

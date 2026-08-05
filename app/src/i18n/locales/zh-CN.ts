@@ -118,6 +118,11 @@ const zhCN = {
     },
   },
 
+  canvasSelection: {
+    backToNode: "返回节点",
+    close: "退出画布选择模式",
+  },
+
   exteriorRender: {
     title: "室外渲染",
     outputTitlePrefix: "室外渲染输出",
@@ -134,7 +139,8 @@ const zhCN = {
       uploadResource: "上传资源图",
       removeImage: "移除图像",
       unassignedRole: "未设置用途",
-      selectionHint: "选择一张画布图片作为输入，Esc 取消",
+      selectionTitle: "从画布选择参考",
+      selectionHint: "点击图片节点作为图像输入",
       empty: "请添加至少一张图像输入",
       viewMore: "查看更多",
     },
@@ -144,7 +150,8 @@ const zhCN = {
       add: "添加 {{channel}} 通道",
       replace: "替换 {{channel}} 通道",
       remove: "移除 {{channel}} 通道",
-      selectionHint: "选择一张画布图片作为 {{channel}} 通道，Esc 取消",
+      selectionTitle: "选择 {{channel}} 通道",
+      selectionHint: "点击图片节点作为通道输入",
       unrecognized: "未识别",
     },
     prompt: { placeholder: "输入补充描述…" },
@@ -367,6 +374,12 @@ const zhCN = {
         enabled: "已开启",
         disabled: "已关闭",
       },
+    },
+    referenceSelection: {
+      button: "参考",
+      buttonTitle: "从画布添加参考图",
+      title: "从画布选择参考",
+      hint: "点击图片节点添加为参考图",
     },
     workflowSource: {
       tooltip: "室外渲染来源",

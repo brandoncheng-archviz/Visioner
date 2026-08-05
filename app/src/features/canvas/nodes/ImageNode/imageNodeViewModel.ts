@@ -59,6 +59,10 @@ export type ImageNodeViewModel = {
   canDeleteReference: boolean;
 };
 
+export function canStartCanvasMarkSelection(isProcessing: boolean): boolean {
+  return !isProcessing;
+}
+
 export function createImageNodeViewModel(
   data: ImageNodeData,
   context: CreateImageNodeViewModelContext = {},

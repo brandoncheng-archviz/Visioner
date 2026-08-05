@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createImageNodeViewModel } from './imageNodeViewModel';
+import { canStartCanvasMarkSelection, createImageNodeViewModel } from './imageNodeViewModel';
 
 describe('createImageNodeViewModel', () => {
+  it('allows an idle empty target node to enter canvas mark selection', () => {
+    expect(canStartCanvasMarkSelection(false)).toBe(true);
+    expect(canStartCanvasMarkSelection(true)).toBe(false);
+  });
+
   it('treats a completed exterior-render output as an editable image', () => {
     const viewModel = createImageNodeViewModel({
       currentImage: '/assets/mock/generation-results/result-01.png',

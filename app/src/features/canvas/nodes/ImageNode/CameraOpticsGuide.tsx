@@ -1,6 +1,7 @@
+import { useRef, useState } from 'react';
 import { Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { CAMERA_APERTURE_PRESETS, CAMERA_FOCAL_LENGTH_PRESETS } from './cameraControlDisplay';
 
 const SURFACE_CLASS = 'border-white/[0.08] bg-[#111214] shadow-[0_12px_32px_rgba(0,0,0,0.45)]';
@@ -18,24 +19,38 @@ export function CameraApertureGuide() {
 function CameraOpticsGuide({ kind }: { kind: OpticsGuideKind }) {
   const { t } = useTranslation();
   const presets = kind === 'focalLength' ? CAMERA_FOCAL_LENGTH_PRESETS : CAMERA_APERTURE_PRESETS;
+  const [open, setOpen] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = () => {
+    if (closeTimerRef.current !== null) globalThis.clearTimeout(closeTimerRef.current);
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimerRef.current = globalThis.setTimeout(() => setOpen(false), 120);
+  };
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
+    <Popover open={open}>
+      <PopoverAnchor asChild>
+        <span
+          data-camera-guide-trigger={kind}
           aria-label={t(`imageNode.camera.${kind}.guideLabel`)}
           className="nodrag nopan nowheel flex h-5 w-5 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/[0.05] hover:text-white/62"
+          onPointerEnter={() => { cancelClose(); setOpen(true); }}
+          onPointerLeave={scheduleClose}
         >
           <Info className="h-3.5 w-3.5" strokeWidth={1.6} />
-        </button>
-      </PopoverTrigger>
+        </span>
+      </PopoverAnchor>
       <PopoverContent
         data-image-camera-popover="true"
         side="top"
         sideOffset={8}
         align="center"
         className={`nodrag nopan nowheel z-[140] w-[440px] rounded-xl border p-4 text-left ${SURFACE_CLASS}`}
+        onPointerEnter={cancelClose}
+        onPointerLeave={scheduleClose}
         onPointerDown={(event) => event.stopPropagation()}
       >
         <div className="text-[13px] font-medium text-white/88">{t(`imageNode.camera.${kind}.guideTitle`)}</div>
