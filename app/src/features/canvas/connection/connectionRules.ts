@@ -1,6 +1,6 @@
 import type { ImageRole } from '../types/imageNode.types';
 import { UNIQUE_USAGES } from '../constants/imageUsages';
-import { formatReferenceLimitIssue, getReferenceLimitIssueForAdd } from '../utils/referenceLimits';
+import { getReferenceLimitIssueForAdd, type ReferenceLimitIssue } from '../utils/referenceLimits';
 import { wouldCreateCycle } from '../utils/canvasGraphUtils';
 import type {
   ConnectionRejectCode,
@@ -20,6 +20,7 @@ export type ConnectionRuleMessages = {
   upscaleMaxOneImage: string;
   compareMaxTwoImages: string;
   usageConflict: (role: ImageRole) => string;
+  referenceLimit: (issue: ReferenceLimitIssue) => string;
 };
 
 export type ValidateConnectionRulesInput = {
@@ -153,7 +154,7 @@ export function validateConnectionRules(input: ValidateConnectionRulesInput): Co
     });
     const limitIssue = getReferenceLimitIssueForAdd(targetReferences, sourceRole);
     if (limitIssue) {
-      return reject('reference_limit', formatReferenceLimitIssue(limitIssue), {
+      return reject('reference_limit', messages.referenceLimit(limitIssue), {
         limitIssue,
         currentReferenceCount: currentReferenceCount ?? targetReferences.length,
       });

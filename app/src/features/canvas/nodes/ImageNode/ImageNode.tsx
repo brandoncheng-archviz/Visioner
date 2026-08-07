@@ -553,7 +553,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
     const referenceLimitIssue = getReferenceLimitIssueForGenerate(references);
     if (referenceLimitIssue) {
-      showToast(formatReferenceLimitIssue(referenceLimitIssue));
+      showToast(formatReferenceLimitIssue(referenceLimitIssue, (key, values) => t(key, values)));
       return;
     }
 
@@ -1503,8 +1503,8 @@ export function ImageNode({ data, selected, id }: NodeProps) {
           </style>
           <CanvasSelectionModeBanner
             icon={ImagePlus}
-            title={t('imageNode.referenceSelection.title')}
-            description={t('imageNode.referenceSelection.hint')}
+            title={t('reference.canvasSelection.title')}
+            description={t('reference.canvasSelection.hint')}
             onBackToNode={() => {
               const onFocusNode = data.onFocusNode as ((nodeId: string) => void) | undefined;
               onFocusNode?.(id);
@@ -2034,7 +2034,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
                   cursor: canEditRole ? 'pointer' : 'default',
                   opacity: canEditRole ? 1 : 0.5,
                 }}
-                title={t('imageNode.tooltips.setReferenceRole')}
+                title={t('reference.tooltips.setRole')}
               >
                 {RoleIconForTitle && (
                   <RoleIconForTitle className="inline-block" style={{ width: 11, height: 11, marginRight: 3, verticalAlign: '-0.1em' }} />

@@ -107,7 +107,7 @@ export function TextNodeInputPanel({
       {(textReferences.length > 0 || imageReferences.length > 0) && (
         <div className="flex items-center gap-2 px-[14px] pb-2 pt-[14px]">
           {textReferences.map((reference, index) => {
-            const summary = reference.content.trim() || t('textNode.references.textEmpty');
+            const summary = reference.content.trim() || t('reference.status.textEmpty');
             return (
               <div
                 key={reference.nodeId}
@@ -160,8 +160,8 @@ export function TextNodeInputPanel({
                     }}
                     className="nodrag nowheel absolute right-0 top-0 z-30 hidden h-[18px] w-[18px] items-center justify-center rounded-full text-white/78 transition-colors hover:bg-black hover:text-white group-hover/text-ref:flex"
                     style={{ background: 'rgba(0,0,0,0.78)', border: '1px solid rgba(255,255,255,0.18)' }}
-                    title={t('textNode.references.disconnectText')}
-                    aria-label={t('textNode.references.disconnectText')}
+                    title={t('reference.actions.disconnectTextReference')}
+                    aria-label={t('reference.actions.disconnectTextReference')}
                   >
                     <X className="h-2.5 w-2.5" />
                   </button>
@@ -250,8 +250,8 @@ export function TextNodeInputPanel({
                     background: 'rgba(0,0,0,0.78)',
                     border: '1px solid rgba(255,255,255,0.18)',
                   }}
-                  title={t('textNode.references.disconnectImage')}
-                  aria-label={t('textNode.references.disconnectImage')}
+                  title={t('reference.actions.disconnectImageReference')}
+                  aria-label={t('reference.actions.disconnectImageReference')}
                 >
                   <X className="h-2.5 w-2.5" />
                 </button>

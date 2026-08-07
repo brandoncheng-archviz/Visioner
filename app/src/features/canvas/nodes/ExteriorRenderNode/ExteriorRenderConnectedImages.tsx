@@ -178,14 +178,14 @@ export function ExteriorRenderConnectedImages({
                   borderColor: `${image.roleColor || DEFAULT_USAGE_COLOR}40`,
                   color: image.roleColor || DEFAULT_USAGE_COLOR,
                 }}
-                title={image.roleLabel || t('exteriorRender.imageInput.unassignedRole')}
+                title={image.roleLabel || t('reference.roles.unassigned')}
               >
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: image.roleColor || DEFAULT_USAGE_COLOR }}
                 />
                 <span className="min-w-0 truncate text-[10px] font-medium">
-                  {image.roleLabel || t('exteriorRender.imageInput.unassignedRole')}
+                  {image.roleLabel || t('reference.roles.unassigned')}
                 </span>
               </div>
             </div>

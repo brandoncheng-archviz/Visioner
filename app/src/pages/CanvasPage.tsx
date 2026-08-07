@@ -27,6 +27,7 @@ import type { ImageRole, LocalReferencePoint, PromptContent } from '../features/
 import { getImageRoleLabel } from '../features/canvas/constants/imageUsages';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM, CANVAS_NODE_CONTROL_SCALE as IMAGE_NODE_CONTROL_SCALE, DEFAULT_MODEL_PARAMS, IMAGE_CROP_CANCEL_EVENT, IMAGE_NODE_CONTROL_WIDTH, IMAGE_NODE_PREVIEW_WIDTH } from '../features/canvas/constants/canvasConstants';
 import { getRoleData } from '../features/canvas/utils/referenceUtils';
+import { formatReferenceLimitIssue } from '../features/canvas/utils/referenceLimits';
 import { getNextCopiedNodeTitle, getNextNodeTitle } from '../features/canvas/utils/nodeNaming';
 import { prepareCanvasNodeDataForCopy } from '../features/canvas/utils/nodeCopyData';
 import {
@@ -294,6 +295,10 @@ function FlowCanvas() {
     usageConflict: (role) => t('reference.validation.usageConflict', {
       role: getImageRoleLabel(role, undefined, undefined, undefined, (key) => t(key)),
     }),
+    referenceLimit: (issue) => formatReferenceLimitIssue(
+      issue,
+      (key, values) => t(key, values),
+    ),
   }), [t]);
 
   const validateImageProcessingEdge = useCallback((

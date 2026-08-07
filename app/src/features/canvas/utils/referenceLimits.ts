@@ -2,23 +2,29 @@ import type { ImageRole, ReferenceInfo } from '../types/imageNode.types';
 import { MAX_REFERENCE_IMAGES_PER_NODE } from '../constants/canvasConstants';
 
 export type ReferenceLimitIssue = {
-  title: string;
-  message: string;
+  titleKey: string;
+  messageKey: string;
+  values: Readonly<Record<string, number>>;
 };
 
 export const REFERENCE_LIMIT_MESSAGES = {
   maxReferences: {
-    title: '参考图已达上限',
-    message: `当前节点最多接入 ${MAX_REFERENCE_IMAGES_PER_NODE} 张图片，请删除部分引用后再添加。`,
+    titleKey: 'reference.validation.limitReachedTitle',
+    messageKey: 'reference.validation.limitReachedMessage',
+    values: { max: MAX_REFERENCE_IMAGES_PER_NODE },
   },
   maxReferencesForGenerate: {
-    title: '参考图数量超过上限',
-    message: `当前节点最多支持 ${MAX_REFERENCE_IMAGES_PER_NODE} 张引用图，请删除部分引用后再生成。`,
+    titleKey: 'reference.validation.generateLimitTitle',
+    messageKey: 'reference.validation.generateLimitMessage',
+    values: { max: MAX_REFERENCE_IMAGES_PER_NODE },
   },
 } satisfies Record<string, ReferenceLimitIssue>;
 
-export function formatReferenceLimitIssue(issue: ReferenceLimitIssue): string {
-  return `${issue.title}\n${issue.message}`;
+export function formatReferenceLimitIssue(
+  issue: ReferenceLimitIssue,
+  translate: (key: string, values: Readonly<Record<string, number>>) => string,
+): string {
+  return `${translate(issue.titleKey, issue.values)}\n${translate(issue.messageKey, issue.values)}`;
 }
 
 export function isLocalReferenceRole(role: ImageRole | null | undefined): boolean {

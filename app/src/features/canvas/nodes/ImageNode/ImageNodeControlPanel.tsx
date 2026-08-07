@@ -791,7 +791,7 @@ export function ImageNodeControlPanel({
 
     const limitIssue = getReferenceLimitIssueForGenerate(references);
     if (limitIssue) {
-      showToast?.(formatReferenceLimitIssue(limitIssue));
+      showToast?.(formatReferenceLimitIssue(limitIssue, (key, values) => t(key, values)));
       return;
     }
     void onGenerate();
@@ -1078,10 +1078,10 @@ export function ImageNodeControlPanel({
                 opacity: canSelectCanvasReference ? 1 : 0.45,
                 cursor: canSelectCanvasReference ? 'pointer' : 'not-allowed',
               }}
-              title={t('imageNode.referenceSelection.buttonTitle')}
+              title={t('reference.canvasSelection.buttonTitle')}
             >
               <ImagePlus className="h-4 w-4" />
-              <span style={{ fontSize: 14 }}>{t('imageNode.referenceSelection.button')}</span>
+              <span style={{ fontSize: 14 }}>{t('reference.canvasSelection.button')}</span>
             </button>
           </div>
           {workflowSource?.type === 'exteriorRender' && (
