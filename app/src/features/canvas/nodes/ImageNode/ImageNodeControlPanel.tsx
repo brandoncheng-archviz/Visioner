@@ -13,6 +13,7 @@ import {
   Check,
   Lock,
   Unlock,
+  SunMedium,
 } from 'lucide-react';
 import type {
   PromptContent,
@@ -41,7 +42,6 @@ import {
   sortReferencesByUsage,
 } from '../../utils/referenceUtils';
 import { formatReferenceLimitIssue, getReferenceLimitIssueForGenerate } from '../../utils/referenceLimits';
-import { LightPreviewPanel } from '../../components/LightPreviewPanel';
 import { ModelAspectRatioOptions } from '../../components/ModelAspectRatioOptions';
 import { ModelParamsSummaryButton } from '../../components/ModelParamsSummaryButton';
 import {
@@ -61,6 +61,7 @@ import { CameraControlPopover } from './CameraControlPopover';
 import { CameraPositionIcon } from './CameraPositionIcon';
 import { CameraControlPreview } from './CameraControlPreview';
 import { isCameraPopoverWheelEvent } from './cameraControlEvents';
+import { ImageLightingControlPopover } from './ImageLightingControlPopover';
 
 const GENERATION_CONTROL_BUTTON_CLASS =
   'border-[rgba(148,163,184,0.28)] bg-transparent text-[rgba(203,213,225,0.68)] hover:border-[rgba(148,163,184,0.55)] hover:bg-[rgba(148,163,184,0.08)] hover:text-[#CBD5E1]';
@@ -229,6 +230,7 @@ export function ImageNodeControlPanel({
   const { t } = useTranslation();
   const translate = useCallback((key: string) => t(key), [t]);
   const [showLightPreview, setShowLightPreview] = useState(false);
+  const [lightingButtonElement, setLightingButtonElement] = useState<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (autoOpenLightPanel && canEditLighting) {
@@ -239,6 +241,12 @@ export function ImageNodeControlPanel({
       return () => clearTimeout(timer);
     }
   }, [autoOpenLightPanel, canEditLighting, onAcknowledgeAutoOpen]);
+
+  useEffect(() => {
+    if (canEditLighting) return;
+    const timer = setTimeout(() => setShowLightPreview(false), 0);
+    return () => clearTimeout(timer);
+  }, [canEditLighting]);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [showRatioMenu, setShowRatioMenu] = useState(false);
   const [showCameraPopover, setShowCameraPopover] = useState(false);
@@ -1657,6 +1665,7 @@ export function ImageNodeControlPanel({
               onClick={() => {
                 if (!canEditModel) return;
                 setShowCameraPopover((value) => !value);
+                setShowLightPreview(false);
                 setShowModelMenu(false);
                 setShowRatioMenu(false);
               }}
@@ -1678,6 +1687,43 @@ export function ImageNodeControlPanel({
               onChange={onCameraControlChange}
               onOpenChange={setShowCameraPopover}
             />
+          </div>
+          {/* Lighting is a lightweight sun-and-sky generation constraint. */}
+          <div className="relative flex-shrink-0">
+            <button
+              ref={setLightingButtonElement}
+              type="button"
+              disabled={!canEditLighting}
+              aria-pressed={showLightPreview}
+              aria-label={t('imageNode.lighting.title')}
+              title={t('imageNode.lighting.title')}
+              onClick={() => {
+                if (!canEditLighting) return;
+                setShowLightPreview((value) => !value);
+                setShowCameraPopover(false);
+                setShowModelMenu(false);
+                setShowRatioMenu(false);
+              }}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                lightPreview?.enabled
+                  ? 'border-[#2f6bff]/55 bg-[#2f6bff]/15 text-[#8eb0ff] hover:border-[#2f6bff]/75 hover:bg-[#2f6bff]/20'
+                  : showLightPreview
+                    ? 'border-white/[0.16] bg-white/[0.09] text-white/86'
+                    : 'border-white/[0.08] bg-white/[0.03] text-white/52 hover:border-white/[0.14] hover:bg-white/[0.065] hover:text-white/82'
+              }`}
+            >
+              <SunMedium className="h-[18px] w-[18px]" strokeWidth={1.6} />
+            </button>
+            {showLightPreview && (
+              <ImageLightingControlPopover
+                anchorElement={lightingButtonElement}
+                value={lightPreview}
+                disabled={!canEditLighting}
+                onApply={onLightPreviewChange}
+                onClear={() => onLightPreviewChange(null)}
+                onOpenChange={setShowLightPreview}
+              />
+            )}
           </div>
         </div>
         {/* Credits + generate button */}
@@ -1741,18 +1787,6 @@ export function ImageNodeControlPanel({
           )}
         </div>
       </div>
-      {canEditLighting && showLightPreview && (
-        <LightPreviewPanel
-          initialSun={lightPreview?.sun}
-          initialSettings={lightPreview?.settings}
-          onApply={(data) => {
-            if (!canEditLighting) return;
-            onLightPreviewChange(data);
-            setShowLightPreview(false);
-          }}
-          onClose={() => setShowLightPreview(false)}
-        />
-      )}
     </div>
   );
 }

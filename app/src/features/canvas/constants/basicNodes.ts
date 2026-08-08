@@ -16,12 +16,6 @@ export const BASIC_NODE_DEFINITIONS = [
     group: 'content',
   },
   {
-    type: 'relight',
-    labelKey: 'canvas.createMenuRelightNode',
-    color: '#facc15',
-    group: 'imageProcessing',
-  },
-  {
     type: 'exteriorRender',
     labelKey: 'canvas.createMenuExteriorRenderNode',
     color: '#38bdf8',

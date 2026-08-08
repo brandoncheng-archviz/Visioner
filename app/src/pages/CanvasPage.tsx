@@ -50,7 +50,6 @@ import {
   buildExteriorRenderFailedOutput,
   buildExteriorRenderProcessingOutput,
 } from '../features/canvas/nodes/ExteriorRenderNode/exteriorRenderResultGraph';
-import type { RelightCreationOptions } from '../features/canvas/types/relight.types';
 import type {
   TextNodeActionType,
   TextNodeData,
@@ -98,7 +97,6 @@ import { NODE_BASE_TITLES } from '../features/canvas/constants/canvasNodeTitles'
 import {
   createBasicCanvasNode,
   createCompareCanvasNode,
-  createRelightCanvasNode,
   createSunSkyCanvasNode,
   createUpscaleCanvasNode,
 } from '../features/canvas/utils/canvasNodeFactories';
@@ -851,57 +849,6 @@ function FlowCanvas() {
     }, 50);
   }, [nodes, setNodes, setEdges, fitView, getViewport, t, getAllNodeLabels]);
 
-  const createRelightNode = useCallback((
-    sourceNodeId: string,
-    inputImage: string,
-    width: number,
-    height: number,
-    options?: RelightCreationOptions,
-  ) => {
-    const sourceNode = nodes.find((n) => n.id === sourceNodeId);
-    if (!sourceNode) return;
-
-    const newNodeId = `relight-${Date.now()}`;
-    const label = getNextNodeTitle(getAllNodeLabels(), NODE_BASE_TITLES.relight);
-    const estimatedWidth = sourceNode.measured?.width || sourceNode.width || IMAGE_NODE_PREVIEW_WIDTH;
-    const newNode = createRelightCanvasNode({
-      id: newNodeId,
-      sourceNode,
-      estimatedWidth,
-      sourceNodeId,
-      label,
-      inputImage,
-      width,
-      height,
-      options,
-    });
-    const newEdge: Edge = {
-      id: `e-${Date.now()}`,
-      source: sourceNodeId,
-      target: newNodeId,
-      sourceHandle: 'right-source',
-      targetHandle: 'left-target',
-      style: { stroke: '#555', strokeWidth: 1 },
-    };
-    const validation = validateImageProcessingEdge([...nodes, newNode], edges, newEdge);
-    if (!validation.valid) {
-      showToast(validation.reason || t('canvas.cannotConnect'));
-      return;
-    }
-
-    setNodes((nds) => [...nds.map((n) => ({ ...n, selected: false })), newNode]);
-    setEdges((eds) => [...eds, newEdge]);
-
-    setTimeout(() => {
-      fitView({
-        nodes: [{ id: newNodeId }],
-        duration: 300,
-        padding: 0.15,
-        maxZoom: Math.min(getViewport().zoom, 1.2),
-      });
-    }, 50);
-  }, [edges, nodes, setNodes, setEdges, fitView, getViewport, getAllNodeLabels, showToast, t, validateImageProcessingEdge]);
-
   const createCompareNode = useCallback((sourceNodeId: string) => {
     const sourceNode = nodes.find((n) => n.id === sourceNodeId);
     if (!sourceNode) return;
@@ -1454,7 +1401,6 @@ function FlowCanvas() {
         onCreateUpscaleNode: n.type === 'image' || n.type === 'upscale' || n.type === 'relight' ? createUpscaleNode : undefined,
         onCreateSunSkyNode: n.type === 'image' ? createSunSkyNode : undefined,
         onCreateCompareNode: n.type === 'image' || n.type === 'relight' ? createCompareNode : undefined,
-        onCreateRelightNode: n.type === 'image' || n.type === 'relight' ? createRelightNode : undefined,
         onTextAction: n.type === 'text' ? handleTextAction : undefined,
         onFocusNode: n.type === 'image' ? focusCanvasNode : undefined,
         activeImageMarkTargetNodeId: n.type === 'image' ? activeImageMarkTargetNodeId : undefined,
@@ -1475,7 +1421,7 @@ function FlowCanvas() {
         onRegisterObjectUrl: n.type === 'image' ? (url: string) => { objectUrlsRef.current.add(url); } : undefined,
       },
     }));
-  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addImageReferenceEdge, addExteriorRenderInputEdge, removeExteriorRenderInputEdge, uploadExteriorRenderInputImages, createExteriorRenderOutput, writeExteriorRenderResult, failExteriorRenderOutput, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, createRelightNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
+  }, [activeImageMarkSessionId, activeImageMarkSourceNodeId, activeImageMarkTargetNodeId, nodes, duplicateNodeById, deleteNodeById, lockedPromptReferenceNodeIds, startLineDraw, removeReferenceEdge, addImageReferenceEdge, addExteriorRenderInputEdge, removeExteriorRenderInputEdge, uploadExteriorRenderInputImages, createExteriorRenderOutput, writeExteriorRenderResult, failExteriorRenderOutput, swapCompareInputs, assignReferenceEdgeRole, createUpscaleNode, createSunSkyNode, createCompareNode, handleTextAction, focusCanvasNode, openHistoryPanel, objectUrlsRef]);
 
   // ─── History (Undo / Redo) ───
   const normalizeHistoryEdges = useCallback((currentEdges: Edge[], currentNodes: Node[]) => {
@@ -1931,7 +1877,7 @@ function FlowCanvas() {
     resolveNodeImage(nodeContextMenuNode.data),
   );
 
-  const handleCreateImageToolFromContextMenu = useCallback((nodeId: string, type: 'relight' | 'upscale' | 'compare') => {
+  const handleCreateImageToolFromContextMenu = useCallback((nodeId: string, type: 'upscale' | 'compare') => {
     const sourceNode = nodes.find((node) => node.id === nodeId);
     if (!sourceNode || sourceNode.type !== 'image') return;
     if (isProcessingImageNode(sourceNode)) return;
@@ -1942,16 +1888,12 @@ function FlowCanvas() {
       return;
     }
 
-    if (type === 'relight') {
-      createRelightNode(nodeId, resolved.imageUrl, resolved.width, resolved.height);
-      return;
-    }
     if (type === 'upscale') {
       createUpscaleNode(nodeId, resolved.imageUrl, resolved.width, resolved.height);
       return;
     }
     createCompareNode(nodeId);
-  }, [createCompareNode, createRelightNode, createUpscaleNode, nodes, showToast, t]);
+  }, [createCompareNode, createUpscaleNode, nodes, showToast, t]);
 
   const handleContextMenuAddNode = useCallback((type: string, label: string) => {
     if (!contextMenu) return;
@@ -1960,7 +1902,7 @@ function FlowCanvas() {
 
   const handleCreateAndConnect = useCallback((type: string) => {
     if (!createMenu) return;
-    if (!['text', 'image', 'video', 'relight', 'upscale', 'compare', 'exteriorRender'].includes(type)) {
+    if (!['text', 'image', 'video', 'upscale', 'compare', 'exteriorRender'].includes(type)) {
       setCreateMenu(null);
       setTempLine(null);
       return;

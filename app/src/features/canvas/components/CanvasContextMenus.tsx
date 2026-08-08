@@ -1,4 +1,4 @@
-import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sun, Sparkles, Columns2, Building2 } from 'lucide-react';
+import { Image, Download, Copy, ClipboardPaste, Trash2, Bug, Sparkles, Columns2, Building2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -125,7 +125,6 @@ function TextNodeIcon({ className, style }: { className?: string; style?: React.
 const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
   text: TextNodeIcon as unknown as typeof Image,
   image: Image,
-  relight: Sun,
   exteriorRender: Building2,
   upscale: Sparkles,
   compare: Columns2,
@@ -260,7 +259,7 @@ export interface NodeContextMenuProps {
   onClose: () => void;
   onReopen: (clientX: number, clientY: number) => void;
   canCreateImageTools?: boolean;
-  onCreateImageToolNode?: (nodeId: string, type: 'relight' | 'upscale' | 'compare') => void;
+  onCreateImageToolNode?: (nodeId: string, type: 'upscale' | 'compare') => void;
   onDuplicate: (nodeId: string) => void;
   onPaste: () => void;
   onDelete: (nodeId: string) => void;
@@ -283,7 +282,6 @@ export function NodeContextMenu({
   if (!menu) return null;
 
   const imageToolItems = [
-    { type: 'relight' as const, label: t('canvas.createMenuRelightNode'), Icon: Sun },
     { type: 'upscale' as const, label: t('canvas.createMenuUpscaleNode'), Icon: Sparkles },
     { type: 'compare' as const, label: t('canvas.createMenuCompareNode'), Icon: Columns2 },
   ];
@@ -398,7 +396,7 @@ export interface CanvasContextMenusProps {
   onCloseNodeContextMenu: () => void;
   onNodeContextMenuReopen: (clientX: number, clientY: number) => void;
   canCreateImageTools?: boolean;
-  onCreateImageToolNode?: (nodeId: string, type: 'relight' | 'upscale' | 'compare') => void;
+  onCreateImageToolNode?: (nodeId: string, type: 'upscale' | 'compare') => void;
   onNodeDuplicate: (nodeId: string) => void;
   onNodePaste: () => void;
   onNodeDelete: (nodeId: string) => void;

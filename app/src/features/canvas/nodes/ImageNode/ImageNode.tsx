@@ -698,6 +698,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         inputRefs: task.inputRefs,
         markRefs: task.markRefs,
         modelParams: generationModelParams,
+        lightPreview,
         style: globalStyle,
         presets: selectedPresets,
       });

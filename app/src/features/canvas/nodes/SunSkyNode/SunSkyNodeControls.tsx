@@ -5,6 +5,9 @@ export interface SunSkyNodeControlsProps {
   elevation: number;
   azimuth: number;
   directionLabel?: string;
+  elevationLabel?: string;
+  azimuthLabel?: string;
+  showRangeLabels?: boolean;
   layout?: 'inline' | 'stacked';
   onElevationChange: (value: number) => void;
   onAzimuthChange: (value: number) => void;
@@ -14,6 +17,9 @@ export function SunSkyNodeControls({
   elevation,
   azimuth,
   directionLabel,
+  elevationLabel = '太阳高度',
+  azimuthLabel = '太阳方位',
+  showRangeLabels = true,
   layout = 'inline',
   onElevationChange,
   onAzimuthChange,
@@ -24,7 +30,7 @@ export function SunSkyNodeControls({
     <div className={stacked ? 'space-y-2' : 'space-y-3'}>
       <SunSlider
         icon={<Sun className="h-4 w-4" />}
-        label="太阳高度"
+        label={elevationLabel}
         value={elevation}
         min={0}
         max={90}
@@ -33,12 +39,13 @@ export function SunSkyNodeControls({
         midLabel="45°"
         maxLabel="90°"
         stacked={stacked}
+        showRangeLabels={showRangeLabels}
         onChange={onElevationChange}
       />
       <div className={stacked ? 'my-2 h-px bg-white/[0.045]' : 'h-px bg-white/[0.06]'} />
       <SunSlider
         icon={<Compass className="h-4 w-4" />}
-        label="太阳方位"
+        label={azimuthLabel}
         value={azimuth}
         min={0}
         max={360}
@@ -48,6 +55,7 @@ export function SunSkyNodeControls({
         maxLabel="360°"
         extraValue={stacked ? undefined : directionLabel}
         stacked={stacked}
+        showRangeLabels={showRangeLabels}
         onChange={onAzimuthChange}
       />
     </div>
@@ -66,6 +74,7 @@ function SunSlider({
   maxLabel,
   extraValue,
   stacked = false,
+  showRangeLabels = true,
   onChange,
 }: {
   icon: React.ReactNode;
@@ -79,6 +88,7 @@ function SunSlider({
   maxLabel: string;
   extraValue?: string;
   stacked?: boolean;
+  showRangeLabels?: boolean;
   onChange: (value: number) => void;
 }) {
   const percent = ((value - min) / (max - min)) * 100;
@@ -106,11 +116,13 @@ function SunSlider({
           background: `linear-gradient(to right, #208cff 0%, #208cff ${percent}%, rgba(255,255,255,0.12) ${percent}%, rgba(255,255,255,0.12) 100%)`,
         }}
       />
-      <div className={`${stacked ? 'mt-2' : 'mt-1.5'} grid grid-cols-3 text-[13px] text-white/32`}>
-        <span>{minLabel}</span>
-        <span className="text-center">{midLabel}</span>
-        <span className="text-right">{maxLabel}</span>
-      </div>
+      {showRangeLabels && (
+        <div className={`${stacked ? 'mt-2' : 'mt-1.5'} grid grid-cols-3 text-[13px] text-white/32`}>
+          <span>{minLabel}</span>
+          <span className="text-center">{midLabel}</span>
+          <span className="text-right">{maxLabel}</span>
+        </div>
+      )}
     </>
   );
 

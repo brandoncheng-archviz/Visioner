@@ -1,5 +1,5 @@
 import type { LightPreviewData } from '../types/lightPreview.types';
-import type { RelightCloudAmount, RelightFogLevel, RelightSettings } from '../types/relight.types';
+import type { RelightCloudAmount, RelightFogLevel, RelightSettings, RelightTimePeriod } from '../types/relight.types';
 import { resolveSunSkyDerived } from '../nodes/SunSkyNode/resolveSunSkyDerived';
 import { clamp, snapToStep } from '../nodes/SunSkyNode/sunSkyNode.utils';
 
@@ -59,6 +59,15 @@ function resolveAtmospherePrompt(settings: RelightSettings): string {
   return `${CLOUD_PROMPTS[settings.cloudAmount]}, ${fogPrompts[settings.fogLevel]}`;
 }
 
+const TIME_PERIOD_PROMPTS: Record<RelightTimePeriod, string> = {
+  earlyMorning: 'early morning sun and sky atmosphere',
+  morning: 'clean morning daylight atmosphere',
+  noon: 'bright noon daylight atmosphere',
+  afternoon: 'natural afternoon daylight atmosphere',
+  evening: 'warm evening and golden-hour atmosphere',
+  night: 'night sky atmosphere with restrained ambient illumination',
+};
+
 export function createRelightLightPreview(
   sun: { elevation: number; azimuth: number },
   settings: RelightSettings,
@@ -68,6 +77,7 @@ export function createRelightLightPreview(
   const baseDerived = resolveSunSkyDerived({ elevation, azimuth });
   const atmosphereLabel = resolveRelightAtmosphereLabel(settings);
   const atmospherePrompt = resolveAtmospherePrompt(settings);
+  const timePeriodPrompt = settings.timePeriod ? `${TIME_PERIOD_PROMPTS[settings.timePeriod]}, ` : '';
   const isSunsetAfterglow = settings.lightingPresetId === 'clear-noon';
 
   const derived = isSunsetAfterglow
@@ -76,12 +86,12 @@ export function createRelightLightPreview(
         timeLabel: '日落余晖',
         skyLabel: '柔和暮色天空 + 低饱和暖色地平线',
         summary: `${baseDerived.directionLabel}极低角度日落余晖，天空柔和并略带暮色，${atmosphereLabel}，${baseDerived.shadowLengthLabel}、${baseDerived.shadowBlurLabel}阴影，氛围低缓安静。`,
-        promptText: `late sunset afterglow, very low ${baseDerived.directionLabel === '右前方光' ? 'right-front light' : 'natural directional light'}, soft dusky sky, subdued warm horizon, quiet low-intensity illumination, ${baseDerived.shadowLengthLabel === '超长阴影' ? 'very long' : 'long'} soft shadows, ${atmospherePrompt}, realistic architectural visualization`,
+        promptText: `${timePeriodPrompt}late sunset afterglow, very low ${baseDerived.directionLabel === '右前方光' ? 'right-front light' : 'natural directional light'}, soft dusky sky, subdued warm horizon, quiet low-intensity illumination, ${baseDerived.shadowLengthLabel === '超长阴影' ? 'very long' : 'long'} soft shadows, ${atmospherePrompt}, realistic architectural visualization`,
       }
     : {
         ...baseDerived,
         summary: `${baseDerived.timeLabel} · ${baseDerived.directionLabel}，${atmosphereLabel}，${baseDerived.shadowLengthLabel}、${baseDerived.shadowBlurLabel}阴影，适合建筑可视化。`,
-        promptText: `${baseDerived.promptText}, ${atmospherePrompt}`,
+        promptText: `${timePeriodPrompt}${baseDerived.promptText}, ${atmospherePrompt}`,
       };
 
   return {

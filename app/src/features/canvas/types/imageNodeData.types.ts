@@ -3,7 +3,6 @@ import type { ImageMark, ImageRole, LocalReferencePoint, PromptContent } from '.
 import type { ConnectionHandleType, MarkItem, ModelParams } from './canvas.types';
 import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
-import type { RelightCreationOptions } from './relight.types';
 import type { ImageControllerState } from './imageController.types';
 import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';
 
@@ -97,7 +96,6 @@ export interface ImageNodeData {
   onCreateSunSkyNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateCompareNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
   onCreateUpscaleNode?: (sourceNodeId: string, inputImage: string, width: number, height: number) => void;
-  onCreateRelightNode?: (sourceNodeId: string, inputImage: string, width: number, height: number, options?: RelightCreationOptions) => void;
   onOpenNodeHistory?: (nodeId: string) => void;
   onRegisterObjectUrl?: (url: string) => void;
   onFocusNode?: (nodeId: string) => void;

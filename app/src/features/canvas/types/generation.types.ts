@@ -2,6 +2,7 @@ import type { ModelParams } from './canvas.types';
 import type { ImageMarkBox, ImageMarkCandidate, ImageMarkPoint, LocalReferencePoint, LocalReferenceType } from './imageNode.types';
 import type { ImageControllerState } from './imageController.types';
 import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';
+import type { RelightTimePeriod } from './relight.types';
 
 export type GenerationStatus = 'pending' | 'running' | 'success' | 'failed';
 
@@ -71,6 +72,16 @@ export interface ImageGenerationRequest {
     count: ImageGenerationCount;
   };
   controller?: unknown;
+  lighting?: {
+    timePeriod?: RelightTimePeriod;
+    sun: {
+      elevation: number;
+      azimuth: number;
+    };
+    cloudAmount: number;
+    fogAmount: number;
+    promptText: string;
+  };
   style?: unknown;
   presets?: string[];
 }
