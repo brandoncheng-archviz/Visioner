@@ -112,7 +112,7 @@ describe('buildExteriorRenderRequest', () => {
         time: { source: 'manual', value: 'sunset' },
         light: { source: 'manual', value: 'left' },
         weather: { source: 'manual', value: 'rainy' },
-        style: { source: 'manual', value: 'photorealistic' },
+        style: { source: 'manual', value: 'photoreal' },
       },
       modelParams: { model: 'GPT Image 2', aspectRatio: '4:3', resolution: '4K' },
     }));
@@ -124,7 +124,7 @@ describe('buildExteriorRenderRequest', () => {
       time: 'sunset',
       lighting: 'left',
       weather: 'rainy',
-      style: 'photorealistic',
+      style: 'photoreal',
     });
     expect(request.modelParams).toEqual({
       model: 'GPT Image 2',
@@ -143,6 +143,28 @@ describe('buildExteriorRenderRequest', () => {
     expect(JSON.stringify(data)).toBe(before);
     expect(request.inputImages[0]).not.toBe(data.connectedImages?.[0]);
     expect(request.renderChannels.albedo).not.toBe(data.renderChannels?.channels?.[0]);
+  });
+
+  it.each([
+    ['photorealistic', 'photoreal'],
+    ['照片般真实', 'photoreal'],
+    ['luxury', 'luxuryRealEstate'],
+    ['高端地产', 'luxuryRealEstate'],
+    ['dramaticConcept', 'conceptAtmosphere'],
+    ['概念戏剧', 'conceptAtmosphere'],
+    ['painterly', 'conceptAtmosphere'],
+    ['绘画感', 'conceptAtmosphere'],
+    ['nordic', null],
+    ['北欧氛围', null],
+  ] as const)('normalizes legacy exterior-render style %s', (legacyValue, expectedValue) => {
+    type Atmosphere = NonNullable<ExteriorRenderNodeData['atmosphere']>;
+    const request = buildExteriorRenderRequest(createData({
+      atmosphere: {
+        style: { source: 'manual', value: legacyValue } as unknown as Atmosphere['style'],
+      },
+    }));
+
+    expect(request.atmosphere.style).toBe(expectedValue);
   });
 });
 

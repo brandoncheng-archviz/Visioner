@@ -170,7 +170,7 @@ export function createImageLightingDraft(value?: LightPreviewData | null): Image
   };
 }
 
-export function createImageLightingPreview(draft: ImageLightingDraft): LightPreviewData {
+export function createImageLightingPreview(draft: ImageLightingDraft, enabled = true): LightPreviewData {
   const cloudAmount = clampPercent(draft.cloudAmount);
   const fogAmount = clampPercent(draft.fogAmount);
   const settings: RelightSettings = {
@@ -181,10 +181,13 @@ export function createImageLightingPreview(draft: ImageLightingDraft): LightPrev
     timePeriod: draft.timePeriod,
     lightingPresetId: draft.presetId,
   };
-  return createRelightLightPreview(
-    { elevation: draft.elevation, azimuth: draft.azimuth },
-    settings,
-  );
+  return {
+    ...createRelightLightPreview(
+      { elevation: draft.elevation, azimuth: draft.azimuth },
+      settings,
+    ),
+    enabled,
+  };
 }
 
 export function selectImageLightingTime(

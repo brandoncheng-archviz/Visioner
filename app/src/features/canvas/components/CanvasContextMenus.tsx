@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   BASIC_NODE_DEFINITIONS,
-  BASIC_NODE_GROUPS,
   CREATE_NODE_MENU_WIDTH,
   type BasicNodeType,
 } from '../constants/basicNodes';
@@ -138,40 +137,28 @@ function BasicNodeMenuItems({
   const { t } = useTranslation();
 
   return (
-    <>
-      {BASIC_NODE_GROUPS.map((group, groupIndex) => {
-        const items = BASIC_NODE_DEFINITIONS.filter((item) => item.group === group.id);
-        if (items.length === 0) return null;
-
+    <div className="py-0.5">
+      {BASIC_NODE_DEFINITIONS.map((item) => {
+        const ItemIcon = basicNodeIcons[item.type];
+        const label = t(item.labelKey);
         return (
-          <div key={group.id} className={groupIndex > 0 ? 'mt-1.5 border-t border-white/[0.06] pt-1.5' : undefined}>
-            <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-white/[0.48]">
-              {t(group.labelKey)}
-            </div>
-            {items.map((item) => {
-              const ItemIcon = basicNodeIcons[item.type];
-              const label = t(item.labelKey);
-              return (
-                <button
-                  key={item.type}
-                  onClick={() => onSelect(item.type, label)}
-                  className="flex h-14 w-full items-center gap-3 px-4 text-left text-[15px] font-medium transition-colors hover:bg-white/[0.07] active:bg-white/[0.10]"
-                  style={{ color: 'rgba(255,255,255,0.86)' }}
-                >
-                  <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06]"
-                    style={{ color: 'rgba(255,255,255,0.82)' }}
-                  >
-                    <ItemIcon className="h-[18px] w-[18px]" />
-                  </span>
-                  <span className="min-w-0 truncate">{label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <button
+            key={item.type}
+            onClick={() => onSelect(item.type, label)}
+            className="flex h-12 w-full items-center gap-3 px-4 text-left text-[15px] font-medium transition-colors hover:bg-white/[0.07] active:bg-white/[0.10]"
+            style={{ color: 'rgba(255,255,255,0.86)' }}
+          >
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.06]"
+              style={{ color: 'rgba(255,255,255,0.82)' }}
+            >
+              <ItemIcon className="h-[18px] w-[18px]" />
+            </span>
+            <span className="min-w-0 truncate">{label}</span>
+          </button>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -200,7 +187,7 @@ export function CanvasContextMenu({ menu, onClose, onAddNode, onReopen }: Canvas
         x={menu.x}
         y={menu.y}
         width={CREATE_NODE_MENU_WIDTH}
-        estimatedHeight={470}
+        estimatedHeight={306}
         tone="add-node"
         className="fixed z-50 rounded-xl py-2"
         onContextMenu={(e) => {
@@ -234,7 +221,7 @@ export function CreateNodeMenu({ menu, onClose, onCreateAndConnect }: CreateNode
         x={menu.x}
         y={menu.y}
         width={CREATE_NODE_MENU_WIDTH}
-        estimatedHeight={470}
+        estimatedHeight={306}
         tone="add-node"
         className="fixed z-50 rounded-xl py-2"
       >

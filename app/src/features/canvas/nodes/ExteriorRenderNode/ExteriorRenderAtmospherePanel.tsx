@@ -8,6 +8,7 @@ import {
   EXTERIOR_RENDER_TIME_OPTIONS,
   EXTERIOR_RENDER_TOGGLE_OPTIONS,
   EXTERIOR_RENDER_WEATHER_OPTIONS,
+  normalizeExteriorRenderAtmosphereStyle,
   type ExteriorRenderAtmosphereDisplayOption,
 } from './exteriorRenderAtmosphereOptions';
 import type {
@@ -53,7 +54,10 @@ function getOptionLabel(
   unsetLabel: string,
 ) {
   if (!value) return unsetLabel;
-  const option = options.find((candidate) => candidate.id === value);
+  const normalizedValue = options === EXTERIOR_RENDER_STYLE_OPTIONS
+    ? normalizeExteriorRenderAtmosphereStyle(value)
+    : value;
+  const option = options.find((candidate) => candidate.id === normalizedValue);
   return option ? translate(option.labelKey) : unsetLabel;
 }
 
@@ -240,7 +244,10 @@ export function ExteriorRenderAtmospherePanel({ data, disabled = false, hasAtmos
           onWheel={(event) => event.stopPropagation()}
         >
           {activeSelectRow.options.map((option) => {
-            const selected = activeSelectValue?.source === 'manual' && activeSelectValue.value === option.id;
+            const activeValue = activeSelectRow.key === 'style'
+              ? normalizeExteriorRenderAtmosphereStyle(activeSelectValue?.value)
+              : activeSelectValue?.value;
+            const selected = activeSelectValue?.source === 'manual' && activeValue === option.id;
             return (
               <button
                 key={option.id}

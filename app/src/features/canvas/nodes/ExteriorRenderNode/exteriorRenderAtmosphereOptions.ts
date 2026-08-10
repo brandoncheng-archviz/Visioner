@@ -36,12 +36,39 @@ export const EXTERIOR_RENDER_WEATHER_OPTIONS: ExteriorRenderAtmosphereDisplayOpt
 ];
 
 export const EXTERIOR_RENDER_STYLE_OPTIONS: ExteriorRenderAtmosphereDisplayOption<ExteriorRenderAtmosphereStyle>[] = [
-  { id: 'photorealistic', labelKey: 'atmosphere.style.photorealistic' },
-  { id: 'nordic', labelKey: 'atmosphere.style.nordic' },
-  { id: 'dramaticConcept', labelKey: 'atmosphere.style.dramaticConcept' },
+  { id: 'photoreal', labelKey: 'atmosphere.style.photoreal' },
   { id: 'luxuryRealEstate', labelKey: 'atmosphere.style.luxuryRealEstate' },
-  { id: 'painterly', labelKey: 'atmosphere.style.painterly' },
+  { id: 'competitionVisual', labelKey: 'atmosphere.style.competitionVisual' },
+  { id: 'conceptAtmosphere', labelKey: 'atmosphere.style.conceptAtmosphere' },
+  { id: 'commercialAd', labelKey: 'atmosphere.style.commercialAd' },
 ];
+
+const EXTERIOR_RENDER_LEGACY_STYLE_MAP: Readonly<Record<string, ExteriorRenderAtmosphereStyle | null>> = {
+  photoreal: 'photoreal',
+  photorealistic: 'photoreal',
+  '照片般真实': 'photoreal',
+  '照片真实': 'photoreal',
+  luxuryRealEstate: 'luxuryRealEstate',
+  luxury: 'luxuryRealEstate',
+  '高端地产': 'luxuryRealEstate',
+  competitionVisual: 'competitionVisual',
+  '竞赛表现': 'competitionVisual',
+  conceptAtmosphere: 'conceptAtmosphere',
+  dramaticConcept: 'conceptAtmosphere',
+  painterly: 'conceptAtmosphere',
+  '概念戏剧': 'conceptAtmosphere',
+  '绘画感': 'conceptAtmosphere',
+  '概念氛围': 'conceptAtmosphere',
+  commercialAd: 'commercialAd',
+  '商业广告': 'commercialAd',
+  nordic: null,
+  '北欧氛围': null,
+};
+
+export function normalizeExteriorRenderAtmosphereStyle(value: unknown): ExteriorRenderAtmosphereStyle | null {
+  if (typeof value !== 'string') return null;
+  return EXTERIOR_RENDER_LEGACY_STYLE_MAP[value] ?? null;
+}
 
 export const EXTERIOR_RENDER_TOGGLE_OPTIONS = [
   { key: 'addEntourage', labelKey: 'atmosphere.toggles.addEntourage.label' },

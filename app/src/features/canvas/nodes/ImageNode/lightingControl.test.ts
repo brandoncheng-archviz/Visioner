@@ -40,6 +40,32 @@ describe('ImageNode lighting control', () => {
     expect(preview.derived.previewImagePath).toContain('/assets/sun-sky/matrix-preview/');
   });
 
+  it('can disable lighting without discarding the configured parameters', () => {
+    const draft = {
+      timePeriod: 'evening' as const,
+      elevation: 12,
+      azimuth: 55,
+      cloudAmount: 37,
+      fogAmount: 21,
+      presetId: 'golden-hour',
+    };
+
+    const disabledPreview = createImageLightingPreview(draft, false);
+    const restoredPreview = createImageLightingPreview(createImageLightingDraft(disabledPreview), true);
+
+    expect(disabledPreview.enabled).toBe(false);
+    expect(disabledPreview.sun).toEqual({ elevation: 12, azimuth: 55 });
+    expect(disabledPreview.settings).toEqual(expect.objectContaining({
+      cloudAmountValue: 37,
+      fogAmountValue: 21,
+      lightingPresetId: 'golden-hour',
+    }));
+    expect(restoredPreview).toEqual(expect.objectContaining({
+      enabled: true,
+      sun: { elevation: 12, azimuth: 55 },
+    }));
+  });
+
   it('keeps cloud and fog values out of the rendered direction preview', () => {
     const clearPreview = createImageLightingPreview({
       timePeriod: 'afternoon',

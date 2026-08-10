@@ -9,6 +9,7 @@ export interface SunSkyNodeControlsProps {
   azimuthLabel?: string;
   showRangeLabels?: boolean;
   layout?: 'inline' | 'stacked';
+  disabled?: boolean;
   onElevationChange: (value: number) => void;
   onAzimuthChange: (value: number) => void;
 }
@@ -21,6 +22,7 @@ export function SunSkyNodeControls({
   azimuthLabel = '太阳方位',
   showRangeLabels = true,
   layout = 'inline',
+  disabled = false,
   onElevationChange,
   onAzimuthChange,
 }: SunSkyNodeControlsProps) {
@@ -40,6 +42,7 @@ export function SunSkyNodeControls({
         maxLabel="90°"
         stacked={stacked}
         showRangeLabels={showRangeLabels}
+        disabled={disabled}
         onChange={onElevationChange}
       />
       <div className={stacked ? 'my-2 h-px bg-white/[0.045]' : 'h-px bg-white/[0.06]'} />
@@ -56,6 +59,7 @@ export function SunSkyNodeControls({
         extraValue={stacked ? undefined : directionLabel}
         stacked={stacked}
         showRangeLabels={showRangeLabels}
+        disabled={disabled}
         onChange={onAzimuthChange}
       />
     </div>
@@ -75,6 +79,7 @@ function SunSlider({
   extraValue,
   stacked = false,
   showRangeLabels = true,
+  disabled = false,
   onChange,
 }: {
   icon: React.ReactNode;
@@ -89,6 +94,7 @@ function SunSlider({
   extraValue?: string;
   stacked?: boolean;
   showRangeLabels?: boolean;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   const percent = ((value - min) / (max - min)) * 100;
@@ -104,6 +110,7 @@ function SunSlider({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
         onWheel={stopSliderEvent}
         onPointerDown={stopSliderEvent}
@@ -111,7 +118,7 @@ function SunSlider({
         onMouseDown={stopSliderEvent}
         onTouchStart={stopSliderEvent}
         onTouchMove={stopSliderEvent}
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-full"
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full disabled:cursor-not-allowed"
         style={{
           background: `linear-gradient(to right, #208cff 0%, #208cff ${percent}%, rgba(255,255,255,0.12) ${percent}%, rgba(255,255,255,0.12) 100%)`,
         }}

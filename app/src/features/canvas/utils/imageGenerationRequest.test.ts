@@ -249,6 +249,54 @@ describe('buildImageGenerationRequest', () => {
     expect(request.lighting?.sun).not.toBe(lightPreview.sun);
   });
 
+  it('omits disabled lighting while retaining the caller-owned settings', () => {
+    const lightPreview = {
+      enabled: false,
+      sun: { elevation: 12, azimuth: 55 },
+      settings: {
+        cloudAmount: 'fewClouds' as const,
+        fogLevel: 'light' as const,
+        cloudAmountValue: 37,
+        fogAmountValue: 21,
+        timePeriod: 'evening' as const,
+      },
+      derived: {
+        timeLabel: '黄金时刻',
+        directionLabel: '右后方光',
+        skyTopColor: '#000000',
+        skyHorizonColor: '#000000',
+        sunColor: '#ffffff',
+        colorTemp: 4200,
+        sunIntensity: 1,
+        shadowDirection: 235,
+        shadowLengthScale: 0.8,
+        shadowBlur: 8,
+        shadowOpacity: 0.5,
+        shadowLengthLabel: '长阴影',
+        shadowBlurLabel: '标准',
+        skyLabel: '暖色地平线',
+        summary: '黄金时刻光影',
+        promptText: 'warm evening sun and sky lighting',
+        previewImagePath: '/assets/sun-sky/matrix-preview/example.webp',
+      },
+    };
+
+    const request = buildImageGenerationRequest({
+      nodeId: 'image-node-1',
+      prompt: '建筑效果图',
+      userPrompt: '建筑效果图',
+      inputRefs: [],
+      modelParams: baseModelParams,
+      lightPreview,
+    });
+
+    expect(request.lighting).toBeUndefined();
+    expect(lightPreview).toEqual(expect.objectContaining({
+      enabled: false,
+      sun: { elevation: 12, azimuth: 55 },
+    }));
+  });
+
   it('does not mutate caller-owned node data, references or prompt blocks', () => {
     const nodeData = {
       prompt: '生成住宅效果图',

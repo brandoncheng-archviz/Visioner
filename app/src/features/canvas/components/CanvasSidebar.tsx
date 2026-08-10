@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { GeneratedImage, ResultSetBatch } from '../types/history.types';
-import { BASIC_NODE_DEFINITIONS, BASIC_NODE_GROUPS, type BasicNodeType } from '../constants/basicNodes';
+import { BASIC_NODE_DEFINITIONS, type BasicNodeType } from '../constants/basicNodes';
 import { stopCanvasWheelPropagation } from '../utils/canvasEvents';
 
 function TextNodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
@@ -183,34 +183,24 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
           </div>
           <div className="p-4">
             {activePanel === 'add' && (
-              <div className="space-y-3">
-                {BASIC_NODE_GROUPS.map((group) => {
-                  const items = BASIC_NODE_DEFINITIONS.filter((item) => item.group === group.id);
-                  if (items.length === 0) return null;
-
+              <div className="space-y-1">
+                {BASIC_NODE_DEFINITIONS.map((item) => {
+                  const ItemIcon = basicNodeIcons[item.type];
                   return (
-                    <div key={group.id} className="space-y-1.5">
-                      <p className="px-1 text-[11px] font-medium uppercase tracking-wider text-white/[0.42]">{t(group.labelKey)}</p>
-                      {items.map((item) => {
-                        const ItemIcon = basicNodeIcons[item.type];
-                        return (
-                          <button
-                            key={item.type}
-                            onClick={() => onAddNode(item.type)}
-                            className="w-full flex items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
-                            style={{ color: 'rgba(255,255,255,0.78)' }}
-                          >
-                            <span
-                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.035]"
-                              style={{ color: 'rgba(255,255,255,0.72)' }}
-                            >
-                              <ItemIcon className="w-4 h-4" />
-                            </span>
-                            <span className="min-w-0 truncate text-sm font-medium">{t(item.labelKey)}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <button
+                      key={item.type}
+                      onClick={() => onAddNode(item.type)}
+                      className="w-full flex items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:bg-white/[0.06] active:bg-white/[0.08]"
+                      style={{ color: 'rgba(255,255,255,0.78)' }}
+                    >
+                      <span
+                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.035]"
+                        style={{ color: 'rgba(255,255,255,0.72)' }}
+                      >
+                        <ItemIcon className="w-4 h-4" />
+                      </span>
+                      <span className="min-w-0 truncate text-sm font-medium">{t(item.labelKey)}</span>
+                    </button>
                   );
                 })}
               </div>

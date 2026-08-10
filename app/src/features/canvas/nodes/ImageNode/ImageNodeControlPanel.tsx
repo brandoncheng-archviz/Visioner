@@ -1719,8 +1719,7 @@ export function ImageNodeControlPanel({
                 anchorElement={lightingButtonElement}
                 value={lightPreview}
                 disabled={!canEditLighting}
-                onApply={onLightPreviewChange}
-                onClear={() => onLightPreviewChange(null)}
+                onChange={onLightPreviewChange}
                 onOpenChange={setShowLightPreview}
               />
             )}

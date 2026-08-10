@@ -185,11 +185,11 @@ const enUS = {
     },
     weather: { sunny: "Sunny", cloudy: "Cloudy", rainy: "Rainy", snowy: "Snowy", foggy: "Foggy" },
     style: {
-      photorealistic: "Photorealistic",
-      nordic: "Nordic",
-      dramaticConcept: "Dramatic Concept",
+      photoreal: "Photoreal",
       luxuryRealEstate: "Luxury Real Estate",
-      painterly: "Painterly",
+      competitionVisual: "Competition Visual",
+      conceptAtmosphere: "Concept Atmosphere",
+      commercialAd: "Commercial Ad",
     },
     title: "Atmosphere",
     toggles: {
@@ -380,6 +380,8 @@ const enUS = {
       header: "Lighting Control",
       subtitle: "Lightweight sun and sky system",
       custom: "Custom",
+      currentSettings: "Current setup",
+      followOriginal: "Follow original image",
       preview: {
         title: "Light Direction Preview",
         alt: "Light direction and elevation preview",

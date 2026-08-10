@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Aperture, ChevronDown, ChevronUp, ScanLine, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Switch } from '@/components/ui/switch';
-import { CANVAS_NODE_CARD_SELECTED_BORDER_COLOR } from '../../constants/canvasConstants';
 import type {
   CameraAperture,
   CameraControlData,
@@ -18,6 +16,7 @@ import {
 import { CameraPositionIcon } from './CameraPositionIcon';
 import { CameraHeightGuide } from './CameraHeightGuide';
 import { CameraApertureGuide, CameraFocalLengthGuide } from './CameraOpticsGuide';
+import { ControlFooterSwitch, ControlSummaryChip, ImageNodeControlFooter } from './ImageNodeControlFooter';
 import {
   CAMERA_APERTURE_PRESETS,
   CAMERA_FOCAL_LENGTH_PRESETS,
@@ -225,29 +224,32 @@ export function CameraControlPanel({
         />
       </div>
 
-      <footer className="mx-5 mb-5 flex min-h-[62px] items-center gap-4 rounded-xl border border-white/[0.07] bg-white/[0.018] px-3.5 py-2.5">
-        <span className="shrink-0 text-[12px] font-medium text-white/48">{t('imageNode.camera.currentConfiguration')}</span>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 transition-opacity duration-200" style={{ opacity: camera.enabled ? 1 : 0.25 }}>
-          <SummaryChip>{t(CAMERA_HEIGHT_OPTIONS.find((option) => option.value === camera.height)?.label ?? CAMERA_HEIGHT_OPTIONS[2].label)}</SummaryChip>
-          <SummaryChip>{camera.focalLength}mm</SummaryChip>
-          <SummaryChip>{camera.aperture}</SummaryChip>
-          {camera.twoPointPerspective && <SummaryChip muted>{t('imageNode.camera.twoPointPerspective')}</SummaryChip>}
-        </div>
-        <div className="flex shrink-0 items-center gap-5 border-l border-white/[0.06] pl-4">
-          <CameraSwitch
-            label={t('imageNode.camera.twoPointPerspective')}
-            checked={camera.twoPointPerspective}
-            disabled={parameterDisabled}
-            onCheckedChange={(checked) => update('twoPointPerspective', checked)}
-          />
-          <CameraSwitch
-            label={t('imageNode.camera.cameraControl')}
-            checked={camera.enabled}
-            disabled={disabled}
-            onCheckedChange={(checked) => update('enabled', checked)}
-          />
-        </div>
-      </footer>
+      <ImageNodeControlFooter
+        label={t('imageNode.camera.currentConfiguration')}
+        summaryOpacity={camera.enabled ? 1 : 0.25}
+        className="mx-5 mb-5"
+        controls={(
+          <>
+            <ControlFooterSwitch
+              label={t('imageNode.camera.twoPointPerspective')}
+              checked={camera.twoPointPerspective}
+              disabled={parameterDisabled}
+              onCheckedChange={(checked) => update('twoPointPerspective', checked)}
+            />
+            <ControlFooterSwitch
+              label={t('imageNode.camera.cameraControl')}
+              checked={camera.enabled}
+              disabled={disabled}
+              onCheckedChange={(checked) => update('enabled', checked)}
+            />
+          </>
+        )}
+      >
+        <ControlSummaryChip>{t(CAMERA_HEIGHT_OPTIONS.find((option) => option.value === camera.height)?.label ?? CAMERA_HEIGHT_OPTIONS[2].label)}</ControlSummaryChip>
+        <ControlSummaryChip>{camera.focalLength}mm</ControlSummaryChip>
+        <ControlSummaryChip>{camera.aperture}</ControlSummaryChip>
+        {camera.twoPointPerspective && <ControlSummaryChip muted>{t('imageNode.camera.twoPointPerspective')}</ControlSummaryChip>}
+      </ImageNodeControlFooter>
     </div>
   );
 }
@@ -395,24 +397,6 @@ function stepCameraValue(
   }
   const option = optionAtStep(APERTURE_OPTIONS, camera.aperture, step);
   return option ? { ...camera, aperture: option.value } : camera;
-}
-
-function CameraSwitch({ label, checked, disabled, onCheckedChange }: { label: string; checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void }) {
-  return (
-    <label className={`flex items-center gap-2.5 text-[12px] ${disabled ? 'text-white/30' : 'text-white/62'}`}>
-      <span className="whitespace-nowrap">{label}</span>
-      <Switch
-        checked={checked}
-        disabled={disabled}
-        onCheckedChange={onCheckedChange}
-        style={{ background: checked ? CANVAS_NODE_CARD_SELECTED_BORDER_COLOR : 'rgba(255,255,255,0.12)' }}
-      />
-    </label>
-  );
-}
-
-function SummaryChip({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <span className={`rounded-md border px-2 py-1 text-[12px] ${muted ? 'border-white/[0.06] bg-transparent text-white/44' : 'border-white/[0.08] bg-white/[0.035] text-white/72'}`}>{children}</span>;
 }
 
 function LensIcon() {

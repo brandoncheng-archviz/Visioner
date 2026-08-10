@@ -185,11 +185,11 @@ const zhCN = {
     },
     weather: { sunny: "晴天", cloudy: "阴天", rainy: "雨天", snowy: "雪天", foggy: "雾天" },
     style: {
-      photorealistic: "照片般真实",
-      nordic: "北欧氛围",
-      dramaticConcept: "概念戏剧",
+      photoreal: "照片真实",
       luxuryRealEstate: "高端地产",
-      painterly: "绘画感",
+      competitionVisual: "竞赛表现",
+      conceptAtmosphere: "概念氛围",
+      commercialAd: "商业广告",
     },
     title: "氛围",
     toggles: {
@@ -380,6 +380,8 @@ const zhCN = {
       header: "光影控制",
       subtitle: "轻量太阳与天空系统",
       custom: "自定义",
+      currentSettings: "当前设置",
+      followOriginal: "跟随原图",
       preview: {
         title: "光向预览",
         alt: "光线方向与高度预览",

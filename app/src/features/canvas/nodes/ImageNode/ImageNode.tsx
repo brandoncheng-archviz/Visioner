@@ -229,7 +229,12 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         prev?.enabled === next?.enabled &&
         prev?.sun.elevation === next?.sun.elevation &&
         prev?.sun.azimuth === next?.sun.azimuth &&
-        prev?.derived.previewImagePath === next?.derived.previewImagePath
+        prev?.settings?.timePeriod === next?.settings?.timePeriod &&
+        prev?.settings?.cloudAmountValue === next?.settings?.cloudAmountValue &&
+        prev?.settings?.fogAmountValue === next?.settings?.fogAmountValue &&
+        prev?.settings?.lightingPresetId === next?.settings?.lightingPresetId &&
+        prev?.derived.previewImagePath === next?.derived.previewImagePath &&
+        prev?.derived.promptText === next?.derived.promptText
       ) {
         return prev;
       }

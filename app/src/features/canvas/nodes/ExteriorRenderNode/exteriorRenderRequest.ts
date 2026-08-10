@@ -14,6 +14,7 @@ import {
   getResolutionTier,
   validateRequestedSize,
 } from '../../utils/modelParams';
+import { normalizeExteriorRenderAtmosphereStyle } from './exteriorRenderAtmosphereOptions';
 
 function resolveReferenceRole(image: ExteriorRenderConnectedImage): 'primaryBuilding' | 'atmosphere' | 'local' | 'unassigned' {
   if (image.role === 'primary_building') return 'primaryBuilding';
@@ -24,6 +25,12 @@ function resolveReferenceRole(image: ExteriorRenderConnectedImage): 'primaryBuil
 
 function resolveAtmosphereValue(option: ExteriorRenderAtmosphereOption | undefined): string | null {
   if (option?.source === 'manual' && option.value) return option.value;
+  if (option?.source === 'followReference') return 'followReference';
+  return null;
+}
+
+function resolveAtmosphereStyleValue(option: ExteriorRenderAtmosphereOption | undefined): string | null {
+  if (option?.source === 'manual') return normalizeExteriorRenderAtmosphereStyle(option.value);
   if (option?.source === 'followReference') return 'followReference';
   return null;
 }
@@ -94,7 +101,7 @@ export function buildExteriorRenderRequest(
       time: resolveAtmosphereValue(atmosphere.time),
       lighting: resolveAtmosphereValue(atmosphere.light),
       weather: resolveAtmosphereValue(atmosphere.weather),
-      style: resolveAtmosphereValue(atmosphere.style),
+      style: resolveAtmosphereStyleValue(atmosphere.style),
     },
     prompt: data.prompt || '',
     modelParams: {

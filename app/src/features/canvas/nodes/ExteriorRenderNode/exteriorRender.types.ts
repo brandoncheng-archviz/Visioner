@@ -6,7 +6,12 @@ export type ExteriorRenderAtmosphereSource = 'unset' | 'followReference' | 'manu
 export type ExteriorRenderAtmosphereTime = 'sunrise' | 'earlyMorning' | 'noon' | 'afternoon' | 'sunset' | 'night';
 export type ExteriorRenderAtmosphereLighting = 'front' | 'back' | 'left' | 'right' | 'softSky';
 export type ExteriorRenderAtmosphereWeather = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'foggy';
-export type ExteriorRenderAtmosphereStyle = 'photorealistic' | 'nordic' | 'dramaticConcept' | 'luxuryRealEstate' | 'painterly';
+export type ExteriorRenderAtmosphereStyle =
+  | 'photoreal'
+  | 'luxuryRealEstate'
+  | 'competitionVisual'
+  | 'conceptAtmosphere'
+  | 'commercialAd';
 export type ExteriorRenderAtmosphereValue =
   | ExteriorRenderAtmosphereTime
   | ExteriorRenderAtmosphereLighting
