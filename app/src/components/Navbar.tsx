@@ -25,13 +25,19 @@ import UpgradePanel from './UpgradePanel';
 import RechargeModal from './RechargeModal';
 import TeamModal from './TeamModal';
 import { fetchCreditBalance, type CreditBalance } from '@/services/accountApi';
+import {
+  CurrentProjectMenu,
+  VisionerGlobalMenu,
+  type CanvasNavigationActions,
+} from './CanvasGlobalMenu';
 
 interface NavbarProps {
-  variant?: 'home' | 'canvas';
+  variant?: 'home' | 'canvas' | 'projects';
   projectName?: string;
+  canvasActions?: CanvasNavigationActions;
 }
 
-export default function Navbar({ variant = 'home', projectName = '' }: NavbarProps) {
+export default function Navbar({ variant = 'home', projectName = '', canvasActions }: NavbarProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -78,20 +84,17 @@ export default function Navbar({ variant = 'home', projectName = '' }: NavbarPro
       }}
     >
       {/* Left */}
-      <div className="flex items-center gap-4 pointer-events-auto">
-        <button
-          onClick={() => navigate('/')}
-          className="text-white font-bold text-lg tracking-tight hover:opacity-80 transition-opacity"
-        >
-          Visioner
-        </button>
-        {isCanvas && (
-          <>
-            <span className="text-[#6a6a7a] text-sm">|</span>
-            <button className="text-[#a0a0b0] text-sm hover:text-white transition-colors flex items-center gap-1">
-              {projectName || t('common.unnamed')}
-            </button>
-          </>
+      <div className="flex items-center gap-2 pointer-events-auto">
+        <VisionerGlobalMenu actions={canvasActions ?? { onHelp: () => setHelpOpen(true) }} />
+        {isCanvas ? (
+          <CurrentProjectMenu projectName={projectName} actions={canvasActions} />
+        ) : (
+          <button
+            onClick={() => navigate('/')}
+            className="text-white font-bold text-lg tracking-tight hover:opacity-80 transition-opacity"
+          >
+            Visioner
+          </button>
         )}
       </div>
 

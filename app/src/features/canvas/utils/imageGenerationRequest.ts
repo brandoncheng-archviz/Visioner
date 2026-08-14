@@ -10,6 +10,7 @@ import {
   getResolutionTier,
   validateRequestedSize,
 } from './modelParams';
+import { normalizeImageModelId } from './imageModelId';
 
 export interface BuildImageGenerationRequestInput {
   nodeId: string;
@@ -83,7 +84,7 @@ export function buildImageGenerationRequest({
       promptText: mark.promptText,
     })),
     modelParams: {
-      model: modelParams.model,
+      model: normalizeImageModelId(modelParams.model),
       aspectRatio: modelParams.ratio,
       resolution: modelParams.resolution,
       resolutionTier,

@@ -36,9 +36,10 @@ export interface CanvasSidebarProps {
   onSetActivePanel: (panel: string | null) => void;
   onAddNode: (type: string) => void;
   onUseHistoryImages?: (images: GeneratedImage[], sourceBatch?: ResultSetBatch) => void;
+  showLauncher?: boolean;
 }
 
-export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseHistoryImages }: CanvasSidebarProps) {
+export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseHistoryImages, showLauncher = true }: CanvasSidebarProps) {
   const { t } = useTranslation();
   const isHistoryOpen = activePanel === 'history';
   const basicNodeIcons: Record<BasicNodeType, typeof Image> = {
@@ -73,7 +74,7 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
   return (
     <>
       {/* Left Sidebar Pill */}
-      <div className="fixed left-3 top-1/2 -translate-y-1/2 z-20">
+      {showLauncher && <div className="fixed left-3 top-1/2 -translate-y-1/2 z-20">
         <div
           className="flex flex-col items-center py-3 gap-2 rounded-2xl"
           style={{
@@ -119,7 +120,7 @@ export function CanvasSidebar({ activePanel, onSetActivePanel, onAddNode, onUseH
             B
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Side Panel */}
       {isHistoryOpen && (

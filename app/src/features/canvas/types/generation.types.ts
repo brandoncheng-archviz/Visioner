@@ -44,6 +44,11 @@ export interface GenerationInput {
 
 export type ImageGenerationCount = 1 | 2 | 4;
 
+export type ImageModelId =
+  | 'gpt-image-2'
+  | 'nano-banana-2'
+  | 'nano-banana-pro';
+
 export interface ImageGenerationRequest {
   nodeId: string;
   prompt: string;
@@ -64,7 +69,7 @@ export interface ImageGenerationRequest {
     promptText: string;
   }>;
   modelParams: {
-    model: string;
+    model: ImageModelId;
     aspectRatio: string;
     resolution: string;
     resolutionTier: OutputResolutionTier;
@@ -135,3 +140,10 @@ export interface GenerationHistoryItem {
 export interface GenerationCallbacks {
   onProgress?: (progress: number) => void;
 }
+
+export type ImageGenerationErrorCode =
+  | 'cancelled'
+  | 'timeout'
+  | 'serviceUnavailable'
+  | 'invalidInput'
+  | 'safetyCheckFailed';

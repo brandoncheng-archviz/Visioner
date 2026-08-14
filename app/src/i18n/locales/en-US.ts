@@ -1300,6 +1300,41 @@ const enUS = {
     deleteProject: "Delete Project",
   },
 
+  globalMenu: {
+    open: "Open Visioner menu",
+    home: "Home",
+    projects: "Project Library",
+    newProject: "New Project",
+    importImage: "Import Image",
+    historyAssets: "History Assets",
+    duplicateObject: "Duplicate Object",
+    helpFeedback: "Help & Feedback",
+  },
+
+  projectLibrary: {
+    title: "Project Library",
+    subtitle: "{{count}} projects",
+    searchPlaceholder: "Search project names",
+    newProject: "New Project",
+    emptyProject: "Empty project",
+    noResults: "No matching projects found",
+    updatedAt: "Updated {{date}}",
+    setCover: "Set as Cover",
+    exportProject: "Export Project",
+    renamePrompt: "Enter a new project name",
+    deleteConfirm: "Delete “{{name}}”? This action cannot be undone.",
+    copySuffix: "Copy",
+    sort: {
+      updated: "Recently Updated",
+      created: "Recently Created",
+      name: "Name A–Z",
+    },
+    view: {
+      grid: "Grid view",
+      list: "List view",
+    },
+  },
+
   gallery: {
     gallery: "Gallery",
     searchWorks: "Search works or designers",

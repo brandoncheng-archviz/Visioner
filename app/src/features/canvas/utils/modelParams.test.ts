@@ -104,6 +104,7 @@ describe('shared model parameter sizing', () => {
     });
 
     expect(imageRequest.modelParams.requestedSize).toEqual({ width: 1638, height: 2048 });
+    expect(imageRequest.modelParams.model).toBe('nano-banana-2');
     expect(exteriorRequest.modelParams.requestedSize).toEqual(imageRequest.modelParams.requestedSize);
     expect(imageRequest.modelParams.aspectRatio).toBe('4:5');
     expect(exteriorRequest.modelParams.aspectRatio).toBe('4:5');

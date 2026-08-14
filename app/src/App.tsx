@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import CanvasPage from './pages/CanvasPage';
+import ProjectLibrary from './pages/ProjectLibrary';
 
 function App() {
   useEffect(() => {
@@ -27,6 +28,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/projects" element={<ProjectLibrary />} />
         <Route path="/canvas" element={<CanvasPage />} />
         <Route path="/canvas/:projectId" element={<CanvasPage />} />
       </Routes>

@@ -3,7 +3,7 @@ export type ImageModelResolution = '1K' | '2K' | '4K';
 export type ImageModelCount = 1 | 2 | 4;
 
 export type ImageModelOption = {
-  id: string;
+  id: ImageModelId;
   label: string;
   provider: ImageModelProvider;
   iconText: string;
@@ -18,7 +18,7 @@ export type ImageModelOption = {
 // TODO: Adjust these options to the actual model capabilities when the real API is connected.
 export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   {
-    id: 'Nano Banana 2',
+    id: 'nano-banana-2',
     label: 'Nano Banana 2',
     provider: 'google',
     iconText: 'NB',
@@ -30,7 +30,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
     costBase: 14,
   },
   {
-    id: 'Nano Banana Pro',
+    id: 'nano-banana-pro',
     label: 'Nano Banana Pro',
     provider: 'google',
     iconText: 'NB',
@@ -42,7 +42,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
     costBase: 14,
   },
   {
-    id: 'GPT Image 2',
+    id: 'gpt-image-2',
     label: 'GPT Image 2',
     provider: 'openai',
     iconText: 'AI',
@@ -56,5 +56,8 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
 ];
 
 export function getImageModelOption(modelId: string | undefined) {
-  return IMAGE_MODEL_OPTIONS.find((option) => option.id === modelId) ?? IMAGE_MODEL_OPTIONS[0];
+  const normalizedModelId = normalizeImageModelId(modelId);
+  return IMAGE_MODEL_OPTIONS.find((option) => option.id === normalizedModelId) ?? IMAGE_MODEL_OPTIONS[0];
 }
+import type { ImageModelId } from '../types/generation.types';
+import { normalizeImageModelId } from '../utils/imageModelId';

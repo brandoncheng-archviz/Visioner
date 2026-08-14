@@ -48,7 +48,7 @@ export const MARK_ACTION_COLORS: Record<MarkAction, string> = {
 };
 
 export const DEFAULT_MODEL_PARAMS: ModelParams = {
-  model: 'Nano Banana 2',
+  model: 'nano-banana-2',
   ratio: '1:1',
   resolution: '2K',
   lens: '标准',

@@ -5,6 +5,7 @@ import type {
   LocalReferenceType,
   ReferenceInfo,
 } from '../types/imageNode.types';
+import type { ImageControllerState } from '../types/imageController.types';
 import {
   buildPromptSubmission,
   createImageReferenceBlock,
@@ -142,5 +143,25 @@ describe('reference prompt classification', () => {
       promptText: editedPrompt,
       promptTextEdited: true,
     }));
+  });
+
+  it('preserves the controller state in structured submission output', () => {
+    const controller: ImageControllerState = {
+      toggles: {
+        addEnvironment: true,
+        addPeople: false,
+        indoorLighting: true,
+        motionBlur: false,
+      },
+      time: 'dusk',
+      lightDirection: 'left_side_light',
+      weather: 'cloudy',
+      season: null,
+      style: 'premium_real_estate',
+    };
+
+    const result = buildPromptSubmission('', [], [], null, [], null, controller);
+
+    expect(result.controller?.state).toEqual(controller);
   });
 });

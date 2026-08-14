@@ -1,4 +1,4 @@
-import type { GenerationHistoryItem } from '../types/generation.types';
+import { normalizeGeneratedImages } from '../types/imageNodeData.types';
 
 export interface ResolvedNodeImage {
   imageUrl: string;
@@ -66,28 +66,4 @@ export function resolveNodeImage(data: unknown): ResolvedNodeImage | null {
   }
 
   return null;
-}
-
-function normalizeGeneratedImages(value: unknown): GenerationHistoryItem[] {
-  if (!Array.isArray(value) || value.length === 0) return [];
-  if (typeof value[0] === 'string') {
-    const baseTime = Date.now();
-    return (value as string[]).map((url, index) => ({
-      resultId: `legacy-${baseTime}-${index}`,
-      batchId: `legacy-batch-${baseTime}`,
-      batchIndex: index + 1,
-      imageUrl: url,
-      prompt: '',
-      userPrompt: '',
-      inputRefs: [],
-      presetIds: [],
-      styleId: null,
-      modelParams: { model: 'Nano Banana 2', ratio: '1:1', resolution: '2K', lens: '标准', count: '1张' },
-      seed: 0,
-      width: 1024,
-      height: 1024,
-      createdAt: baseTime + index,
-    }));
-  }
-  return value as GenerationHistoryItem[];
 }

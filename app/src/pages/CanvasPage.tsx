@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   useNodesState,
   useReactFlow,
@@ -12,7 +12,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useTranslation } from 'react-i18next';
 import Navbar from '../components/Navbar';
-import { getProjectCanvasData, recentProjects } from '../data/siteData';
+import { getProjectCanvasData, type CanvasNodeType } from '../data/siteData';
 import { useToast } from '../features/canvas/hooks/useToast';
 import { useCanvasKeyboardShortcuts } from '../features/canvas/hooks/useCanvasKeyboardShortcuts';
 import { useCanvasSelectionActions } from '../features/canvas/hooks/useCanvasSelectionActions';
@@ -88,6 +88,15 @@ import {
 } from '../features/canvas/utils/textNodeUtils';
 import { getCurrentImage } from '../features/canvas/types/imageNodeData.types';
 import { resolveNodeImage } from '../features/canvas/utils/resolveNodeImage';
+import { normalizeImageModelParams } from '../features/canvas/utils/imageModelId';
+import {
+  createProject,
+  getProjectRecord,
+  markProjectCoverAsUsed,
+  renameProject,
+  updateAutomaticProjectCover,
+} from '../features/projects/projectLibrary';
+import { resolveAutomaticProjectCover } from '../features/projects/projectCover';
 import {
   CREATE_NODE_MENU_TOP_OFFSET,
   CREATE_NODE_MENU_VIEWPORT_PADDING,
@@ -122,7 +131,7 @@ function createGeneratedNodeDataFromHistoryImage(image: GeneratedImage, batch?: 
   const prompt = batch?.prompt || '';
   const userPrompt = batch?.userPrompt || '';
   const inputRefs = batch?.inputRefs || [];
-  const modelParams = batch?.modelParams || { ...DEFAULT_MODEL_PARAMS };
+  const modelParams = normalizeImageModelParams(batch?.modelParams || { ...DEFAULT_MODEL_PARAMS });
   const lightPreview = batch?.lightPreview ?? null;
   const result = {
     taskId: image.resultId,
@@ -220,14 +229,20 @@ function getPromptReferenceSourceNodeIds(data: Node['data']) {
 
 function FlowCanvas() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { projectId } = useParams<{ projectId?: string }>();
-  const projectName = useMemo(() => {
+  const resolvedProjectName = useMemo(() => {
     if (!projectId || projectId === 'new') return t('canvas.unnamedProject');
-    return recentProjects.find((p) => p.id === projectId)?.name || t('canvas.unnamedProject');
+    return getProjectRecord(projectId)?.name || t('canvas.unnamedProject');
   }, [projectId, t]);
+  const [projectName, setProjectName] = useState(resolvedProjectName);
+
+  useEffect(() => setProjectName(resolvedProjectName), [resolvedProjectName]);
 
   const defaultData = useMemo(() => {
     if (!projectId || projectId === 'new') return getProjectCanvasData('new');
+    const project = getProjectRecord(projectId);
+    if (project?.canvasNodes) return { nodes: project.canvasNodes };
     return getProjectCanvasData(projectId);
   }, [projectId]);
 
@@ -235,6 +250,12 @@ function FlowCanvas() {
   const { screenToFlowPosition, setViewport, getViewport, getNodes, fitView } = useReactFlow();
   const { msg: toastMsg, show: showToast } = useToast();
   const lastPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const globalImageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!projectId || projectId === 'new') return;
+    updateAutomaticProjectCover(projectId, resolveAutomaticProjectCover(nodes));
+  }, [nodes, projectId]);
 
   const {
     activePanel, setActivePanel,
@@ -1429,7 +1450,7 @@ function FlowCanvas() {
     const connectedEdges = currentEdges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
     return removeComposeTextInputEdges(connectedEdges, currentNodes);
   }, []);
-  const { undo, redo, beginNodeDrag, endNodeDrag } = useCanvasUndoRedo({
+  const { undo, redo, canUndo, canRedo, beginNodeDrag, endNodeDrag } = useCanvasUndoRedo({
     nodes,
     edges,
     setNodes,
@@ -1971,6 +1992,7 @@ function FlowCanvas() {
     if (!historyPanelNodeId || images.length === 0) return;
 
     const selectedImage = images[0];
+    if (projectId && projectId !== 'new') markProjectCoverAsUsed(projectId, selectedImage.imageUrl);
     const generatedNodeData = createGeneratedNodeDataFromHistoryImage(selectedImage, sourceBatch);
     setNodes((nds) =>
       nds.map((node) =>
@@ -1985,10 +2007,12 @@ function FlowCanvas() {
           : node,
       ),
     );
-  }, [historyPanelNodeId, setNodes]);
+  }, [historyPanelNodeId, projectId, setNodes]);
 
   const handleUseGlobalHistoryImages = useCallback((images: GeneratedImage[], sourceBatch?: ResultSetBatch, sourceBatches?: ResultSetBatch[]) => {
     if (images.length === 0) return;
+
+    if (projectId && projectId !== 'new') markProjectCoverAsUsed(projectId, images[0].imageUrl);
 
     const viewportCenter = screenToFlowPosition({
       x: window.innerWidth / 2,
@@ -2032,12 +2056,86 @@ function FlowCanvas() {
       ...nds.map((node) => ({ ...node, selected: false })),
       ...newNodes,
     ]);
-  }, [getAllNodeLabels, getViewport, screenToFlowPosition, setNodes]);
+  }, [getAllNodeLabels, getViewport, projectId, screenToFlowPosition, setNodes]);
+
+  const handleCreateProject = useCallback(() => {
+    const project = createProject(t('canvas.unnamedProject'));
+    setNodes([]);
+    setEdges([]);
+    setProjectName(project.name);
+    navigate(`/canvas/${project.id}`);
+  }, [navigate, setEdges, setNodes, t]);
+
+  const handleRenameProject = useCallback((name: string) => {
+    setProjectName(name);
+    if (projectId && projectId !== 'new') renameProject(projectId, name);
+  }, [projectId]);
+
+  const handleDuplicateProject = useCallback(() => {
+    const copiedNodes = structuredClone(nodes) as unknown as CanvasNodeType[];
+    const project = createProject(`${projectName} ${t('projectLibrary.copySuffix')}`, copiedNodes);
+    setNodes((currentNodes) => structuredClone(currentNodes));
+    setEdges((currentEdges) => structuredClone(currentEdges));
+    setProjectName(project.name);
+    navigate(`/canvas/${project.id}`);
+  }, [navigate, nodes, projectName, setEdges, setNodes, t]);
+
+  const handleExportProject = useCallback(() => {
+    const payload = {
+      id: projectId || 'new',
+      name: projectName,
+      exportedAt: new Date().toISOString(),
+      nodes,
+      edges,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${projectName || 'visioner-project'}.visioner.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [edges, nodes, projectId, projectName]);
+
+  const handleDuplicateSelectedObjects = useCallback(() => {
+    if (copyNodes() > 0) pasteNodes();
+  }, [copyNodes, pasteNodes]);
 
   return (
     <div className="fixed inset-0 h-screen w-screen overflow-hidden" style={{ background: '#000' }}>
       <GlobalDropForwarder />
-      <Navbar variant="canvas" projectName={projectName} />
+      <Navbar
+        variant="canvas"
+        projectName={projectName}
+        canvasActions={{
+          onNewProject: handleCreateProject,
+          onImportImage: () => globalImageInputRef.current?.click(),
+          onOpenHistory: () => setActivePanel('history'),
+          onUndo: undo,
+          onRedo: redo,
+          onDuplicate: handleDuplicateSelectedObjects,
+          onHelp: toggleHelp,
+          onRenameProject: handleRenameProject,
+          onDuplicateProject: handleDuplicateProject,
+          onExportProject: handleExportProject,
+          canUndo,
+          canRedo,
+          canDuplicate: nodes.some((node) => node.selected),
+        }}
+      />
+      <input
+        ref={globalImageInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          if (event.target.files?.length) {
+            handleDropFiles(event.target.files, window.innerWidth / 2, window.innerHeight / 2);
+          }
+          event.currentTarget.value = '';
+        }}
+      />
 
       <CanvasFlowStyles />
 
@@ -2075,6 +2173,7 @@ function FlowCanvas() {
         onSetActivePanel={setActivePanel}
         onAddNode={addNode}
         onUseHistoryImages={handleUseGlobalHistoryImages}
+        showLauncher={false}
       />
 
       {selectedTextNode && (

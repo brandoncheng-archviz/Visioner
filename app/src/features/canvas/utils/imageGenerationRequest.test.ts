@@ -42,7 +42,7 @@ describe('buildImageGenerationRequest', () => {
       inputRefs: [],
       markRefs: undefined,
       modelParams: {
-        model: 'Nano Banana 2',
+        model: 'nano-banana-2',
         aspectRatio: '16:9',
         resolution: '2K',
         resolutionTier: '2K',
@@ -161,7 +161,7 @@ describe('buildImageGenerationRequest', () => {
     });
 
     expect(request.modelParams).toEqual({
-      model: 'Nano Banana 2',
+      model: 'nano-banana-2',
       aspectRatio: '16:9',
       resolution: '2K',
       resolutionTier: '2K',

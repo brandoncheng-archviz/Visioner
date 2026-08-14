@@ -5,6 +5,7 @@ import type { LightPreviewData } from './lightPreview.types';
 import type { CurrentResultSet } from './history.types';
 import type { ImageControllerState } from './imageController.types';
 import type { OutputResolutionTier, OutputSize } from '../utils/modelParams';
+import { normalizeImageModelParams } from '../utils/imageModelId';
 
 export type CameraHeight = 'low' | 'eyeLevel' | 'slightlyHigh' | 'semiBirdsEye' | 'birdsEye' | 'aerial';
 export type CameraFocalLength = 16 | 24 | 35 | 50 | 85 | 100;
@@ -176,12 +177,15 @@ export function normalizeGeneratedImages(value: unknown): GenerationHistoryItem[
       inputRefs: [],
       presetIds: [],
       styleId: null,
-      modelParams: { model: 'Nano Banana 2', ratio: '1:1', resolution: '2K', lens: '标准', count: '1张' },
+      modelParams: { model: 'nano-banana-2', ratio: '1:1', resolution: '2K', lens: '标准', count: '1张' },
       seed: 0,
       width: 1024,
       height: 1024,
       createdAt: baseTime + index,
     }));
   }
-  return value as GenerationHistoryItem[];
+  return (value as GenerationHistoryItem[]).map((item) => ({
+    ...item,
+    modelParams: normalizeImageModelParams(item.modelParams),
+  }));
 }

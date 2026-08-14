@@ -10,7 +10,7 @@ export type MockGenerationErrorCode =
   | 'invalidInput'
   | 'safetyCheckFailed';
 
-class MockGenerationError extends Error {
+export class MockGenerationError extends Error {
   readonly code: MockGenerationErrorCode;
 
   constructor(code: MockGenerationErrorCode) {
@@ -38,7 +38,7 @@ function createMockResult(input: GenerationInput): GenerationResult {
     seed: Math.floor(Math.random() * 1000000),
     metadata: {
       prompt: input.prompt,
-      model: input.modelParams?.model || 'Nano Banana 2',
+      model: input.modelParams?.model || 'nano-banana-2',
       resolution: input.modelParams?.resolution || '2K',
     },
   };

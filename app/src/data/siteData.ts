@@ -21,6 +21,8 @@ export interface ProjectItem {
   name: string;
   thumbnail?: string;
   date?: string;
+  createdAt?: string;
+  updatedAt?: string;
   isCreateNew?: boolean;
   canvasNodes?: CanvasNodeType[];
 }
@@ -235,6 +237,20 @@ export const recentProjects: ProjectItem[] = [
     thumbnail: '/images/show-cover-4.jpg',
     date: '2026/04/15',
     canvasNodes: landscapeProjectNodes,
+  },
+  {
+    id: 'museum-01',
+    name: '文化展馆概念方案',
+    thumbnail: '/images/show-cover-7.jpg',
+    date: '2026/04/12',
+    canvasNodes: [],
+  },
+  {
+    id: 'office-01',
+    name: '总部办公建筑研究',
+    thumbnail: '/images/show-cover-6.jpg',
+    date: '2026/04/08',
+    canvasNodes: [],
   },
 ];
 

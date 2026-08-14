@@ -7,7 +7,8 @@ import { useToast } from '../../hooks/useToast';
 import type { ImageMark, ImageRole, PromptContent, ReferenceInfo, LocalReferencePoint, LocalReferenceType } from '../../types/imageNode.types';
 import type { ModelParams } from '../../types/canvas.types';
 import type { LightPreviewData } from '../../types/lightPreview.types';
-import type { GenerationTask, GenerationHistoryItem } from '../../types/generation.types';
+import type { GenerationTask, GenerationHistoryItem, ImageGenerationErrorCode } from '../../types/generation.types';
+import type { ImageControllerState } from '../../types/imageController.types';
 import type { CurrentResultSet, ResultSetBatch, GeneratedImage } from '../../types/history.types';
 import type { TextReferenceInfo, TextNodeData } from '../../types/basicNode.types';
 import {
@@ -22,10 +23,8 @@ import {
 import { useHistory } from '../../contexts/HistoryContext';
 import {
   createGenerationTask,
-  getMockGenerationErrorCode,
-  simulateGeneration,
-  type MockGenerationErrorCode,
 } from '../../utils/mockGenerationTask';
+import { getImageGenerationErrorCode, imageGenerationService } from '../../services/imageGenerationService';
 import { checkGenerationRequestSafety, checkGenerationResultSafety } from '../../utils/contentSafety';
 import {
   CANVAS_NODE_CARD_BACKGROUND,
@@ -65,8 +64,9 @@ import {
   resolveOutputSize,
   validateRequestedSize,
 } from '../../utils/modelParams';
+import { normalizeImageModelParams } from '../../utils/imageModelId';
 
-const MOCK_GENERATION_ERROR_KEYS: Record<MockGenerationErrorCode, string> = {
+const GENERATION_ERROR_KEYS: Record<ImageGenerationErrorCode, string> = {
   cancelled: 'imageNode.errors.cancelled',
   timeout: 'imageNode.errors.timeout',
   serviceUnavailable: 'imageNode.errors.serviceUnavailable',
@@ -140,12 +140,26 @@ export function ImageNode({ data, selected, id }: NodeProps) {
   const [selectedPresets] = useState<string[]>((data.selectedPresets as string[]) || []);
   const [selectedStyleId] = useState<string | null>((data.selectedStyleId as string | null | undefined) || null);
   const workflowSource = data.sourceWorkflow as ExteriorRenderWorkflowSource | undefined;
-  const [modelParams, setModelParams] = useState<ModelParams>((data.modelParams as ModelParams) || DEFAULT_MODEL_PARAMS);
+  const controller = data.controller as ImageControllerState | undefined;
+  const [modelParams, setModelParams] = useState<ModelParams>(() => normalizeImageModelParams(
+    (data.modelParams as ModelParams | undefined) || DEFAULT_MODEL_PARAMS,
+  ));
   const [generatedImages, setGeneratedImages] = useState<GenerationHistoryItem[]>(normalizeGeneratedImages(data.generatedImages));
   const [generationTask, setGenerationTask] = useState<GenerationTask | null>(getNodeGenerationTask(data));
 
   /* ─── Current Result Set ─── */
   const { addBatch } = useHistory();
+
+  useEffect(() => {
+    const storedModelParams = data.modelParams as ModelParams | undefined;
+    if (!storedModelParams) return;
+    const normalizedModelParams = normalizeImageModelParams(storedModelParams);
+    if (normalizedModelParams.model === storedModelParams.model) return;
+    setNodes((nds) => nds.map((node) => (node.id === id ? {
+      ...node,
+      data: { ...node.data, modelParams: normalizedModelParams },
+    } : node)));
+  }, [data.modelParams, id, setNodes]);
 
   const legacyCurrentResultSet = useMemo((): CurrentResultSet | null => {
     const legacy = normalizeGeneratedImages(data.generatedImages);
@@ -565,7 +579,25 @@ export function ImageNode({ data, selected, id }: NodeProps) {
     const promptWithTextReferences = [textReferencePrompt, promptText]
       .filter((value) => value.trim().length > 0)
       .join('\n\n');
-    const { textPrompt, imageReferences, referenceImages, markReferences, promptBlocks, userPrompt, globalStyle, presets } = buildPromptSubmission(promptWithTextReferences, promptContent, selectedPresets, selectedStyle, references, lightPreview);
+    const {
+      textPrompt,
+      imageReferences,
+      referenceImages,
+      markReferences,
+      promptBlocks,
+      userPrompt,
+      globalStyle,
+      presets,
+      controller: submissionController,
+    } = buildPromptSubmission(
+      promptWithTextReferences,
+      promptContent,
+      selectedPresets,
+      selectedStyle,
+      references,
+      lightPreview,
+      controller,
+    );
     const resolutionTier = getResolutionTier(modelParams.resolutionTier ?? modelParams.resolution);
     const adaptiveSourceSize = references.find((reference) => (
       typeof reference.width === 'number'
@@ -703,38 +735,17 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         inputRefs: task.inputRefs,
         markRefs: task.markRefs,
         modelParams: generationModelParams,
+        controller: submissionController,
         lightPreview,
         style: globalStyle,
         presets: selectedPresets,
       });
-      const count = generationRequest.modelParams.count;
-      const results: import('../../types/generation.types').GenerationResult[] = [];
-
-      for (let i = 0; i < count; i++) {
-        const result = await simulateGeneration(
-          {
-            sourceNodeId: generationRequest.nodeId,
-            prompt: generationRequest.prompt,
-            inputRefs: task.inputRefs,
-            markRefs: task.markRefs,
-            modelParams: {
-              model: generationRequest.modelParams.model,
-              ratio: generationRequest.modelParams.aspectRatio,
-              resolution: generationRequest.modelParams.resolution,
-              resolutionTier: generationRequest.modelParams.resolutionTier,
-              requestedSize: generationRequest.modelParams.requestedSize,
-            },
-          },
-          {
-            onProgress: (progress) => {
-              const overall = Math.floor(((i + progress / 100) / count) * 100);
-              setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress: overall, updatedAt: Date.now() } : prev));
-            },
-          },
-          generationAbortController.signal,
-        );
-        results.push(result);
-      }
+      const results = await imageGenerationService.generate(generationRequest, {
+        onProgress: (progress) => {
+          setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, progress, updatedAt: Date.now() } : prev));
+        },
+        signal: generationAbortController.signal,
+      });
 
       if (results.length > 0) {
         const resultSafety = await checkGenerationResultSafety({
@@ -872,9 +883,9 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     } catch (err) {
-      const errorCode = getMockGenerationErrorCode(err);
+      const errorCode = getImageGenerationErrorCode(err);
       const errorMessage = errorCode
-        ? t(MOCK_GENERATION_ERROR_KEYS[errorCode])
+        ? t(GENERATION_ERROR_KEYS[errorCode])
         : t('imageNode.errors.generationFailed');
       setGenerationTask((prev) => (prev && prev.taskId === task.taskId ? { ...prev, status: 'failed', errorMessage, updatedAt: Date.now() } : prev));
       setNodes((nds) =>
@@ -893,7 +904,7 @@ export function ImageNode({ data, selected, id }: NodeProps) {
         ),
       );
     }
-  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, currentResultSet, addBatch, buildHistoryBatchFromCurrentResultSet, t, imgSize]);
+  }, [hasGenerationIntent, promptText, promptContent, selectedPresets, selectedStyle, selectedStyleId, references, textReferencePrompt, generatedImages, id, setNodes, modelParams, showToast, lightPreview, controller, currentResultSet, addBatch, buildHistoryBatchFromCurrentResultSet, t, imgSize]);
 
   const handleGenerate = useCallback(() => {
     if (!canGenerate) {
@@ -923,14 +934,15 @@ export function ImageNode({ data, selected, id }: NodeProps) {
 
   const handleModelParamsChange = (params: ModelParams) => {
     if (!imageNodeViewModel.canEditModel) return;
-    setModelParams(params);
+    const normalizedParams = normalizeImageModelParams(params);
+    setModelParams(normalizedParams);
     setNodes((nds) => nds.map((n) => (n.id === id ? {
       ...n,
       data: {
         ...n.data,
-        modelParams: params,
-        resolutionTier: params.resolutionTier,
-        requestedSize: params.requestedSize,
+        modelParams: normalizedParams,
+        resolutionTier: normalizedParams.resolutionTier,
+        requestedSize: normalizedParams.requestedSize,
       },
     } : n)));
   };

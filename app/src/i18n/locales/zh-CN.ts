@@ -1300,6 +1300,41 @@ const zhCN = {
     deleteProject: "删除项目",
   },
 
+  globalMenu: {
+    open: "打开 Visioner 菜单",
+    home: "首页",
+    projects: "项目库",
+    newProject: "新建项目",
+    importImage: "导入图片",
+    historyAssets: "历史资产",
+    duplicateObject: "复制对象",
+    helpFeedback: "帮助与反馈",
+  },
+
+  projectLibrary: {
+    title: "项目库",
+    subtitle: "共 {{count}} 个项目",
+    searchPlaceholder: "搜索项目名称",
+    newProject: "新建项目",
+    emptyProject: "空项目",
+    noResults: "没有找到匹配的项目",
+    updatedAt: "最近更新 {{date}}",
+    setCover: "设为封面",
+    exportProject: "导出项目",
+    renamePrompt: "输入新的项目名称",
+    deleteConfirm: "确定删除“{{name}}”吗？此操作无法恢复。",
+    copySuffix: "副本",
+    sort: {
+      updated: "最近更新",
+      created: "最近创建",
+      name: "名称 A–Z",
+    },
+    view: {
+      grid: "网格视图",
+      list: "列表视图",
+    },
+  },
+
   gallery: {
     gallery: "作品库",
     searchWorks: "搜索作品或设计师",
