@@ -1450,7 +1450,7 @@ function FlowCanvas() {
     const connectedEdges = currentEdges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
     return removeComposeTextInputEdges(connectedEdges, currentNodes);
   }, []);
-  const { undo, redo, canUndo, canRedo, beginNodeDrag, endNodeDrag } = useCanvasUndoRedo({
+  const { undo, redo, beginNodeDrag, endNodeDrag } = useCanvasUndoRedo({
     nodes,
     edges,
     setNodes,
@@ -2097,10 +2097,6 @@ function FlowCanvas() {
     URL.revokeObjectURL(url);
   }, [edges, nodes, projectId, projectName]);
 
-  const handleDuplicateSelectedObjects = useCallback(() => {
-    if (copyNodes() > 0) pasteNodes();
-  }, [copyNodes, pasteNodes]);
-
   return (
     <div className="fixed inset-0 h-screen w-screen overflow-hidden" style={{ background: '#000' }}>
       <GlobalDropForwarder />
@@ -2111,16 +2107,9 @@ function FlowCanvas() {
           onNewProject: handleCreateProject,
           onImportImage: () => globalImageInputRef.current?.click(),
           onOpenHistory: () => setActivePanel('history'),
-          onUndo: undo,
-          onRedo: redo,
-          onDuplicate: handleDuplicateSelectedObjects,
-          onHelp: toggleHelp,
           onRenameProject: handleRenameProject,
           onDuplicateProject: handleDuplicateProject,
           onExportProject: handleExportProject,
-          canUndo,
-          canRedo,
-          canDuplicate: nodes.some((node) => node.selected),
         }}
       />
       <input

@@ -103,10 +103,11 @@ describe('imageGenerationService', () => {
   });
 
   it('normalizes cancellation to the stable generation error code', async () => {
-    const simulator = vi.fn(async () => {
+    const controller = new AbortController();
+    const simulator = vi.fn(async (_input, _callbacks, signal) => {
+      expect(signal).toBe(controller.signal);
       throw new MockGenerationError('cancelled');
     });
-    const controller = new AbortController();
     controller.abort();
     const service = createImageGenerationService(createMockImageGenerationTransport(simulator));
 
@@ -128,6 +129,22 @@ describe('imageGenerationService', () => {
 
     await expect(timeoutService.generate(request)).rejects.toMatchObject({ code: 'timeout' });
     await expect(unknownService.generate(request)).rejects.toMatchObject({ code: 'serviceUnavailable' });
+  });
+
+  it('returns batch results through the same service contract without changing ImageNode runtime count', async () => {
+    const secondResult = { ...result, taskId: 'result-2', imageUrl: '/result-2.png' };
+    const simulator = vi.fn()
+      .mockResolvedValueOnce(result)
+      .mockResolvedValueOnce(secondResult);
+    const service = createImageGenerationService(createMockImageGenerationTransport(simulator));
+    const batchRequest: ImageGenerationRequest = {
+      ...request,
+      modelParams: { ...request.modelParams, count: 2 },
+    };
+
+    await expect(service.generate(batchRequest)).resolves.toEqual([result, secondResult]);
+    expect(simulator).toHaveBeenCalledTimes(2);
+    expect(request.modelParams.count).toBe(1);
   });
 
   it('keeps the current ImageNode runtime count at one result', async () => {

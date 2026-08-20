@@ -1307,8 +1307,6 @@ const zhCN = {
     newProject: "新建项目",
     importImage: "导入图片",
     historyAssets: "历史资产",
-    duplicateObject: "复制对象",
-    helpFeedback: "帮助与反馈",
   },
 
   projectLibrary: {

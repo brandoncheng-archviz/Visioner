@@ -4,24 +4,19 @@ import { useTranslation } from 'react-i18next';
 import {
   ChevronDown,
   Copy,
-  CopyPlus,
   Download,
   FolderKanban,
-  HelpCircle,
   History,
   House,
   ImagePlus,
   Pencil,
   Plus,
-  Redo2,
-  Undo2,
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -29,16 +24,9 @@ export interface CanvasNavigationActions {
   onNewProject?: () => void;
   onImportImage?: () => void;
   onOpenHistory?: () => void;
-  onUndo?: () => void;
-  onRedo?: () => void;
-  onDuplicate?: () => void;
-  onHelp?: () => void;
   onRenameProject?: (name: string) => void;
   onDuplicateProject?: () => void;
   onExportProject?: () => void;
-  canUndo?: boolean;
-  canRedo?: boolean;
-  canDuplicate?: boolean;
 }
 
 const menuContentClass = 'w-56 border-white/[0.08] bg-[#252526] p-1.5 text-white shadow-2xl';
@@ -63,6 +51,12 @@ export function VisionerGlobalMenu({ actions }: { actions?: CanvasNavigationActi
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={8} className={menuContentClass}>
+        <div className="flex items-center gap-2.5 px-2.5 pb-2 pt-1.5 text-[13px] font-semibold text-white/90">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg border border-white/[0.10] bg-[#1e1e28] text-[11px] font-bold text-white">
+            V
+          </span>
+          <span>Visioner</span>
+        </div>
         <DropdownMenuItem onSelect={() => navigate('/')} className={`${menuItemClass} ${isHome ? 'bg-[#8b5cf6]/12 text-[#c4b5fd]' : ''}`}>
           <House />{t('globalMenu.home')}
         </DropdownMenuItem>
@@ -82,20 +76,6 @@ export function VisionerGlobalMenu({ actions }: { actions?: CanvasNavigationActi
         <DropdownMenuSeparator className="mx-2 bg-white/[0.08]" />
         <DropdownMenuItem disabled={!actions?.onOpenHistory} onSelect={actions?.onOpenHistory} className={menuItemClass}>
           <History />{t('globalMenu.historyAssets')}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator className="mx-2 bg-white/[0.08]" />
-        <DropdownMenuItem disabled={!actions?.onUndo || !actions.canUndo} onSelect={actions?.onUndo} className={menuItemClass}>
-          <Undo2 />{t('toolbar.undo')}<DropdownMenuShortcut>Ctrl Z</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!actions?.onRedo || !actions.canRedo} onSelect={actions?.onRedo} className={menuItemClass}>
-          <Redo2 />{t('toolbar.redo')}<DropdownMenuShortcut>Ctrl ⇧ Z</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!actions?.onDuplicate || !actions.canDuplicate} onSelect={actions?.onDuplicate} className={menuItemClass}>
-          <CopyPlus />{t('globalMenu.duplicateObject')}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator className="mx-2 bg-white/[0.08]" />
-        <DropdownMenuItem onSelect={actions?.onHelp} className={menuItemClass}>
-          <HelpCircle />{t('globalMenu.helpFeedback')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

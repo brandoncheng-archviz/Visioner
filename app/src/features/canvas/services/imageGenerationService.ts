@@ -4,14 +4,14 @@ import type {
   ImageGenerationRequest,
 } from '../types/generation.types';
 import {
-  createMockImageGenerationTransport,
   ImageGenerationServiceError,
   type ImageGenerationServiceOptions,
   type ImageGenerationTransport,
-} from './mockImageGenerationTransport';
+} from './imageGenerationTransport';
+import { createHttpImageGenerationTransport } from './httpImageGenerationTransport';
 
-export type { ImageGenerationServiceOptions } from './mockImageGenerationTransport';
-export { ImageGenerationServiceError } from './mockImageGenerationTransport';
+export type { ImageGenerationServiceOptions } from './imageGenerationTransport';
+export { ImageGenerationServiceError } from './imageGenerationTransport';
 
 export function getImageGenerationErrorCode(error: unknown): ImageGenerationErrorCode | null {
   return error instanceof ImageGenerationServiceError ? error.code : null;
@@ -35,5 +35,5 @@ export function createImageGenerationService(
 }
 
 export const imageGenerationService = createImageGenerationService(
-  createMockImageGenerationTransport(),
+  createHttpImageGenerationTransport(),
 );

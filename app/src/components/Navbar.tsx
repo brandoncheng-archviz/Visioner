@@ -85,7 +85,7 @@ export default function Navbar({ variant = 'home', projectName = '', canvasActio
     >
       {/* Left */}
       <div className="flex items-center gap-2 pointer-events-auto">
-        <VisionerGlobalMenu actions={canvasActions ?? { onHelp: () => setHelpOpen(true) }} />
+        <VisionerGlobalMenu actions={canvasActions} />
         {isCanvas ? (
           <CurrentProjectMenu projectName={projectName} actions={canvasActions} />
         ) : (

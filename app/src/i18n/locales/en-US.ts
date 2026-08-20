@@ -1307,8 +1307,6 @@ const enUS = {
     newProject: "New Project",
     importImage: "Import Image",
     historyAssets: "History Assets",
-    duplicateObject: "Duplicate Object",
-    helpFeedback: "Help & Feedback",
   },
 
   projectLibrary: {

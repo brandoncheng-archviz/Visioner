@@ -1,35 +1,19 @@
 import type {
   GenerationInput,
   GenerationResult,
-  ImageGenerationErrorCode,
   ImageGenerationRequest,
 } from '../types/generation.types';
 import {
   getMockGenerationErrorCode,
   simulateGeneration,
 } from '../utils/mockGenerationTask';
+import {
+  ImageGenerationServiceError,
+  type ImageGenerationTransport,
+} from './imageGenerationTransport';
 
-export type ImageGenerationServiceOptions = {
-  signal?: AbortSignal;
-  onProgress?: (progress: number) => void;
-};
-
-export interface ImageGenerationTransport {
-  generate(
-    request: ImageGenerationRequest,
-    options?: ImageGenerationServiceOptions,
-  ): Promise<GenerationResult[]>;
-}
-
-export class ImageGenerationServiceError extends Error {
-  readonly code: ImageGenerationErrorCode;
-
-  constructor(code: ImageGenerationErrorCode, options?: ErrorOptions) {
-    super(code, options);
-    this.name = 'ImageGenerationServiceError';
-    this.code = code;
-  }
-}
+export type { ImageGenerationServiceOptions, ImageGenerationTransport } from './imageGenerationTransport';
+export { ImageGenerationServiceError } from './imageGenerationTransport';
 
 type GenerationSimulator = typeof simulateGeneration;
 
