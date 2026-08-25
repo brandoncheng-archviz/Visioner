@@ -9,6 +9,7 @@ export type ImageGenerationModelRegistration = {
   internalModelId: ServerImageGenerationRequest['modelParams']['model'];
   providerId: ImageGenerationProviderId;
   providerModel: string;
+  defaultQuality: 'low' | 'medium' | 'high';
   provider: ImageGenerationProvider;
 };
 
@@ -24,6 +25,7 @@ export function createImageGenerationModelRegistry({
       internalModelId: 'gpt-image-2',
       providerId: 'openai',
       providerModel: 'gpt-image-2',
+      defaultQuality: 'medium',
       provider: openAIProvider,
     }],
   ]);

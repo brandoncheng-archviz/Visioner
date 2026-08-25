@@ -6,6 +6,7 @@ import type {
 
 export type ImageGenerationProviderOptions = {
   providerModel: string;
+  defaultQuality: 'low' | 'medium' | 'high';
   signal: AbortSignal;
 };
 

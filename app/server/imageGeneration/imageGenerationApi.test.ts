@@ -219,6 +219,8 @@ describe('image generation server', () => {
   });
 
   it('serves POST /api/image-generations through the real Node HTTP adapter', async () => {
+    const previousMode = process.env.IMAGE_GENERATION_MODE;
+    process.env.IMAGE_GENERATION_MODE = 'mock';
     const server = createServer((incoming, outgoing) => {
       void handleNodeImageGenerationRequest(incoming, outgoing);
     });
@@ -250,6 +252,8 @@ describe('image generation server', () => {
       });
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      if (previousMode === undefined) delete process.env.IMAGE_GENERATION_MODE;
+      else process.env.IMAGE_GENERATION_MODE = previousMode;
     }
   });
 

@@ -26,10 +26,17 @@ type OpenAIErrorBody = {
 };
 
 export type OpenAIImageProviderLogContext = {
-  status?: number;
-  requestId?: string | null;
-  providerCode?: string;
-  providerType?: string;
+  requestId: string;
+  model: string;
+  operation: 'generation' | 'edit';
+  referenceCount: number;
+  requestedSize: { width: number; height: number };
+  quality: 'low' | 'medium' | 'high';
+  openAIHttpStatus: number | null;
+  openAIErrorType: string | null;
+  openAIErrorCode: string | null;
+  stableErrorCode: string | null;
+  durationMs: number;
 };
 
 export type OpenAIImageProviderDependencies = {
@@ -44,6 +51,10 @@ function asSafeString(value: unknown) {
   return typeof value === 'string' ? value.slice(0, 120) : undefined;
 }
 
+function logDevelopmentDiagnostic(message: string, context: OpenAIImageProviderLogContext) {
+  if (process.env.NODE_ENV === 'development') console.info(message, context);
+}
+
 export function mapOpenAIProviderError(
   status: number,
   errorBody: OpenAIErrorBody,
@@ -53,8 +64,11 @@ export function mapOpenAIProviderError(
   const param = asSafeString(errorBody.error?.param)?.toLowerCase() || '';
 
   if (status === 408) return new ServerGenerationError('TIMEOUT', 'Image provider request timed out.');
-  if (status === 401 || status === 403 || status === 429 || status >= 500) {
+  if (status === 401 || status === 403 || status === 429) {
     return new ServerGenerationError('PROVIDER_UNAVAILABLE', 'Image provider is unavailable.');
+  }
+  if (status >= 500) {
+    return new ServerGenerationError('GENERATION_FAILED', 'Image provider failed to generate an image.');
   }
   if (status === 400 || status === 415 || status === 422) {
     if (param.includes('image') || code.includes('image') || type.includes('image')) {
@@ -71,6 +85,7 @@ function buildEditFormData(payload: OpenAIImageEditPayload) {
   formData.set('prompt', payload.prompt);
   formData.set('n', String(payload.n));
   formData.set('size', payload.size);
+  formData.set('quality', payload.quality);
   formData.set('output_format', payload.output_format);
   payload.images.forEach((image, index) => {
     const filename = image.filename || `reference-${index + 1}.png`;
@@ -117,87 +132,113 @@ export function createOpenAIImageProvider({
   apiKey = () => process.env.OPENAI_API_KEY,
   baseUrl = DEFAULT_OPENAI_BASE_URL,
   fetchImplementation = fetch,
-  logger = (message, context) => console.error(message, context),
+  logger = logDevelopmentDiagnostic,
   resultStore = createLocalGeneratedImageResultStore(),
 }: OpenAIImageProviderDependencies = {}): ImageGenerationProvider {
   return {
-    async generate(request, references, { providerModel, signal }) {
-      const key = apiKey()?.trim();
-      if (!key) throw new ServerGenerationError('PROVIDER_UNAVAILABLE', 'Image provider is not configured.');
+    async generate(request, references, { providerModel, defaultQuality, signal }) {
+      const startedAt = Date.now();
+      const requestId = randomUUID();
+      const operation = references.length > 0 ? 'edit' : 'generation';
+      let openAIHttpStatus: number | null = null;
+      let openAIErrorType: string | null = null;
+      let openAIErrorCode: string | null = null;
+      let stableErrorCode: string | null = null;
 
-      const generationPayload = mapOpenAIImageGenerationPayload(request, providerModel);
-      const isEdit = references.length > 0;
-      const editPayload = isEdit
-        ? mapOpenAIImageEditPayload(request, references, providerModel)
-        : undefined;
-      const endpoint = isEdit ? '/images/edits' : '/images/generations';
-      const headers: Record<string, string> = { authorization: `Bearer ${key}` };
-      let body: string | FormData;
-      if (editPayload) {
-        body = buildEditFormData(editPayload);
-      } else {
-        headers['content-type'] = 'application/json';
-        body = JSON.stringify(generationPayload);
-      }
-
-      let response: Response;
       try {
-        response = await fetchImplementation(`${baseUrl.replace(/\/$/, '')}${endpoint}`, {
-          method: 'POST',
-          headers,
-          body,
-          signal,
-        });
-      } catch (error) {
-        if (signal.aborted || isAbortError(error)) {
-          throw new ServerGenerationError('GENERATION_CANCELLED', 'Image generation was cancelled.', { cause: error });
+        const key = apiKey()?.trim();
+        if (!key) throw new ServerGenerationError('PROVIDER_UNAVAILABLE', 'Image provider is not configured.');
+
+        const generationPayload = mapOpenAIImageGenerationPayload(request, providerModel, defaultQuality);
+        const isEdit = references.length > 0;
+        const editPayload = isEdit
+          ? mapOpenAIImageEditPayload(request, references, providerModel, defaultQuality)
+          : undefined;
+        const endpoint = isEdit ? '/images/edits' : '/images/generations';
+        const headers: Record<string, string> = { authorization: `Bearer ${key}` };
+        let body: string | FormData;
+        if (editPayload) {
+          body = buildEditFormData(editPayload);
+        } else {
+          headers['content-type'] = 'application/json';
+          body = JSON.stringify(generationPayload);
         }
-        logger('OpenAI image request failed', {});
-        throw new ServerGenerationError('PROVIDER_UNAVAILABLE', 'Image provider is unavailable.', { cause: error });
-      }
 
-      if (!response.ok) {
-        const errorBody = await safeErrorBody(response);
-        const context = {
-          status: response.status,
-          requestId: response.headers.get('x-request-id'),
-          providerCode: asSafeString(errorBody.error?.code),
-          providerType: asSafeString(errorBody.error?.type),
-        };
-        logger('OpenAI image request rejected', context);
-        throw mapOpenAIProviderError(response.status, errorBody);
-      }
-
-      let payload: OpenAIImageResponse;
-      try {
-        payload = await response.json() as OpenAIImageResponse;
-      } catch (error) {
-        throw new ServerGenerationError('GENERATION_FAILED', 'Image provider returned an invalid response.', { cause: error });
-      }
-      if (!Array.isArray(payload.data) || payload.data.length === 0) {
-        throw new ServerGenerationError('GENERATION_FAILED', 'Image provider returned no images.');
-      }
-
-      return Promise.all(payload.data.map(async (item, index): Promise<ServerGenerationResult> => {
-        if (typeof item.b64_json !== 'string') {
-          throw new ServerGenerationError('GENERATION_FAILED', 'Image provider returned invalid image data.');
+        let response: Response;
+        try {
+          response = await fetchImplementation(`${baseUrl.replace(/\/$/, '')}${endpoint}`, {
+            method: 'POST',
+            headers,
+            body,
+            signal,
+          });
+          openAIHttpStatus = response.status;
+        } catch (error) {
+          if (signal.aborted || isAbortError(error)) {
+            throw new ServerGenerationError('GENERATION_CANCELLED', 'Image generation was cancelled.', { cause: error });
+          }
+          throw new ServerGenerationError('PROVIDER_UNAVAILABLE', 'Image provider is unavailable.', { cause: error });
         }
-        const imageBytes = decodeBase64Image(item.b64_json);
-        const actualSize = readPngSize(imageBytes);
-        const stored = await resultStore.save(imageBytes, 'png');
-        return {
-          taskId: `openai-${payload.created || Date.now()}-${index + 1}-${randomUUID()}`,
-          imageUrl: stored.imageUrl,
-          width: actualSize.width,
-          height: actualSize.height,
-          seed: 0,
-          metadata: {
-            prompt: request.prompt,
-            model: request.modelParams.model,
-            resolution: request.modelParams.resolution,
-          },
-        };
-      }));
+
+        if (!response.ok) {
+          const errorBody = await safeErrorBody(response);
+          openAIErrorCode = asSafeString(errorBody.error?.code) ?? null;
+          openAIErrorType = asSafeString(errorBody.error?.type) ?? null;
+          throw mapOpenAIProviderError(response.status, errorBody);
+        }
+
+        let payload: OpenAIImageResponse;
+        try {
+          payload = await response.json() as OpenAIImageResponse;
+        } catch (error) {
+          throw new ServerGenerationError('GENERATION_FAILED', 'Image provider returned an invalid response.', { cause: error });
+        }
+        if (!Array.isArray(payload.data) || payload.data.length === 0) {
+          throw new ServerGenerationError('GENERATION_FAILED', 'Image provider returned no images.');
+        }
+
+        return await Promise.all(payload.data.map(async (item, index): Promise<ServerGenerationResult> => {
+          if (typeof item.b64_json !== 'string') {
+            throw new ServerGenerationError('GENERATION_FAILED', 'Image provider returned invalid image data.');
+          }
+          const imageBytes = decodeBase64Image(item.b64_json);
+          const actualSize = readPngSize(imageBytes);
+          const stored = await resultStore.save(imageBytes, 'png');
+          return {
+            taskId: `openai-${payload.created || Date.now()}-${index + 1}-${randomUUID()}`,
+            imageUrl: stored.imageUrl,
+            width: actualSize.width,
+            height: actualSize.height,
+            seed: 0,
+            metadata: {
+              prompt: request.prompt,
+              model: request.modelParams.model,
+              resolution: request.modelParams.resolution,
+            },
+          };
+        }));
+      } catch (error) {
+        stableErrorCode = error instanceof ServerGenerationError ? error.code : 'GENERATION_FAILED';
+        throw error;
+      } finally {
+        try {
+          logger('OpenAI image request diagnostic', {
+            requestId,
+            model: providerModel,
+            operation,
+            referenceCount: references.length,
+            requestedSize: { ...request.modelParams.requestedSize },
+            quality: defaultQuality,
+            openAIHttpStatus,
+            openAIErrorType,
+            openAIErrorCode,
+            stableErrorCode,
+            durationMs: Date.now() - startedAt,
+          });
+        } catch {
+          // Diagnostics must never affect generation behavior.
+        }
+      }
     },
   };
 }

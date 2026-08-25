@@ -12,6 +12,9 @@ dist
 dist-ssr
 dist-server
 .visioner
+.env
+.env.*
+!.env.example
 *.local
 
 # Editor directories and files

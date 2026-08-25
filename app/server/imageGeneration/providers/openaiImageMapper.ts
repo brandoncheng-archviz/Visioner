@@ -8,6 +8,7 @@ export type OpenAIImageGenerationPayload = {
   prompt: string;
   n: number;
   size: OpenAIImageSize;
+  quality: 'low' | 'medium' | 'high';
   output_format: 'png';
 };
 
@@ -76,12 +77,14 @@ export function parseOpenAIImageSize(size: OpenAIImageSize) {
 export function mapOpenAIImageGenerationPayload(
   request: ServerImageGenerationRequest,
   providerModel: string,
+  defaultQuality: OpenAIImageGenerationPayload['quality'],
 ): OpenAIImageGenerationPayload {
   return {
     model: providerModel,
     prompt: request.prompt,
     n: request.modelParams.count,
     size: mapOpenAIImageSize(request.modelParams.requestedSize),
+    quality: defaultQuality,
     output_format: 'png',
   };
 }
@@ -90,6 +93,7 @@ export function mapOpenAIImageEditPayload(
   request: ServerImageGenerationRequest,
   references: ParsedImageReference[],
   providerModel: string,
+  defaultQuality: OpenAIImageGenerationPayload['quality'],
 ): OpenAIImageEditPayload {
   const images = references.map((reference) => {
     if (reference.source.kind !== 'file') {
@@ -109,5 +113,5 @@ export function mapOpenAIImageEditPayload(
     };
   });
 
-  return { ...mapOpenAIImageGenerationPayload(request, providerModel), images };
+  return { ...mapOpenAIImageGenerationPayload(request, providerModel, defaultQuality), images };
 }

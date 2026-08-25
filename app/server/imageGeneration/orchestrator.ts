@@ -73,6 +73,7 @@ export function createProviderImageGenerationOrchestrator(
       const registration = registry.resolve(request.modelParams.model);
       return registration.provider.generate(request, references, {
         providerModel: registration.providerModel,
+        defaultQuality: registration.defaultQuality,
         signal,
       });
     },
