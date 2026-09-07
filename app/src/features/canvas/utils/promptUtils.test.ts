@@ -64,8 +64,41 @@ describe('reference prompt classification', () => {
     ];
     const prompt = buildFromReferences(references).textPrompt;
 
-    expect(prompt).toContain(`主体建筑默认保护：${getImageReferencePromptText(references[0])}`);
-    expect(prompt).toContain(`氛围参考：${getImageReferencePromptText(references[1])}`);
+    expect(prompt).toContain('[PRIMARY SUBJECT]');
+    expect(prompt).toContain(`Primary subject instruction: ${getImageReferencePromptText(references[0])}`);
+    expect(prompt).toContain('[ATMOSPHERE / ENVIRONMENT TRANSFER]');
+    expect(prompt).toContain(`Atmosphere transfer instruction: ${getImageReferencePromptText(references[1])}`);
+  });
+
+  it('protects primary structure and camera while allowing atmosphere to rebuild original lighting', () => {
+    const primary = createReference('primary', 'primary_building', '主体建筑');
+    const atmosphere = createReference('atmosphere', 'atmosphere_reference', '氛围参考');
+    const result = buildFromReferences([primary, atmosphere]);
+
+    expect(result.referenceImages[0]?.promptText).toContain('不默认保留原图已有阴影、受光方向、曝光和色温');
+    expect(result.referenceImages[1]?.promptText).toContain('季节、天气、地面状态、植被状态、天空、光照、色温');
+    expect(result.referenceImages[1]?.promptText).toContain('迁移并应用到主体场景');
+    expect(result.referenceImages[1]?.promptText).toContain('不得复制该图的建筑内容');
+    expect(result.referenceImages[1]?.promptText).toContain('可覆盖主体建筑原图已有光影');
+    expect(result.textPrompt).toContain('统一重建建筑、地面、植物和环境的受光、背光与投影关系');
+    expect(result.textPrompt).toContain('只有用户明确要求“保留原图光影”时才保留原图光影');
+  });
+
+  it('emits mandatory environment-transfer instructions without weakening primary-subject protection', () => {
+    const result = buildFromReferences([
+      createReference('primary', 'primary_building', '主体建筑'),
+      createReference('snow', 'atmosphere_reference', '氛围参考'),
+    ]);
+
+    expect(result.textPrompt).toContain('Image 1 is the primary architectural subject and the only primary subject.');
+    expect(result.textPrompt).toContain('Do not replace or blend this building with architecture from any other reference image.');
+    expect(result.textPrompt).toContain('Image 2 is an atmosphere/environment reference, not a subject reference.');
+    expect(result.textPrompt).toContain('Do not copy, replace, or blend in its architecture or building geometry.');
+    expect(result.textPrompt).toContain('Transfer and apply only its season, weather, ground condition, vegetation condition, sky, lighting, color temperature');
+    expect(result.textPrompt).toContain('[REQUIRED TRANSFORMATION]');
+    expect(result.textPrompt).toContain('required, mandatory, and not optional');
+    expect(result.textPrompt).toContain('must visibly become a winter snow environment');
+    expect(result.textPrompt).toContain('primary architecture, geometry, camera, perspective, and composition must remain unchanged');
   });
 
   it.each<LocalReferenceType>([
@@ -111,7 +144,7 @@ describe('reference prompt classification', () => {
   });
 
   it.each([
-    ['overall_reference', undefined, '氛围参考：'],
+    ['overall_reference', undefined, '[ATMOSPHERE / ENVIRONMENT TRANSFER]'],
     ['vegetation_reference', undefined, '旧版局部参考：'],
     ['plant_reference', undefined, '旧版局部参考：'],
     ['people_reference', undefined, '旧版局部参考：'],

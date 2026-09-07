@@ -638,8 +638,8 @@ const enUS = {
       roleUpdateFailed: "Failed to update the reference role. Try again",
     },
     descriptions: {
-      primaryBuilding: "As primary building reference, AI will prioritize building mass, outline ratio, facade relationships, architectural features, and main material textures.",
-      atmosphere: "As atmosphere reference, AI will mainly reference time of day, weather, color tone, light/shadow mood, exposure, contrast and realism, without copying specific building content.",
+      primaryBuilding: "Protects only the primary building's structure and camera stability, including massing, facade relationships, window positions, silhouette boundaries, camera angle, perspective, and composition; original lighting is not preserved by default.",
+      atmosphere: "Guides only the overall atmosphere and lighting reconstruction, including time, weather, sky, brightness, color temperature, air quality, and environmental mood; it may override original lighting without changing the primary building's structure, camera, or composition.",
       material: "Use material types, surface textures, reflections, roughness, and detail quality without copying the overall building massing.",
       landscape: "Use landscape layout, planting, terrain relationships, paving, and outdoor spatial atmosphere.",
       lighting: "Use fixture language, light color, illumination intensity, contrast hierarchy, and light distribution.",

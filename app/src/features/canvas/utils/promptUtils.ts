@@ -131,10 +131,10 @@ export function getImageReferencePromptText(reference: ReferenceInfo) {
   const normalizedRole = getNormalizedRole(reference.role);
 
   if (normalizedRole === 'primary_building') {
-    return '默认保护主体建筑，保持建筑结构、体块比例、立面关系、相机角度和构图比例稳定；如果用户明确要求调整，则以用户显式意图为准。';
+    return '仅用于保护主体建筑的结构与相机稳定性：保持建筑结构、体块比例、立面关系、开窗位置、轮廓边界、相机角度、透视关系和构图比例稳定；不默认保留原图已有阴影、受光方向、曝光和色温，只有用户明确要求保留原图光影时才保留。';
   }
   if (normalizedRole === 'atmosphere_reference') {
-    return '参考整体时间段、天气状态、色调、光影氛围和画面情绪。';
+    return '将该图的季节、天气、地面状态、植被状态、天空、光照、色温、空气感和整体环境氛围迁移并应用到主体场景；不得复制该图的建筑内容，不得改变主体建筑结构、相机角度、透视关系和构图，并可覆盖主体建筑原图已有光影。';
   }
   if (normalizedRole === 'material_reference') {
     return '参考该图片中的材质类型、表面纹理、反射关系、粗糙度和细节质感。';
@@ -290,8 +290,19 @@ export function buildPromptSubmission(
 
   const sections: string[] = [];
   if (trimmedUserText) sections.push(trimmedUserText);
-  if (primaryBuilding.length) sections.push(`主体建筑默认保护：${primaryBuilding.map((block) => block.promptText).join('；')}`);
-  if (atmosphereRefs.length) sections.push(`氛围参考：${atmosphereRefs.map((block) => block.promptText).join('；')}`);
+  if (primaryBuilding.length) {
+    sections.push(`[PRIMARY SUBJECT]\n${primaryBuilding.map((block) => {
+      const imageNumber = Math.max(1, (sortedReferenceIndex.get(block.sourceNodeId) ?? 0) + 1);
+      return `Image ${imageNumber} is the primary architectural subject and the only primary subject.\nPreserve its architecture, geometry, massing proportions, facade relationships, window positions, silhouette boundaries, camera angle, perspective, and composition.\nDo not replace or blend this building with architecture from any other reference image.\nPrimary subject instruction: ${block.promptText}`;
+    }).join('\n')}`);
+  }
+  if (atmosphereRefs.length) {
+    sections.push(`[ATMOSPHERE / ENVIRONMENT TRANSFER]\n${atmosphereRefs.map((block) => {
+      const imageNumber = Math.max(1, (sortedReferenceIndex.get(block.sourceNodeId) ?? 0) + 1);
+      return `Image ${imageNumber} is an atmosphere/environment reference, not a subject reference.\nDo not copy, replace, or blend in its architecture or building geometry.\nTransfer and apply only its season, weather, ground condition, vegetation condition, sky, lighting, color temperature, atmospheric qualities, and overall environmental mood to the primary scene.\nAtmosphere transfer instruction: ${block.promptText}`;
+    }).join('\n')}`);
+    sections.push('[REQUIRED TRANSFORMATION]\nApply the atmosphere reference\'s environmental conditions to the primary scene clearly, strongly, and visibly. This environment transfer is required, mandatory, and not optional. The environment must change while the primary architecture, geometry, camera, perspective, and composition must remain unchanged. If the atmosphere reference contains a clear seasonal or weather condition, that condition must be visibly present throughout the final scene. In particular, if it contains snow or winter conditions, the final scene must visibly become a winter snow environment: apply snow cover and winter conditions consistently to the ground, vegetation, roofs and exposed horizontal surfaces where physically appropriate, and rebuild the sky, lighting, shadows, exposure, and color temperature accordingly. Do not return the original season or weather.');
+  }
   if (materialRefs.length) sections.push(`材质参考：${materialRefs.map((block) => block.promptText).join('；')}`);
   if (landscapeRefs.length) sections.push(`景观参考：${landscapeRefs.map((block) => block.promptText).join('；')}`);
   if (lightingRefs.length) sections.push(`照明参考：${lightingRefs.map((block) => block.promptText).join('；')}`);
@@ -328,7 +339,7 @@ export function buildPromptSubmission(
     sections.push('维度控制约束：参考图按各自用途控制对应内容维度；风格持续作用于整体画面表现层，不无故破坏主体建筑、氛围、材质、景观、照明和室内空间等内容约束；普通增强型预设不覆盖参考图约束，修改型预设与用户明确手写指令可覆盖对应维度。');
   }
   if (trimmedUserText || primaryBuilding.length || atmosphereRefs.length || imageMarkBlocks.length || controllerPrompt.fragments.length) {
-    sections.push('最终规则：用户手写提示词为最高优先级；用户修改过的参考说明、标记说明和手动设置的氛围控制均属于用户显式意图，优先于系统默认。主体建筑仅做默认保护，默认保持结构、体块比例、立面关系、相机角度和构图比例稳定；如果用户显式要求改变建筑，则以用户显式意图为准。标记属于局部指令，在其标记区域内优先于全局氛围控制和氛围参考；全局增强开关关闭不禁止局部标记指令。氛围控制器只覆盖用户主动选择或开启的对应维度，未设置或跟随参考的维度不生成额外覆盖约束。');
+    sections.push('最终规则：用户手写提示词为最高优先级；用户修改过的参考说明、标记说明和手动设置的氛围控制均属于用户显式意图，优先于系统默认。主体建筑默认只保护结构与相机稳定性，保持结构、体块比例、立面关系、开窗位置、轮廓边界、相机角度、透视关系和构图比例稳定，不默认保护原图光影；如果用户显式要求改变建筑，则以用户显式意图为准。氛围参考、光影控制或用户指定的新时间、天气、光照方向可覆盖主体建筑原图已有阴影、受光方向、曝光和色温，并应按新氛围统一重建建筑、地面、植物和环境的受光、背光与投影关系，避免双重光影和光向冲突，但不得因此改变受保护的结构、相机与构图。只有用户明确要求“保留原图光影”时才保留原图光影。标记属于局部指令，在其标记区域内优先于全局氛围控制和氛围参考；全局增强开关关闭不禁止局部标记指令。氛围控制器只覆盖用户主动选择或开启的对应维度，未设置或跟随参考的维度不生成额外覆盖约束。');
   }
 
   return {

@@ -70,7 +70,7 @@ export const imageRoleOptions: ImageRoleOption[] = [
     labelKey: 'reference.roles.primaryBuilding',
     descriptionKey: 'reference.roles.primaryBuilding',
     detailKey: 'reference.descriptions.primaryBuilding',
-    constraints: ['buildingMass', 'outlineRatio', 'facadeLanguage', 'windowRhythm', 'buildingFeature', 'mainMaterialTexture'],
+    constraints: ['buildingMass', 'outlineRatio', 'facadeLanguage', 'windowRhythm', 'outlineBoundary', 'cameraAngle', 'perspective', 'compositionRatio'],
     Icon: Building2,
     color: '#3B82F6',
   },
